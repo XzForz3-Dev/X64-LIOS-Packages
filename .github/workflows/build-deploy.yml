@@ -1,0 +1,77 @@
+name: X64 LIOS Packages CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
+
+jobs:
+  build-and-sync:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Build Environment & SSH
+        run: |
+          pacman -Syu --noconfirm rsync openssh git sudo
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 169.58.73.67 >> ~/.ssh/known_hosts
+          
+          # Crear usuario sin privilegios para makepkg
+          useradd -m -G wheel builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder .
+
+      - name: Download Current Repo Database
+        run: |
+          echo "Descargando base de datos actual del VPS para no sobrescribir paquetes antiguos..."
+          rsync -avz root@169.58.73.67:/var/www/x64-repo/x86_64/x64-repo.db.tar.gz ./ || echo "No DB found. Creating a new one."
+          chown builder:builder x64-repo.db.tar.gz || true
+
+      - name: Build Packages (makepkg)
+        run: |
+          su builder -c "
+            mkdir -p build_output
+            shopt -s nullglob
+            for dir in */ ; do
+              if [ -f \"\${dir}PKGBUILD\" ]; then
+                echo \"Compilando paquete en \${dir}...\"
+                cd \"\${dir}\"
+                # Instalar dependencias faltantes automáticamente y compilar
+                makepkg -s --noconfirm
+                mv *.pkg.tar.zst ../build_output/ 2>/dev/null || true
+                cd ..
+              fi
+            done
+          "
+
+      - name: Update Pacman Database (repo-add)
+        run: |
+          su builder -c "
+            shopt -s nullglob
+            pkgs=(build_output/*.pkg.tar.zst)
+            if [ \${#pkgs[@]} -gt 0 ]; then
+              echo \"Registrando nuevos paquetes en la base de datos...\"
+              cp x64-repo.db.tar.gz build_output/ 2>/dev/null || true
+              cd build_output
+              repo-add x64-repo.db.tar.gz *.pkg.tar.zst
+            else
+              echo \"No se compilaron paquetes nuevos.\"
+            fi
+          "
+
+      - name: Deploy to VPS Production
+        run: |
+          shopt -s nullglob
+          pkgs=(build_output/*.pkg.tar.zst)
+          if [ \${#pkgs[@]} -gt 0 ]; then
+            echo \"Desplegando paquetes y base de datos actualizada al VPS Contabo...\"
+            rsync -avz build_output/*.pkg.tar.zst build_output/x64-repo.db* build_output/x64-repo.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
+          else
+            echo \"Nada que desplegar.\"
+          fi

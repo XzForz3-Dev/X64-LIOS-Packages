@@ -1,0 +1,946 @@
+#!/usr/bin/env python3
+import sys
+import os
+import platform
+import webbrowser
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect, QScrollArea, QComboBox, QMenu, QWidgetAction)
+from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QAction
+from PyQt6.QtCore import Qt, QSize
+
+import locale
+
+TRANSLATIONS = {
+    "es": {
+        "Home": "Inicio",
+        "System": "Sistema",
+        "Philosophy": "Filosofía",
+        "Welcome to X64 LIOS": "Bienvenido a X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "El sistema operativo purista diseñado para el máximo rendimiento, latencia mínima y control absoluto.",
+        "Install X64 LIOS": "Instalar X64 LIOS",
+        "System Tools": "Herramientas del Sistema",
+        "Low-level utilities for advanced system configuration.": "Utilidades de bajo nivel para la configuración avanzada del sistema.",
+        "Hacker Terminal": "Terminal Hacker",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Lanza Kitty con tu perfil transparente y logotipo ASCII.",
+        "Partition Manager": "Gestor de Particiones",
+        "Open GParted to partition, format, or prepare disks.": "Abre GParted para particionar, formatear o preparar discos.",
+        "Resource Monitor": "Monitor de Recursos",
+        "Check deep CPU and RAM usage with btop.": "Revisa el uso profundo de CPU y RAM con btop.",
+        "X64 Architectural Manifesto": "Manifiesto Arquitectónico X64",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "X64 LIOS nace como la respuesta definitiva a la fragmentación de Linux. Extraemos la fuerza bruta de los kernels de alto rendimiento, la precisión del ecosistema gaming y la pureza de Arch para forjar el sistema operativo definitivo.",
+        "Architecture:": "Arquitectura:",
+        "Session:": "Sesión:",
+        "I. Absolute Freedom": "I. La Libertad Absoluta",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Pureza Upstream de Arch Linux combinada con la tienda universal Shelly. Cero PPAs, cero ataduras corporativas y el 99% del software del sistema intacto para garantizar máxima estabilidad.",
+        "II. Surgical Optimization": "II. Optimización Quirúrgica",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Kernels de máximo rendimiento compilados a medida, schedulers avanzados BORE/EEVDF, mitigaciones controladas y pre-configuraciones estrictas para Gaming de latencia ultrabaja.",
+        "III. Multi-Environment Ecosystem": "III. Ecosistema Multi-Entorno",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "El usuario forja su destino: KDE Plasma para confort, GNOME para fluidez, o Hyprland X64 para minimalismo purista con uso microscópico de RAM.",
+        "IV. Infrastructure Sovereignty": "IV. Soberanía de Infraestructura",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modelo híbrido de repositorios en cascada. Inyectamos nuestros parches encima de Arch Linux para garantizar rendimiento, sin el colosal costo de recompilar todo.",
+        "V. Hardware Mutation": "V. Mutación de Hardware",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Durante la instalación el sistema audita tu CPU: si es antigua usa paquetes genéricos a prueba de balas, si es moderna activa el Modo Turbo inyectando repositorios AVX2/AVX512 (v3/v4).",
+        "VI. Modular Architecture": "VI. Arquitectura Modular",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "Perfiles a la carta (Gaming, Hacker, Minimalista). Cero Bloatware. El ISO es un lienzo en blanco; el sistema resultante es una forja exacta de tu identidad.",
+        "VII. Shield of Resilience": "VII. Escudo de Resiliencia",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Inmutabilidad temporal con Btrfs y Snapper. Gestor de arranque gráfico rEFInd para retroceder en el tiempo tras errores críticos, eliminando el terror a las Rolling Release.",
+        "VIII. The Death of the Terminal": "VIII. La Muerte de la Terminal",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Filosofía GUI-First. El usuario promedio nunca debería necesitar abrir una terminal. Todo el poder absoluto de Arch gestionable por completo mediante interfaces gráficas.",
+        "IX. Hybrid Rolling Release": "IX. Rolling Release Híbrido",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "El núcleo del sistema vuela a velocidad Arch, pero las aplicaciones críticas pueden congelarse usando Flatpak o Distrobox para garantizar estabilidad de nivel Debian a la carta.",
+        "X. Architectural Pragmatism": "X. Pragmatismo Arquitectónico",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Sinergia Open Source. Heredamos y pulimos cimientos probados por la élite purista de Arch Linux, escribiendo código e inyectando repositorios propios donde verdaderamente aportamos valor único.",
+        "XI. Aesthetics as Function": "XI. La Estética como Función",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "El diseño no es un capricho. Un entorno hermoso y coherente inspira concentración y control. Cada píxel del sistema obedece a nuestra estricta dirección de arte Hacker-Minimalista.",
+        "XII. Absolute Privacy": "XII. Privacidad Absoluta",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "En la era de la telemetría corporativa encubierta, tu PC es tu fortaleza de cristal. Cero telemetría, cero rastreadores ocultos, cero reportes. Lo que haces en tu máquina, muere en tu máquina.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS está diseñado meticulosamente para puristas del rendimiento. Nuestra arquitectura te garantiza:",
+        "Top Gaming Performance:": "Rendimiento Top Gaming:",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latencia ultra-baja y optimizaciones de kernel para exprimir cada FPS.",
+        "Hybrid Rolling Release:": "Rolling Release Híbrido:",
+        "Explore Live Environment": "Explorar Entorno Live",
+        "Minimize this window and test the extreme performance of the live system.": "Minimiza esta ventana y prueba el rendimiento extremo del sistema en vivo.",
+        "Install the System": "Instalar el Sistema",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Lanza el instalador Calamares para instalar X64 LIOS en tu disco duro.",
+        "X64 Community": "Comunidad X64",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios es una comunidad abierta de entusiastas y desarrolladores. Únete para recibir soporte, compartir scripts y debatir.",
+        "Official Website": "Sitio Web Oficial",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Revisa la Wiki Oficial para aprender sobre módulos y atajos.",
+        "Discord Server": "Servidor de Discord",
+        "Real-time support channels and discussions.": "Canales de soporte en tiempo real y discusiones.",
+        "GitHub Repository": "Repositorio GitHub",
+        "Audit and contribute to the system's source code.": "Audita y contribuye al código fuente del sistema.",
+        "Documentation and Notes": "Documentación y Notas",
+        "Native utilities to audit and manage your hardware during Live mode.": "Utilidades nativas para auditar y gestionar tu hardware en modo Live.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Has iniciado la sesión Live. Explora el entorno de forma segura sin alterar tu disco duro, o procede con la instalación permanente del sistema.",
+        "Smart Package System:": "Sistema de Paquetes Inteligente:",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Detecta automáticamente tu procesador e instala la versión exacta adaptada para él (ya sea antigua o de última generación).",
+        "Pristine System:": "Sistema Impoluto:",
+        "Zero bloatware, returning total control of your machine back to you.": "Cero bloatware, devolviéndote el control total de tu máquina.",
+        "The freshness of Arch Linux combined with armored stability.": "La frescura de Arch Linux combinada con una estabilidad blindada.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Cero telemetría por diseño. Tus datos son exclusivamente tuyos.",
+        "Avant-garde Aesthetics:": "Estética Vanguardista:",
+        "Ultra-fluid, minimalist environments ready to choose.": "Entornos ultra-fluidos, minimalistas y listos para elegir.",
+        "Absolute Privacy:": "Privacidad Absoluta:"
+    },
+    "fr": {
+        "Home": "Accueil",
+        "System": "Système",
+        "Philosophy": "Philosophie",
+        "Welcome to X64 LIOS": "Bienvenue sur X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "Le système d'exploitation puriste conçu pour des performances maximales, une latence minimale et un contrôle absolu.",
+        "Install X64 LIOS": "Installer X64 LIOS",
+        "System Tools": "Outils Système",
+        "Low-level utilities for advanced system configuration.": "Utilitaires de bas niveau pour la configuration avancée du système.",
+        "Hacker Terminal": "Terminal Hacker",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Lancez Kitty avec votre profil transparent et votre logo ASCII.",
+        "Partition Manager": "Gestionnaire de Partitions",
+        "Open GParted to partition, format, or prepare disks.": "Ouvrez GParted pour partitionner, formater ou préparer les disques.",
+        "Resource Monitor": "Moniteur de Ressources",
+        "Check deep CPU and RAM usage with btop.": "Vérifiez l'utilisation approfondie du CPU et de la RAM avec btop.",
+        "X64 Architectural Manifesto": "Manifeste Architectural X64",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "X64 LIOS est né comme la réponse ultime à la fragmentation de Linux. Nous extrayons la puissance brute des noyaux haute performance, la précision de l'écosystème du jeu et la pureté d'Arch pour forger le système d'exploitation définitif.",
+        "Architecture:": "Architecture:",
+        "Session:": "Session:",
+        "I. Absolute Freedom": "I. Liberté Absolue",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Pureté en amont d'Arch Linux combinée au magasin universel Shelly. Zéro PPA, zéro lien d'entreprise, et 99% des logiciels système intacts pour assurer une stabilité maximale.",
+        "II. Surgical Optimization": "II. Optimisation Chirurgicale",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Noyaux haute performance compilés sur mesure, planificateurs BORE/EEVDF avancés, atténuations contrôlées et pré-configurations strictes pour un jeu à latence ultra-faible.",
+        "III. Multi-Environment Ecosystem": "III. Écosystème Multi-Environnements",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "L'utilisateur forge son destin : KDE Plasma pour le confort, GNOME pour la fluidité, ou Hyprland X64 pour le minimalisme puriste avec une utilisation microscopique de la RAM.",
+        "IV. Infrastructure Sovereignty": "IV. Souveraineté de l'Infrastructure",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modèle de dépôt hybride en cascade. Nous injectons nos patchs au-dessus d'Arch Linux pour garantir les performances, sans le coût colossal de tout recompiler.",
+        "V. Hardware Mutation": "V. Mutation Matérielle",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Lors de l'installation, le système audite votre processeur : s'il est ancien, il utilise des paquets génériques infaillibles ; s'il est moderne, il active le mode Turbo en injectant des dépôts AVX2/AVX512 (v3/v4).",
+        "VI. Modular Architecture": "VI. Architecture Modulaire",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "Profils à la carte (Gaming, Hacker, Minimaliste). Zéro Bloatware. L'ISO est une toile vierge ; le système qui en résulte est la forge exacte de votre identité.",
+        "VII. Shield of Resilience": "VII. Bouclier de Résilience",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Immutabilité temporelle avec Btrfs et Snapper. Gestionnaire de démarrage graphique rEFInd pour remonter le temps après des erreurs critiques, éliminant la peur des Rolling Releases.",
+        "VIII. The Death of the Terminal": "VIII. La Mort du Terminal",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Philosophie GUI-First. L'utilisateur moyen ne devrait jamais avoir besoin d'ouvrir un terminal. Toute la puissance absolue d'Arch gérable entièrement via des interfaces graphiques.",
+        "IX. Hybrid Rolling Release": "IX. Rolling Release Hybride",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Le cœur du système vole à la vitesse d'Arch, mais les applications critiques peuvent être gelées en utilisant Flatpak ou Distrobox pour garantir une stabilité de niveau Debian à la demande.",
+        "X. Architectural Pragmatism": "X. Pragmatisme Architectural",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Synergie Open Source. Nous héritons et peaufinons les fondations prouvées par l'élite puriste d'Arch Linux, en écrivant du code et en injectant des dépôts personnalisés uniquement là où nous ajoutons vraiment une valeur unique.",
+        "XI. Aesthetics as Function": "XI. L'Esthétique comme Fonction",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Le design n'est pas un caprice. Un environnement beau et cohérent inspire la concentration et le contrôle. Chaque pixel du système obéit à notre stricte direction artistique Hacker-Minimaliste.",
+        "XII. Absolute Privacy": "XII. Confidentialité Absolue",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "À l'ère de la télémétrie d'entreprise cachée, votre PC est votre forteresse de verre. Zéro télémétrie, zéro traceur caché, zéro rapport. Ce que vous faites sur votre machine meurt sur votre machine.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS est méticuleusement conçu pour les puristes de la performance. Notre architecture vous garantit :",
+        "Top Gaming Performance:": "Performances de Jeu Supérieures :",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latence ultra-faible et optimisations du noyau pour extraire chaque FPS.",
+        "Hybrid Rolling Release:": "Rolling Release Hybride :",
+        "Explore Live Environment": "Explorer l'Environnement Live",
+        "Minimize this window and test the extreme performance of the live system.": "Minimisez cette fenêtre et testez les performances extrêmes du système en direct.",
+        "Install the System": "Installer le Système",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Lancez l'installateur Calamares pour installer X64 LIOS sur votre disque dur.",
+        "X64 Community": "Communauté X64",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios est une communauté ouverte d'amateurs et de développeurs. Rejoignez-nous pour recevoir du soutien, partager des scripts et discuter.",
+        "Official Website": "Site Officiel",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Consultez le Wiki officiel pour en savoir plus sur les modules et les raccourcis.",
+        "Discord Server": "Serveur Discord",
+        "Real-time support channels and discussions.": "Canaux d'assistance en temps réel et discussions.",
+        "GitHub Repository": "Dépôt GitHub",
+        "Audit and contribute to the system's source code.": "Auditez et contribuez au code source du système.",
+        "Documentation and Notes": "Documentation et Notes",
+        "Native utilities to audit and manage your hardware during Live mode.": "Utilitaires natifs pour auditer et gérer votre matériel en mode Live.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Vous avez démarré la session Live. Explorez l'environnement en toute sécurité sans modifier votre disque dur, ou procédez à l'installation permanente du système.",
+        "Smart Package System:": "Système de Paquets Intelligent :",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Détecte automatiquement votre processeur et installe la version exacte adaptée (qu'il soit ancien ou de nouvelle génération).",
+        "Pristine System:": "Système Immaculé :",
+        "Zero bloatware, returning total control of your machine back to you.": "Zéro bloatware, vous redonnant le contrôle total de votre machine.",
+        "The freshness of Arch Linux combined with armored stability.": "La fraîcheur d'Arch Linux combinée à une stabilité blindée.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Zéro télémétrie par conception. Vos données vous appartiennent exclusivement.",
+        "Avant-garde Aesthetics:": "Esthétique Avant-gardiste :",
+        "Ultra-fluid, minimalist environments ready to choose.": "Des environnements ultra-fluides, minimalistes et prêts à choisir.",
+        "Absolute Privacy:": "Confidentialité Absolue :"
+    },
+    "de": {
+        "Home": "Startseite",
+        "System": "System",
+        "Philosophy": "Philosophie",
+        "Welcome to X64 LIOS": "Willkommen bei X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "Das puristische Betriebssystem für maximale Leistung, minimale Latenz und absolute Kontrolle.",
+        "Install X64 LIOS": "X64 LIOS Installieren",
+        "System Tools": "Systemwerkzeuge",
+        "Low-level utilities for advanced system configuration.": "Low-Level-Dienstprogramme für erweiterte Systemkonfiguration.",
+        "Hacker Terminal": "Hacker-Terminal",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Starten Sie Kitty mit Ihrem transparenten Profil und ASCII-Logo.",
+        "Partition Manager": "Partitionsmanager",
+        "Open GParted to partition, format, or prepare disks.": "Öffnen Sie GParted, um Festplatten zu partitionieren, zu formatieren oder vorzubereiten.",
+        "Resource Monitor": "Ressourcenmonitor",
+        "Check deep CPU and RAM usage with btop.": "Überprüfen Sie die tiefgehende CPU- und RAM-Auslastung mit btop.",
+        "X64 Architectural Manifesto": "X64 Architektur-Manifest",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "X64 LIOS wurde als ultimative Antwort auf die Linux-Fragmentierung geboren. Wir extrahieren die rohe Kraft von Hochleistungs-Kerneln, die Präzision des Gaming-Ökosystems und die Reinheit von Arch, um das definitive Betriebssystem zu schmieden.",
+        "Architecture:": "Architektur:",
+        "Session:": "Sitzung:",
+        "I. Absolute Freedom": "I. Absolute Freiheit",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Upstream-Reinheit von Arch Linux kombiniert mit dem universellen Shelly-Store. Null PPAs, null Unternehmensbindungen und 99 % der Systemsoftware intakt, um maximale Stabilität zu gewährleisten.",
+        "II. Surgical Optimization": "II. Chirurgische Optimierung",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Benutzerdefiniert kompilierte Hochleistungs-Kernel, fortschrittliche BORE/EEVDF-Scheduler, kontrollierte Mitigations und strenge Vorkonfigurationen für Spiele mit extrem niedriger Latenz.",
+        "III. Multi-Environment Ecosystem": "III. Multi-Environment-Ökosystem",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "Der Benutzer schmiedet sein Schicksal: KDE Plasma für Komfort, GNOME für Flüssigkeit oder Hyprland X64 für puristischen Minimalismus mit mikroskopischem RAM-Verbrauch.",
+        "IV. Infrastructure Sovereignty": "IV. Infrastruktur-Souveränität",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Hybrides kaskadierendes Repository-Modell. Wir injizieren unsere Patches auf Arch Linux, um die Leistung zu gewährleisten, ohne die kolossalen Kosten, alles neu kompilieren zu müssen.",
+        "V. Hardware Mutation": "V. Hardware-Mutation",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Während der Installation prüft das System Ihre CPU: Wenn sie alt ist, verwendet sie kugelsichere generische Pakete; wenn sie modern ist, aktiviert sie den Turbo-Modus, indem sie AVX2/AVX512 (v3/v4) Repositories injiziert.",
+        "VI. Modular Architecture": "VI. Modulare Architektur",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "À-la-carte-Profile (Gaming, Hacker, Minimalistisch). Zero Bloatware. Die ISO ist eine leere Leinwand; das resultierende System ist eine genaue Schmiede Ihrer Identität.",
+        "VII. Shield of Resilience": "VII. Schild der Resilienz",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Zeitliche Unveränderlichkeit mit Btrfs und Snapper. Der grafische Bootmanager rEFInd, um nach kritischen Fehlern in der Zeit zurückzuspringen und die Angst vor Rolling Releases zu beseitigen.",
+        "VIII. The Death of the Terminal": "VIII. Der Tod des Terminals",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "GUI-First-Philosophie. Der durchschnittliche Benutzer sollte niemals ein Terminal öffnen müssen. Die gesamte absolute Macht von Arch, die vollständig über grafische Benutzeroberflächen verwaltet werden kann.",
+        "IX. Hybrid Rolling Release": "IX. Hybrid Rolling Release",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Der Kern des Systems fliegt in Arch-Geschwindigkeit, aber kritische Anwendungen können mit Flatpak oder Distrobox eingefroren werden, um bei Bedarf Debian-Level-Stabilität zu gewährleisten.",
+        "X. Architectural Pragmatism": "X. Architektonischer Pragmatismus",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Open Source Synergie. Wir erben und polieren Grundlagen, die sich bei der puristischen Elite von Arch Linux bewährt haben, schreiben Code und injizieren benutzerdefinierte Repositories nur dort, wo wir wirklich einen einzigartigen Wert schaffen.",
+        "XI. Aesthetics as Function": "XI. Ästhetik als Funktion",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Design ist keine Laune. Eine schöne und kohärente Umgebung inspiriert Konzentration und Kontrolle. Jeder Pixel des Systems gehorcht unserer strengen Hacker-Minimalismus Art Direction.",
+        "XII. Absolute Privacy": "XII. Absolute Privatsphäre",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "In der Ära der verdeckten Unternehmens-Telemetrie ist Ihr PC Ihre Glasfestung. Keine Telemetrie, keine versteckten Tracker, keine Berichte. Was Sie auf Ihrer Maschine tun, stirbt auf Ihrer Maschine.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS wurde akribisch für Leistungs-Puristen entwickelt. Unsere Architektur garantiert Ihnen:",
+        "Top Gaming Performance:": "Top Gaming-Leistung:",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Extrem niedrige Latenz- und Kerneloptimierungen, um jeden FPS herauszupressen.",
+        "Hybrid Rolling Release:": "Hybrid Rolling Release:",
+        "Explore Live Environment": "Live-Umgebung Erkunden",
+        "Minimize this window and test the extreme performance of the live system.": "Minimieren Sie dieses Fenster und testen Sie die extreme Leistung des Live-Systems.",
+        "Install the System": "System Installieren",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Starten Sie das Calamares-Installationsprogramm, um X64 LIOS auf Ihrer Festplatte zu installieren.",
+        "X64 Community": "X64-Community",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios ist eine offene Gemeinschaft von Enthusiasten und Entwicklern. Treten Sie bei, um Unterstützung zu erhalten, Skripte auszutauschen und zu diskutieren.",
+        "Official Website": "Offizielle Website",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Überprüfen Sie das offizielle Wiki, um mehr über Module und Verknüpfungen zu erfahren.",
+        "Discord Server": "Discord-Server",
+        "Real-time support channels and discussions.": "Echtzeit-Supportkanäle und Diskussionen.",
+        "GitHub Repository": "GitHub-Repository",
+        "Audit and contribute to the system's source code.": "Überprüfen Sie den Quellcode des Systems und tragen Sie dazu bei.",
+        "Documentation and Notes": "Dokumentation und Notizen",
+        "Native utilities to audit and manage your hardware during Live mode.": "Native Dienstprogramme zum Überprüfen und Verwalten Ihrer Hardware während des Live-Modus.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Sie haben die Live-Sitzung gestartet. Erkunden Sie die Umgebung sicher, ohne Ihre Festplatte zu verändern, oder fahren Sie mit der dauerhaften Systeminstallation fort.",
+        "Smart Package System:": "Intelligentes Paketsystem:",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Erkennt automatisch Ihren Prozessor und installiert die genau dafür angepasste Version (egal ob alt oder Next-Generation).",
+        "Pristine System:": "Makelloses System:",
+        "Zero bloatware, returning total control of your machine back to you.": "Kein Bloatware, gibt Ihnen die volle Kontrolle über Ihre Maschine zurück.",
+        "The freshness of Arch Linux combined with armored stability.": "Die Frische von Arch Linux kombiniert mit gepanzerter Stabilität.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Keine Telemetrie durch Design. Ihre Daten gehören ausschließlich Ihnen.",
+        "Avant-garde Aesthetics:": "Avantgardistische Ästhetik:",
+        "Ultra-fluid, minimalist environments ready to choose.": "Ultra-flüssige, minimalistische Umgebungen stehen zur Auswahl.",
+        "Absolute Privacy:": "Absolute Privatsphäre:"
+    },
+    "it": {
+        "Home": "Home",
+        "System": "Sistema",
+        "Philosophy": "Filosofia",
+        "Welcome to X64 LIOS": "Benvenuti in X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "Il sistema operativo purista progettato per le massime prestazioni, minima latenza e controllo assoluto.",
+        "Install X64 LIOS": "Installa X64 LIOS",
+        "System Tools": "Strumenti di Sistema",
+        "Low-level utilities for advanced system configuration.": "Utilità di basso livello per la configurazione avanzata del sistema.",
+        "Hacker Terminal": "Terminale Hacker",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Avvia Kitty con il tuo profilo trasparente e logo ASCII.",
+        "Partition Manager": "Gestore Partizioni",
+        "Open GParted to partition, format, or prepare disks.": "Apri GParted per partizionare, formattare o preparare i dischi.",
+        "Resource Monitor": "Monitor di Risorse",
+        "Check deep CPU and RAM usage with btop.": "Controlla l'uso profondo di CPU e RAM con btop.",
+        "X64 Architectural Manifesto": "Manifesto Architettonico X64",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "X64 LIOS è nato come la risposta definitiva alla frammentazione di Linux. Estraiamo la potenza bruta dei kernel ad alte prestazioni, la precisione dell'ecosistema di gioco e la purezza di Arch per forgiare il sistema operativo definitivo.",
+        "Architecture:": "Architettura:",
+        "Session:": "Sessione:",
+        "I. Absolute Freedom": "I. Libertà Assoluta",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Purezza upstream di Arch Linux combinata con lo store universale Shelly. Zero PPA, zero legami aziendali e 99% del software di sistema intatto per garantire la massima stabilità.",
+        "II. Surgical Optimization": "II. Ottimizzazione Chirurgica",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Kernel ad alte prestazioni compilati su misura, scheduler BORE/EEVDF avanzati, mitigazioni controllate e rigide pre-configurazioni per giochi a latenza ultra-bassa.",
+        "III. Multi-Environment Ecosystem": "III. Ecosistema Multi-Ambiente",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "L'utente forgia il proprio destino: KDE Plasma per il comfort, GNOME per la fluidità o Hyprland X64 per un minimalismo purista con uso microscopico della RAM.",
+        "IV. Infrastructure Sovereignty": "IV. Sovranità dell'Infrastruttura",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modello ibrido di repository a cascata. Iniettiamo le nostre patch sopra Arch Linux per garantire prestazioni, senza il costo colossale di ricompilare tutto.",
+        "V. Hardware Mutation": "V. Mutazione Hardware",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Durante l'installazione, il sistema controlla la tua CPU: se è vecchia, usa pacchetti generici a prova di proiettile; se è moderna, attiva la modalità Turbo iniettando repository AVX2/AVX512 (v3/v4).",
+        "VI. Modular Architecture": "VI. Architettura Modulare",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "Profili à la carte (Gaming, Hacker, Minimalista). Zero Bloatware. L'ISO è una tela bianca; il sistema risultante è un'esatta forgia della tua identità.",
+        "VII. Shield of Resilience": "VII. Scudo di Resilienza",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Immutabilità temporale con Btrfs e Snapper. Gestore di avvio grafico rEFInd per tornare indietro nel tempo dopo errori critici, eliminando la paura delle Rolling Release.",
+        "VIII. The Death of the Terminal": "VIII. La Morte del Terminale",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Filosofia GUI-First. L'utente medio non dovrebbe mai aver bisogno di aprire un terminale. Tutto il potere assoluto di Arch gestibile interamente attraverso interfacce grafiche.",
+        "IX. Hybrid Rolling Release": "IX. Rolling Release Ibrido",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Il nucleo del sistema vola a velocità Arch, ma le applicazioni critiche possono essere congelate usando Flatpak o Distrobox per garantire la stabilità a livello Debian su richiesta.",
+        "X. Architectural Pragmatism": "X. Pragmatismo Architettonico",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Sinergia Open Source. Ereditiamo e perfezioniamo fondamenta provate dall'élite purista di Arch Linux, scrivendo codice e iniettando repository personalizzati solo dove aggiungiamo davvero un valore unico.",
+        "XI. Aesthetics as Function": "XI. L'Estetica come Funzione",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Il design non è un capriccio. Un ambiente bello e coerente ispira concentrazione e controllo. Ogni pixel del sistema obbedisce alla nostra rigorosa direzione artistica Hacker-Minimalista.",
+        "XII. Absolute Privacy": "XII. Privacy Assoluta",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "Nell'era della telemetria aziendale occulta, il tuo PC è la tua fortezza di vetro. Zero telemetria, zero tracker nascosti, zero rapporti. Quello che fai sulla tua macchina, muore sulla tua macchina.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS è meticolosamente progettato per i puristi delle prestazioni. La nostra architettura ti garantisce:",
+        "Top Gaming Performance:": "Prestazioni di Gioco Top:",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latenza ultra-bassa e ottimizzazioni del kernel per spremere ogni FPS.",
+        "Hybrid Rolling Release:": "Rolling Release Ibrido:",
+        "Explore Live Environment": "Esplora l'Ambiente Live",
+        "Minimize this window and test the extreme performance of the live system.": "Minimizza questa finestra e prova le prestazioni estreme del sistema live.",
+        "Install the System": "Installa il Sistema",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Avvia l'installatore Calamares per installare X64 LIOS sul tuo disco rigido.",
+        "X64 Community": "Comunità X64",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios è una comunità aperta di appassionati e sviluppatori. Unisciti per ricevere supporto, condividere script e discutere.",
+        "Official Website": "Sito Web Ufficiale",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Controlla il Wiki ufficiale per saperne di più su moduli e scorciatoie.",
+        "Discord Server": "Server Discord",
+        "Real-time support channels and discussions.": "Canali di supporto in tempo reale e discussioni.",
+        "GitHub Repository": "Repository GitHub",
+        "Audit and contribute to the system's source code.": "Verifica e contribuisci al codice sorgente del sistema.",
+        "Documentation and Notes": "Documentazione e Note",
+        "Native utilities to audit and manage your hardware during Live mode.": "Utilità native per controllare e gestire l'hardware durante la modalità Live.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Hai avviato la sessione Live. Esplora l'ambiente in sicurezza senza alterare il tuo disco rigido, o procedi con l'installazione permanente del sistema.",
+        "Smart Package System:": "Sistema di Pacchetti Intelligente:",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Rileva automaticamente il tuo processore e installa la versione esatta adattata ad esso (che sia vecchio o di ultima generazione).",
+        "Pristine System:": "Sistema Incontaminato:",
+        "Zero bloatware, returning total control of your machine back to you.": "Zero bloatware, restituendoti il controllo totale della tua macchina.",
+        "The freshness of Arch Linux combined with armored stability.": "La freschezza di Arch Linux combinata con una stabilità blindata.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Zero telemetria di progettazione. I tuoi dati sono esclusivamente tuoi.",
+        "Avant-garde Aesthetics:": "Estetica All'avanguardia:",
+        "Ultra-fluid, minimalist environments ready to choose.": "Ambienti ultra-fluidi e minimalisti pronti per essere scelti.",
+        "Absolute Privacy:": "Privacy Assoluta:"
+    },
+    "pt": {
+        "Home": "Início",
+        "System": "Sistema",
+        "Philosophy": "Filosofia",
+        "Welcome to X64 LIOS": "Bem-vindo ao X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "O sistema operacional purista projetado para máximo desempenho, latência mínima e controle absoluto.",
+        "Install X64 LIOS": "Instalar X64 LIOS",
+        "System Tools": "Ferramentas do Sistema",
+        "Low-level utilities for advanced system configuration.": "Utilitários de baixo nível para configuração avançada do sistema.",
+        "Hacker Terminal": "Terminal Hacker",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Inicie o Kitty com seu perfil transparente e logotipo ASCII.",
+        "Partition Manager": "Gerenciador de Partições",
+        "Open GParted to partition, format, or prepare disks.": "Abra o GParted para particionar, formatar ou preparar discos.",
+        "Resource Monitor": "Monitor de Recursos",
+        "Check deep CPU and RAM usage with btop.": "Verifique o uso profundo de CPU e RAM com o btop.",
+        "X64 Architectural Manifesto": "Manifesto Arquitetônico X64",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "O X64 LIOS nasceu como a resposta definitiva para a fragmentação do Linux. Extraímos a potência bruta dos kernels de alto desempenho, a precisão do ecossistema de jogos e a pureza do Arch para forjar o sistema operacional definitivo.",
+        "Architecture:": "Arquitetura:",
+        "Session:": "Sessão:",
+        "I. Absolute Freedom": "I. Liberdade Absoluta",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Pureza upstream do Arch Linux combinada com a loja universal Shelly. Zero PPAs, zero laços corporativos e 99% do software de sistema intacto para garantir estabilidade máxima.",
+        "II. Surgical Optimization": "II. Otimização Cirúrgica",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Kernels de alto desempenho compilados sob medida, agendadores BORE/EEVDF avançados, mitigações controladas e pré-configurações rigorosas para jogos de latência ultrabaixa.",
+        "III. Multi-Environment Ecosystem": "III. Ecossistema Multi-Ambiente",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "O usuário forja o seu destino: KDE Plasma para conforto, GNOME para fluidez, ou Hyprland X64 para minimalismo purista com uso microscópico de RAM.",
+        "IV. Infrastructure Sovereignty": "IV. Soberania da Infraestrutura",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modelo híbrido de repositórios em cascata. Injetamos nossos patches em cima do Arch Linux para garantir desempenho, sem o custo colossal de recompilar tudo.",
+        "V. Hardware Mutation": "V. Mutação de Hardware",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Durante a instalação, o sistema audita sua CPU: se for antiga, usa pacotes genéricos à prova de balas; se for moderna, ativa o Modo Turbo injetando repositórios AVX2/AVX512 (v3/v4).",
+        "VI. Modular Architecture": "VI. Arquitetura Modular",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "Perfis à la carte (Gaming, Hacker, Minimalista). Zero Bloatware. A ISO é uma tela em branco; o sistema resultante é uma forja exata da sua identidade.",
+        "VII. Shield of Resilience": "VII. Escudo de Resiliência",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Imutabilidade temporal com Btrfs e Snapper. Gerenciador de inicialização gráfico rEFInd para voltar no tempo após erros críticos, eliminando o medo de Rolling Releases.",
+        "VIII. The Death of the Terminal": "VIII. A Morte do Terminal",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Filosofia GUI-First. O usuário médio nunca precisará abrir um terminal. Todo o poder absoluto do Arch gerenciável inteiramente através de interfaces gráficas.",
+        "IX. Hybrid Rolling Release": "IX. Rolling Release Híbrido",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "O núcleo do sistema voa na velocidade do Arch, mas os aplicativos críticos podem ser congelados usando Flatpak ou Distrobox para garantir estabilidade no nível do Debian sob demanda.",
+        "X. Architectural Pragmatism": "X. Pragmatismo Arquitetônico",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Sinergia Open Source. Herdamos e lapidamos alicerces comprovados pela elite purista do Arch Linux, escrevendo código e injetando repositórios customizados apenas onde realmente agregamos valor único.",
+        "XI. Aesthetics as Function": "XI. A Estética como Função",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "O design não é um capricho. Um ambiente bonito e coerente inspira foco e controle. Cada pixel do sistema obedece à nossa rígida direção de arte Hacker-Minimalista.",
+        "XII. Absolute Privacy": "XII. Privacidade Absoluta",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "Na era da telemetria corporativa encoberta, seu PC é sua fortaleza de vidro. Zero telemetria, zero rastreadores ocultos, zero relatórios. O que você faz na sua máquina, morre na sua máquina.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "O X64 LIOS foi meticulosamente projetado para os puristas do desempenho. Nossa arquitetura garante:",
+        "Top Gaming Performance:": "Desempenho Top em Jogos:",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latência ultrabaixa e otimizações do kernel para espremer cada FPS.",
+        "Hybrid Rolling Release:": "Rolling Release Híbrido:",
+        "Explore Live Environment": "Explorar o Ambiente Live",
+        "Minimize this window and test the extreme performance of the live system.": "Minimize esta janela e teste o desempenho extremo do sistema ao vivo.",
+        "Install the System": "Instalar o Sistema",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Inicie o instalador Calamares para instalar o X64 LIOS no seu disco rígido.",
+        "X64 Community": "Comunidade X64",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "O X64 Studios é uma comunidade aberta de entusiastas e desenvolvedores. Junte-se para receber suporte, compartilhar scripts e discutir.",
+        "Official Website": "Site Oficial",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Consulte a Wiki oficial para aprender sobre módulos e atalhos.",
+        "Discord Server": "Servidor do Discord",
+        "Real-time support channels and discussions.": "Canais de suporte em tempo real e discussões.",
+        "GitHub Repository": "Repositório do GitHub",
+        "Audit and contribute to the system's source code.": "Audite e contribua para o código-fonte do sistema.",
+        "Documentation and Notes": "Documentação e Notas",
+        "Native utilities to audit and manage your hardware during Live mode.": "Utilitários nativos para auditar e gerenciar seu hardware no modo Live.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Você iniciou a sessão Live. Explore o ambiente com segurança sem alterar seu disco rígido ou prossiga com a instalação permanente do sistema.",
+        "Smart Package System:": "Sistema de Pacotes Inteligente:",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Detecta automaticamente seu processador e instala a versão exata adaptada para ele (seja antigo ou de nova geração).",
+        "Pristine System:": "Sistema Impecável:",
+        "Zero bloatware, returning total control of your machine back to you.": "Zero bloatware, devolvendo a você o controle total de sua máquina.",
+        "The freshness of Arch Linux combined with armored stability.": "O frescor do Arch Linux combinado com uma estabilidade blindada.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Zero telemetria por design. Seus dados são exclusivamente seus.",
+        "Avant-garde Aesthetics:": "Estética Vanguarda:",
+        "Ultra-fluid, minimalist environments ready to choose.": "Ambientes ultra-fluidos, minimalistas e prontos para escolher.",
+        "Absolute Privacy:": "Privacidade Absoluta:"
+    },
+    "ru": {
+        "Home": "Главная",
+        "System": "Система",
+        "Philosophy": "Философия",
+        "Welcome to X64 LIOS": "Добро пожаловать в X64 LIOS",
+        "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "Операционная система для пуристов, разработанная для максимальной производительности, минимальной задержки и абсолютного контроля.",
+        "Install X64 LIOS": "Установить X64 LIOS",
+        "System Tools": "Системные инструменты",
+        "Low-level utilities for advanced system configuration.": "Низкоуровневые утилиты для расширенной настройки системы.",
+        "Hacker Terminal": "Хакерский терминал",
+        "Launch Kitty with your transparent profile and ASCII logo.": "Запустите Kitty с вашим прозрачным профилем и логотипом ASCII.",
+        "Partition Manager": "Менеджер разделов",
+        "Open GParted to partition, format, or prepare disks.": "Откройте GParted для разделения, форматирования или подготовки дисков.",
+        "Resource Monitor": "Монитор ресурсов",
+        "Check deep CPU and RAM usage with btop.": "Проверьте глубокое использование процессора и оперативной памяти с помощью btop.",
+        "X64 Architectural Manifesto": "Архитектурный Манифест X64",
+        "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.": "X64 LIOS родился как окончательный ответ на фрагментацию Linux. Мы извлекаем необузданную мощь высокопроизводительных ядер, точность игровой экосистемы и чистоту Arch, чтобы создать идеальную операционную систему.",
+        "Architecture:": "Архитектура:",
+        "Session:": "Сессия:",
+        "I. Absolute Freedom": "I. Абсолютная свобода",
+        "Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.": "Апстрим-чистота Arch Linux в сочетании с универсальным магазином Shelly. Никаких PPA, корпоративных связей и 99% системного программного обеспечения, обеспечивающего максимальную стабильность.",
+        "II. Surgical Optimization": "II. Хирургическая оптимизация",
+        "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Настраиваемые высокопроизводительные ядра, продвинутые планировщики BORE/EEVDF, контролируемые смягчения и строгие предварительные конфигурации для игр со сверхнизкой задержкой.",
+        "III. Multi-Environment Ecosystem": "III. Многосредовая экосистема",
+        "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "Пользователь кует свою судьбу: KDE Plasma для комфорта, GNOME для плавности или Hyprland X64 для пуристского минимализма с микроскопическим использованием оперативной памяти.",
+        "IV. Infrastructure Sovereignty": "IV. Инфраструктурный суверенитет",
+        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Гибридная каскадная модель репозитория. Мы внедряем наши патчи поверх Arch Linux для обеспечения производительности без колоссальных затрат на перекомпиляцию всего.",
+        "V. Hardware Mutation": "V. Аппаратная мутация",
+        "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "При установке система проверяет процессор: если он старый, используются надежные стандартные пакеты; если современный — включает турбо-режим (AVX2/AVX512).",
+        "VI. Modular Architecture": "VI. Модульная архитектура",
+        "A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.": "Профили на выбор (Игровой, Хакерский, Минималистичный). Ноль Bloatware. ISO — чистый холст; полученная система — точная кузница вашей личности.",
+        "VII. Shield of Resilience": "VII. Щит устойчивости",
+        "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Временная неизменность с помощью Btrfs и Snapper. Графический менеджер загрузки rEFInd для отката во времени после критических ошибок, устраняющий страх перед Rolling Releases.",
+        "VIII. The Death of the Terminal": "VIII. Смерть терминала",
+        "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Философия GUI-First. Обычному пользователю никогда не понадобится открывать терминал. Вся абсолютная мощь Arch управляется исключительно через графические интерфейсы.",
+        "IX. Hybrid Rolling Release": "IX. Гибридный Rolling Release",
+        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Ядро системы летает на скорости Arch, но критические приложения можно заморозить с помощью Flatpak или Distrobox, чтобы гарантировать стабильность уровня Debian по запросу.",
+        "X. Architectural Pragmatism": "X. Архитектурный прагматизм",
+        "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Синергия Open Source. Мы наследуем и совершенствуем основы, доказанные элитой пуристов Arch Linux, пишем код и внедряем собственные репозитории только там, где мы действительно приносим уникальную пользу.",
+        "XI. Aesthetics as Function": "XI. Эстетика как функция",
+        "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Дизайн — это не прихоть. Красивая и согласованная среда вдохновляет на концентрацию и контроль. Каждый пиксель системы подчиняется нашему строгому хакерско-минималистическому художественному направлению.",
+        "XII. Absolute Privacy": "XII. Абсолютная конфиденциальность",
+        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "В эпоху скрытой корпоративной телеметрии ваш компьютер — это ваша стеклянная крепость. Никакой телеметрии, никаких скрытых трекеров, никаких отчетов. То, что вы делаете на своей машине, остается на ней.",
+        "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS тщательно разработан для пуристов производительности. Наша архитектура гарантирует вам:",
+        "Top Gaming Performance:": "Лучшая игровая производительность:",
+        "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Сверхнизкая задержка и оптимизация ядра, чтобы выжать каждый FPS.",
+        "Hybrid Rolling Release:": "Гибридный Rolling Release:",
+        "Explore Live Environment": "Исследуйте Live-среду",
+        "Minimize this window and test the extreme performance of the live system.": "Сверните это окно и проверьте экстремальную производительность Live-системы.",
+        "Install the System": "Установить систему",
+        "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Запустите установщик Calamares, чтобы установить X64 LIOS на жесткий диск.",
+        "X64 Community": "Сообщество X64",
+        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios — открытое сообщество энтузиастов и разработчиков. Присоединяйтесь, чтобы получить поддержку, поделиться скриптами и пообщаться.",
+        "Official Website": "Официальный сайт",
+        "Check the Official Wiki to learn about modules and shortcuts.": "Проверьте официальную вики, чтобы узнать о модулях и сочетаниях клавиш.",
+        "Discord Server": "Сервер Discord",
+        "Real-time support channels and discussions.": "Каналы поддержки в реальном времени и обсуждения.",
+        "GitHub Repository": "Репозиторий GitHub",
+        "Audit and contribute to the system's source code.": "Проверяйте исходный код системы и вносите свой вклад.",
+        "Documentation and Notes": "Документация и примечания",
+        "Native utilities to audit and manage your hardware during Live mode.": "Собственные утилиты для проверки и управления вашим оборудованием в режиме Live.",
+        "You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.": "Вы запустили Live-сессию. Безопасно изучайте среду без изменения жесткого диска или перейдите к постоянной установке системы.",
+        "Smart Package System:": "Умная система пакетов:",
+        "Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).": "Автоматически определяет ваш процессор и устанавливает точную версию, адаптированную для него (старую или нового поколения).",
+        "Pristine System:": "Безупречная система:",
+        "Zero bloatware, returning total control of your machine back to you.": "Никакого bloatware, возвращая вам полный контроль над вашей машиной.",
+        "The freshness of Arch Linux combined with armored stability.": "Свежесть Arch Linux в сочетании с бронированной стабильностью.",
+        "Zero telemetry by design. Your data is exclusively yours.": "Нулевая телеметрия по дизайну. Ваши данные принадлежат исключительно вам.",
+        "Avant-garde Aesthetics:": "Авангардная эстетика:",
+        "Ultra-fluid, minimalist environments ready to choose.": "Ультра-плавные, минималистичные среды готовы к выбору.",
+        "Absolute Privacy:": "Абсолютная конфиденциальность:"
+    }
+}
+
+try:
+    if "X64_LANG" in os.environ:
+        _lang_code = os.environ["X64_LANG"]
+    else:
+        _locale_tup = locale.getdefaultlocale()
+        _lang_code = _locale_tup[0].split('_')[0] if _locale_tup and _locale_tup[0] else 'en'
+except:
+    _lang_code = 'en'
+
+def tr(text):
+    if _lang_code in TRANSLATIONS and text in TRANSLATIONS[_lang_code]:
+        return TRANSLATIONS[_lang_code][text]
+    return text
+
+LOGO_PATH = "/usr/share/pixmaps/x64-logo.png"
+LOCAL_PATH = os.path.join(os.path.dirname(__file__), "x64-logo.png")
+if os.path.exists(LOCAL_PATH):
+    LOGO_PATH = LOCAL_PATH
+
+class PremiumButton(QPushButton):
+    def __init__(self, title, desc, icon_name, url=None, cmd=None):
+        super().__init__()
+        self.url = url
+        self.cmd = cmd
+        self.setFixedHeight(85)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        self.setStyleSheet("""
+            PremiumButton {
+                background-color: rgba(255, 255, 255, 0.03);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                text-align: left;
+            }
+            PremiumButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(204, 0, 0, 0.5);
+            }
+        """)
+        
+        hbox = QHBoxLayout()
+        hbox.setContentsMargins(20, 15, 20, 15)
+        hbox.setSpacing(20)
+        
+        icon_label = QLabel()
+        icon = QIcon.fromTheme(icon_name)
+        if not icon.isNull():
+            pixmap = icon.pixmap(42, 42)
+            icon_label.setPixmap(pixmap)
+        else:
+            icon_label.setText("💠")
+            icon_label.setStyleSheet("font-size: 30px; background: transparent; border: none;")
+        
+        icon_label.setFixedSize(42, 42)
+        icon_label.setStyleSheet("background: transparent; border: none;")
+        hbox.addWidget(icon_label)
+        
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(3)
+        
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
+        vbox.addWidget(lbl_title)
+        
+        lbl_desc = QLabel(desc)
+        lbl_desc.setStyleSheet("color: #aaaaaa; font-size: 13px; border: none; background: transparent;")
+        lbl_desc.setWordWrap(True)
+        vbox.addWidget(lbl_desc)
+        
+        hbox.addLayout(vbox)
+        self.setLayout(hbox)
+        self.clicked.connect(self.action)
+
+    def action(self):
+        if self.url:
+            webbrowser.open(self.url)
+        elif self.cmd:
+            if self.cmd == "close":
+                self.window().close()
+            elif self.cmd == "minimize":
+                self.window().showMinimized()
+            else:
+                os.system(f"{self.cmd} &")
+
+class NavButton(QPushButton):
+    def __init__(self, title, icon_name, index, parent_app):
+        super().__init__()
+        self.index = index
+        self.parent_app = parent_app
+        self.setFixedHeight(50)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        hbox = QHBoxLayout()
+        hbox.setContentsMargins(15, 0, 15, 0)
+        hbox.setSpacing(15)
+        
+        icon_lbl = QLabel()
+        icon = QIcon.fromTheme(icon_name)
+        if not icon.isNull():
+            icon_lbl.setPixmap(icon.pixmap(22, 22))
+        icon_lbl.setStyleSheet("background: transparent; border: none;")
+        hbox.addWidget(icon_lbl)
+        
+        text_lbl = QLabel(title)
+        text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 15px; background: transparent; border: none;")
+        self.text_lbl = text_lbl 
+        hbox.addWidget(text_lbl)
+        hbox.addStretch(1)
+        
+        self.setLayout(hbox)
+        self.clicked.connect(self.activate)
+        self.set_inactive_style()
+
+    def set_active_style(self):
+        self.setStyleSheet("""
+            NavButton {
+                background-color: rgba(204, 0, 0, 0.15);
+                border-radius: 8px;
+                border: none;
+                border-left: 4px solid #cc0000;
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+            }
+        """)
+        self.text_lbl.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 15px; background: transparent; border: none;")
+
+    def set_inactive_style(self):
+        self.setStyleSheet("""
+            NavButton {
+                background-color: transparent;
+                border-radius: 8px;
+                border: none;
+            }
+            NavButton:hover {
+                background-color: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        self.text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 15px; background: transparent; border: none;")
+
+    def activate(self):
+        self.parent_app.change_page(self.index)
+
+
+class X64Welcome(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.nav_buttons = []
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('X64 LIOS - Welcome')
+        self.setFixedSize(1250, 720)
+        self.setStyleSheet("background-color: #080808;")
+        
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        self.setLayout(main_layout)
+
+        sidebar = QFrame()
+        sidebar.setFixedWidth(270)
+        sidebar.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #050505, stop:1 #110000);
+                border-right: 1px solid #1a1a1a;
+            }
+        """)
+        sidebar_layout = QVBoxLayout()
+        sidebar_layout.setContentsMargins(25, 40, 25, 30)
+        sidebar.setLayout(sidebar_layout)
+
+        logo_label = QLabel()
+        pixmap = QPixmap(LOGO_PATH)
+        if not pixmap.isNull():
+            logo_label.setPixmap(pixmap.scaled(140, 140, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_label.setStyleSheet("background: transparent; border: none;")
+        sidebar_layout.addWidget(logo_label)
+        sidebar_layout.addSpacing(30)
+
+        nav_vbox = QVBoxLayout()
+        nav_vbox.setSpacing(20)
+        
+        tabs = [(tr("Home"), "go-home"), (tr("System"), "preferences-system"), 
+                (tr("Philosophy"), "help-about")]
+        
+        for i, (text, icon) in enumerate(tabs):
+            btn = NavButton(text, icon, i, self)
+            self.nav_buttons.append(btn)
+            nav_vbox.addWidget(btn)
+            
+        sidebar_layout.addLayout(nav_vbox)
+        sidebar_layout.addStretch(1)
+
+        
+
+        self.btn_install = QPushButton("  " + tr("Install X64 LIOS"))
+        self.btn_install.setIcon(QIcon(LOGO_PATH))
+        self.btn_install.setIconSize(QSize(24, 24))
+        self.btn_install.setFixedHeight(60)
+        self.btn_install.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #cc0000, stop:1 #800000);
+                color: white; font-weight: bold; font-size: 16px; border-radius: 10px; border: 1px solid #ff1a1a;
+            }
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000); }
+        """)
+        self.btn_install.setCursor(Qt.CursorShape.PointingHandCursor)
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(204, 0, 0, 100))
+        shadow.setOffset(0, 4)
+        self.btn_install.setGraphicsEffect(shadow)
+        self.btn_install.clicked.connect(self.launch_calamares)
+        kernel_ver = platform.release()
+        arch = platform.machine()
+        hud_text = f"X64 LIOS 2026 (Live)\n{tr('Architecture:')} {arch}\nKernel: {kernel_ver}\n{tr('Session:')} KDE Plasma (Wayland)"
+        info_label = QLabel(hud_text)
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_label.setStyleSheet("color: #4a4a4a; font-size: 12px; font-weight: bold; line-height: 1.5; background: transparent;")
+        sidebar_layout.addWidget(info_label)
+        sidebar_layout.addSpacing(15)
+        sidebar_layout.addWidget(self.btn_install)
+        sidebar_layout.addSpacing(10)
+
+        lang_hbox = QHBoxLayout()
+        lang_hbox.addStretch(1)
+        
+        current_lang_str = {
+            'en': 'English', 'es': 'Español', 'fr': 'Français', 'de': 'Deutsch', 
+            'it': 'Italiano', 'pt': 'Português', 'ru': 'Русский'
+        }.get(_lang_code, 'English')
+        
+        self.lang_btn = QPushButton(" 🌎  " + current_lang_str + " ")
+        self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lang_btn.setFixedHeight(28)
+        self.lang_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #777777;
+                border: 1px solid transparent;
+                border-radius: 14px;
+                padding: 0px 10px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #aaaaaa;
+            }
+            QPushButton::menu-indicator { image: none; }
+        """)
+        
+        lang_menu = QMenu(self)
+        lang_menu.setCursor(Qt.CursorShape.PointingHandCursor)
+        lang_menu.setStyleSheet("""
+            QMenu {
+                background-color: #0a0a0a;
+                color: #bbbbbb;
+                border: 1px solid #222222;
+                border-radius: 6px;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 5px 20px 5px 15px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QMenu::item:selected {
+                background-color: #cc0000;
+                color: #ffffff;
+            }
+        """)
+        
+        langs = [
+            ("en", "English"), ("es", "Español"), ("fr", "Français"),
+            ("de", "Deutsch"), ("it", "Italiano"), ("pt", "Português"),
+            ("ru", "Русский")
+        ]
+        
+        for code, name in langs:
+            action = QAction(name, self)
+            # Capture the current value of code inside the lambda using a default argument!
+            action.triggered.connect(lambda checked=False, c=code: self.change_language(c))
+            lang_menu.addAction(action)
+            
+        self.lang_btn.setMenu(lang_menu)
+        lang_hbox.addWidget(self.lang_btn)
+        lang_hbox.addStretch(1)
+        sidebar_layout.addLayout(lang_hbox)
+
+        main_layout.addWidget(sidebar)
+
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.setStyleSheet("QStackedWidget { background-color: #0f0f0f; }")
+        main_layout.addWidget(self.stacked_widget)
+
+        self.stacked_widget.addWidget(self.create_page_inicio())
+        self.stacked_widget.addWidget(self.create_page_sistema())
+        # self.stacked_widget.addWidget(self.create_page_comunidad())
+        self.stacked_widget.addWidget(self.create_page_filosofia())
+
+        self.change_page(0)
+
+    def create_page_inicio(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(70, 40, 70, 40)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        page.setLayout(layout)
+
+        title = QLabel(tr("Welcome to X64 LIOS").upper())
+        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+
+        desc = QLabel(
+    f"<p>{tr('You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.')}</p>"
+    f"<p>{tr('X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:')}</p>"
+    "<ul style='margin-top: 0px; margin-bottom: 0px; padding-left: 20px;'>"
+    f"<li><b>{tr('Top Gaming Performance:')}</b> {tr('Ultra-low latency and kernel optimizations to squeeze out every FPS.')}</li>"
+    f"<li><b>{tr('Hybrid Rolling Release:')}</b> {tr('The freshness of Arch Linux combined with armored stability.')}</li>"
+    f"<li><b>{tr('Smart Package System:')}</b> {tr('Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).')}</li>"
+    f"<li><b>{tr('Absolute Privacy:')}</b> {tr('Zero telemetry by design. Your data is exclusively yours.')}</li>"
+    f"<li><b>{tr('Avant-garde Aesthetics:')}</b> {tr('Ultra-fluid, minimalist environments ready to choose.')}</li>"
+    f"<li><b>{tr('Pristine System:')}</b> {tr('Zero bloatware, returning total control of your machine back to you.')}</li>"
+    "</ul>"
+)
+        desc.setTextFormat(Qt.TextFormat.RichText)
+        desc.setStyleSheet("color: #a0a0a0; font-size: 15px; line-height: 1.6; background: transparent;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        layout.addSpacing(40)
+
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(20)
+        vlayout.addWidget(PremiumButton(tr("Explore Live Environment"), tr("Minimize this window and test the extreme performance of the live system."), "view-fullscreen", cmd="minimize"))
+        vlayout.addWidget(PremiumButton(tr("Documentation and Notes"), tr("Check the Official Wiki to learn about modules and shortcuts."), "help-contents", url="https://x64studios.com"))
+        vlayout.addWidget(PremiumButton(tr("Install the System"), tr("Launch the Calamares installer to install X64 LIOS on your hard drive."), "drive-harddisk", cmd="launch-calamares"))
+        layout.addLayout(vlayout)
+        
+        return page
+
+    def create_page_sistema(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(70, 40, 70, 40)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        page.setLayout(layout)
+
+        title = QLabel(tr("System Tools"))
+        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+
+        desc = QLabel(tr("Native utilities to audit and manage your hardware during Live mode."))
+        desc.setStyleSheet("color: #a0a0a0; font-size: 15px; background: transparent;")
+        layout.addWidget(desc)
+        layout.addSpacing(40)
+
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(20)
+        vlayout.addWidget(PremiumButton(tr("Hacker Terminal"), tr("Launch Kitty with your transparent profile and ASCII logo."), "utilities-terminal", cmd="kitty"))
+        vlayout.addWidget(PremiumButton(tr("Partition Manager"), tr("Open GParted to partition, format, or prepare disks."), "drive-harddisk", cmd="pkexec gparted"))
+        vlayout.addWidget(PremiumButton(tr("Resource Monitor"), tr("Check deep CPU and RAM usage with btop."), "utilities-system-monitor", cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop"))
+        layout.addLayout(vlayout)
+        return page
+
+    def create_page_comunidad(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(70, 40, 70, 40)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        page.setLayout(layout)
+
+        title = QLabel(tr("X64 Community"))
+        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+
+        desc = QLabel(tr("X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss."))
+        desc.setStyleSheet("color: #a0a0a0; font-size: 15px; background: transparent;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        layout.addSpacing(40)
+
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(20)
+        vlayout.addWidget(PremiumButton(tr("Discord Server"), tr("Real-time support channels and discussions."), "applications-internet", url="https://discord.gg/x64studios"))
+        vlayout.addWidget(PremiumButton(tr("GitHub Repository"), tr("Audit and contribute to the system's source code."), "text-x-script", url="https://github.com/x64studios"))
+        layout.addLayout(vlayout)
+        return page
+
+    def create_page_filosofia(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(50, 40, 50, 40)
+        page.setLayout(layout)
+
+        title = QLabel(tr("X64 Architectural Manifesto"))
+        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+        layout.addSpacing(10)
+
+        intro = QLabel(tr("X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system."))
+        intro.setStyleSheet("color: #bbbbbb; font-size: 15px; font-style: italic; background: transparent;")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        layout.addSpacing(20)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        # Beautiful custom dark red scrollbar
+        scroll_area.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical { background: #121212; width: 8px; margin: 0px; border-radius: 4px; }
+            QScrollBar::handle:vertical { background: #333333; min-height: 30px; border-radius: 4px; }
+            QScrollBar::handle:vertical:hover { background: #cc0000; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
+        """)
+
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background: transparent;")
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(0, 0, 15, 20)
+        content_layout.setSpacing(20)
+
+        filosofia = [
+            (tr("I. Absolute Freedom"), tr("Upstream purity of Arch Linux combined with the Shelly universal store. Zero PPAs, zero corporate ties, and 99% of the system software intact to ensure maximum stability.")),
+            (tr("II. Surgical Optimization"), tr("Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.")),
+            (tr("III. Multi-Environment Ecosystem"), tr("The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.")),
+            (tr("IV. Infrastructure Sovereignty"), tr("Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.")),
+            (tr("V. Hardware Mutation"), tr("During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.")),
+            (tr("VI. Modular Architecture"), tr("A la carte profiles (Gaming, Hacker, Minimalist). Zero Bloatware. The ISO is a blank canvas; the resulting system is an exact forge of your identity.")),
+            (tr("VII. Shield of Resilience"), tr("Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.")),
+            (tr("VIII. The Death of the Terminal"), tr("GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.")),
+            (tr("IX. Hybrid Rolling Release"), tr("The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.")),
+            (tr("X. Architectural Pragmatism"), tr("Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.")),
+            (tr("XI. Aesthetics as Function"), tr("Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.")),
+            (tr("XII. Absolute Privacy"), tr("In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine."))
+        ]
+
+        for p_title, p_desc in filosofia:
+            frame = QFrame()
+            frame.setObjectName("FiloCard")
+            frame.setStyleSheet("""
+                QFrame#FiloCard {
+                    background-color: rgba(255, 255, 255, 0.03);
+                    border-radius: 10px;
+                    border-left: 4px solid #cc0000;
+                }
+                QFrame#FiloCard:hover { background-color: rgba(204, 0, 0, 0.1); }
+            """)
+            flayout = QVBoxLayout()
+            # Very spacious margins to look un-cramped and premium
+            flayout.setContentsMargins(25, 20, 25, 20)
+            flayout.setSpacing(6)
+            
+            lbl_t = QLabel(p_title)
+            lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
+            
+            lbl_d = QLabel(p_desc)
+            lbl_d.setStyleSheet("color: #a0a0a0; font-size: 14px; line-height: 1.5; border: none; background: transparent;")
+            lbl_d.setWordWrap(True)
+            
+            flayout.addWidget(lbl_t)
+            flayout.addWidget(lbl_d)
+            frame.setLayout(flayout)
+            content_layout.addWidget(frame)
+
+        content_widget.setLayout(content_layout)
+        scroll_area.setWidget(content_widget)
+        
+        layout.addWidget(scroll_area)
+        return page
+
+    def change_language(self, lang_id):
+        if lang_id != _lang_code:
+            os.environ["X64_LANG"] = lang_id
+            os.execl(sys.executable, sys.executable, *sys.argv)
+
+    def change_page(self, index):
+        for i, btn in enumerate(self.nav_buttons):
+            if i == index:
+                btn.set_active_style()
+            else:
+                btn.set_inactive_style()
+        self.stacked_widget.setCurrentIndex(index)
+
+    def launch_calamares(self):
+        os.system("launch-calamares &")
+        self.close()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    QIcon.setThemeName("breeze-dark")
+    app.setStyle("Fusion")
+    welcome = X64Welcome()
+    welcome.show()
+    sys.exit(app.exec())

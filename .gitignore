@@ -1,0 +1,11 @@
+# Build Artifacts
+src/
+pkg/
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.log
+*.tar.gz
+*.tar.xz
+*.db
+*.files
+repo-build/

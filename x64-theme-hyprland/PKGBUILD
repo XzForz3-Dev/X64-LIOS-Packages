@@ -1,0 +1,12 @@
+pkgname=x64-theme-hyprland
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="X64 LIOS Official Visual Theme (Hyprland, Waybar, Kitty, Wofi, Fastfetch)"
+arch=('any')
+license=('GPL')
+depends=('hyprland' 'waybar' 'kitty' 'wofi' 'fastfetch')
+
+package() {
+    mkdir -p "${pkgdir}/etc/skel"
+    cp -r "${startdir}/skel/.config" "${pkgdir}/etc/skel/"
+}
