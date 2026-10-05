@@ -9,3 +9,5 @@ pkg/
 *.db
 *.files
 repo-build/
+__pycache__/
+*.pyc
