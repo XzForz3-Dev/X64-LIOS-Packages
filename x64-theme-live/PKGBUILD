@@ -1,6 +1,6 @@
 pkgname=x64-theme-live
 pkgver=1.0.2
-pkgrel=6
+pkgrel=7
 pkgdesc="X64 LIOS Official Theme for Live ISO (KDE Dark + Wallpapers + Logo)"
 arch=('any')
 license=('GPL')
