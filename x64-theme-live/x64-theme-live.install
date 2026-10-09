@@ -1,0 +1,10 @@
+post_install() {
+    echo "=> [X64 Theme] Inyectando layout custom de Plasma..."
+    if [ -d /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents ]; then
+        cp -f /usr/share/x64-lios/x64-layout.js /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents/layout.js
+    fi
+}
+
+post_upgrade() {
+    post_install
+}

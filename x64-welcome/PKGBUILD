@@ -1,14 +1,24 @@
 pkgname=x64-welcome
 pkgver=2.1.4
-pkgrel=21
+pkgrel=25
 pkgdesc="X64 LIOS Official Welcome App (Live Environment & Post-Install)"
 arch=('any')
 license=('GPL')
 depends=('python' 'python-pyqt6')
-source=('x64-welcome')
-sha256sums=('SKIP')
+source=('x64-welcome'
+        'x64-welcome.desktop'
+        'x64-welcome-icon.png')
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP')
 
 package() {
     # Instalar el ejecutable principal
     install -Dm755 "${srcdir}/x64-welcome" "${pkgdir}/usr/bin/x64-welcome"
+    
+    # Instalar acceso directo
+    install -Dm644 "${srcdir}/x64-welcome.desktop" "${pkgdir}/usr/share/applications/x64-welcome.desktop"
+    
+    # Instalar el icono
+    install -Dm644 "${srcdir}/x64-welcome-icon.png" "${pkgdir}/usr/share/pixmaps/x64-welcome-icon.png"
 }

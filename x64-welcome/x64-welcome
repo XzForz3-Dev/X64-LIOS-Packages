@@ -63,7 +63,7 @@ TRANSLATIONS = {
         "Install the System": "Instalar el Sistema",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Lanza el instalador Calamares para instalar X64 LIOS en tu disco duro.",
         "X64 Community": "Comunidad X64",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios es una comunidad abierta de entusiastas y desarrolladores. Únete para recibir soporte, compartir scripts y debatir.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 LIOS es una comunidad abierta de entusiastas y desarrolladores. Únete para recibir soporte, compartir scripts y debatir.",
         "Official Website": "Sitio Web Oficial",
         "Check the Official Wiki to learn about modules and shortcuts.": "Revisa la Wiki Oficial para aprender sobre módulos y atajos.",
         "Discord Server": "Servidor de Discord",
@@ -135,7 +135,7 @@ TRANSLATIONS = {
         "Install the System": "Installer le Système",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Lancez l'installateur Calamares pour installer X64 LIOS sur votre disque dur.",
         "X64 Community": "Communauté X64",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios est une communauté ouverte d'amateurs et de développeurs. Rejoignez-nous pour recevoir du soutien, partager des scripts et discuter.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 LIOS est une communauté ouverte d'amateurs et de développeurs. Rejoignez-nous pour recevoir du soutien, partager des scripts et discuter.",
         "Official Website": "Site Officiel",
         "Check the Official Wiki to learn about modules and shortcuts.": "Consultez le Wiki officiel pour en savoir plus sur les modules et les raccourcis.",
         "Discord Server": "Serveur Discord",
@@ -207,7 +207,7 @@ TRANSLATIONS = {
         "Install the System": "System Installieren",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Starten Sie das Calamares-Installationsprogramm, um X64 LIOS auf Ihrer Festplatte zu installieren.",
         "X64 Community": "X64-Community",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios ist eine offene Gemeinschaft von Enthusiasten und Entwicklern. Treten Sie bei, um Unterstützung zu erhalten, Skripte auszutauschen und zu diskutieren.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 LIOS ist eine offene Gemeinschaft von Enthusiasten und Entwicklern. Treten Sie bei, um Unterstützung zu erhalten, Skripte auszutauschen und zu diskutieren.",
         "Official Website": "Offizielle Website",
         "Check the Official Wiki to learn about modules and shortcuts.": "Überprüfen Sie das offizielle Wiki, um mehr über Module und Verknüpfungen zu erfahren.",
         "Discord Server": "Discord-Server",
@@ -279,7 +279,7 @@ TRANSLATIONS = {
         "Install the System": "Installa il Sistema",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Avvia l'installatore Calamares per installare X64 LIOS sul tuo disco rigido.",
         "X64 Community": "Comunità X64",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios è una comunità aperta di appassionati e sviluppatori. Unisciti per ricevere supporto, condividere script e discutere.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 LIOS è una comunità aperta di appassionati e sviluppatori. Unisciti per ricevere supporto, condividere script e discutere.",
         "Official Website": "Sito Web Ufficiale",
         "Check the Official Wiki to learn about modules and shortcuts.": "Controlla il Wiki ufficiale per saperne di più su moduli e scorciatoie.",
         "Discord Server": "Server Discord",
@@ -351,7 +351,7 @@ TRANSLATIONS = {
         "Install the System": "Instalar o Sistema",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Inicie o instalador Calamares para instalar o X64 LIOS no seu disco rígido.",
         "X64 Community": "Comunidade X64",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "O X64 Studios é uma comunidade aberta de entusiastas e desenvolvedores. Junte-se para receber suporte, compartilhar scripts e discutir.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "O X64 LIOS é uma comunidade aberta de entusiastas e desenvolvedores. Junte-se para receber suporte, compartilhar scripts e discutir.",
         "Official Website": "Site Oficial",
         "Check the Official Wiki to learn about modules and shortcuts.": "Consulte a Wiki oficial para aprender sobre módulos e atalhos.",
         "Discord Server": "Servidor do Discord",
@@ -423,7 +423,7 @@ TRANSLATIONS = {
         "Install the System": "Установить систему",
         "Launch the Calamares installer to install X64 LIOS on your hard drive.": "Запустите установщик Calamares, чтобы установить X64 LIOS на жесткий диск.",
         "X64 Community": "Сообщество X64",
-        "X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 Studios — открытое сообщество энтузиастов и разработчиков. Присоединяйтесь, чтобы получить поддержку, поделиться скриптами и пообщаться.",
+        "X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss.": "X64 LIOS — открытое сообщество энтузиастов и разработчиков. Присоединяйтесь, чтобы получить поддержку, поделиться скриптами и пообщаться.",
         "Official Website": "Официальный сайт",
         "Check the Official Wiki to learn about modules and shortcuts.": "Проверьте официальную вики, чтобы узнать о модулях и сочетаниях клавиш.",
         "Discord Server": "Сервер Discord",
@@ -823,7 +823,7 @@ class X64Welcome(QWidget):
         title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
         layout.addWidget(title)
 
-        desc = QLabel(tr("X64 Studios is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss."))
+        desc = QLabel(tr("X64 LIOS is an open community of enthusiasts and developers. Join to receive support, share scripts, and discuss."))
         desc.setStyleSheet("color: #a0a0a0; font-size: 15px; background: transparent;")
         desc.setWordWrap(True)
         layout.addWidget(desc)

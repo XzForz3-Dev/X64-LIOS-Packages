@@ -1,14 +1,16 @@
 pkgname=x64-theme-live
 pkgver=1.0.2
-pkgrel=1
+pkgrel=6
 pkgdesc="X64 LIOS Official Theme for Live ISO (KDE Dark + Wallpapers + Logo)"
 arch=('any')
 license=('GPL')
+install='x64-theme-live.install'
 depends=('plasma-desktop' 'sddm')
 source=('x64-lios-v2.jpg'
         'x64-lios-v3.jpg'
-        'x64-logo.png')
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+        'x64-logo.png'
+        'x64-layout.js')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar fondos de pantalla
@@ -19,29 +21,18 @@ package() {
     # Instalar logo
     mkdir -p "${pkgdir}/usr/share/pixmaps"
     cp "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/pixmaps/x64-logo.png"
-    
-    # Crear script de configuración de Plasma JS
-    mkdir -p "${pkgdir}/usr/share/x64-lios"
-    cat << 'JSCRIPT' > "${pkgdir}/usr/share/x64-lios/set-kickoff-icon.js"
-var panels = panels();
-for (var i = 0; i < panels.length; i++) {
-    var widgets = panels[i].widgets();
-    for (var j = 0; j < widgets.length; j++) {
-        if (widgets[j].type === "org.kde.plasma.kickoff") {
-            widgets[j].currentConfigGroup = ["General"];
-            widgets[j].writeConfig("icon", "/usr/share/pixmaps/x64-logo.png");
-        }
-    }
-}
-JSCRIPT
 
-    # Crear script de auto-arranque para forzar el tema oscuro, el wallpaper v3 en KDE, y el ícono
+    # Instalar layout en ruta segura
+    mkdir -p "${pkgdir}/usr/share/x64-lios"
+    cp "${srcdir}/x64-layout.js" "${pkgdir}/usr/share/x64-lios/x64-layout.js"
+
+    # Crear script de auto-arranque para forzar el tema oscuro y el wallpaper v3 en KDE
     mkdir -p "${pkgdir}/etc/xdg/autostart"
     cat << 'SCRIPT' > "${pkgdir}/etc/xdg/autostart/x64-theme-init.desktop"
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop && plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg && sleep 2 && qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$(cat /usr/share/x64-lios/set-kickoff-icon.js)"'
+Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop && plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg'
 X-KDE-autostart-phase=1
 SCRIPT
 
