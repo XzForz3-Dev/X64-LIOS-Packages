@@ -30,8 +30,8 @@ jobs:
       - name: Download Current Repo Database
         run: |
           echo "Descargando base de datos actual del VPS para no sobrescribir paquetes antiguos..."
-          rsync -avz root@169.58.73.67:/var/www/x64-repo/x86_64/x64-repo.db.tar.gz ./ || echo "No DB found. Creating a new one."
-          chown builder:builder x64-repo.db.tar.gz || true
+          rsync -avz root@169.58.73.67:/var/www/x64-repo/x86_64/x64-lios.db.tar.gz ./ || echo "No DB found. Creating a new one."
+          chown builder:builder x64-lios.db.tar.gz || true
 
       - name: Build Packages (makepkg)
         run: |
@@ -57,9 +57,9 @@ jobs:
             pkgs=(build_output/*.pkg.tar.zst)
             if [ \${#pkgs[@]} -gt 0 ]; then
               echo \"Registrando nuevos paquetes en la base de datos...\"
-              cp x64-repo.db.tar.gz build_output/ 2>/dev/null || true
+              cp x64-lios.db.tar.gz build_output/ 2>/dev/null || true
               cd build_output
-              repo-add x64-repo.db.tar.gz *.pkg.tar.zst
+              repo-add x64-lios.db.tar.gz *.pkg.tar.zst
             else
               echo \"No se compilaron paquetes nuevos.\"
             fi
@@ -71,7 +71,7 @@ jobs:
           pkgs=(build_output/*.pkg.tar.zst)
           if [ \${#pkgs[@]} -gt 0 ]; then
             echo \"Desplegando paquetes y base de datos actualizada al VPS Contabo...\"
-            rsync -avz build_output/*.pkg.tar.zst build_output/x64-repo.db* build_output/x64-repo.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
+            rsync -avz build_output/*.pkg.tar.zst build_output/x64-lios.db* build_output/x64-lios.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
           else
             echo \"Nada que desplegar.\"
           fi
