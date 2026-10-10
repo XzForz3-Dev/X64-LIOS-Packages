@@ -783,7 +783,7 @@ class X64Welcome(QWidget):
         vlayout.setSpacing(20)
         vlayout.addWidget(PremiumButton(tr("Explore Live Environment"), tr("Minimize this window and test the extreme performance of the live system."), "view-fullscreen", cmd="minimize"))
         vlayout.addWidget(PremiumButton(tr("Documentation and Notes"), tr("Check the Official Wiki to learn about modules and shortcuts."), "help-contents", url="https://x64lios.com"))
-        vlayout.addWidget(PremiumButton(tr("Install the System"), tr("Launch the Calamares installer to install X64 LIOS on your hard drive."), "drive-harddisk", cmd="launch-calamares"))
+        vlayout.addWidget(PremiumButton(tr("Install the System"), tr("Launch the Calamares installer to install X64 LIOS on your hard drive."), "drive-harddisk", cmd="sudo calamares -d"))
         layout.addLayout(vlayout)
         
         return page
@@ -934,7 +934,7 @@ class X64Welcome(QWidget):
         self.stacked_widget.setCurrentIndex(index)
 
     def launch_calamares(self):
-        os.system("launch-calamares &")
+        os.system("sudo calamares -d &")
         self.close()
 
 if __name__ == '__main__':
