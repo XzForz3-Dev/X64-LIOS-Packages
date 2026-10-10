@@ -660,7 +660,7 @@ class X64Welcome(QWidget):
         shadow.setOffset(0, 4)
         self.btn_install.setGraphicsEffect(shadow)
         self.btn_install.clicked.connect(self.launch_calamares)
-        kernel_ver = platform.release()
+        kernel_ver = platform.release().replace('-cachyos', '')
         arch = platform.machine()
         hud_text = f"X64 LIOS 2026 (Live)\n{tr('Architecture:')} {arch}\nKernel: {kernel_ver}\n{tr('Session:')} KDE Plasma (Wayland)"
         info_label = QLabel(hud_text)
@@ -782,7 +782,7 @@ class X64Welcome(QWidget):
         vlayout = QVBoxLayout()
         vlayout.setSpacing(20)
         vlayout.addWidget(PremiumButton(tr("Explore Live Environment"), tr("Minimize this window and test the extreme performance of the live system."), "view-fullscreen", cmd="minimize"))
-        vlayout.addWidget(PremiumButton(tr("Documentation and Notes"), tr("Check the Official Wiki to learn about modules and shortcuts."), "help-contents", url="https://x64studios.com"))
+        vlayout.addWidget(PremiumButton(tr("Documentation and Notes"), tr("Check the Official Wiki to learn about modules and shortcuts."), "help-contents", url="https://x64lios.com"))
         vlayout.addWidget(PremiumButton(tr("Install the System"), tr("Launch the Calamares installer to install X64 LIOS on your hard drive."), "drive-harddisk", cmd="launch-calamares"))
         layout.addLayout(vlayout)
         

@@ -1,6 +1,6 @@
 pkgname=x64-welcome
 pkgver=2.1.4
-pkgrel=25
+pkgrel=26
 pkgdesc="X64 LIOS Official Welcome App (Live Environment & Post-Install)"
 arch=('any')
 license=('GPL')
