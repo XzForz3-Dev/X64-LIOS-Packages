@@ -806,7 +806,7 @@ class X64Welcome(QWidget):
 
         vlayout = QVBoxLayout()
         vlayout.setSpacing(20)
-        vlayout.addWidget(PremiumButton(tr("Hacker Terminal"), tr("Launch Kitty with your transparent profile and ASCII logo."), "utilities-terminal", cmd="kitty"))
+        vlayout.addWidget(PremiumButton(tr("Hacker Terminal"), tr("Launch Kitty with your transparent profile and ASCII logo."), "utilities-terminal", cmd="kitty -o remember_window_size=no -o initial_window_width=110c -o initial_window_height=30c"))
         vlayout.addWidget(PremiumButton(tr("Partition Manager"), tr("Open GParted to partition, format, or prepare disks."), "drive-harddisk", cmd="pkexec gparted"))
         vlayout.addWidget(PremiumButton(tr("Resource Monitor"), tr("Check deep CPU and RAM usage with btop."), "utilities-system-monitor", cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop"))
         layout.addLayout(vlayout)
