@@ -69,9 +69,9 @@ jobs:
         run: |
           shopt -s nullglob
           pkgs=(build_output/*.pkg.tar.zst)
-          if [ \${#pkgs[@]} -gt 0 ]; then
-            echo \"Desplegando paquetes y base de datos actualizada al VPS Contabo...\"
+          if [ ${#pkgs[@]} -gt 0 ]; then
+            echo "Desplegando paquetes y base de datos actualizada al VPS Contabo..."
             rsync -avz build_output/*.pkg.tar.zst build_output/x64-lios.db* build_output/x64-lios.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
           else
-            echo \"Nada que desplegar.\"
+            echo "Nada que desplegar."
           fi
