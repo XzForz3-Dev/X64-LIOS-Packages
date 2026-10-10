@@ -30,7 +30,7 @@ jobs:
       - name: Download Current Repo Database
         run: |
           echo "Descargando base de datos actual del VPS para no sobrescribir paquetes antiguos..."
-          rsync -avz root@169.58.73.67:/var/www/x64-repo/x86_64/x64-lios.db.tar.gz ./ || echo "No DB found. Creating a new one."
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" root@169.58.73.67:/var/www/x64-repo/x86_64/x64-lios.db.tar.gz ./ || echo "No DB found. Creating a new one."
           chown builder:builder x64-lios.db.tar.gz || true
 
       - name: Build Packages (makepkg)
@@ -75,11 +75,11 @@ jobs:
               pkgname=$(pacman -Qp "$pkg" | awk '{print $1}')
               if [ -n "$pkgname" ]; then
                 echo "Borrando versiones antiguas de $pkgname..."
-                ssh root@169.58.73.67 "rm -f /var/www/x64-repo/x86_64/${pkgname}-*.pkg.tar.zst"
+                ssh -o StrictHostKeyChecking=no root@169.58.73.67 "rm -f /var/www/x64-repo/x86_64/${pkgname}-*.pkg.tar.zst"
               fi
             done
             echo "Desplegando paquetes nuevos y base de datos actualizada al VPS Contabo..."
-            rsync -avz build_output/*.pkg.tar.zst build_output/x64-lios.db* build_output/x64-lios.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no" build_output/*.pkg.tar.zst build_output/x64-lios.db* build_output/x64-lios.files* root@169.58.73.67:/var/www/x64-repo/x86_64/
           else
             echo "Nada que desplegar."
           fi
