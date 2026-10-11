@@ -16,6 +16,8 @@ jobs:
 
       - name: Setup Build Environment & SSH
         run: |
+          # Configurar repositorio propio x64-lios para resolver dependencias existentes
+          echo -e "\n[x64-lios]\nSigLevel = Optional TrustAll\nServer = https://repo.x64lios.com/\$arch\n" >> /etc/pacman.conf
           pacman -Syu --noconfirm rsync openssh git sudo
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > $HOME/.ssh/deploy_key
@@ -38,14 +40,36 @@ jobs:
           su builder -c "
             mkdir -p build_output
             shopt -s nullglob
-            for dir in */ ; do
-              if [ -f \"\${dir}PKGBUILD\" ]; then
-                echo \"Compilando paquete en \${dir}...\"
-                cd \"\${dir}\"
-                # Instalar dependencias faltantes automáticamente y compilar
+            # Orden de compilación para respetar dependencias locales (falcond-profiles antes de falcond)
+            BUILD_QUEUE=(falcond-profiles falcond x64-calamares x64-theme-live x64-welcome)
+            for dir in \"\${BUILD_QUEUE[@]}\"; do
+              if [ -d \"\$dir\" ] && [ -f \"\$dir/PKGBUILD\" ]; then
+                echo \"Compilando paquete en \$dir...\"
+                cd \"\$dir\"
                 makepkg -s --noconfirm
                 mv *.pkg.tar.zst ../build_output/ 2>/dev/null || true
                 cd ..
+                # Instalar inmediatamente paquetes locales recién construidos para satisfacer dependencias de paquetes posteriores
+                pkgs=(build_output/*.pkg.tar.zst)
+                if [ \${#pkgs[@]} -gt 0 ]; then
+                  sudo pacman -U --needed --noconfirm \"\${pkgs[@]}\" 2>/dev/null || true
+                fi
+              fi
+            done
+
+            # Escaneo dinámico para cualquier otro paquete adicional que se agregue en el futuro
+            for dir in */ ; do
+              dir=\"\${dir%/}\"
+              if [[ ! \" \${BUILD_QUEUE[*]} \" =~ \" \${dir} \" ]] && [ \"\$dir\" != \"build_output\" ] && [ -f \"\$dir/PKGBUILD\" ]; then
+                echo \"Compilando paquete adicional en \$dir...\"
+                cd \"\$dir\"
+                makepkg -s --noconfirm
+                mv *.pkg.tar.zst ../build_output/ 2>/dev/null || true
+                cd ..
+                pkgs=(build_output/*.pkg.tar.zst)
+                if [ \${#pkgs[@]} -gt 0 ]; then
+                  sudo pacman -U --needed --noconfirm \"\${pkgs[@]}\" 2>/dev/null || true
+                fi
               fi
             done
           "
