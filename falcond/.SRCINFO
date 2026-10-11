@@ -1,0 +1,21 @@
+pkgbase = falcond
+	pkgdesc = Advanced Linux gaming performance daemon
+	pkgver = 2.0.14
+	pkgrel = 1
+	url = https://github.com/PikaOS-Linux/falcond
+	install = falcond.install
+	arch = x86_64
+	license = MIT
+	makedepends = zig>=0.16.0
+	depends = dbus
+	depends = falcond-profiles
+	depends = power-profiles-daemon
+	depends = sudo
+	optdepends = dmemcg-booster: dmem cgroup profile protection
+	optdepends = scx-tools: SCX Scheduler Integration
+	conflicts = gamemode
+	noextract = falcond-2.0.14.tar.gz
+	source = falcond-2.0.14.tar.gz::https://github.com/PikaOS-Linux/falcond/archive/refs/tags/v2.0.14.tar.gz
+	sha256sums = ddd7d0e213f0b1c8f23c0ac0087998f3b1a2ee1d5836395b6f7393f89ccc9d75
+
+pkgname = falcond
