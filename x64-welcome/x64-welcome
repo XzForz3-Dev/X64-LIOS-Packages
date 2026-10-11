@@ -939,8 +939,12 @@ class X64Welcome(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    app.setDesktopFileName("x64-welcome")
+    icon = QIcon("/usr/share/pixmaps/x64-welcome-icon.png")
+    app.setWindowIcon(icon)
     QIcon.setThemeName("breeze-dark")
     app.setStyle("Fusion")
     welcome = X64Welcome()
+    welcome.setWindowIcon(icon)
     welcome.show()
     sys.exit(app.exec())
