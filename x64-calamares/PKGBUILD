@@ -4,7 +4,7 @@
 _pkgname="calamares"
 pkgname="$_pkgname"
 pkgver=3.4.2
-pkgrel=2
+pkgrel=3
 pkgdesc="Instalador Oficial de X64 LIOS (Fork de Calamares)"
 url="https://codeberg.org/Calamares/calamares"
 license=("GPL-3.0-or-later")
@@ -41,7 +41,6 @@ build() {
     initramfs
     initramfscfg
     interactiveterminal
-    packagechooser
     packagechooserq
     services-openrc
   )
