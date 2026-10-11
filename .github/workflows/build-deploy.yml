@@ -2,7 +2,7 @@ name: X64 LIOS Packages CI/CD
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
 
 jobs:
