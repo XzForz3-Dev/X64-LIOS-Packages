@@ -1,0 +1,46 @@
+# Maintainer: X64 Studios <dev@x64lios.com>
+pkgname=x64-terminal-settings
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official terminal and shell environment settings for X64 LIOS"
+arch=('any')
+url="https://x64lios.com"
+license=('GPL3')
+depends=('fish' 'starship' 'fastfetch')
+optdepends=('kitty: GPU-accelerated terminal emulator')
+source=(
+    'config.fish'
+    'starship.toml'
+    'fastfetch.jsonc'
+    'x64_logo.txt'
+    'kitty.conf'
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+    # Fish shell skel configuration
+    install -d "${pkgdir}/etc/skel/.config/fish"
+    install -m644 "${srcdir}/config.fish" "${pkgdir}/etc/skel/.config/fish/config.fish"
+
+    # Starship prompt skel configuration
+    install -d "${pkgdir}/etc/skel/.config"
+    install -m644 "${srcdir}/starship.toml" "${pkgdir}/etc/skel/.config/starship.toml"
+
+    # Fastfetch skel and system-wide configurations
+    install -d "${pkgdir}/etc/skel/.config/fastfetch"
+    install -m644 "${srcdir}/fastfetch.jsonc" "${pkgdir}/etc/skel/.config/fastfetch/config.jsonc"
+    install -m644 "${srcdir}/x64_logo.txt" "${pkgdir}/etc/skel/.config/fastfetch/x64_logo.txt"
+
+    install -d "${pkgdir}/etc/fastfetch"
+    install -m644 "${srcdir}/fastfetch.jsonc" "${pkgdir}/etc/fastfetch/config.jsonc"
+
+    install -d "${pkgdir}/usr/share/fastfetch"
+    install -m644 "${srcdir}/x64_logo.txt" "${pkgdir}/usr/share/fastfetch/x64_logo.txt"
+
+    # Kitty terminal skel and global XDG configurations
+    install -d "${pkgdir}/etc/skel/.config/kitty"
+    install -m644 "${srcdir}/kitty.conf" "${pkgdir}/etc/skel/.config/kitty/kitty.conf"
+
+    install -d "${pkgdir}/etc/xdg/kitty"
+    install -m644 "${srcdir}/kitty.conf" "${pkgdir}/etc/xdg/kitty/kitty.conf"
+}

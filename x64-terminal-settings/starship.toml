@@ -1,0 +1,24 @@
+format = """
+[](#ff2b2b)\
+$username\
+[](#ff2b2b) \
+[](#262626)\
+$directory\
+[](#262626) \
+$character"""
+
+[username]
+show_always = true
+style_user = "bg:#ff2b2b fg:#ffffff"
+style_root = "bg:#ff2b2b fg:#ffffff"
+format = "[X64 LIOS]($style)"
+
+[directory]
+style = "bg:#262626 fg:#ffffff"
+format = "[ $path]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[character]
+success_symbol = "[❯](#ff2b2b)"
+error_symbol = "[✗](#ff2b2b)"
