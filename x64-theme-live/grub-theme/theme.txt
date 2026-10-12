@@ -1,0 +1,123 @@
+# ============================================================
+#  X64 LIOS - GRUB Theme
+#  Tarjeta de cristal oscuro centrada (760x560) que contiene
+#  cabecera, menu, cuenta atras y ayuda. Seleccion = barra roja fina.
+#  Fuentes: JetBrains Mono -> PF2 (mono_*.pf2, cargadas en grub.cfg)
+#
+#  ⚠️ ORDEN DE CAPAS: GRUB pinta los componentes en orden INVERSO
+#  al declarado (el ultimo del archivo queda al fondo). Por eso la
+#  tarjeta (+ image) va AL FINAL del archivo.
+# ============================================================
+
+title-text: ""
+desktop-image: "background.png"
+desktop-image-scale-method: "crop"
+desktop-color: "#000000"
+
+message-font: "X64 Mono Regular 16"
+message-color: "#cccccc"
+
+terminal-font: "X64 Mono Regular 16"
+terminal-box: "panel_*.png"
+terminal-left: "50%-480"
+terminal-top: "50%-300"
+terminal-width: "960"
+terminal-height: "600"
+terminal-border: "0"
+
+# ---------- Cabecera ----------
++ label {
+    left = 50%-380
+    top = 50%-252
+    width = 760
+    height = 48
+    align = "center"
+    text = "X64 LIOS"
+    font = "X64 Mono Bold 40"
+    color = "#ffffff"
+}
+
++ label {
+    left = 50%-380
+    top = 50%-198
+    width = 760
+    height = 24
+    align = "center"
+    text = "SISTEMA OPERATIVO  ·  GAMING EDITION"
+    font = "X64 Mono Bold 18"
+    color = "#ff3b3b"
+}
+# (linea divisoria roja dibujada en card.png en y = 118)
+
+# ---------- Menu ----------
+# Altura: 6 entradas UEFI * (38 + 4) - 4 + 2*8 padding = 264
++ boot_menu {
+    left = 50%-360
+    top = 50%-138
+    width = 720
+    height = 268
+
+    item_font = "X64 Mono Regular 20"
+    selected_item_font = "X64 Mono Bold 20"
+    item_color = "#a8a8a8"
+    selected_item_color = "#ffffff"
+
+    item_height = 38
+    item_spacing = 4
+    item_padding = 8
+
+    icon_width = 0
+    icon_height = 0
+    item_icon_space = 14
+
+    # Solo select_w (barra roja de 4px) + select_c (degradado).
+    # Sin piezas n/s: la seleccion no invade las lineas vecinas.
+    selected_item_pixmap_style = "select_*.png"
+    scrollbar = false
+}
+
+# ---------- Cuenta atras ----------
++ progress_bar {
+    id = "__timeout__"
+    left = 50%-340
+    top = 50%+160
+    width = 680
+    height = 3
+    fg_color = "#ff2b2b"
+    bg_color = "#262626"
+    border_color = "#262626"
+    show_text = false
+}
+
++ label {
+    id = "__timeout__"
+    left = 50%-380
+    top = 50%+174
+    width = 760
+    height = 22
+    align = "center"
+    text = "Arranque automático en %d s"
+    font = "X64 Mono Regular 16"
+    color = "#9a9a9a"
+}
+
+# ---------- Ayuda ----------
++ label {
+    left = 50%-380
+    top = 50%+228
+    width = 760
+    height = 22
+    align = "center"
+    text = "↑↓ Navegar   •   Enter Arrancar   •   E Editar   •   C Consola"
+    font = "X64 Mono Regular 16"
+    color = "#6f6f6f"
+}
+
+# ---------- Tarjeta (CAPA DE FONDO: debe ir la ultima) ----------
++ image {
+    left = 50%-380
+    top = 50%-280
+    width = 760
+    height = 560
+    file = "card.png"
+}

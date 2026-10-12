@@ -1,6 +1,6 @@
 pkgname=x64-theme-live
 pkgver=1.0.2
-pkgrel=8
+pkgrel=9
 pkgdesc="X64 LIOS Official Theme for Live ISO (KDE Dark + Wallpapers + Logo)"
 arch=('any')
 license=('GPL')
@@ -42,4 +42,9 @@ SCRIPT
 [General]
 background=/usr/share/backgrounds/x64-lios/x64-lios-v2.jpg
 SDDMCONF
+
+    # Instalar tema oficial de GRUB
+    mkdir -p "${pkgdir}/usr/share/grub/themes/x64" "${pkgdir}/boot/grub/themes/x64"
+    cp -r "${startdir}/grub-theme/"* "${pkgdir}/usr/share/grub/themes/x64/"
+    cp -r "${startdir}/grub-theme/"* "${pkgdir}/boot/grub/themes/x64/"
 }
