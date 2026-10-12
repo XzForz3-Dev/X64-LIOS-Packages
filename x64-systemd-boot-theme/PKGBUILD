@@ -1,0 +1,12 @@
+pkgname=x64-systemd-boot-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS systemd-boot Bootloader Theme (Vanilla Skeleton)"
+arch=('any')
+license=('GPL')
+depends=()
+
+package() {
+    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
+    echo "X64 LIOS systemd-boot Theme - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+}

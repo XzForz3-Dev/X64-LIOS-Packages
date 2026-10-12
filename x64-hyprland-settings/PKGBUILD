@@ -1,0 +1,12 @@
+pkgname=x64-hyprland-settings
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Vanilla Skeleton)"
+arch=('any')
+license=('GPL')
+depends=()
+
+package() {
+    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
+    echo "X64 LIOS Hyprland Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+}
