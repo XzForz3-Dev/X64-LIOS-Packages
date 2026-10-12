@@ -459,10 +459,17 @@ def tr(text):
         return TRANSLATIONS[_lang_code][text]
     return text
 
-LOGO_PATH = "/usr/share/pixmaps/x64-logo.png"
-LOCAL_PATH = os.path.join(os.path.dirname(__file__), "x64-logo.png")
-if os.path.exists(LOCAL_PATH):
-    LOGO_PATH = LOCAL_PATH
+LOGO_PATH = "/usr/share/pixmaps/x64-cube.png"
+if not os.path.exists(LOGO_PATH):
+    for candidate in [
+        "/etc/calamares/branding/x64lios/cube.png",
+        "/usr/share/calamares/branding/x64lios/cube.png",
+        os.path.join(os.path.dirname(__file__), "x64-cube.png"),
+        "/usr/share/pixmaps/x64-logo.png"
+    ]:
+        if os.path.exists(candidate):
+            LOGO_PATH = candidate
+            break
 
 class PremiumButton(QPushButton):
     def __init__(self, title, desc, icon_name, url=None, cmd=None):
@@ -642,14 +649,13 @@ class X64Welcome(QWidget):
 
         
 
-        self.btn_install = QPushButton("  " + tr("Install X64 LIOS"))
-        self.btn_install.setIcon(QIcon(LOGO_PATH))
-        self.btn_install.setIconSize(QSize(24, 24))
+        self.btn_install = QPushButton(tr("Install X64 LIOS"))
         self.btn_install.setFixedHeight(60)
         self.btn_install.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #cc0000, stop:1 #800000);
                 color: white; font-weight: bold; font-size: 16px; border-radius: 10px; border: 1px solid #ff1a1a;
+                text-align: center;
             }
             QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000); }
         """)

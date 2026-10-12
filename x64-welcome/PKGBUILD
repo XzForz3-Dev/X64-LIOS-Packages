@@ -1,6 +1,6 @@
 pkgname=x64-welcome
 pkgver=2.1.4
-pkgrel=32
+pkgrel=33
 pkgdesc="X64 LIOS Official Welcome App (Live Environment & Post-Install)"
 arch=('any')
 license=('GPL')
@@ -8,8 +8,10 @@ depends=('python' 'python-pyqt6')
 source=('x64-welcome'
         'x64-welcome.desktop'
         'x64-welcome-icon.png'
-        'x64-welcome-icon.svg')
+        'x64-welcome-icon.svg'
+        'x64-cube.png')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP')
@@ -24,5 +26,8 @@ package() {
     # Instalar los iconos (PNG pixmap y SVG vectorial para temas de escritorio)
     install -Dm644 "${srcdir}/x64-welcome-icon.png" "${pkgdir}/usr/share/pixmaps/x64-welcome-icon.png"
     install -Dm644 "${srcdir}/x64-welcome-icon.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-welcome-icon.svg"
+    
+    # Instalar el logo del cubo 3D
+    install -Dm644 "${srcdir}/x64-cube.png" "${pkgdir}/usr/share/pixmaps/x64-cube.png"
 }
 
