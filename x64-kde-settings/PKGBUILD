@@ -1,0 +1,47 @@
+pkgname=x64-kde-settings
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
+arch=('any')
+license=('GPL')
+install='x64-kde-settings.install'
+depends=('plasma-desktop' 'sddm')
+provides=('cachyos-kde-settings')
+conflicts=('cachyos-kde-settings')
+source=('x64-lios-v2.jpg'
+        'x64-lios-v3.jpg'
+        'x64-logo.png'
+        'x64-layout.js')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+    # Instalar fondos de pantalla
+    mkdir -p "${pkgdir}/usr/share/backgrounds/x64-lios"
+    cp "${srcdir}/x64-lios-v2.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/x64-lios-v3.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    
+    # Instalar logo
+    mkdir -p "${pkgdir}/usr/share/pixmaps"
+    cp "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/pixmaps/x64-logo.png"
+
+    # Instalar layout en ruta segura
+    mkdir -p "${pkgdir}/usr/share/x64-lios"
+    cp "${srcdir}/x64-layout.js" "${pkgdir}/usr/share/x64-lios/x64-layout.js"
+
+    # Crear script de auto-arranque para forzar el tema oscuro y el wallpaper v3 en KDE
+    mkdir -p "${pkgdir}/etc/xdg/autostart"
+    cat << 'SCRIPT' > "${pkgdir}/etc/xdg/autostart/x64-theme-init.desktop"
+[Desktop Entry]
+Type=Application
+Name=X64 LIOS Theme Initializer
+Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop && plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg'
+X-KDE-autostart-phase=1
+SCRIPT
+
+    # Configurar SDDM para que use el wallpaper v2
+    mkdir -p "${pkgdir}/usr/share/sddm/themes/breeze"
+    cat << 'SDDMCONF' > "${pkgdir}/usr/share/sddm/themes/breeze/theme.conf.user"
+[General]
+background=/usr/share/backgrounds/x64-lios/x64-lios-v2.jpg
+SDDMCONF
+}

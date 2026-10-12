@@ -1,0 +1,17 @@
+pkgname=x64-grub-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS GRUB Bootloader Theme (Dark Glass + Crimson Bar + PF2 Fonts)"
+arch=('any')
+license=('GPL')
+depends=()
+provides=('cachyos-grub-theme')
+conflicts=('cachyos-grub-theme')
+
+package() {
+    mkdir -p "${pkgdir}/usr/share/grub/themes/x64"
+    mkdir -p "${pkgdir}/boot/grub/themes/x64"
+
+    cp -r "${startdir}/assets/"* "${pkgdir}/usr/share/grub/themes/x64/"
+    cp -r "${startdir}/assets/"* "${pkgdir}/boot/grub/themes/x64/"
+}
