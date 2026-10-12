@@ -1,8 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
   <defs>
-    <clipPath id="card-clip">
-      <rect x="29" y="15" width="92" height="100" rx="8" ry="8"/>
-    </clipPath>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
@@ -12,10 +9,8 @@
     <!-- Red Card Body -->
     <rect x="29" y="15" width="92" height="100" rx="8" ry="8" fill="#cc0000"/>
 
-    <!-- Diagonal Arrow Shadow (clipped to card) -->
-    <g clip-path="url(#card-clip)">
-      <polygon points="83,30 150,97 150,130 107,130 74.5,97.5 74.5,82.5 97,60 83,60" fill="#a30000"/>
-    </g>
+    <!-- Diagonal Arrow Shadow (Pure Geometry, No clipPath required) -->
+    <polygon points="83,30 121,68 121,90 82,90 74.5,82.5 97,60 83,60" fill="#a30000"/>
 
     <!-- White Arrow -->
     <path d="M66,30 H83 V60 H97 L74.5,82.5 L52,60 H66 Z" fill="#ffffff"/>
