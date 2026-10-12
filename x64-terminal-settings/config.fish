@@ -8,3 +8,4 @@ end
 
 # Inicializar starship
 starship init fish | source
+

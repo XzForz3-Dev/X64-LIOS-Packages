@@ -44,3 +44,4 @@ package() {
     install -d "${pkgdir}/etc/xdg/kitty"
     install -m644 "${srcdir}/kitty.conf" "${pkgdir}/etc/xdg/kitty/kitty.conf"
 }
+

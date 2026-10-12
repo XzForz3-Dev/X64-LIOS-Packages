@@ -22,3 +22,4 @@ truncation_symbol = "…/"
 [character]
 success_symbol = "[❯](#ff2b2b)"
 error_symbol = "[✗](#ff2b2b)"
+
