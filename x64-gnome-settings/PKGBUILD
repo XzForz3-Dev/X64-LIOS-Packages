@@ -10,3 +10,4 @@ package() {
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
     echo "X64 LIOS GNOME Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 }
+
