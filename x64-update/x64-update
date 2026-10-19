@@ -31,6 +31,7 @@ C_BLUE    = "\033[1;34m"
 C_MAGENTA = "\033[1;35m"
 C_CYAN    = "\033[1;36m"
 C_WHITE   = "\033[1;37m"
+C_LIGHT   = "\033[37m"
 C_GRAY    = "\033[1;30m"
 
 BANNER = rf"""{C_RED}
@@ -50,14 +51,15 @@ def ensure_state_dir():
 def wait_for_user(msg="Presione [Enter] para cerrar esta ventana..."):
     print()
     try:
-        input(f"{C_GRAY}▶ {msg}{C_RESET} ")
+        input(f"  {C_CYAN}▶{C_RESET} {C_WHITE}{msg}{C_RESET} ")
     except (KeyboardInterrupt, EOFError):
         pass
 
 def get_telemetry():
     kernel = "Linux Desconocido"
     try:
-        kernel = subprocess.check_output(["uname", "-r"], text=True).strip()
+        raw_k = subprocess.check_output(["uname", "-r"], text=True).strip()
+        kernel = raw_k
     except Exception:
         pass
 
@@ -92,12 +94,16 @@ def get_telemetry():
 
 def print_telemetry_box():
     t = get_telemetry()
-    w = 75
-    print(f"{C_GRAY}  ┌{'─' * w}┐{C_RESET}")
-    print(f"{C_GRAY}  │{C_RESET}  {C_CYAN}Equipo:{C_RESET} {C_WHITE}{t['hostname']:<16}{C_RESET} "
-          f"{C_CYAN}Kernel:{C_RESET} {C_WHITE}{t['kernel']:<24}{C_RESET} "
-          f"{C_CYAN}Uptime:{C_RESET} {C_WHITE}{t['uptime']:<8}{C_RESET}{C_GRAY}│{C_RESET}")
-    print(f"{C_GRAY}  └{'─' * w}┘{C_RESET}")
+    box_w = 75
+    line_content = f"  {C_CYAN}Equipo:{C_RESET} {C_WHITE}{t['hostname']}{C_RESET}     {C_CYAN}Kernel:{C_RESET} {C_WHITE}{t['kernel']}{C_RESET}     {C_CYAN}Uptime:{C_RESET} {C_WHITE}{t['uptime']}{C_RESET}"
+    
+    # Calculate visible length (without ANSI codes)
+    visible_content = f"  Equipo: {t['hostname']}     Kernel: {t['kernel']}     Uptime: {t['uptime']}"
+    pad = max(0, box_w - len(visible_content))
+
+    print(f"{C_GRAY}  ┌{'─' * box_w}┐{C_RESET}")
+    print(f"{C_GRAY}  │{C_RESET}{line_content}{' ' * pad}{C_GRAY}│{C_RESET}")
+    print(f"{C_GRAY}  └{'─' * box_w}┘{C_RESET}")
     print()
 
 class Spinner:
@@ -123,12 +129,13 @@ class Spinner:
         self.thread = threading.Thread(target=self._animate, daemon=True)
         self.thread.start()
 
-    def stop(self, final_msg="", success=True):
+    def stop(self, final_msg="", is_alert=False):
         self.stop_event.set()
         if self.thread:
             self.thread.join()
         if final_msg:
-            icon = f"{C_GREEN}[ ✓ ]{C_RESET}" if success else f"{C_YELLOW}[ ! ]{C_RESET}"
+            # Check mark in green for clean status
+            icon = f"{C_YELLOW}[ ! ]{C_RESET}" if is_alert else f"{C_GREEN}[ ✓ ]{C_RESET}"
             print(f"  {icon} {final_msg}")
 
 def check_official_repos():
@@ -259,8 +266,6 @@ def is_critical_package(name):
     return False
 
 def parse_pkg_line(line):
-    # Formats from checkupdates or yay:
-    # "pkgname oldver -> newver"
     parts = line.split()
     if len(parts) >= 4 and parts[2] == "->":
         pkg = parts[0]
@@ -330,7 +335,6 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
     print()
 
 def run_interactive():
-    # Clear screen for crisp presentation if stdout is a tty
     if sys.stdout.isatty():
         os.system("clear")
 
@@ -341,26 +345,20 @@ def run_interactive():
     sp_repo = Spinner("Consultando repositorios oficiales de X64 LIOS...")
     sp_repo.start()
     repo_pkgs = check_official_repos()
-    sp_repo.stop(
-        f"Repositorios Oficiales: {C_WHITE}{len(repo_pkgs)} paquetes disponibles{C_RESET}",
-        success=(len(repo_pkgs) > 0)
-    )
+    msg_repo = f"Repositorios Oficiales: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(repo_pkgs) == 0 else f"Repositorios Oficiales: {C_WHITE}{len(repo_pkgs)} actualizaciones disponibles{C_RESET}"
+    sp_repo.stop(msg_repo, is_alert=False)
 
     sp_aur = Spinner("Inspeccionando paquetes de usuario (AUR vía Yay/Paru)...")
     sp_aur.start()
     aur_pkgs = check_aur_packages()
-    sp_aur.stop(
-        f"Catálogo AUR: {C_WHITE}{len(aur_pkgs)} paquetes disponibles{C_RESET}",
-        success=(len(aur_pkgs) > 0)
-    )
+    msg_aur = f"Catálogo AUR: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(aur_pkgs) == 0 else f"Catálogo AUR: {C_WHITE}{len(aur_pkgs)} actualizaciones disponibles{C_RESET}"
+    sp_aur.stop(msg_aur, is_alert=False)
 
     sp_fp = Spinner("Verificando aplicaciones en contenedor Flatpak...")
     sp_fp.start()
     flatpak_pkgs = check_flatpak_packages()
-    sp_fp.stop(
-        f"Aplicaciones Flatpak: {C_WHITE}{len(flatpak_pkgs)} actualizaciones listas{C_RESET}",
-        success=(len(flatpak_pkgs) > 0)
-    )
+    msg_fp = f"Aplicaciones Flatpak: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(flatpak_pkgs) == 0 else f"Aplicaciones Flatpak: {C_WHITE}{len(flatpak_pkgs)} actualizaciones listas{C_RESET}"
+    sp_fp.stop(msg_fp, is_alert=False)
 
     total_updates = len(repo_pkgs) + len(aur_pkgs) + len(flatpak_pkgs)
     print()
@@ -382,12 +380,17 @@ def run_interactive():
     except Exception:
         pass
 
-    # Case 0 updates: UP TO DATE! (NEVER auto-close!)
+    # Case 0 updates: UP TO DATE! (Clean symmetrical centered box, NEVER auto-close!)
     if total_updates == 0:
-        print(f"{C_GREEN}{C_BOLD}  ╔════════════════════════════════════════════════════════════════════════════╗{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ║  ✓  ¡TU SISTEMA X64 LIOS ESTÁ BLINDADO Y COMPLETAMENTE ACTUALIZADO!        ║{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ╚════════════════════════════════════════════════════════════════════════════╝{C_RESET}")
-        print(f"\n{C_WHITE}  No hay paquetes ni controladores pendientes en este momento.{C_RESET}")
+        box_width = 75
+        content_text = "✓  ¡TU SISTEMA X64 LIOS ESTÁ BLINDADO Y COMPLETAMENTE AL DÍA!"
+        pad_left = (box_width - len(content_text)) // 2
+        pad_right = box_width - len(content_text) - pad_left
+
+        print(f"{C_GREEN}{C_BOLD}  ╔{'═' * box_width}╗{C_RESET}")
+        print(f"{C_GREEN}{C_BOLD}  ║{' ' * pad_left}{content_text}{' ' * pad_right}║{C_RESET}")
+        print(f"{C_GREEN}{C_BOLD}  ╚{'═' * box_width}╝{C_RESET}")
+        print(f"\n  {C_WHITE}Todos los paquetes, controladores y dependencias están en su última versión.{C_RESET}")
         wait_for_user()
         return 0
 
@@ -400,21 +403,21 @@ def run_interactive():
     print(f"   {C_RED}[1]{C_RESET} {C_WHITE}Actualizar TODO el sistema ahora (Recomendado: Oficial + AUR + Flatpak){C_RESET}")
     print(f"   {C_RED}[2]{C_RESET} {C_WHITE}Solo repositorios oficiales (omitir AUR y Flatpak temporalmente){C_RESET}")
     print(f"   {C_RED}[3]{C_RESET} {C_WHITE}Actualizar y realizar purga de caché de paquetes (pacman -Sc){C_RESET}")
-    print(f"   {C_RED}[4]{C_RESET} {C_GRAY}Cancelar y salir{C_RESET}")
+    print(f"   {C_RED}[4]{C_RESET} {C_LIGHT}Cancelar y salir{C_RESET}")
     print()
 
     choice = "1"
     try:
-        raw_choice = input(f"{C_CYAN}  Seleccione una opción [1-4] (por defecto 1): {C_RESET}").strip()
+        raw_choice = input(f"  {C_CYAN}Seleccione una opción [1-4] (por defecto 1): {C_RESET}").strip()
         if raw_choice:
             choice = raw_choice
     except (KeyboardInterrupt, EOFError):
-        print(f"\n\n{C_YELLOW}Operación cancelada por el usuario.{C_RESET}")
+        print(f"\n\n  {C_YELLOW}Operación cancelada por el usuario.{C_RESET}")
         wait_for_user()
         return 0
 
     if choice == "4":
-        print(f"\n{C_YELLOW}Actualización pospuesta. No se realizaron cambios.{C_RESET}")
+        print(f"\n  {C_YELLOW}Actualización pospuesta. No se realizaron cambios en el equipo.{C_RESET}")
         wait_for_user()
         return 0
 
@@ -438,13 +441,13 @@ def run_interactive():
     try:
         main_ret = subprocess.run(main_cmd).returncode
     except KeyboardInterrupt:
-        print(f"\n{C_RED}[!] Proceso interrumpido por el usuario.{C_RESET}")
+        print(f"\n  {C_RED}[!] Proceso interrumpido por el usuario.{C_RESET}")
         wait_for_user()
         return 1
 
     # Flatpak upgrade if selected and available
     if main_ret == 0 and not only_official and flatpak_pkgs:
-        print(f"\n{C_CYAN}[*] Actualizando aplicaciones Flatpak...{C_RESET}\n")
+        print(f"\n  {C_CYAN}[*] Actualizando aplicaciones Flatpak...{C_RESET}\n")
         try:
             subprocess.run(["flatpak", "update", "-y"])
         except Exception:
@@ -452,14 +455,14 @@ def run_interactive():
 
     # Clean cache if selected
     if main_ret == 0 and clean_cache:
-        print(f"\n{C_YELLOW}[*] Purgando paquetes antiguos de la caché local (pacman -Sc)...{C_RESET}\n")
+        print(f"\n  {C_YELLOW}[*] Purgando paquetes antiguos de la caché local (pacman -Sc)...{C_RESET}\n")
         try:
             subprocess.run(["sudo", "pacman", "-Sc", "--noconfirm"])
         except Exception:
             pass
 
     # Post update check & state refresh
-    print(f"\n{C_CYAN}[*] Actualizando registros de estado del sistema...{C_RESET}")
+    print(f"\n  {C_CYAN}[*] Actualizando registros de estado del sistema...{C_RESET}")
     run_background_check_and_save()
 
     # Kernel reboot check
@@ -474,9 +477,14 @@ def run_interactive():
 
     print()
     if main_ret == 0:
-        print(f"{C_GREEN}{C_BOLD}  ╔════════════════════════════════════════════════════════════════════════════╗{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ║  ✓  ¡SISTEMA X64 LIOS ACTUALIZADO CON ÉXITO!                               ║{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ╚════════════════════════════════════════════════════════════════════════════╝{C_RESET}")
+        box_width = 75
+        success_msg = "✓  ¡SISTEMA X64 LIOS ACTUALIZADO CON ÉXITO!"
+        pad_l = (box_width - len(success_msg)) // 2
+        pad_r = box_width - len(success_msg) - pad_l
+
+        print(f"{C_GREEN}{C_BOLD}  ╔{'═' * box_width}╗{C_RESET}")
+        print(f"{C_GREEN}{C_BOLD}  ║{' ' * pad_l}{success_msg}{' ' * pad_r}║{C_RESET}")
+        print(f"{C_GREEN}{C_BOLD}  ╚{'═' * box_width}╝{C_RESET}")
         
         if kernel_updated:
             print(f"\n{C_YELLOW}{C_BOLD}  ⚠️  ADVERTENCIA DE CIBERSEGURIDAD Y CONTROLADORES:{C_RESET}")
@@ -487,9 +495,8 @@ def run_interactive():
         print(f"{C_RED}{C_BOLD}  ╔════════════════════════════════════════════════════════════════════════════╗{C_RESET}")
         print(f"{C_RED}{C_BOLD}  ║  ✗  EL PROCESO TERMINÓ CON ADVERTENCIAS O ERRORES (Código: {main_ret})        ║{C_RESET}")
         print(f"{C_RED}{C_BOLD}  ╚════════════════════════════════════════════════════════════════════════════╝{C_RESET}")
-        print(f"{C_WHITE}  Revise los mensajes de error mostrados arriba para más detalles.{C_RESET}")
+        print(f"  {C_WHITE}Revise los mensajes de error mostrados arriba para más detalles.{C_RESET}")
 
-    # ALWAYS wait for user confirmation before closing terminal window
     wait_for_user()
     return main_ret
 
