@@ -5,3 +5,4 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/x64-update --check --notify
+
