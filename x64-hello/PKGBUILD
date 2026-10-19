@@ -1,11 +1,12 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
 depends=('python' 'python-pyqt6' 'qt6-svg')
 source=('x64-hello'
+        'x64-toggle-mitigations'
         'x64-hello.desktop'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
@@ -14,11 +15,13 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
+            'SKIP'
             'SKIP')
 
 package() {
-    # Instalar el ejecutable principal
+    # Instalar el ejecutable principal y utilidades
     install -Dm755 "${srcdir}/x64-hello" "${pkgdir}/usr/bin/x64-hello"
+    install -Dm755 "${srcdir}/x64-toggle-mitigations" "${pkgdir}/usr/bin/x64-toggle-mitigations"
     
     # Instalar acceso directo en menú de aplicaciones
     install -Dm644 "${srcdir}/x64-hello.desktop" "${pkgdir}/usr/share/applications/x64-hello.desktop"

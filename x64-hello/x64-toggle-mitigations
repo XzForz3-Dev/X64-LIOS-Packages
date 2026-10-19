@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""
+X64 LIOS Kernel Mitigations Toggle Tool
+Manages 'mitigations=off' kernel parameter across GRUB, Limine, systemd-boot, and rEFInd.
+"""
+import sys
+import os
+import re
+import subprocess
+
+
+def is_running_disabled():
+    try:
+        with open("/proc/cmdline", "r") as f:
+            return "mitigations=off" in f.read().split()
+    except Exception:
+        return False
+
+
+def check_configured_disabled():
+    # GRUB
+    if os.path.exists("/etc/default/grub"):
+        try:
+            with open("/etc/default/grub", "r") as f:
+                for line in f:
+                    if line.strip().startswith("GRUB_CMDLINE_LINUX_DEFAULT"):
+                        if "mitigations=off" in line:
+                            return True
+        except Exception:
+            pass
+    # Limine
+    for lp in ["/etc/default/limine", "/boot/limine.conf", "/boot/efi/limine.conf"]:
+        if os.path.exists(lp):
+            try:
+                with open(lp, "r") as f:
+                    if "mitigations=off" in f.read():
+                        return True
+            except Exception:
+                pass
+    # systemd-boot
+    if os.path.isdir("/boot/loader/entries"):
+        for fname in os.listdir("/boot/loader/entries"):
+            if fname.endswith(".conf"):
+                try:
+                    with open(os.path.join("/boot/loader/entries", fname), "r") as f:
+                        if "mitigations=off" in f.read():
+                            return True
+                except Exception:
+                    pass
+    # rEFInd
+    if os.path.exists("/boot/refind_linux.conf"):
+        try:
+            with open("/boot/refind_linux.conf", "r") as f:
+                if "mitigations=off" in f.read():
+                    return True
+        except Exception:
+            pass
+    return False
+
+
+def get_status():
+    running = is_running_disabled()
+    configured = check_configured_disabled()
+    if running and configured:
+        print("disabled")
+    elif configured and not running:
+        print("disabled_pending_reboot")
+    elif not configured and running:
+        print("enabled_pending_reboot")
+    else:
+        print("enabled")
+
+
+def update_grub(enable_off=True):
+    path = "/etc/default/grub"
+    if not os.path.exists(path):
+        return False
+    with open(path, "r") as f:
+        content = f.read()
+
+    lines = content.splitlines()
+    new_lines = []
+    modified = False
+    for line in lines:
+        if line.strip().startswith("GRUB_CMDLINE_LINUX_DEFAULT="):
+            m = re.match(r'^(GRUB_CMDLINE_LINUX_DEFAULT=)(["\'])(.*)(["\'])$', line.strip())
+            if m:
+                prefix, quote_open, val, quote_close = m.groups()
+                tokens = val.split()
+                if enable_off:
+                    if "mitigations=off" not in tokens:
+                        tokens.append("mitigations=off")
+                        modified = True
+                else:
+                    if "mitigations=off" in tokens:
+                        tokens = [t for t in tokens if t != "mitigations=off"]
+                        modified = True
+                new_val = " ".join(tokens)
+                line = f"{prefix}{quote_open}{new_val}{quote_close}"
+        new_lines.append(line)
+
+    if modified:
+        with open(path, "w") as f:
+            f.write("\n".join(new_lines) + "\n")
+        subprocess.run(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"], check=False)
+        return True
+    return False
+
+
+def update_limine(enable_off=True):
+    modified = False
+    # Check /etc/default/limine
+    lp = "/etc/default/limine"
+    if os.path.exists(lp):
+        with open(lp, "r") as f:
+            lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            if "KERNEL_CMDLINE[default]" in line:
+                if enable_off and "mitigations=off" not in line:
+                    line = re.sub(r'(["\'])$', r' mitigations=off\1', line.strip()) + "\n"
+                    modified = True
+                elif not enable_off and "mitigations=off" in line:
+                    line = line.replace("mitigations=off", "").replace("  ", " ")
+                    modified = True
+            new_lines.append(line)
+        if modified:
+            with open(lp, "w") as f:
+                f.writelines(new_lines)
+            if subprocess.run(["which", "limine-update"], capture_output=True).returncode == 0:
+                subprocess.run(["limine-update"], check=False)
+
+    # Check /boot/limine.conf
+    for cf in ["/boot/limine.conf", "/boot/efi/limine.conf"]:
+        if os.path.exists(cf):
+            with open(cf, "r") as f:
+                content = f.read()
+            if enable_off and "mitigations=off" not in content:
+                content = re.sub(r'(cmdline:.*)', r'\1 mitigations=off', content)
+                with open(cf, "w") as f:
+                    f.write(content)
+                modified = True
+            elif not enable_off and "mitigations=off" in content:
+                content = content.replace("mitigations=off", "").replace("  ", " ")
+                with open(cf, "w") as f:
+                    f.write(content)
+                modified = True
+    return modified
+
+
+def update_systemd_boot(enable_off=True):
+    modified = False
+    entries_dir = "/boot/loader/entries"
+    if os.path.isdir(entries_dir):
+        for fname in os.listdir(entries_dir):
+            if fname.endswith(".conf"):
+                p = os.path.join(entries_dir, fname)
+                with open(p, "r") as f:
+                    lines = f.readlines()
+                new_lines = []
+                for line in lines:
+                    if line.startswith("options"):
+                        tokens = line.strip().split()
+                        if enable_off and "mitigations=off" not in tokens:
+                            tokens.append("mitigations=off")
+                            line = " ".join(tokens) + "\n"
+                            modified = True
+                        elif not enable_off and "mitigations=off" in tokens:
+                            tokens = [t for t in tokens if t != "mitigations=off"]
+                            line = " ".join(tokens) + "\n"
+                            modified = True
+                    new_lines.append(line)
+                if modified:
+                    with open(p, "w") as f:
+                        f.writelines(new_lines)
+    return modified
+
+
+def update_refind(enable_off=True):
+    modified = False
+    path = "/boot/refind_linux.conf"
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            lines = f.readlines()
+        new_lines = []
+        for line in lines:
+            if '"' in line:
+                if enable_off and "mitigations=off" not in line:
+                    line = re.sub(r'"$', ' mitigations=off"', line.strip()) + "\n"
+                    modified = True
+                elif not enable_off and "mitigations=off" in line:
+                    line = line.replace("mitigations=off", "").replace("  ", " ")
+                    modified = True
+            new_lines.append(line)
+        if modified:
+            with open(path, "w") as f:
+                f.writelines(new_lines)
+    return modified
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-s", "--status", "status"):
+        get_status()
+        return
+
+    cmd = sys.argv[1].lower()
+    if cmd in ("off", "disable"):
+        if os.geteuid() != 0:
+            print("Error: Root privileges required to modify bootloader config.", file=sys.stderr)
+            sys.exit(1)
+        update_grub(enable_off=True)
+        update_limine(enable_off=True)
+        update_systemd_boot(enable_off=True)
+        update_refind(enable_off=True)
+        print("SUCCESS: mitigations=off configured. System reboot required.")
+    elif cmd in ("on", "enable", "restore"):
+        if os.geteuid() != 0:
+            print("Error: Root privileges required to modify bootloader config.", file=sys.stderr)
+            sys.exit(1)
+        update_grub(enable_off=False)
+        update_limine(enable_off=False)
+        update_systemd_boot(enable_off=False)
+        update_refind(enable_off=False)
+        print("SUCCESS: Mitigations restored to default secure state. System reboot required.")
+    else:
+        print(f"Usage: {sys.argv[0]} [status|off|on]")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
