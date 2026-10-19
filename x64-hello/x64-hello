@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect,
     QScrollArea, QMenu, QProgressBar, QDialog, QComboBox, QCheckBox, QSizePolicy
 )
-from PyQt6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QPen, QBrush
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QFileSystemWatcher, QProcess
+from PyQt6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QPen, QBrush, QFont, QFontMetrics, QPalette
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QFileSystemWatcher, QProcess, QSize
 
 INSTALLED_PKGS_CACHE = set()
 
@@ -2912,12 +2912,120 @@ def _detect_initial_lang():
     except Exception:
         return "es"
 
+
+NEW_TAB_TRANSLATIONS = {'es': {'CPU & Performance': 'CPU y Rendimiento', 'Network & Security': 'Red y Seguridad', 'Maintenance & Rescue': 'Mantenimiento y Rescate', 'CPU, Scheduler & System Performance': 'CPU, Planificador y Rendimiento', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': 'Conmuta en tiempo real el planificador de tareas del kernel Linux y controla los demonios de rendimiento.', 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'PLANIFICADOR DE CPU EN TIEMPO REAL (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'DEMONIOS DE RENDIMIENTO, MEMORIA Y ALMACENAMIENTO', 'Network, Low-Latency DNS & Security': 'Red, Latencia DNS y Seguridad', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Mide el ping de los servidores DNS en tiempo real, activa el cifrado DNS-over-TLS y gestiona el cortafuegos.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'OPTIMIZADOR DNS Y BENCHMARK DE LATENCIA EN VIVO', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'CORTAFUEGOS, BLUETOOTH Y PILA DE RED DEL KERNEL', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Anti-Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Control de congestión Google BBR, cola justa (fq) y buffers de baja latencia activos en el kernel.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Sin Jitter (PowerSave Off)', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': 'Ahorro energético Wi-Fi desactivado (wifi.powersave = 2) para erradicar picos de ping jugando online.', 'System Maintenance & Rescue': 'Mantenimiento y Rescate del Sistema', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Mantén tus paquetes al día, clasifica los espejos más veloces, limpia la caché y ejecuta herramientas de rescate.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'ACTUALIZACIONES Y MANTENIMIENTO PREVENTIVO', 'SYSTEM DOCTOR & EMERGENCY RESCUE': 'DOCTOR DEL SISTEMA Y RESCATE DE EMERGENCIA', 'Configure ➔': 'Configurar ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Mantener fijo al reiniciar (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Monitor de Recursos (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Panel interactivo en vivo de frecuencias de CPU, temperaturas, procesos y uso de disco.', 'Workload Profile:': 'Perfil:', 'Active Scheduler:': 'Planificador Activo:'}, 'fr': {'CPU & Performance': 'CPU et Performance', 'Network & Security': 'Réseau et Sécurité', 'Maintenance & Rescue': 'Maintenance et Secours', 'CPU, Scheduler & System Performance': 'CPU, Ordonnanceur et Performance', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': "Changez l'ordonnanceur CPU du noyau Linux en temps réel et gérez les démons de performance.", 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'ORDONNANCEUR CPU EN TEMPS RÉEL (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'DÉMONS DE PERFORMANCE, MÉMOIRE ET STOCKAGE', 'Network, Low-Latency DNS & Security': 'Réseau, DNS Basse Latence et Sécurité', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Mesurez le ping DNS en temps réel, activez le chiffrement DNS-over-TLS et gérez votre pare-feu.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'OPTIMISEUR DNS ET BENCHMARK DE PING EN DIRECT', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'PARE-FEU, BLUETOOTH ET PILE RÉSEAU DU NOYAU', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Anti-Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Contrôle de congestion Google BBR, file équitable (fq) et tampons basse latence actifs dans le noyau.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Sans Jitter (PowerSave Off)', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': "Économie d'énergie Wi-Fi désactivée (wifi.powersave = 2) pour éliminer les pics de ping en jeu.", 'System Maintenance & Rescue': 'Maintenance et Secours du Système', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Maintenez vos paquets à jour, classez les miroirs rapides, nettoyez le cache et réparez le système.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'MAINTENANCE PRÉVENTIVE ET MISES À JOUR', 'SYSTEM DOCTOR & EMERGENCY RESCUE': "DOCTEUR SYSTÈME ET SECOURS D'URGENCE", 'Configure ➔': 'Configurer ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Maintenir au démarrage (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Moniteur de Ressources (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Tableau de bord interactif des fréquences CPU, températures, processus et disques.', 'Workload Profile:': 'Profil :', 'Active Scheduler:': 'Ordonnanceur Actif :'}, 'de': {'CPU & Performance': 'CPU & Leistung', 'Network & Security': 'Netzwerk & Sicherheit', 'Maintenance & Rescue': 'Wartung & Rettung', 'CPU, Scheduler & System Performance': 'CPU, Scheduler & Systemleistung', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': 'Wechseln Sie den Linux-Kernel-CPU-Scheduler in Echtzeit und steuern Sie Leistungs-Daemons.', 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'ECHTZEIT-CPU-SCHEDULER (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'LEISTUNGS-, SPEICHER- & LAUFWERKS-DAEMONS', 'Network, Low-Latency DNS & Security': 'Netzwerk, Niedriglatenz-DNS & Sicherheit', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Messen Sie die DNS-Ping-Latenz in Echtzeit, aktivieren Sie DNS-over-TLS und verwalten Sie Ihre Firewall.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'DNS-OPTIMIERER & ECHTZEIT-PING-BENCHMARK', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'FIREWALL, BLUETOOTH & KERNEL-NETZWERK-STACK', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Anti-Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Google BBR-Staukontrolle, Fair Queueing (fq) und Niedriglatenz-Puffer im Kernel aktiv.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Ohne Jitter (PowerSave Aus)', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': 'WLAN-Energiesparmodus deaktiviert (wifi.powersave = 2) gegen Ping-Spitzen beim Online-Gaming.', 'System Maintenance & Rescue': 'Systemwartung & Rettung', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Halten Sie Pakete aktuell, wählen Sie schnellste Spiegelserver, leeren Sie den Cache und reparieren Sie das System.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'VORBEUGENDE WARTUNG & SYSTEM-UPDATES', 'SYSTEM DOCTOR & EMERGENCY RESCUE': 'SYSTEM-DOKTOR & NOTFALL-RETTUNG', 'Configure ➔': 'Anpassen ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Beim Booten beibehalten (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Ressourcenmonitor (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Interaktives Dashboard für CPU-Frequenzen, Temperaturen, Prozesse und Festplatten-I/O.', 'Workload Profile:': 'Profil:', 'Active Scheduler:': 'Aktiver Scheduler:'}, 'it': {'CPU & Performance': 'CPU e Prestazioni', 'Network & Security': 'Rete e Sicurezza', 'Maintenance & Rescue': 'Manutenzione e Ripristino', 'CPU, Scheduler & System Performance': 'CPU, Scheduler e Prestazioni', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': 'Cambia lo scheduler CPU del kernel Linux in tempo reale e controlla i demoni di prestazione.', 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'SCHEDULER CPU IN TEMPO REALE (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'DEMONI DI PRESTAZIONI, MEMORIA E ARCHIVIAZIONE', 'Network, Low-Latency DNS & Security': 'Rete, DNS a Bassa Latenza e Sicurezza', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Misura il ping DNS in tempo reale, attiva la crittografia DNS-over-TLS e gestisci il firewall.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'OTTIMIZZATORE DNS E BENCHMARK PING IN TEMPO REALE', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'FIREWALL, BLUETOOTH E STACK DI RETE DEL KERNEL', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Anti-Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Controllo congestione Google BBR, Fair Queueing (fq) e buffer a bassa latenza attivi nel kernel.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Anti-Jitter (PowerSave Off)', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': 'Risparmio energetico Wi-Fi disattivato (wifi.powersave = 2) per eliminare picchi di ping nei giochi.', 'System Maintenance & Rescue': 'Manutenzione e Ripristino del Sistema', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Mantieni i pacchetti aggiornati, classifica i mirror più veloci, pulisci la cache e ripara il sistema.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'MANUTENZIONE PREVENTIVA E AGGIORNAMENTI', 'SYSTEM DOCTOR & EMERGENCY RESCUE': 'DOTTORE DI SISTEMA E RIPRISTINO DI EMERGENZA', 'Configure ➔': 'Configura ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Mantieni al riavvio (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Monitor Risorse (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Pannello interattivo per frequenze CPU, temperature, processi e utilizzo disco.', 'Workload Profile:': 'Profilo:', 'Active Scheduler:': 'Scheduler Attivo:'}, 'pt': {'CPU & Performance': 'CPU e Desempenho', 'Network & Security': 'Rede e Segurança', 'Maintenance & Rescue': 'Manutenção e Resgate', 'CPU, Scheduler & System Performance': 'CPU, Escalonador e Desempenho', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': 'Altere o escalonador de CPU do kernel Linux em tempo real e controle os daemons de desempenho.', 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'ESCALONADOR DE CPU EM TEMPO REAL (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'DAEMONS DE DESEMPENHO, MEMÓRIA E ARMAZENAMENTO', 'Network, Low-Latency DNS & Security': 'Rede, DNS de Baixa Latência e Segurança', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Meça o ping DNS em tempo real, ative a criptografia DNS-over-TLS e gerencie seu firewall.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'OTIMIZADOR DNS E BENCHMARK DE PING EM TEMPO REAL', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'FIREWALL, BLUETOOTH E PILHA DE REDE DO KERNEL', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Anti-Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Controle de congestionamento Google BBR, Fair Queueing (fq) e buffers de baixa latência ativos no kernel.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Sem Jitter (PowerSave Off)', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': 'Economia de energia Wi-Fi desativada (wifi.powersave = 2) para eliminar picos de ping em jogos online.', 'System Maintenance & Rescue': 'Manutenção e Resgate do Sistema', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Mantenha os pacotes atualizados, classifique os espelhos mais rápidos, limpe o cache e repare o sistema.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'MANUTENÇÃO PREVENTIVA E ATUALIZAÇÕES', 'SYSTEM DOCTOR & EMERGENCY RESCUE': 'DOUTOR DO SISTEMA E RESGATE DE EMERGÊNCIA', 'Configure ➔': 'Configurar ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Manter ao reiniciar (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Monitor de Recursos (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Painel interativo de frequências da CPU, temperaturas, processos e uso de disco.', 'Workload Profile:': 'Perfil:', 'Active Scheduler:': 'Escalonador Ativo:'}, 'ru': {'CPU & Performance': 'CPU и Производительность', 'Network & Security': 'Сеть и Безопасность', 'Maintenance & Rescue': 'Обслуживание и Спасение', 'CPU, Scheduler & System Performance': 'Процессор, Планировщик и Производительность', 'Switch the Linux kernel CPU task scheduler in real time and control background performance daemons.': 'Переключайте планировщик CPU ядра Linux в реальном времени и управляйте службами производительности.', 'REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)': 'ПЛАНИРОВЩИК ПРОЦЕССОРА В РЕАЛЬНОМ ВРЕМЕНИ (BORE / SCHED_EXT)', 'PERFORMANCE, MEMORY & STORAGE DAEMONS': 'СЛУЖБЫ ПРОИЗВОДИТЕЛЬНОСТИ, ПАМЯТИ И ДИСКОВ', 'Network, Low-Latency DNS & Security': 'Сеть, Низколатентный DNS и Безопасность', 'Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall.': 'Измеряйте пинг DNS-серверов в реальном времени, включайте шифрование DNS-over-TLS и управляйте брандмауэром.', 'DNS OPTIMIZER & REAL-TIME PING BENCHMARK': 'ОПТИМИЗАТОР DNS И ТЕСТ ЗАДЕРЖКИ (ПИНГА) В РЕАЛЬНОМ ВРЕМЕНИ', 'FIREWALL, BLUETOOTH & KERNEL NETWORK STACK': 'БРАНДМАУЭР, BLUETOOTH И СЕТЕВОЙ СТЕК ЯДРА', 'TCP BBR + Anti-Bufferbloat': 'TCP BBR + Защита от Bufferbloat', 'Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel.': 'Управление перегрузкой Google BBR, Fair Queueing (fq) и низколатентные буферы активны в ядре.', 'Wi-Fi Low-Jitter (PowerSave Off)': 'Wi-Fi Без Скачков Пинга', 'Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming.': 'Энергосбережение Wi-Fi отключено (wifi.powersave = 2) для устранения скачков пинга в играх.', 'System Maintenance & Rescue': 'Обслуживание и Восстановление Системы', 'Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools.': 'Обновляйте пакеты, выбирайте быстрые зеркала, очищайте кэш и запускайте инструменты восстановления.', 'PREVENTIVE MAINTENANCE & SYSTEM UPDATES': 'ПРОФИЛАКТИКА И ОБНОВЛЕНИЕ СИСТЕМЫ', 'SYSTEM DOCTOR & EMERGENCY RESCUE': 'ДОКТОР СИСТЕМЫ И АВАРИЙНОЕ ВОССТАНОВЛЕНИЕ', 'Configure ➔': 'Настроить ➔', 'Persist at boot (/etc/scx_loader/config.toml)': 'Сохранять при запуске (/etc/scx_loader/config.toml)', 'Live Resource Monitor (btop)': 'Монитор Ресурсов (btop)', 'Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O.': 'Интерактивная панель частот процессора, температур, процессов и дискового ввода-вывода.', 'Workload Profile:': 'Профиль:', 'Active Scheduler:': 'Активный Планировщик:'}}
+for _lc, _d in NEW_TAB_TRANSLATIONS.items():
+    if _lc in TRANSLATIONS:
+        TRANSLATIONS[_lc].update(_d)
+
+
+# Compact card titles so 3-column grids never clip in any language
+FIT_TRANSLATIONS = {
+    'en': {
+        'Reset Pacman Keyrings': 'Reset GPG Keyrings',
+        'Unlock Pacman Database': 'Unlock Pacman (db.lck)',
+        'Reinstall All Native Packages': 'Reinstall Native Packages',
+        'KWin (Wayland) Debug Console': 'KWin Debug Console',
+    },
+    'es': {
+        'Reset Pacman Keyrings': 'Restablecer Keyrings GPG',
+        'Unlock Pacman Database': 'Desbloquear Pacman (db.lck)',
+        'Reinstall All Native Packages': 'Reinstalar Paquetes Nativos',
+        'KWin (Wayland) Debug Console': 'Consola de Depuración KWin',
+    },
+    'fr': {
+        'Reset Pacman Keyrings': 'Réinitialiser Clés GPG',
+        'Unlock Pacman Database': 'Déverrouiller Pacman (db.lck)',
+        'Reinstall All Native Packages': 'Réinstaller Paquets Natifs',
+        'KWin (Wayland) Debug Console': 'Console de Débogage KWin',
+        'Ananicy-cpp Priority': 'Ananicy-cpp',
+    },
+    'de': {
+        'Reset Pacman Keyrings': 'GPG-Schlüssel zurücksetzen',
+        'Unlock Pacman Database': 'Pacman entsperren (db.lck)',
+        'Reinstall All Native Packages': 'Native Pakete neu installieren',
+        'KWin (Wayland) Debug Console': 'KWin-Debug-Konsole',
+        'Ananicy-cpp Priority': 'Ananicy-cpp',
+        'Systemd-OOMD Anti-Freeze': 'Systemd-OOMD',
+        'LIOS Update Notifier': 'LIOS Update-Info',
+    },
+    'it': {
+        'Reset Pacman Keyrings': 'Ripristina Chiavi GPG',
+        'Unlock Pacman Database': 'Sblocca Pacman (db.lck)',
+        'Reinstall All Native Packages': 'Reinstalla Pacchetti Nativi',
+        'KWin (Wayland) Debug Console': 'Console Debug KWin',
+        'Ananicy-cpp Priority': 'Ananicy-cpp',
+        'Profile-sync-daemon (RAM Browser)': 'Browser in RAM',
+        'LIOS Update Notifier': 'Avvisi LIOS Update',
+    },
+    'pt': {
+        'Reset Pacman Keyrings': 'Redefinir Chaves GPG',
+        'Unlock Pacman Database': 'Desbloquear Pacman (db.lck)',
+        'Reinstall All Native Packages': 'Reinstalar Pacotes Nativos',
+        'KWin (Wayland) Debug Console': 'Console de Depuração KWin',
+        'Bpftune Kernel Auto-Tuning': 'Bpftune Auto-Tuning',
+    },
+    'ru': {
+        'Reset Pacman Keyrings': 'Сброс ключей GPG',
+        'Unlock Pacman Database': 'Разблокировать Pacman',
+        'Reinstall All Native Packages': 'Переустановить пакеты',
+        'KWin (Wayland) Debug Console': 'Консоль отладки KWin',
+        'Profile-sync-daemon (RAM Browser)': 'Браузер в ОЗУ',
+        'BORE (Kernel Default)': 'BORE (Стандарт)',
+        'CPU & Performance': 'CPU и Скорость',
+    },
+}
+for _lc, _d in FIT_TRANSLATIONS.items():
+    if _lc in TRANSLATIONS:
+        TRANSLATIONS[_lc].update(_d)
+    elif _lc == 'en':
+        TRANSLATIONS['en'] = dict(_d)
+
 _lang_code = _detect_initial_lang()
 
 def tr(text):
     if _lang_code in TRANSLATIONS and text in TRANSLATIONS[_lang_code]:
         return TRANSLATIONS[_lang_code][text]
     return text
+
+
+class FitLabel(QLabel):
+    """Single-line QLabel that shrinks its font (down to min_ratio) and finally
+    elides with '…' so text never gets hard-clipped in narrow grid cards."""
+
+    def __init__(self, text="", parent=None, min_ratio=0.82):
+        super().__init__(text, parent)
+        self._min_ratio = min_ratio
+        self.setMinimumWidth(0)
+
+    def minimumSizeHint(self):
+        return QSize(0, super().minimumSizeHint().height())
+
+    def paintEvent(self, event):
+        text = self.text()
+        if not text or self.textFormat() == Qt.TextFormat.RichText or self.wordWrap():
+            return super().paintEvent(event)
+        rect = self.contentsRect()
+        font = QFont(self.font())
+        use_px = font.pixelSize() > 0
+        base = float(font.pixelSize()) if use_px else font.pointSizeF()
+        size = base
+        fm = QFontMetrics(font)
+        while fm.horizontalAdvance(text) > rect.width() and size > base * self._min_ratio:
+            size -= 0.5
+            if use_px:
+                font.setPixelSize(max(1, int(round(size))))
+            else:
+                font.setPointSizeF(size)
+            fm = QFontMetrics(font)
+        if fm.horizontalAdvance(text) > rect.width():
+            text = fm.elidedText(text, Qt.TextElideMode.ElideRight, rect.width())
+        painter = QPainter(self)
+        painter.setFont(font)
+        painter.setPen(self.palette().color(QPalette.ColorRole.WindowText))
+        painter.drawText(rect, int(self.alignment()), text)
+        painter.end()
+
 
 LOGO_PATH = "/usr/share/pixmaps/x64-cube.png"
 if not os.path.exists(LOGO_PATH):
@@ -2943,6 +3051,9 @@ SCROLLBAR_STYLE = """
 
 
 SVG_ICONS = {
+    "home": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#ff3333" fill-opacity="0.14"/><polyline points="9 22 9 12 15 12 15 22" stroke="#ffffff"/></svg>''',
+    "info": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#ff3333" fill-opacity="0.14"/><line x1="12" y1="16" x2="12" y2="12" stroke="#ffffff" stroke-width="2.4"/><line x1="12" y1="8" x2="12.01" y2="8" stroke="#ffffff" stroke-width="3"/></svg>''',
+    "wifi": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0" stroke="#ffffff"/><line x1="12" y1="20" x2="12.01" y2="20" stroke="#ffffff" stroke-width="3"/></svg>''',
     "cpu": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" stroke="#ffffff"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>''',
     "memory": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4" stroke="#ffffff"/><path d="M5 18v3M9 18v3M15 18v3M19 18v3"/></svg>''',
     "video-display": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3" stroke="#ffffff"/><path d="M8 21h8M12 17v4"/></svg>''',
@@ -3035,6 +3146,7 @@ DNS_PROVIDERS = [
         "ping_ip": "208.67.222.222"
     }
 ]
+_BG_WORKERS = set()
 
 
 class DnsPingWorker(QThread):
@@ -3071,15 +3183,15 @@ class DnsPingWorker(QThread):
         self.results_ready.emit(latencies)
 
 
-class DnsConfigDialog(QDialog):
+class DnsOptimizerPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(tr("X64 DNS & Low-Latency Optimizer"))
-        self.setFixedSize(760, 520)
+        self.setObjectName("DnsOptimizerPanel")
         self.setStyleSheet("""
-            QDialog {
-                background-color: #0b0b0e;
-                border: 1px solid #2a2a32;
+            QFrame#DnsOptimizerPanel {
+                background-color: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 12px;
             }
             QLabel {
                 color: #ffffff;
@@ -3090,8 +3202,8 @@ class DnsConfigDialog(QDialog):
                 color: #ffffff;
                 border: 1px solid #33333e;
                 border-radius: 8px;
-                padding: 7px 14px;
-                font-size: 13px;
+                padding: 5px 12px;
+                font-size: 12.5px;
                 font-weight: bold;
             }
             QComboBox:hover {
@@ -3100,7 +3212,7 @@ class DnsConfigDialog(QDialog):
             QComboBox::drop-down {
                 border: none;
                 background: transparent;
-                width: 26px;
+                width: 24px;
             }
             QComboBox QAbstractItemView {
                 background-color: #121216;
@@ -3111,14 +3223,14 @@ class DnsConfigDialog(QDialog):
             QCheckBox {
                 background: transparent;
                 color: #e0e0e0;
-                font-size: 13px;
+                font-size: 12.5px;
                 font-weight: bold;
-                spacing: 10px;
-                padding: 4px 2px;
+                spacing: 8px;
+                padding: 2px;
             }
             QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
+                width: 17px;
+                height: 17px;
                 border-radius: 4px;
                 border: 1px solid #555560;
                 background-color: #16161d;
@@ -3129,36 +3241,35 @@ class DnsConfigDialog(QDialog):
             }
         """)
         self._ping_worker = None
+        self._has_benchmarked = False
         self.selected_idx = 0
         self.provider_buttons = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(26, 22, 26, 22)
-        layout.setSpacing(12)
-
-        hdr = QLabel(tr("X64 DNS & Low-Latency Optimizer"))
-        hdr.setStyleSheet("color: #ffffff; font-size: 21px; font-weight: bold;")
-        layout.addWidget(hdr)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(10)
 
         conn_row = QHBoxLayout()
-        conn_row.setSpacing(12)
+        conn_row.setSpacing(10)
         lbl_conn = QLabel(tr("Active Network Connection:"))
-        lbl_conn.setStyleSheet("color: #aaaaaa; font-size: 13px; font-weight: bold;")
+        lbl_conn.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
         self.conn_combo = QComboBox()
+        self.conn_combo.setMinimumWidth(210)
+        self.conn_combo.setFixedHeight(34)
         self.populate_connections()
         conn_row.addWidget(lbl_conn)
-        conn_row.addWidget(self.conn_combo, 1)
+        conn_row.addWidget(self.conn_combo)
 
         self.btn_ping = QPushButton(tr("⚡ Benchmark DNS Latency (Ping)"))
         self.btn_ping.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_ping.setFixedHeight(38)
+        self.btn_ping.setFixedHeight(34)
         self.btn_ping.setStyleSheet("""
             QPushButton {
                 background-color: rgba(204, 0, 0, 0.16);
                 color: #ff4d4d;
                 border: 1px solid #cc0000;
                 border-radius: 8px;
-                padding: 0 16px;
+                padding: 0 14px;
                 font-weight: bold;
                 font-size: 12px;
             }
@@ -3169,85 +3280,88 @@ class DnsConfigDialog(QDialog):
         """)
         self.btn_ping.clicked.connect(self.run_ping_benchmark)
         conn_row.addWidget(self.btn_ping)
+
+        self.status_lbl = FitLabel("", min_ratio=0.85)
+        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        conn_row.addSpacing(6)
+        conn_row.addWidget(self.status_lbl, 1)
         layout.addLayout(conn_row)
 
+        # 3x2 Grid of 6 DNS Providers
         grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(10)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        for col in range(3):
+            grid.setColumnStretch(col, 1)
 
         for i, p in enumerate(DNS_PROVIDERS):
             btn = QPushButton()
             btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
             btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-            btn.setFixedHeight(82)
+            btn.setFixedHeight(78)
             btn.setMinimumWidth(0)
             btn.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked=False, idx=i: self.select_provider(idx))
 
             b_lay = QVBoxLayout(btn)
-            b_lay.setContentsMargins(14, 9, 14, 9)
-            b_lay.setSpacing(3)
+            b_lay.setContentsMargins(12, 7, 12, 7)
+            b_lay.setSpacing(2)
 
             top_h = QHBoxLayout()
             lbl_n = QLabel(p["name"])
             lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14px; border: none; background: transparent;")
+            lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
             lbl_ms = QLabel("● — ms")
             lbl_ms.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_ms.setStyleSheet("""
                 color: #888888; background-color: rgba(255,255,255,0.05);
                 border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-                padding: 2px 8px; font-weight: bold; font-size: 11px;
+                padding: 2px 7px; font-weight: bold; font-size: 10.5px;
             """)
             top_h.addWidget(lbl_n)
             top_h.addStretch(1)
             top_h.addWidget(lbl_ms)
             b_lay.addLayout(top_h)
 
-            ipv4_pretty = p["ipv4"].replace(",", " / ")
-            lbl_ip = QLabel(f"{tr(p['tag'])}  •  {ipv4_pretty}")
+            ipv4_pretty = p["ipv4"].split(",")[0]
+            lbl_ip = FitLabel(f"{tr(p['tag'])}  •  {ipv4_pretty}")
             lbl_ip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_ip.setStyleSheet("color: #bbbbbb; font-size: 11px; border: none; background: transparent;")
+            lbl_ip.setStyleSheet("color: #ff4d4d; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             b_lay.addWidget(lbl_ip)
 
             lbl_dot = QLabel(f"TLS (DoT): {p['dot']}")
             lbl_dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_dot.setStyleSheet("color: #808088; font-size: 11px; border: none; background: transparent;")
+            lbl_dot.setStyleSheet("color: #888894; font-size: 10.5px; border: none; background: transparent;")
             b_lay.addWidget(lbl_dot)
 
             self.provider_buttons.append((btn, lbl_ms))
-            grid.addWidget(btn, i // 2, i % 2)
+            grid.addWidget(btn, i // 3, i % 3)
 
         layout.addLayout(grid)
         self.select_provider(0)
 
+        btm_row = QHBoxLayout()
+        btm_row.setSpacing(10)
+
         self.chk_dot = QCheckBox(tr("Enable Encrypted DNS (DNS-over-TLS / DoT)"))
         self.chk_dot.setChecked(True)
         self.chk_dot.setCursor(Qt.CursorShape.PointingHandCursor)
-        layout.addWidget(self.chk_dot)
+        btm_row.addWidget(self.chk_dot)
+        btm_row.addStretch(1)
 
-        self.status_lbl = QLabel("")
-        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
-        layout.addWidget(self.status_lbl)
-
-        layout.addStretch(1)
-
-        btn_row = QHBoxLayout()
         btn_reset = QPushButton(tr("Reset to Automatic (DHCP)"))
         btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_reset.setFixedHeight(40)
+        btn_reset.setFixedHeight(34)
         btn_reset.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.06);
                 color: #cccccc;
                 border: 1px solid #33333c;
                 border-radius: 8px;
-                padding: 0 16px;
+                padding: 0 14px;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 11.5px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.12);
@@ -3258,16 +3372,16 @@ class DnsConfigDialog(QDialog):
 
         btn_apply = QPushButton(tr("Apply Selected DNS"))
         btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_apply.setFixedHeight(40)
+        btn_apply.setFixedHeight(34)
         btn_apply.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #d60000, stop:1 #850000);
                 color: #ffffff;
                 border: 1px solid #ff3333;
                 border-radius: 8px;
-                padding: 0 22px;
+                padding: 0 18px;
                 font-weight: bold;
-                font-size: 13px;
+                font-size: 12px;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000);
@@ -3275,33 +3389,9 @@ class DnsConfigDialog(QDialog):
         """)
         btn_apply.clicked.connect(self.apply_dns)
 
-        btn_close = QPushButton(tr("Close"))
-        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setFixedHeight(40)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #888888;
-                border: 1px solid #2a2a32;
-                border-radius: 8px;
-                padding: 0 16px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                color: #ffffff;
-                border: 1px solid #555555;
-            }
-        """)
-        btn_close.clicked.connect(self.accept)
-
-        btn_row.addWidget(btn_reset)
-        btn_row.addStretch(1)
-        btn_row.addWidget(btn_close)
-        btn_row.addWidget(btn_apply)
-        layout.addLayout(btn_row)
-
-        QTimer.singleShot(150, self.run_ping_benchmark)
+        btm_row.addWidget(btn_reset)
+        btm_row.addWidget(btn_apply)
+        layout.addLayout(btm_row)
 
     def populate_connections(self):
         self.conn_combo.clear()
@@ -3360,11 +3450,15 @@ class DnsConfigDialog(QDialog):
     def run_ping_benchmark(self):
         if self._ping_worker and self._ping_worker.isRunning():
             return
-        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12.5px; font-weight: bold; background: transparent;")
+        self._has_benchmarked = True
+        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(tr("Testing ping to all DNS servers..."))
-        self._ping_worker = DnsPingWorker(self)
-        self._ping_worker.results_ready.connect(self.on_ping_results)
-        self._ping_worker.start()
+        worker = DnsPingWorker()
+        self._ping_worker = worker
+        _BG_WORKERS.add(worker)
+        worker.results_ready.connect(self.on_ping_results)
+        worker.finished.connect(lambda w=worker: _BG_WORKERS.discard(w))
+        worker.start()
 
     def on_ping_results(self, latencies):
         best_idx = None
@@ -3378,19 +3472,19 @@ class DnsConfigDialog(QDialog):
                     lbl_ms.setStyleSheet("""
                         color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
                         border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
-                        padding: 2px 8px; font-weight: bold; font-size: 11px;
+                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                     """)
                 elif ms < 85:
                     lbl_ms.setStyleSheet("""
                         color: #f1c40f; background-color: rgba(241, 196, 15, 0.14);
                         border: 1px solid rgba(241, 196, 15, 0.45); border-radius: 6px;
-                        padding: 2px 8px; font-weight: bold; font-size: 11px;
+                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                     """)
                 else:
                     lbl_ms.setStyleSheet("""
                         color: #e67e22; background-color: rgba(230, 126, 34, 0.14);
                         border: 1px solid rgba(230, 126, 34, 0.45); border-radius: 6px;
-                        padding: 2px 8px; font-weight: bold; font-size: 11px;
+                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                     """)
                 if ms < best_ms:
                     best_ms = ms
@@ -3400,26 +3494,26 @@ class DnsConfigDialog(QDialog):
                 lbl_ms.setStyleSheet("""
                     color: #777777; background-color: rgba(255,255,255,0.04);
                     border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-                    padding: 2px 8px; font-weight: bold; font-size: 11px;
+                    padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                 """)
         if best_idx is not None:
             self.select_provider(best_idx)
-            self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
+            self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
             self.status_lbl.setText(f"✓ {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
         else:
             self.status_lbl.setText("")
 
     def _run_dns_pkexec(self, sh_cmd, pending_msg, success_msg):
-        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12.5px; font-weight: bold; background: transparent;")
+        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(f"⟳ {pending_msg}")
         proc = QProcess(self)
 
         def _on_done(exit_code, _exit_status):
             if exit_code == 0:
-                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
             else:
-                self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✕ {tr('Operation canceled or authentication failed.')}")
             proc.deleteLater()
 
@@ -3474,7 +3568,7 @@ SCX_SCHEDULERS = [
     },
     {
         "id": "lavd",
-        "name": "scx_lavd (Valve / SteamOS)",
+        "name": "scx_lavd (Valve)",
         "badge": "eBPF • Gaming",
         "default_mode": "gaming",
         "tag": "Competitive Gaming & 1% Low FPS",
@@ -3552,7 +3646,6 @@ def query_scxctl_runtime():
         )
         out = res.stdout.strip()
         if out.lower().startswith("running "):
-            # e.g. "running Lavd in Gaming mode"
             parts = out.split()
             sched_raw = parts[1].lower() if len(parts) > 1 else "lavd"
             mode_raw = parts[3].lower() if len(parts) > 3 else "auto"
@@ -3564,19 +3657,19 @@ def query_scxctl_runtime():
     if cur.startswith("scx_"):
         s_id = cur.replace("scx_", "").split()[0].strip().lower()
         return s_id, "auto", cur
-    return "bore", "auto", "BORE (Kernel Default)"
+    return "bore", "auto", tr("BORE (Kernel Default)")
 
 
-class ScxSchedulerDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent_app = parent
-        self.setWindowTitle(tr("X64 CPU Scheduler & Latency Selector"))
-        self.setFixedSize(790, 565)
+class ScxSchedulerPanel(QFrame):
+    def __init__(self, parent_app=None):
+        super().__init__(parent_app)
+        self.parent_app = parent_app
+        self.setObjectName("ScxSchedulerPanel")
         self.setStyleSheet("""
-            QDialog {
-                background-color: #0b0b0e;
-                border: 1px solid #2a2a32;
+            QFrame#ScxSchedulerPanel {
+                background-color: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 12px;
             }
             QLabel {
                 color: #ffffff;
@@ -3585,14 +3678,14 @@ class ScxSchedulerDialog(QDialog):
             QCheckBox {
                 background: transparent;
                 color: #e0e0e0;
-                font-size: 12.5px;
+                font-size: 12px;
                 font-weight: bold;
-                spacing: 10px;
-                padding: 4px 2px;
+                spacing: 8px;
+                padding: 2px;
             }
             QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
+                width: 17px;
+                height: 17px;
                 border-radius: 4px;
                 border: 1px solid #555560;
                 background-color: #16161d;
@@ -3611,76 +3704,61 @@ class ScxSchedulerDialog(QDialog):
         self.mode_buttons = {}
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(26, 20, 26, 20)
+        layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(10)
 
-        hdr = QLabel(tr("X64 CPU Scheduler & Latency Selector"))
-        hdr.setStyleSheet("color: #ffffff; font-size: 21px; font-weight: bold;")
-        layout.addWidget(hdr)
+        # Top Status + Workload Mode Row
+        top_bar = QHBoxLayout()
+        top_bar.setSpacing(8)
 
-        sub = QLabel(tr("Switch the Linux kernel CPU task scheduler in real time with zero reboot required."))
-        sub.setStyleSheet("color: #a0a0a0; font-size: 12.5px;")
-        layout.addWidget(sub)
-
-        # Active Kernel Scheduler Bar
-        status_frame = QFrame()
-        status_frame.setFixedHeight(42)
-        status_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 9px;
-            }
-        """)
-        sf_hbox = QHBoxLayout(status_frame)
-        sf_hbox.setContentsMargins(14, 0, 14, 0)
-        sf_hbox.setSpacing(10)
-
-        lbl_act_title = QLabel(tr("Active Kernel Scheduler:"))
+        lbl_act_title = QLabel(tr("Active Scheduler:"))
         lbl_act_title.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
-        sf_hbox.addWidget(lbl_act_title)
+        top_bar.addWidget(lbl_act_title)
 
         self.lbl_active_pill = QLabel("● BORE")
-        self.lbl_active_pill.setStyleSheet("""
-            color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
-            border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
-            padding: 3px 10px; font-weight: bold; font-size: 12px;
-        """)
-        sf_hbox.addWidget(self.lbl_active_pill)
-        sf_hbox.addStretch(1)
+        top_bar.addWidget(self.lbl_active_pill)
+        top_bar.addStretch(1)
 
-        kernel_rel = platform.release().replace('-cachyos', '')
-        lbl_kern = QLabel(f"Kernel {kernel_rel}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}")
-        lbl_kern.setStyleSheet("color: #777782; font-size: 11.5px; font-weight: bold; border: none;")
-        sf_hbox.addWidget(lbl_kern)
-        layout.addWidget(status_frame)
+        lbl_mode = QLabel(tr("Workload Profile:"))
+        lbl_mode.setStyleSheet("color: #bbbbbb; font-size: 12px; font-weight: bold; border: none;")
+        top_bar.addWidget(lbl_mode)
 
-        # 2x3 Grid of Schedulers
+        for m_id, m_label, _m_toml in SCX_MODES:
+            m_btn = QPushButton(tr(m_label))
+            m_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            m_btn.setFixedHeight(30)
+            m_btn.clicked.connect(lambda checked=False, mid=m_id: self.select_mode(mid))
+            self.mode_buttons[m_id] = m_btn
+            top_bar.addWidget(m_btn)
+
+        layout.addLayout(top_bar)
+
+        # 3x2 Symmetric Grid of 6 Schedulers
         grid = QGridLayout()
-        grid.setHorizontalSpacing(12)
-        grid.setVerticalSpacing(9)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        for col in range(3):
+            grid.setColumnStretch(col, 1)
 
         for i, s in enumerate(SCX_SCHEDULERS):
             btn = QPushButton()
             btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
             btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-            btn.setFixedHeight(86)
+            btn.setFixedHeight(88)
             btn.setMinimumWidth(0)
             btn.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked=False, idx=i: self.select_scheduler(idx, auto_mode=True))
 
             b_lay = QVBoxLayout(btn)
-            b_lay.setContentsMargins(14, 8, 14, 8)
+            b_lay.setContentsMargins(12, 8, 12, 8)
             b_lay.setSpacing(2)
 
             top_h = QHBoxLayout()
             disp_name = tr(s["name"]) if s["id"] == "bore" else s["name"]
-            lbl_n = QLabel(disp_name)
+            lbl_n = FitLabel(disp_name)
             lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.5px; border: none; background: transparent;")
+            lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
 
             lbl_badge = QLabel(s["badge"])
             lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -3689,65 +3767,51 @@ class ScxSchedulerDialog(QDialog):
             top_h.addWidget(lbl_badge)
             b_lay.addLayout(top_h)
 
-            lbl_tag = QLabel(tr(s["tag"]))
+            lbl_tag = FitLabel(tr(s["tag"]))
             lbl_tag.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_tag.setStyleSheet("color: #ff4d4d; font-size: 11px; font-weight: bold; border: none; background: transparent;")
+            lbl_tag.setStyleSheet("color: #ff4d4d; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             b_lay.addWidget(lbl_tag)
 
             lbl_desc = QLabel(tr(s["desc"]))
             lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_desc.setWordWrap(True)
-            lbl_desc.setStyleSheet("color: #9999a2; font-size: 10.5px; border: none; background: transparent;")
+            _hfw = lbl_desc.sizePolicy()
+            _hfw.setHeightForWidth(True)
+            lbl_desc.setSizePolicy(_hfw)
+            lbl_desc.setStyleSheet("color: #9999a4; font-size: 10px; border: none; background: transparent;")
             b_lay.addWidget(lbl_desc)
 
             self.sched_buttons.append((btn, lbl_badge, s))
-            grid.addWidget(btn, i // 2, i % 2)
+            grid.addWidget(btn, i // 3, i % 3)
 
         layout.addLayout(grid)
 
-        # Mode Selector Row
-        mode_row = QHBoxLayout()
-        mode_row.setSpacing(8)
-        lbl_mode = QLabel(tr("Workload Profile (scx_loader):"))
-        lbl_mode.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold;")
-        mode_row.addWidget(lbl_mode)
-        mode_row.addSpacing(4)
+        # Bottom Action & Persistence Bar
+        btm_row = QHBoxLayout()
+        btm_row.setSpacing(10)
 
-        for m_id, m_label, _m_toml in SCX_MODES:
-            m_btn = QPushButton(tr(m_label))
-            m_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            m_btn.setFixedHeight(32)
-            m_btn.clicked.connect(lambda checked=False, mid=m_id: self.select_mode(mid))
-            self.mode_buttons[m_id] = m_btn
-            mode_row.addWidget(m_btn)
-
-        mode_row.addStretch(1)
-        layout.addLayout(mode_row)
-
-        self.chk_persist = QCheckBox(tr("Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)"))
+        self.chk_persist = QCheckBox(tr("Persist at boot (/etc/scx_loader/config.toml)"))
         self.chk_persist.setChecked(False)
         self.chk_persist.setCursor(Qt.CursorShape.PointingHandCursor)
-        layout.addWidget(self.chk_persist)
+        btm_row.addWidget(self.chk_persist)
 
-        self.status_lbl = QLabel("")
-        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
-        layout.addWidget(self.status_lbl)
+        self.status_lbl = FitLabel("", min_ratio=0.85)
+        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setFixedHeight(16)
+        btm_row.addStretch(1)
 
-        layout.addStretch(1)
-
-        btn_row = QHBoxLayout()
         btn_reset = QPushButton(tr("Reset to BORE Default"))
         btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_reset.setFixedHeight(40)
+        btn_reset.setFixedHeight(34)
         btn_reset.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.06);
                 color: #cccccc;
                 border: 1px solid #33333c;
                 border-radius: 8px;
-                padding: 0 16px;
+                padding: 0 14px;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 11.5px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.12);
@@ -3758,16 +3822,16 @@ class ScxSchedulerDialog(QDialog):
 
         btn_apply = QPushButton(tr("Apply Selected Scheduler"))
         btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_apply.setFixedHeight(40)
+        btn_apply.setFixedHeight(34)
         btn_apply.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #d60000, stop:1 #850000);
                 color: #ffffff;
                 border: 1px solid #ff3333;
                 border-radius: 8px;
-                padding: 0 22px;
+                padding: 0 18px;
                 font-weight: bold;
-                font-size: 13px;
+                font-size: 12px;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000);
@@ -3775,31 +3839,10 @@ class ScxSchedulerDialog(QDialog):
         """)
         btn_apply.clicked.connect(self.apply_scheduler)
 
-        btn_close = QPushButton(tr("Close"))
-        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_close.setFixedHeight(40)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #888888;
-                border: 1px solid #2a2a32;
-                border-radius: 8px;
-                padding: 0 16px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                color: #ffffff;
-                border: 1px solid #555555;
-            }
-        """)
-        btn_close.clicked.connect(self.accept)
-
-        btn_row.addWidget(btn_reset)
-        btn_row.addStretch(1)
-        btn_row.addWidget(btn_close)
-        btn_row.addWidget(btn_apply)
-        layout.addLayout(btn_row)
+        btm_row.addWidget(btn_reset)
+        btm_row.addWidget(btn_apply)
+        layout.addLayout(btm_row)
+        layout.addWidget(self.status_lbl)
 
         self.refresh_runtime_state(select_active=True)
 
@@ -3807,24 +3850,43 @@ class ScxSchedulerDialog(QDialog):
         s_id, m_id, pretty = query_scxctl_runtime()
         self.active_sched_id = s_id
         self.active_mode_id = m_id
-        self.lbl_active_pill.setText(f"● {pretty}")
+        self.lbl_active_pill.setText(f" ●  {pretty} ")
+        if s_id == "bore":
+            self.lbl_active_pill.setStyleSheet("""
+                color: #38bdf8; background-color: rgba(56, 189, 248, 0.14);
+                border: 1px solid rgba(56, 189, 248, 0.55); border-radius: 6px;
+                padding: 3px 10px; font-weight: bold; font-size: 11.5px;
+            """)
+        else:
+            self.lbl_active_pill.setStyleSheet("""
+                color: #2ecc71; background-color: rgba(46, 204, 113, 0.16);
+                border: 1px solid rgba(46, 204, 113, 0.55); border-radius: 6px;
+                padding: 3px 10px; font-weight: bold; font-size: 11.5px;
+            """)
 
         found_idx = 0
         for i, (_btn, lbl_badge, s_info) in enumerate(self.sched_buttons):
             if s_info["id"] == s_id:
                 found_idx = i
                 lbl_badge.setText(f"● {tr('ACTIVE')}")
-                lbl_badge.setStyleSheet("""
-                    color: #2ecc71; background-color: rgba(46, 204, 113, 0.15);
-                    border: 1px solid rgba(46, 204, 113, 0.5); border-radius: 6px;
-                    padding: 2px 8px; font-weight: bold; font-size: 10.5px;
-                """)
+                if s_id == "bore":
+                    lbl_badge.setStyleSheet("""
+                        color: #38bdf8; background-color: rgba(56, 189, 248, 0.15);
+                        border: 1px solid rgba(56, 189, 248, 0.55); border-radius: 6px;
+                        padding: 2px 7px; font-weight: bold; font-size: 10px;
+                    """)
+                else:
+                    lbl_badge.setStyleSheet("""
+                        color: #2ecc71; background-color: rgba(46, 204, 113, 0.16);
+                        border: 1px solid rgba(46, 204, 113, 0.55); border-radius: 6px;
+                        padding: 2px 7px; font-weight: bold; font-size: 10px;
+                    """)
             else:
                 lbl_badge.setText(s_info["badge"])
                 lbl_badge.setStyleSheet("""
                     color: #888892; background-color: rgba(255,255,255,0.05);
                     border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
-                    padding: 2px 8px; font-weight: bold; font-size: 10.5px;
+                    padding: 2px 7px; font-weight: bold; font-size: 10px;
                 """)
 
         if select_active:
@@ -3837,7 +3899,7 @@ class ScxSchedulerDialog(QDialog):
             self.select_scheduler(self.selected_idx, auto_mode=False)
 
         if self.parent_app and hasattr(self.parent_app, "update_hardware_telemetry"):
-            self.parent_app.update_hardware_telemetry()
+            self.parent_app.update_hardware_telemetry(force=True)
 
     def select_scheduler(self, idx, auto_mode=True):
         self.selected_idx = idx
@@ -3882,9 +3944,9 @@ class ScxSchedulerDialog(QDialog):
                         color: #55555e;
                         border: 1px solid #22222a;
                         border-radius: 7px;
-                        padding: 0 12px;
+                        padding: 0 10px;
                         font-weight: bold;
-                        font-size: 11.5px;
+                        font-size: 11px;
                     }
                 """)
             elif m_id == mode_id:
@@ -3894,9 +3956,9 @@ class ScxSchedulerDialog(QDialog):
                         color: #ffffff;
                         border: 1px solid #ff3333;
                         border-radius: 7px;
-                        padding: 0 12px;
+                        padding: 0 10px;
                         font-weight: bold;
-                        font-size: 11.5px;
+                        font-size: 11px;
                     }
                 """)
             else:
@@ -3906,9 +3968,9 @@ class ScxSchedulerDialog(QDialog):
                         color: #aaaaaa;
                         border: 1px solid #33333c;
                         border-radius: 7px;
-                        padding: 0 12px;
+                        padding: 0 10px;
                         font-weight: bold;
-                        font-size: 11.5px;
+                        font-size: 11px;
                     }
                     QPushButton:hover {
                         background-color: rgba(255, 255, 255, 0.10);
@@ -3959,7 +4021,7 @@ class ScxSchedulerDialog(QDialog):
         return f"printf %s {shlex.quote(toml_body)} > /etc/scx_loader/config.toml"
 
     def _execute_scx_change(self, sched_id, mode_id):
-        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12.5px; font-weight: bold; background: transparent;")
+        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(f"⟳ {tr('Applying CPU scheduler...')}")
 
         if sched_id == "bore":
@@ -3979,12 +4041,12 @@ class ScxSchedulerDialog(QDialog):
                 _SCX_OVERRIDE_CACHE["sched"] = target_cache
                 _SCX_OVERRIDE_CACHE["mode"] = mode_id
                 _SCX_OVERRIDE_CACHE["until"] = time.monotonic() + 3.5
-                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
                 self.refresh_runtime_state(select_active=False)
                 QTimer.singleShot(1800, lambda: self.refresh_runtime_state(select_active=False))
             else:
-                self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✕ {tr('Operation canceled or authentication failed.')}")
             proc.deleteLater()
 
@@ -4004,40 +4066,35 @@ class ScxSchedulerDialog(QDialog):
         self._execute_scx_change("bore", "auto")
 
 
-class PremiumButton(QPushButton):
-    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None):
+class KernelStatusCard(QFrame):
+    def __init__(self, title, desc, badge_text, icon_name, height=78):
         super().__init__()
-        self.url = url
-        self.cmd = cmd
-        self.callback = callback
+        self.setObjectName("KernelStatusCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(66)
+        self.setFixedHeight(height)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(f"<b>{title}</b><br>{desc}")
-
         self.setStyleSheet("""
-            PremiumButton {
+            QFrame#KernelStatusCard {
                 background-color: rgba(255, 255, 255, 0.03);
                 border-radius: 11px;
                 border: 1px solid rgba(255, 255, 255, 0.06);
-                text-align: left;
             }
-            PremiumButton:hover {
-                background-color: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(204, 0, 0, 0.6);
+            QFrame#KernelStatusCard:hover {
+                background-color: rgba(255, 255, 255, 0.055);
+                border: 1px solid rgba(56, 189, 248, 0.45);
             }
         """)
 
-        hbox = QHBoxLayout()
-        hbox.setContentsMargins(12, 4, 12, 4)
-        hbox.setSpacing(10)
+        hbox = QHBoxLayout(self)
+        hbox.setContentsMargins(14, 6, 14, 6)
+        hbox.setSpacing(12)
 
         icon_box = QFrame()
         icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        icon_box.setFixedSize(36, 36)
+        icon_box.setFixedSize(40, 40)
         icon_box.setStyleSheet("""
             QFrame {
                 background-color: rgba(204, 0, 0, 0.13);
@@ -4051,7 +4108,101 @@ class PremiumButton(QPushButton):
 
         icon_label = QLabel()
         icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        pixmap = make_svg_pixmap(icon_name, 20)
+        pix = make_svg_pixmap(icon_name, 20)
+        if not pix.isNull():
+            icon_label.setPixmap(pix)
+        icon_label.setStyleSheet("background: transparent; border: none;")
+        ibox_layout.addWidget(icon_label)
+        hbox.addWidget(icon_box)
+
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(2)
+        vbox.addStretch(1)
+
+        lbl_title = FitLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lbl_title.setMinimumWidth(0)
+        lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
+        vbox.addWidget(lbl_title)
+
+        lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lbl_desc.setMinimumWidth(0)
+        lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        lbl_desc.setStyleSheet("color: #a0a0a8; font-size: 11px; border: none; background: transparent;")
+        lbl_desc.setWordWrap(True)
+        _hfw = lbl_desc.sizePolicy()
+        _hfw.setHeightForWidth(True)
+        lbl_desc.setSizePolicy(_hfw)
+        vbox.addWidget(lbl_desc)
+
+        vbox.addStretch(1)
+        hbox.addLayout(vbox, 1)
+
+        lbl_badge = QLabel(f"● {badge_text}")
+        lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lbl_badge.setStyleSheet("""
+            color: #38bdf8;
+            background-color: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            border-radius: 7px;
+            padding: 4px 10px;
+            font-weight: bold;
+            font-size: 11px;
+        """)
+        hbox.addWidget(lbl_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+
+
+class PremiumButton(QPushButton):
+    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None, height=82):
+        super().__init__()
+        self.url = url
+        self.cmd = cmd
+        self.callback = callback
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setFixedHeight(height)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"<b>{title}</b><br>{desc}")
+
+        self.setStyleSheet("""
+            PremiumButton {
+                background-color: rgba(255, 255, 255, 0.03);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                text-align: left;
+            }
+            PremiumButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(204, 0, 0, 0.6);
+            }
+        """)
+
+        hbox = QHBoxLayout()
+        hbox.setContentsMargins(14, 6, 14, 6)
+        hbox.setSpacing(12)
+
+        icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        icon_box.setFixedSize(40, 40)
+        icon_box.setStyleSheet("""
+            QFrame {
+                background-color: rgba(204, 0, 0, 0.13);
+                border: 1px solid rgba(204, 0, 0, 0.35);
+                border-radius: 10px;
+            }
+        """)
+        ibox_layout = QVBoxLayout(icon_box)
+        ibox_layout.setContentsMargins(0, 0, 0, 0)
+        ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        icon_label = QLabel()
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        pixmap = make_svg_pixmap(icon_name, 21)
         if not pixmap.isNull():
             icon_label.setPixmap(pixmap)
         else:
@@ -4063,24 +4214,28 @@ class PremiumButton(QPushButton):
 
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(2)
-        vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        vbox.setSpacing(3)
+        vbox.addStretch(1)
 
-        lbl_title = QLabel(title)
+        lbl_title = FitLabel(title)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
+        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
         lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_desc.setStyleSheet("color: #aaaaaa; font-size: 10.5px; border: none; background: transparent;")
+        lbl_desc.setStyleSheet("color: #a8a8b0; font-size: 11px; border: none; background: transparent;")
         lbl_desc.setWordWrap(True)
+        _hfw = lbl_desc.sizePolicy()
+        _hfw.setHeightForWidth(True)
+        lbl_desc.setSizePolicy(_hfw)
         vbox.addWidget(lbl_desc)
 
+        vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
         self.setLayout(hbox)
         self.clicked.connect(self.action)
@@ -4095,7 +4250,7 @@ class PremiumButton(QPushButton):
 
 
 class ServiceSwitchCard(QFrame):
-    def __init__(self, title, desc, unit_name, icon_name, parent_app=None, is_user=False, req_pkg=None):
+    def __init__(self, title, desc, unit_name, icon_name, parent_app=None, is_user=False, req_pkg=None, height=78):
         super().__init__()
         self.title = title
         self.unit_name = unit_name
@@ -4106,14 +4261,14 @@ class ServiceSwitchCard(QFrame):
         self.setObjectName("ServiceCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(63)
+        self.setFixedHeight(height)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setToolTip(f"<b>{title}</b> ({unit_name})<br>{desc}")
         self.setStyleSheet("""
             QFrame#ServiceCard {
                 background-color: rgba(255, 255, 255, 0.03);
-                border-radius: 11px;
+                border-radius: 12px;
                 border: 1px solid rgba(255, 255, 255, 0.06);
             }
             QFrame#ServiceCard:hover {
@@ -4123,17 +4278,17 @@ class ServiceSwitchCard(QFrame):
         """)
 
         hbox = QHBoxLayout()
-        hbox.setContentsMargins(10, 3, 10, 3)
-        hbox.setSpacing(8)
+        hbox.setContentsMargins(13, 5, 13, 5)
+        hbox.setSpacing(10)
 
         icon_box = QFrame()
         icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        icon_box.setFixedSize(34, 34)
+        icon_box.setFixedSize(38, 38)
         icon_box.setStyleSheet("""
             QFrame {
                 background-color: rgba(204, 0, 0, 0.13);
                 border: 1px solid rgba(204, 0, 0, 0.35);
-                border-radius: 8px;
+                border-radius: 9px;
             }
         """)
         ibox_layout = QVBoxLayout(icon_box)
@@ -4142,7 +4297,7 @@ class ServiceSwitchCard(QFrame):
 
         icon_label = QLabel()
         icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        pix = make_svg_pixmap(icon_name, 18)
+        pix = make_svg_pixmap(icon_name, 20)
         if not pix.isNull():
             icon_label.setPixmap(pix)
         else:
@@ -4154,29 +4309,33 @@ class ServiceSwitchCard(QFrame):
 
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(1)
-        vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        vbox.setSpacing(2)
+        vbox.addStretch(1)
 
-        lbl_title = QLabel(title)
+        lbl_title = FitLabel(title)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
+        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
         lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_desc.setStyleSheet("color: #999999; font-size: 10.5px; border: none; background: transparent;")
+        lbl_desc.setStyleSheet("color: #a0a0a8; font-size: 11px; border: none; background: transparent;")
         lbl_desc.setWordWrap(True)
+        _hfw = lbl_desc.sizePolicy()
+        _hfw.setHeightForWidth(True)
+        lbl_desc.setSizePolicy(_hfw)
         vbox.addWidget(lbl_desc)
 
+        vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
 
         self.toggle_btn = QPushButton()
-        self.toggle_btn.setFixedHeight(26)
-        self.toggle_btn.setMinimumWidth(78)
+        self.toggle_btn.setFixedHeight(28)
+        self.toggle_btn.setMinimumWidth(82)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.toggle_btn.setToolTip(f"<b>{title}</b> ({unit_name})<br>{desc}")
         self.toggle_btn.clicked.connect(self.toggle_service)
@@ -4195,12 +4354,12 @@ class ServiceSwitchCard(QFrame):
                     color: #2ecc71;
                     border: 1px solid #27ae60;
                     border-radius: 7px;
-                    padding: 0 7px;
+                    padding: 0 8px;
                     font-weight: bold;
-                    font-size: 10px;
+                    font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(0, 180, 90, 0.30);
+                    background-color: rgba(0, 180, 90, 0.28);
                 }
             """)
         else:
@@ -4211,12 +4370,12 @@ class ServiceSwitchCard(QFrame):
                     color: #888888;
                     border: 1px solid #333333;
                     border-radius: 7px;
-                    padding: 0 7px;
+                    padding: 0 8px;
                     font-weight: bold;
-                    font-size: 10px;
+                    font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(204, 0, 0, 0.20);
+                    background-color: rgba(204, 0, 0, 0.18);
                     color: #ffffff;
                     border: 1px solid #cc0000;
                 }
@@ -4224,27 +4383,35 @@ class ServiceSwitchCard(QFrame):
 
     def toggle_service(self):
         if not self._active and self.req_pkg and self.req_pkg not in INSTALLED_PKGS_CACHE:
-            if self.unit_name == "ufw.service":
-                enable_part = "if systemctl is-active --quiet sshd; then sudo ufw allow 22/tcp >/dev/null 2>&1 || true; fi && sudo ufw --force enable && sudo systemctl enable --now ufw.service"
-            elif self.unit_name == "psd.service":
-                enable_part = "psd p >/dev/null 2>&1 || true; systemctl --user enable --now psd.service"
+            if self.is_user:
+                act_part = f"systemctl --user enable --now {self.unit_name}"
+                if self.unit_name == "psd.service":
+                    act_part = f"psd p >/dev/null 2>&1 || true; {act_part}"
+                elif self.unit_name == "arch-update.timer":
+                    act_part += "; cp -f /usr/share/applications/arch-update-tray.desktop ~/.config/autostart/ 2>/dev/null || true; (arch-update --tray >/dev/null 2>&1 &)"
+            elif self.unit_name == "ufw.service":
+                act_part = "if systemctl is-active --quiet sshd; then sudo ufw allow 22/tcp >/dev/null 2>&1 || true; fi && sudo ufw --force enable && sudo systemctl enable --now ufw.service"
             else:
-                enable_part = (
-                    f"systemctl --user enable --now {self.unit_name}"
-                    if self.is_user else f"sudo systemctl enable --now {self.unit_name}"
-                )
+                act_part = f"sudo systemctl enable --now {self.unit_name}"
+
             body = (
-                f"printf '\\033[1;31m==>\\033[0m Instalando componente requerido para: \\033[1;37m{self.title}\\033[0m...\\n'; "
-                f"sudo pacman -Sy --needed {self.req_pkg} && {enable_part}"
+                f"printf '\033[1;31m==> [X64 SERVICE MANAGER]\033[0m El servicio \033[1;37m{self.title}\033[0m requiere instalar el paquete \033[1;33m{self.req_pkg}\033[0m.\n\n'; "
+                f"sudo pacman -Sy --needed {self.req_pkg} && {act_part}"
             )
-            cmd = build_x64_term_cmd("X64 LIOS Service Installer", f"ACTIVANDO {self.title.upper()}", body)
+            cmd = build_x64_term_cmd(
+                f"X64 Service Installer - {self.req_pkg}",
+                f"INSTALACIÓN Y ACTIVACIÓN DE SERVICIO ({self.req_pkg})",
+                body
+            )
             os.system(f"{cmd} &")
             return
 
         action = "disable --now" if self._active else "enable --now"
+        self.toggle_btn.setEnabled(False)
         proc = QProcess(self)
 
-        def _on_svc_done(_code, _status):
+        def _on_svc_done(_exit_code, _exit_status):
+            self.toggle_btn.setEnabled(True)
             if self.parent_app:
                 self.parent_app.refresh_services_async()
             proc.deleteLater()
@@ -4364,9 +4531,9 @@ class GamingInstallCard(QFrame):
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(2)
-        vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        vbox.addStretch(1)
 
-        lbl_title = QLabel(title)
+        lbl_title = FitLabel(title)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -4381,8 +4548,12 @@ class GamingInstallCard(QFrame):
         d_sz = 12 if is_suite else 11
         lbl_desc.setStyleSheet(f"color: #aaaaaa; font-size: {d_sz}px; border: none; background: transparent;")
         lbl_desc.setWordWrap(True)
+        _hfw = lbl_desc.sizePolicy()
+        _hfw.setHeightForWidth(True)
+        lbl_desc.setSizePolicy(_hfw)
         vbox.addWidget(lbl_desc)
 
+        vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
 
         self.btn_action = QPushButton()
@@ -4482,24 +4653,24 @@ class NavButton(QPushButton):
         self.parent_app = parent_app
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(48)
+        self.setFixedHeight(40)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
         hbox = QHBoxLayout()
-        hbox.setContentsMargins(13, 0, 12, 0)
-        hbox.setSpacing(12)
+        hbox.setContentsMargins(12, 0, 10, 0)
+        hbox.setSpacing(10)
 
         icon_lbl = QLabel()
         icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        icon = QIcon.fromTheme(icon_name)
-        if not icon.isNull():
-            icon_lbl.setPixmap(icon.pixmap(22, 22))
+        pix = make_svg_pixmap(icon_name, 19)
+        if not pix.isNull():
+            icon_lbl.setPixmap(pix)
         icon_lbl.setStyleSheet("background: transparent; border: none;")
         hbox.addWidget(icon_lbl)
 
         text_lbl = QLabel(title)
         text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 13px; background: transparent; border: none;")
         self.text_lbl = text_lbl
         hbox.addWidget(text_lbl)
         hbox.addStretch(1)
@@ -4511,7 +4682,7 @@ class NavButton(QPushButton):
     def set_active_style(self):
         self.setStyleSheet("""
             NavButton {
-                background-color: rgba(204, 0, 0, 0.15);
+                background-color: rgba(204, 0, 0, 0.16);
                 border-radius: 8px;
                 border: none;
                 border-left: 4px solid #cc0000;
@@ -4519,7 +4690,7 @@ class NavButton(QPushButton):
                 border-bottom-left-radius: 4px;
             }
         """)
-        self.text_lbl.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        self.text_lbl.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; background: transparent; border: none;")
 
     def set_inactive_style(self):
         self.setStyleSheet("""
@@ -4532,7 +4703,7 @@ class NavButton(QPushButton):
                 background-color: rgba(255, 255, 255, 0.05);
             }
         """)
-        self.text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 14px; background: transparent; border: none;")
+        self.text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 13px; background: transparent; border: none;")
 
     def activate(self):
         self.parent_app.change_page(self.index)
@@ -4547,7 +4718,7 @@ class TelemetryCard(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         if self.on_click:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(108)
+        self.setFixedHeight(112)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setStyleSheet("""
@@ -4616,12 +4787,25 @@ class TelemetryCard(QFrame):
         self.lbl_model.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; background: transparent; border: none;")
         vbox.addWidget(self.lbl_model)
 
+        sub_row = QHBoxLayout()
+        sub_row.setContentsMargins(0, 0, 0, 0)
+        sub_row.setSpacing(8)
         self.lbl_sub = QLabel(sub_text)
         self.lbl_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_sub.setMinimumWidth(0)
         self.lbl_sub.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_sub.setStyleSheet("color: #999999; font-size: 12px; background: transparent; border: none;")
-        vbox.addWidget(self.lbl_sub)
+        sub_row.addWidget(self.lbl_sub, 1)
+
+        self.action_badge = None
+        if self.on_click:
+            self.action_badge = QPushButton()
+            self.action_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.action_badge.setFixedHeight(22)
+            self.action_badge.clicked.connect(self.on_click)
+            sub_row.addWidget(self.action_badge)
+
+        vbox.addLayout(sub_row)
 
         self.bar = QProgressBar()
         self.bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -4644,6 +4828,44 @@ class TelemetryCard(QFrame):
 
         hbox.addLayout(vbox, 1)
         self.setLayout(hbox)
+
+    def set_sched_badge(self, sched_name):
+        if not self.action_badge:
+            return
+        is_bore = (sched_name.upper() == "BORE")
+        self.action_badge.setText(f"⚡ {sched_name.upper()}  •  {tr('Configure ➔')}")
+        if is_bore:
+            self.action_badge.setStyleSheet("""
+                QPushButton {
+                    color: #38bdf8;
+                    background-color: rgba(56, 189, 248, 0.14);
+                    border: 1px solid rgba(56, 189, 248, 0.55);
+                    border-radius: 6px;
+                    padding: 0 9px;
+                    font-weight: bold;
+                    font-size: 10.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(56, 189, 248, 0.26);
+                    color: #ffffff;
+                }
+            """)
+        else:
+            self.action_badge.setStyleSheet("""
+                QPushButton {
+                    color: #2ecc71;
+                    background-color: rgba(46, 204, 113, 0.16);
+                    border: 1px solid rgba(46, 204, 113, 0.55);
+                    border-radius: 6px;
+                    padding: 0 9px;
+                    font-weight: bold;
+                    font-size: 10.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(46, 204, 113, 0.28);
+                    color: #ffffff;
+                }
+            """)
 
     def mousePressEvent(self, event):
         if self.on_click and event.button() == Qt.MouseButton.LeftButton:
@@ -4713,7 +4935,7 @@ class CommunityPillCard(QPushButton):
         vbox.setContentsMargins(0, 0, 0, 0)
         vbox.setSpacing(4)
 
-        lbl_title = QLabel(title)
+        lbl_title = FitLabel(title)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -4726,6 +4948,9 @@ class CommunityPillCard(QPushButton):
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_desc.setStyleSheet("color: #a0a0a0; font-size: 12px; line-height: 1.3; background: transparent; border: none;")
         lbl_desc.setWordWrap(True)
+        _hfw = lbl_desc.sizePolicy()
+        _hfw.setHeightForWidth(True)
+        lbl_desc.setSizePolicy(_hfw)
         vbox.addWidget(lbl_desc)
 
         vbox.addStretch(1)
@@ -4759,12 +4984,12 @@ class X64Hello(QWidget):
         self.hw_timer = QTimer(self)
         self.hw_timer.timeout.connect(self.update_hardware_telemetry)
         self.hw_timer.start(1500)
-        self.update_hardware_telemetry()
+        self.update_hardware_telemetry(force=True)
 
         self.refresh_services_async()
 
-    def update_hardware_telemetry(self):
-        if self.stacked_widget.currentIndex() != 0:
+    def update_hardware_telemetry(self, force=False):
+        if not force and self.stacked_widget.currentIndex() != 0:
             return
         try:
             with open("/proc/stat", "r") as f:
@@ -4783,10 +5008,9 @@ class X64Hello(QWidget):
             self.card_cpu.update_telemetry(
                 f"{cpu_pct:.1f}%  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
                 cpu_pct,
-                f"Kernel: {kernel_rel}  •  Sched: {active_sched}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}"
+                f"Kernel: {kernel_rel}"
             )
-            if hasattr(self, "pill_sched"):
-                self.set_sched_pill_state(self.pill_sched, active_sched)
+            self.card_cpu.set_sched_badge(active_sched)
         except Exception:
             pass
 
@@ -4837,28 +5061,20 @@ class X64Hello(QWidget):
     def refresh_services_async(self):
         if self._svc_worker and self._svc_worker.isRunning():
             return
-        sys_units = [c.unit_name for c in self.service_cards if not c.is_user]
-        user_units = [c.unit_name for c in self.service_cards if c.is_user]
-        self._svc_worker = ServiceStatusWorker(sys_units, user_units, self)
-        self._svc_worker.status_ready.connect(self.on_services_status)
-        self._svc_worker.start()
+        sys_units = list(dict.fromkeys(c.unit_name for c in self.service_cards if not c.is_user))
+        user_units = list(dict.fromkeys(c.unit_name for c in self.service_cards if c.is_user))
+        worker = ServiceStatusWorker(sys_units, user_units)
+        self._svc_worker = worker
+        _BG_WORKERS.add(worker)
+        worker.status_ready.connect(self.on_services_status)
+        worker.finished.connect(lambda w=worker: _BG_WORKERS.discard(w))
+        worker.start()
 
     def open_dns_dialog(self):
-        dlg = DnsConfigDialog(self)
-        dlg.exec()
+        self.change_page(2)
 
     def open_scx_dialog(self):
-        dlg = ScxSchedulerDialog(self)
-        dlg.exec()
-        self.update_hardware_telemetry()
-
-    def set_sched_pill_state(self, pill, sched_name):
-        pill.setText(f" ●  SCHED: {sched_name.upper()} ")
-        pill.setStyleSheet("""
-            color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
-            border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
-            font-size: 10px; font-weight: bold; padding: 3px 9px;
-        """)
+        self.change_page(1)
 
     def set_hero_pill_state(self, pill, name, is_active):
         if is_active:
@@ -4866,14 +5082,14 @@ class X64Hello(QWidget):
             pill.setStyleSheet("""
                 color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
                 border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
-                font-size: 10px; font-weight: bold; padding: 3px 9px;
+                font-size: 10.5px; font-weight: bold; padding: 3px 10px;
             """)
         else:
             pill.setText(f" ○  {name}: {tr('INACTIVE')} ")
             pill.setStyleSheet("""
                 color: #888888; background-color: rgba(255, 255, 255, 0.05);
                 border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 6px;
-                font-size: 10px; font-weight: bold; padding: 3px 9px;
+                font-size: 10.5px; font-weight: bold; padding: 3px 10px;
             """)
 
     def on_services_status(self, status_dict):
@@ -4940,26 +5156,28 @@ class X64Hello(QWidget):
             }
         """)
         sidebar_layout = QVBoxLayout()
-        sidebar_layout.setContentsMargins(25, 35, 25, 25)
+        sidebar_layout.setContentsMargins(20, 24, 20, 18)
         sidebar.setLayout(sidebar_layout)
 
         logo_label = QLabel()
         pixmap = QPixmap(LOGO_PATH)
         if not pixmap.isNull():
-            logo_label.setPixmap(pixmap.scaled(135, 135, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            logo_label.setPixmap(pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setStyleSheet("background: transparent; border: none;")
         sidebar_layout.addWidget(logo_label)
-        sidebar_layout.addSpacing(25)
+        sidebar_layout.addSpacing(16)
 
         nav_vbox = QVBoxLayout()
-        nav_vbox.setSpacing(12)
+        nav_vbox.setSpacing(7)
 
         tabs = [
-            (tr("Home"), "go-home"),
-            (tr("Tweaks & System"), "preferences-system"),
-            (tr("Gaming Center"), "input-gaming"),
-            (tr("Philosophy"), "help-about")
+            (tr("Home"), "home"),
+            (tr("CPU & Performance"), "cpu"),
+            (tr("Network & Security"), "shield"),
+            (tr("Maintenance & Rescue"), "sliders"),
+            (tr("Gaming Center"), "gamepad"),
+            (tr("Philosophy"), "info")
         ]
 
         for i, (text, icon) in enumerate(tabs):
@@ -4982,24 +5200,24 @@ class X64Hello(QWidget):
         )
         info_label = QLabel(hud_text)
         info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setStyleSheet("color: #555555; font-size: 12px; font-weight: bold; line-height: 1.5; background: transparent; border: none;")
+        info_label.setStyleSheet("color: #555555; font-size: 11.5px; font-weight: bold; line-height: 1.45; background: transparent; border: none;")
         sidebar_layout.addWidget(info_label)
-        sidebar_layout.addSpacing(12)
+        sidebar_layout.addSpacing(10)
 
         sidebar_sep = QFrame()
         sidebar_sep.setFixedHeight(1)
         sidebar_sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.06); border: none;")
         sidebar_layout.addWidget(sidebar_sep)
-        sidebar_layout.addSpacing(8)
+        sidebar_layout.addSpacing(6)
 
         self.autostart_btn = QPushButton()
-        self.autostart_btn.setFixedHeight(30)
+        self.autostart_btn.setFixedHeight(28)
         self.autostart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.autostart_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 border: 1px solid transparent;
-                border-radius: 15px;
+                border-radius: 14px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.04);
@@ -5022,7 +5240,7 @@ class X64Hello(QWidget):
         self.autostart_btn.clicked.connect(self.toggle_autostart)
         self.update_autostart_btn()
         sidebar_layout.addWidget(self.autostart_btn)
-        sidebar_layout.addSpacing(6)
+        sidebar_layout.addSpacing(4)
 
         lang_hbox = QHBoxLayout()
         lang_hbox.addStretch(1)
@@ -5034,13 +5252,13 @@ class X64Hello(QWidget):
 
         self.lang_btn = QPushButton(" 🌎  " + current_lang_str + " ")
         self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.lang_btn.setFixedHeight(28)
+        self.lang_btn.setFixedHeight(26)
         self.lang_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 color: #777777;
                 border: 1px solid transparent;
-                border-radius: 14px;
+                border-radius: 13px;
                 padding: 0px 10px;
                 font-size: 11px;
             }
@@ -5096,7 +5314,9 @@ class X64Hello(QWidget):
         self.main_layout.addWidget(self.stacked_widget)
 
         self.stacked_widget.addWidget(self.create_page_home())
-        self.stacked_widget.addWidget(self.create_page_tweaks())
+        self.stacked_widget.addWidget(self.create_page_cpu_perf())
+        self.stacked_widget.addWidget(self.create_page_network_sec())
+        self.stacked_widget.addWidget(self.create_page_maintenance())
         self.stacked_widget.addWidget(self.create_page_gaming())
         self.stacked_widget.addWidget(self.create_page_philosophy())
 
@@ -5140,7 +5360,7 @@ class X64Hello(QWidget):
     def create_page_home(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(48, 34, 48, 30)
+        layout.setContentsMargins(46, 32, 46, 28)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
@@ -5165,7 +5385,7 @@ class X64Hello(QWidget):
         hero_left.setSpacing(6)
 
         badges_row = QHBoxLayout()
-        badges_row.setSpacing(8)
+        badges_row.setSpacing(10)
 
         self.pill_falcond = QLabel()
         self.set_hero_pill_state(self.pill_falcond, "FALCOND", False)
@@ -5176,13 +5396,9 @@ class X64Hello(QWidget):
         self.pill_ufw = QLabel()
         self.set_hero_pill_state(self.pill_ufw, tr("FIREWALL UFW"), False)
 
-        self.pill_sched = QLabel()
-        self.set_sched_pill_state(self.pill_sched, get_active_cpu_scheduler())
-
         badges_row.addWidget(self.pill_falcond)
         badges_row.addWidget(self.pill_ananicy)
         badges_row.addWidget(self.pill_ufw)
-        badges_row.addWidget(self.pill_sched)
         badges_row.addStretch(1)
         hero_left.addLayout(badges_row)
 
@@ -5253,7 +5469,7 @@ class X64Hello(QWidget):
         hero_hbox.addLayout(hero_right)
         hero.setLayout(hero_hbox)
         layout.addWidget(hero)
-        layout.addSpacing(22)
+        layout.addSpacing(20)
 
         # 2. REAL-TIME HARDWARE TELEMETRY (2x2)
         sec_hw = QLabel(tr("REAL-TIME HARDWARE TELEMETRY"))
@@ -5271,13 +5487,15 @@ class X64Hello(QWidget):
         self.card_cpu = TelemetryCard(
             tr("PROCESSOR (CPU)"),
             STATIC_HW["cpu_model"],
-            f"Kernel: {kernel_rel}  •  Sched: {init_sched}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
+            f"Kernel: {kernel_rel}",
             "cpu",
             f"0.0%  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
             8,
             on_click=self.open_scx_dialog
         )
+        self.card_cpu.set_sched_badge(init_sched)
         self.card_cpu.setToolTip(f"<b>{tr('PROCESSOR (CPU)')}</b><br>{tr('Click to open X64 CPU Scheduler Selector (BORE / sched_ext).')}")
+
         ram_sub = tr("ZRAM Active in RAM • Zero Disk Swap") if STATIC_HW["zram_active"] else tr("High-Speed System Memory")
         self.card_ram = TelemetryCard(
             tr("PHYSICAL RAM & ZRAM"),
@@ -5311,7 +5529,7 @@ class X64Hello(QWidget):
         hw_grid.addWidget(self.card_gpu, 1, 0)
         hw_grid.addWidget(self.card_disk, 1, 1)
         layout.addLayout(hw_grid)
-        layout.addSpacing(24)
+        layout.addSpacing(22)
 
         # 3. ECOSYSTEM & COMMUNITY (1x2 Spacious Cards)
         sec_eco = QLabel(tr("OFFICIAL ECOSYSTEM & COMMUNITY"))
@@ -5345,64 +5563,169 @@ class X64Hello(QWidget):
 
         return page
 
-    def create_page_tweaks(self):
+    def create_page_cpu_perf(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(36, 18, 36, 14)
+        layout.setContentsMargins(36, 20, 36, 16)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
 
-        title = QLabel(tr("System Services & Tweaks"))
+        title = QLabel(tr("CPU, Scheduler & System Performance"))
         title.setStyleSheet("color: #ffffff; font-size: 25px; font-weight: bold; background: transparent;")
         layout.addWidget(title)
         layout.addSpacing(2)
 
-        desc = QLabel(tr("Control real-time daemons, configure low-latency DNS, and execute system rescue routines with a single click."))
+        desc = QLabel(tr("Switch the Linux kernel CPU task scheduler in real time and control background performance daemons."))
         desc.setStyleSheet("color: #a0a0a0; font-size: 12.5px; background: transparent;")
         layout.addWidget(desc)
-        layout.addSpacing(10)
+        layout.addSpacing(12)
 
-        # SECTION 1: DAEMONS & SERVICES (3x3 Symmetric Grid)
-        sec1 = QLabel(tr("Real-Time Daemons & Services").upper())
+        sec1 = QLabel(tr("REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)"))
         sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
         layout.addWidget(sec1)
-        layout.addSpacing(5)
+        layout.addSpacing(6)
 
-        services = [
+        self.scx_panel = ScxSchedulerPanel(self)
+        layout.addWidget(self.scx_panel)
+        layout.addSpacing(14)
+
+        sec2 = QLabel(tr("PERFORMANCE, MEMORY & STORAGE DAEMONS"))
+        sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        layout.addWidget(sec2)
+        layout.addSpacing(6)
+
+        perf_services = [
             (tr("FalconD Gaming Daemon"), tr("Dynamic CPU affinity and automatic performance profiles for games."), "falcond.service", "bolt", False, "falcond"),
             (tr("Ananicy-cpp Priority"), tr("Automatic process nice/ionice latency tuning in the background."), "ananicy-cpp.service", "sliders", False, "ananicy-cpp"),
             (tr("Bpftune Kernel Auto-Tuning"), tr("Dynamic eBPF network buffer and sysctl optimization in real time."), "bpftune.service", "cpu", False, "bpftune-git"),
-            (tr("Systemd-OOMD Anti-Freeze"), tr("Prevents hard system freezes under extreme 100% RAM/ZRAM exhaustion."), "systemd-oomd.service", "memory", False, None),
             (tr("Profile-sync-daemon (RAM Browser)"), tr("Moves browser profiles to tmpfs RAM for instant speed and less SSD wear."), "psd.service", "bolt", True, "profile-sync-daemon"),
-            (tr("LIOS Update Notifier"), tr("System tray timer that checks and alerts when new updates are ready."), "arch-update.timer", "bell", True, "cachy-update"),
-            (tr("UFW Security Firewall"), tr("Active network protection against unauthorized incoming connections."), "ufw.service", "shield", False, "ufw"),
-            (tr("Bluetooth Service"), tr("Support for wireless controllers, headsets, and Bluetooth peripherals."), "bluetooth.service", "bluetooth", False, "bluez"),
-            (tr("NVMe / SSD Trim Timer"), tr("Weekly scheduled block maintenance to preserve SSD lifespan and speed."), "fstrim.timer", "drive-harddisk", False, None)
+            (tr("Systemd-OOMD Anti-Freeze"), tr("Prevents hard system freezes under extreme 100% RAM/ZRAM exhaustion."), "systemd-oomd.service", "memory", False, None),
+            (tr("NVMe / SSD Trim Timer"), tr("Weekly scheduled block maintenance to preserve SSD lifespan and speed."), "fstrim.timer", "drive-harddisk", False, None),
         ]
 
         svc_grid = QGridLayout()
         svc_grid.setHorizontalSpacing(10)
-        svc_grid.setVerticalSpacing(7)
+        svc_grid.setVerticalSpacing(8)
         for col in range(3):
             svc_grid.setColumnStretch(col, 1)
 
-        for idx, (s_title, s_desc, s_unit, s_icon, s_user, s_pkg) in enumerate(services):
-            card = ServiceSwitchCard(s_title, s_desc, s_unit, s_icon, self, is_user=s_user, req_pkg=s_pkg)
+        for idx, (s_title, s_desc, s_unit, s_icon, s_user, s_pkg) in enumerate(perf_services):
+            card = ServiceSwitchCard(s_title, s_desc, s_unit, s_icon, self, is_user=s_user, req_pkg=s_pkg, height=78)
             self.service_cards.append(card)
             svc_grid.addWidget(card, idx // 3, idx % 3)
-        layout.addLayout(svc_grid)
-        layout.addSpacing(10)
 
-        # SECTION 2: UTILITIES & SYSTEM OPTIMIZATION (3x2 Symmetric Grid)
-        sec2 = QLabel(tr("System Maintenance & Utilities").upper())
+        layout.addLayout(svc_grid)
+        return page
+
+    def create_page_network_sec(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(36, 20, 36, 16)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        page.setLayout(layout)
+
+        title = QLabel(tr("Network, Low-Latency DNS & Security"))
+        title.setStyleSheet("color: #ffffff; font-size: 25px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+        layout.addSpacing(2)
+
+        desc = QLabel(tr("Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall."))
+        desc.setStyleSheet("color: #a0a0a0; font-size: 12.5px; background: transparent;")
+        layout.addWidget(desc)
+        layout.addSpacing(12)
+
+        sec1 = QLabel(tr("DNS OPTIMIZER & REAL-TIME PING BENCHMARK"))
+        sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        layout.addWidget(sec1)
+        layout.addSpacing(6)
+
+        self.dns_panel = DnsOptimizerPanel(self)
+        layout.addWidget(self.dns_panel)
+        layout.addSpacing(14)
+
+        sec2 = QLabel(tr("FIREWALL, BLUETOOTH & KERNEL NETWORK STACK"))
         sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
         layout.addWidget(sec2)
-        layout.addSpacing(5)
+        layout.addSpacing(6)
+
+        net_grid = QGridLayout()
+        net_grid.setHorizontalSpacing(12)
+        net_grid.setVerticalSpacing(8)
+        net_grid.setColumnStretch(0, 1)
+        net_grid.setColumnStretch(1, 1)
+
+        card_ufw = ServiceSwitchCard(
+            tr("UFW Security Firewall"),
+            tr("Active network protection against unauthorized incoming connections."),
+            "ufw.service", "shield", self, is_user=False, req_pkg="ufw", height=78
+        )
+        self.service_cards.append(card_ufw)
+
+        card_bt = ServiceSwitchCard(
+            tr("Bluetooth Service"),
+            tr("Support for wireless controllers, headsets, and Bluetooth peripherals."),
+            "bluetooth.service", "bluetooth", self, is_user=False, req_pkg="bluez", height=78
+        )
+        self.service_cards.append(card_bt)
+
+        tcp_cc = "BBR"
+        try:
+            with open("/proc/sys/net/ipv4/tcp_congestion_control", "r") as f:
+                tcp_cc = f.read().strip().upper()
+        except Exception:
+            pass
+
+        card_bbr = KernelStatusCard(
+            tr("TCP BBR + Anti-Bufferbloat"),
+            tr("Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel."),
+            f"{tcp_cc} + FQ",
+            "bolt",
+            height=78
+        )
+
+        card_wifi = KernelStatusCard(
+            tr("Wi-Fi Low-Jitter (PowerSave Off)"),
+            tr("Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming."),
+            tr("ACTIVE"),
+            "wifi",
+            height=78
+        )
+
+        net_grid.addWidget(card_ufw, 0, 0)
+        net_grid.addWidget(card_bt, 0, 1)
+        net_grid.addWidget(card_bbr, 1, 0)
+        net_grid.addWidget(card_wifi, 1, 1)
+        layout.addLayout(net_grid)
+        return page
+
+    def create_page_maintenance(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(36, 20, 36, 16)
+        layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        page.setLayout(layout)
+
+        title = QLabel(tr("System Maintenance & Rescue"))
+        title.setStyleSheet("color: #ffffff; font-size: 25px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+        layout.addSpacing(2)
+
+        desc = QLabel(tr("Keep system packages updated, rank fastest mirrors, clean disk cache, and run emergency repair tools."))
+        desc.setStyleSheet("color: #a0a0a0; font-size: 12.5px; background: transparent;")
+        layout.addWidget(desc)
+        layout.addSpacing(14)
+
+        sec1 = QLabel(tr("PREVENTIVE MAINTENANCE & SYSTEM UPDATES"))
+        sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        layout.addWidget(sec1)
+        layout.addSpacing(8)
 
         util_grid = QGridLayout()
-        util_grid.setHorizontalSpacing(10)
-        util_grid.setVerticalSpacing(7)
+        util_grid.setHorizontalSpacing(12)
+        util_grid.setVerticalSpacing(10)
         for col in range(3):
             util_grid.setColumnStretch(col, 1)
 
@@ -5410,19 +5733,8 @@ class X64Hello(QWidget):
             tr("Update System"),
             tr("Synchronize repositories and upgrade all system packages (pacman -Syu)."),
             "refresh",
-            cmd=get_system_update_cmd()
-        )
-        btn_scx = PremiumButton(
-            tr("CPU Scheduler (scx / BORE)"),
-            tr("Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty."),
-            "cpu",
-            callback=self.open_scx_dialog
-        )
-        btn_dns = PremiumButton(
-            tr("Change DNS Server"),
-            tr("Measure ping latency and switch to Cloudflare, AdGuard, Quad9, or DoT."),
-            "dns",
-            callback=self.open_dns_dialog
+            cmd=get_system_update_cmd(),
+            height=100
         )
         btn_mirrors = PremiumButton(
             tr("Rank Fastest Mirrors"),
@@ -5431,28 +5743,9 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Mirror Ranking",
                 "CLASIFICACIÓN DE ESPEJOS (MIRRORS)",
-                "printf '\\033[1;31m==> [X64 MIRRORS]\\033[0m \\033[1;37mAnalizando latencia y velocidad de servidores de descarga...\\033[0m\\n\\n'; sudo cachyos-rate-mirrors"
-            )
-        )
-        btn_orphans = PremiumButton(
-            tr("Remove Orphan Packages"),
-            tr("Purge unused dependency packages left behind on your system."),
-            "trash",
-            cmd=build_x64_term_cmd(
-                "X64 LIOS Orphan Cleaner",
-                "PURGA DE PAQUETES HUÉRFANOS",
-                "printf '\\033[1;31m==> [X64 CLEANER]\\033[0m \\033[1;37mBuscando dependencias huérfanas sin uso...\\033[0m\\n\\n'; orphans=$(pacman -Qtdq); if [ -n \"$orphans\" ]; then sudo pacman -Rns $orphans; else printf '\\033[1;32m✓ No hay paquetes huérfanos en el sistema.\\033[0m\\n'; fi"
-            )
-        )
-        btn_winboat = PremiumButton(
-            tr("Install Winboat (Windows Apps)"),
-            tr("Run Windows productivity apps seamlessly via container integration."),
-            "window-app",
-            cmd=build_x64_term_cmd(
-                "X64 LIOS Winboat Installer",
-                "INSTALADOR DE WINBOAT Y CONTENEDORES",
-                "printf '\\033[1;31m==> [X64 WINBOAT]\\033[0m \\033[1;37mInstalando Winboat y motor de contenedores Docker...\\033[0m\\n\\n'; sudo pacman -Sy --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
-            )
+                "printf '\033[1;31m==> [X64 MIRRORS]\033[0m \033[1;37mAnalizando latencia y velocidad de servidores de descarga...\033[0m\n\n'; sudo cachyos-rate-mirrors"
+            ),
+            height=100
         )
         btn_cache = PremiumButton(
             tr("Clean Package Cache"),
@@ -5461,28 +5754,56 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Cache Cleaner",
                 "LIMPIEZA DE CACHÉ DE PAQUETES",
-                "printf '\\033[1;31m==> [X64 CACHE]\\033[0m \\033[1;37mLiberando espacio en disco de paquetes antiguos (pacman -Sc)...\\033[0m\\n\\n'; sudo pacman -Sc"
-            )
+                "printf '\033[1;31m==> [X64 CACHE]\033[0m \033[1;37mLiberando espacio en disco de paquetes antiguos (pacman -Sc)...\033[0m\n\n'; sudo pacman -Sc"
+            ),
+            height=100
         )
+        btn_orphans = PremiumButton(
+            tr("Remove Orphan Packages"),
+            tr("Purge unused dependency packages left behind on your system."),
+            "trash",
+            cmd=build_x64_term_cmd(
+                "X64 LIOS Orphan Cleaner",
+                "PURGA DE PAQUETES HUÉRFANOS",
+                "printf '\033[1;31m==> [X64 CLEANER]\033[0m \033[1;37mBuscando dependencias huérfanas sin uso...\033[0m\n\n'; orphans=$(pacman -Qtdq); if [ -n \"$orphans\" ]; then sudo pacman -Rns $orphans; else printf '\033[1;32m✓ No hay paquetes huérfanos en el sistema.\033[0m\n'; fi"
+            ),
+            height=100
+        )
+        btn_winboat = PremiumButton(
+            tr("Install Winboat (Windows Apps)"),
+            tr("Run Windows productivity apps seamlessly via container integration."),
+            "window-app",
+            cmd=build_x64_term_cmd(
+                "X64 LIOS Winboat Installer",
+                "INSTALADOR DE WINBOAT Y CONTENEDORES",
+                "printf '\033[1;31m==> [X64 WINBOAT]\033[0m \033[1;37mInstalando Winboat y motor de contenedores Docker...\033[0m\n\n'; sudo pacman -Sy --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
+            ),
+            height=100
+        )
+        card_upd_tray = ServiceSwitchCard(
+            tr("LIOS Update Notifier"),
+            tr("System tray timer that checks and alerts when new updates are ready."),
+            "arch-update.timer", "bell", self, is_user=True, req_pkg="cachy-update", height=100
+        )
+        self.service_cards.append(card_upd_tray)
 
         util_grid.addWidget(btn_upd, 0, 0)
-        util_grid.addWidget(btn_scx, 0, 1)
-        util_grid.addWidget(btn_dns, 0, 2)
-        util_grid.addWidget(btn_mirrors, 1, 0)
-        util_grid.addWidget(btn_orphans, 1, 1)
-        util_grid.addWidget(btn_winboat, 1, 2)
+        util_grid.addWidget(btn_mirrors, 0, 1)
+        util_grid.addWidget(btn_cache, 0, 2)
+        util_grid.addWidget(btn_orphans, 1, 0)
+        util_grid.addWidget(btn_winboat, 1, 1)
+        util_grid.addWidget(card_upd_tray, 1, 2)
         layout.addLayout(util_grid)
-        layout.addSpacing(10)
+        layout.addSpacing(20)
 
-        # SECTION 3: TROUBLESHOOTING & SYSTEM RESCUE (3x2 Symmetric Grid)
-        sec3 = QLabel(tr("Troubleshooting & System Rescue").upper())
-        sec3.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
-        layout.addWidget(sec3)
-        layout.addSpacing(5)
+        sec2 = QLabel(tr("SYSTEM DOCTOR & EMERGENCY RESCUE"))
+        sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        layout.addWidget(sec2)
+        layout.addSpacing(8)
 
         rescue_grid = QGridLayout()
-        rescue_grid.setHorizontalSpacing(10)
-        rescue_grid.setVerticalSpacing(7)
+        rescue_grid.setHorizontalSpacing(12)
+        rescue_grid.setVerticalSpacing(10)
         for col in range(3):
             rescue_grid.setColumnStretch(col, 1)
 
@@ -5493,8 +5814,9 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Keyring Reset",
                 "RESTABLECIMIENTO DE LLAVES CRIPTOGRÁFICAS (KEYRINGS)",
-                "printf '\\033[1;31m==> [X64 KEYRINGS]\\033[0m \\033[1;37mRegenerando depósito de firmas GPG de Pacman...\\033[0m\\n\\n'; sudo rm -rf /etc/pacman.d/gnupg/ && sudo pacman-key --init && sudo pacman-key --populate && sudo pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && sudo pacman-key --lsign-key F3B607488DB35A47"
-            )
+                "printf '\033[1;31m==> [X64 KEYRINGS]\033[0m \033[1;37mRegenerando depósito de firmas GPG de Pacman...\033[0m\n\n'; sudo rm -rf /etc/pacman.d/gnupg/ && sudo pacman-key --init && sudo pacman-key --populate && sudo pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && sudo pacman-key --lsign-key F3B607488DB35A47"
+            ),
+            height=100
         )
         btn_unlock = PremiumButton(
             tr("Unlock Pacman Database"),
@@ -5503,8 +5825,9 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Database Unlocker",
                 "DESBLOQUEO DE BASE DE DATOS PACMAN",
-                "printf '\\033[1;31m==> [X64 RESCUE]\\033[0m \\033[1;37mVerificando estado de /var/lib/pacman/db.lck...\\033[0m\\n\\n'; if [ -f /var/lib/pacman/db.lck ]; then sudo rm -f /var/lib/pacman/db.lck && printf '\\033[1;32m✓ Archivo db.lck eliminado. Base de datos desbloqueada.\\033[0m\\n'; else printf '\\033[1;32m✓ La base de datos no está bloqueada (no existe db.lck).\\033[0m\\n'; fi"
-            )
+                "printf '\033[1;31m==> [X64 RESCUE]\033[0m \033[1;37mVerificando estado de /var/lib/pacman/db.lck...\033[0m\n\n'; if [ -f /var/lib/pacman/db.lck ]; then sudo rm -f /var/lib/pacman/db.lck && printf '\033[1;32m✓ Archivo db.lck eliminado. Base de datos desbloqueada.\033[0m\n'; else printf '\033[1;32m✓ La base de datos no está bloqueada (no existe db.lck).\033[0m\n'; fi"
+            ),
+            height=100
         )
         btn_reinstall = PremiumButton(
             tr("Reinstall All Native Packages"),
@@ -5513,14 +5836,9 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS System Reinstaller",
                 "REINSTALACIÓN COMPLETA DE PAQUETES NATIVOS",
-                "printf '\\033[1;31m==> [X64 RESCUE]\\033[0m \\033[1;37mReinstalando todos los paquetes nativos del sistema...\\033[0m\\n\\n'; sudo pacman -Sy $(pacman -Qnq)"
-            )
-        )
-        btn_kwin = PremiumButton(
-            tr("KWin (Wayland) Debug Console"),
-            tr("Open the native KWin Wayland diagnostic inspector for windows and VRR."),
-            "bug",
-            cmd="/usr/lib/qt6/bin/qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || dbus-send --session --dest=org.kde.KWin --type=method_call /KWin org.kde.KWin.showDebugConsole"
+                "printf '\033[1;31m==> [X64 RESCUE]\033[0m \033[1;37mReinstalando todos los paquetes nativos del sistema...\033[0m\n\n'; sudo pacman -Sy $(pacman -Qnq)"
+            ),
+            height=100
         )
         btn_journal = PremiumButton(
             tr("System Boot Error Log"),
@@ -5529,16 +5847,31 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Boot Error Inspector",
                 "REGISTRO DE ERRORES CRÍTICOS DEL SISTEMA",
-                "printf '\\033[1;31m==> [X64 DIAGNOSTICS]\\033[0m \\033[1;37mAnalizando eventos críticos del kernel y systemd (journalctl -p 3 -xb)...\\033[0m\\n\\n'; out=$(journalctl -p 3 -xb --no-pager); if [ -n \"$out\" ]; then echo \"$out\"; else printf '\\033[1;32m✓ Cero errores críticos registrados en este arranque.\\033[0m\\n'; fi"
-            )
+                "printf '\033[1;31m==> [X64 DIAGNOSTICS]\033[0m \033[1;37mAnalizando eventos críticos del kernel y systemd (journalctl -p 3 -xb)...\033[0m\n\n'; out=$(journalctl -p 3 -xb --no-pager); if [ -n \"$out\" ]; then echo \"$out\"; else printf '\033[1;32m✓ Cero errores críticos registrados en este arranque.\033[0m\n'; fi"
+            ),
+            height=100
+        )
+        btn_kwin = PremiumButton(
+            tr("KWin (Wayland) Debug Console"),
+            tr("Open the native KWin Wayland diagnostic inspector for windows and VRR."),
+            "bug",
+            cmd="/usr/lib/qt6/bin/qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || dbus-send --session --dest=org.kde.KWin --type=method_call /KWin org.kde.KWin.showDebugConsole",
+            height=100
+        )
+        btn_btop = PremiumButton(
+            tr("Live Resource Monitor (btop)"),
+            tr("Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O."),
+            "gauge",
+            cmd="kitty -o remember_window_size=no -o background_opacity=1.0 -o initial_window_width=105c -o initial_window_height=30c --title 'X64 LIOS Resource Monitor' -e btop",
+            height=100
         )
 
         rescue_grid.addWidget(btn_keyrings, 0, 0)
         rescue_grid.addWidget(btn_unlock, 0, 1)
-        rescue_grid.addWidget(btn_cache, 0, 2)
-        rescue_grid.addWidget(btn_reinstall, 1, 0)
+        rescue_grid.addWidget(btn_reinstall, 0, 2)
+        rescue_grid.addWidget(btn_journal, 1, 0)
         rescue_grid.addWidget(btn_kwin, 1, 1)
-        rescue_grid.addWidget(btn_journal, 1, 2)
+        rescue_grid.addWidget(btn_btop, 1, 2)
         layout.addLayout(rescue_grid)
 
         return page
@@ -5579,7 +5912,6 @@ class X64Hello(QWidget):
         layout.addWidget(sec_mod)
         layout.addSpacing(8)
 
-        # 2x4 SYMMETRIC GRID FOR 8 MODULAR GAMING PACKAGES
         modular_items = [
             (
                 tr("X64 Gaming Core, Proton-SLR & Wine X64"),
@@ -5749,7 +6081,7 @@ class X64Hello(QWidget):
         current_idx = self.stacked_widget.currentIndex() if hasattr(self, "stacked_widget") else 0
         self._svc_worker = None
         self.build_ui(initial_page=current_idx)
-        self.update_hardware_telemetry()
+        self.update_hardware_telemetry(force=True)
         self.refresh_services_async()
 
     def change_page(self, index):
@@ -5760,9 +6092,19 @@ class X64Hello(QWidget):
                 btn.set_inactive_style()
         self.stacked_widget.setCurrentIndex(index)
         if index == 0:
-            self.update_hardware_telemetry()
+            self.update_hardware_telemetry(force=True)
             self.refresh_services_async()
         elif index == 1:
+            if hasattr(self, "scx_panel"):
+                self.scx_panel.refresh_runtime_state(select_active=True)
+            self.refresh_services_async()
+        elif index == 2:
+            if hasattr(self, "dns_panel"):
+                self.dns_panel.populate_connections()
+                if not self.dns_panel._has_benchmarked:
+                    QTimer.singleShot(120, self.dns_panel.run_ping_benchmark)
+            self.refresh_services_async()
+        elif index == 3:
             self.refresh_services_async()
 
 
@@ -5777,9 +6119,7 @@ if __name__ == '__main__':
     hello.setWindowIcon(icon)
     hello.show()
     if "--scheduler" in sys.argv:
-        QTimer.singleShot(150, hello.open_scx_dialog)
+        hello.change_page(1)
     elif "--dns" in sys.argv:
-        QTimer.singleShot(150, hello.open_dns_dialog)
+        hello.change_page(2)
     sys.exit(app.exec())
-
-
