@@ -13,3 +13,4 @@ post_remove() {
         plymouth-set-default-theme bgrt 2>/dev/null || true
     fi
 }
+
