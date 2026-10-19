@@ -1,0 +1,16 @@
+# Maintainer: X64 Studios <dev@x64lios.com>
+pkgname=x64-plymouth-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS Isometric Cyberpunk Plymouth Boot Splash Theme"
+arch=('any')
+url="https://x64lios.com"
+license=('GPL3')
+depends=('plymouth')
+install=x64-plymouth-theme.install
+
+package() {
+    # Install theme assets
+    install -d "${pkgdir}/usr/share/plymouth/themes/x64-lios"
+    cp -r "${startdir}/assets/"* "${pkgdir}/usr/share/plymouth/themes/x64-lios/"
+}

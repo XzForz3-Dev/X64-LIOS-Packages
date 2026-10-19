@@ -1,0 +1,50 @@
+[Plymouth Theme]
+Name=X64 LIOS
+Description=Official Isometric Cyberpunk Boot Splash for X64 LIOS
+ModuleName=two-step
+
+[two-step]
+Font=JetBrainsMono Nerd Font 12
+TitleFont=JetBrainsMono Nerd Font Bold 20
+MonospaceFont=JetBrainsMono Nerd Font 12
+ImageDir=/usr/share/plymouth/themes/x64-lios
+HorizontalAlignment=.5
+VerticalAlignment=.45
+Transition=fade
+TransitionDuration=0.6
+BackgroundStartColor=0x08080a
+BackgroundEndColor=0x08080a
+
+# Minimalist Progress Bar
+UseProgressBar=true
+ProgressBarHorizontalAlignment=.5
+ProgressBarVerticalAlignment=.88
+ProgressBarWidth=320
+ProgressBarHeight=3
+ProgressBarBackgroundColor=0x16161a
+ProgressBarForegroundColor=0xff1c1c
+ProgressBarShowPercentComplete=false
+MessageBelowAnimation=true
+
+[boot-up]
+UseEndAnimation=false
+
+[shutdown]
+UseEndAnimation=false
+
+[reboot]
+UseEndAnimation=false
+
+[updates]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=true
+Title=Actualizando X64 LIOS...
+SubTitle=Por favor, no apague el equipo
+
+[system-upgrade]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=true
+Title=Actualizando Sistema...
+SubTitle=Por favor, no apague el equipo
