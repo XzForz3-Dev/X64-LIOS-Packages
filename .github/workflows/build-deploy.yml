@@ -41,7 +41,7 @@ jobs:
             mkdir -p build_output
             shopt -s nullglob
             # Orden de compilación para respetar dependencias locales (falcond-profiles antes de falcond)
-            BUILD_QUEUE=(falcond-profiles falcond x64-calamares x64-theme-live x64-welcome)
+            BUILD_QUEUE=(falcond-profiles falcond x64-calamares x64-theme-live x64-welcome x64-hello)
             for dir in \"\${BUILD_QUEUE[@]}\"; do
               if [ -d \"\$dir\" ] && [ -f \"\$dir/PKGBUILD\" ]; then
                 echo \"Compilando paquete en \$dir...\"

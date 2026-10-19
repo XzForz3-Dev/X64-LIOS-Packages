@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=X64 LIOS Hello
+Comment=X64 LIOS Post-Installation Control & Gaming Center
+Exec=/usr/bin/x64-hello
+Icon=x64-hello-icon
+Terminal=false
+Type=Application
+Categories=System;Utility;
+
