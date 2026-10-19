@@ -1,13 +1,19 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Official X64 LIOS Hyprland Desktop Settings and Integration"
 arch=('any')
 license=('GPL')
-depends=()
+depends=('hyprland' 'kitty' 'waybar' 'dunst' 'rofi-wayland' 'dolphin')
+source=('hyprland.conf')
+sha256sums=('SKIP')
 
 package() {
+    # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS Hyprland Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
-}
+    echo "X64 LIOS Hyprland Desktop Settings" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 
+    # Install skeleton and system-wide default configuration
+    install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/skel/.config/hypr/hyprland.conf"
+    install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/xdg/hypr/hyprland.conf"
+}
