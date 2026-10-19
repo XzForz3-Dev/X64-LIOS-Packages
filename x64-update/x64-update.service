@@ -1,0 +1,7 @@
+[Unit]
+Description=Comprobación periódica de actualizaciones X64 LIOS
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/x64-update --check --notify

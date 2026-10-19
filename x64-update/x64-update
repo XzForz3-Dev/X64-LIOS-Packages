@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+x64-update: Gestor y Notificador de Actualizaciones de X64 LIOS.
+Desarrollado para X64 Studios.
+"""
+
+import sys
+import os
+import shutil
+import subprocess
+import time
+import argparse
+import tempfile
+
+STATE_DIR = os.path.expanduser("~/.local/state/x64-update")
+COUNT_FILE = os.path.join(STATE_DIR, "count")
+PACKAGES_FILE = os.path.join(STATE_DIR, "packages.txt")
+LAST_CHECK_FILE = os.path.join(STATE_DIR, "last_check")
+
+BANNER = r"""
+\033[1;31m  ██╗  ██╗ ██████╗ ██╗  ██╗     ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗
+  ╚██╗██╔╝██╔════╝ ██║  ██║     ██║   ██║██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔════╝
+   ╚███╔╝ ███████╗ ███████║     ██║   ██║██████╔╝██║  ██║███████║   ██║   █████╗  
+   ██╔██╗ ██╔═══██╗╚════██║     ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝  
+  ██╔╝ ██╗╚██████╔╝     ██║     ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗
+  ╚═╝  ╚═╝ ╚═════╝      ╚═╝      ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝\033[0m
+\033[1;30m  ───────────────────────────────────────────────────────────────────────────────\033[0m
+\033[1;37m                       SISTEMA DE GESTIÓN DE ACTUALIZACIONES                      \033[0m
+\033[1;30m  ───────────────────────────────────────────────────────────────────────────────\033[0m
+"""
+
+def ensure_state_dir():
+    os.makedirs(STATE_DIR, exist_ok=True)
+
+def check_updates():
+    ensure_state_dir()
+    repo_pkgs = []
+    aur_pkgs = []
+    flatpak_pkgs = []
+
+    # 1. Official Repo updates via checkupdates in isolated temporary DB
+    if shutil.which("checkupdates"):
+        tmp_db = tempfile.mkdtemp(prefix="x64-checkupdates-")
+        env = os.environ.copy()
+        env["CHECKUPDATES_DB"] = tmp_db
+        try:
+            res = subprocess.run(
+                ["checkupdates"],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=45
+            )
+            for line in res.stdout.strip().splitlines():
+                line = line.strip()
+                if line:
+                    repo_pkgs.append(line)
+        except Exception:
+            pass
+        finally:
+            shutil.rmtree(tmp_db, ignore_errors=True)
+
+    # 2. AUR updates (paru or yay)
+    aur_helper = None
+    if shutil.which("paru"):
+        aur_helper = "paru"
+    elif shutil.which("yay"):
+        aur_helper = "yay"
+
+    if aur_helper:
+        try:
+            res = subprocess.run(
+                [aur_helper, "-Qua"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=45
+            )
+            for line in res.stdout.strip().splitlines():
+                line = line.strip()
+                if line and not line.endswith("[ignored]"):
+                    aur_pkgs.append(f"{line} (AUR)")
+        except Exception:
+            pass
+
+    # 3. Flatpak updates
+    if shutil.which("flatpak"):
+        try:
+            res = subprocess.run(
+                ["flatpak", "remote-ls", "--updates", "--columns=name,application,version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30
+            )
+            for line in res.stdout.strip().splitlines():
+                parts = line.strip().split("\t")
+                if parts and parts[0]:
+                    name = parts[0]
+                    ver = parts[2] if len(parts) > 2 else ""
+                    flatpak_pkgs.append(f"{name} {ver} (Flatpak)".strip())
+        except Exception:
+            pass
+
+    all_pkgs = repo_pkgs + aur_pkgs + flatpak_pkgs
+    total_count = len(all_pkgs)
+
+    # Write state files
+    try:
+        with open(COUNT_FILE, "w", encoding="utf-8") as f:
+            f.write(f"{total_count}\n")
+        with open(PACKAGES_FILE, "w", encoding="utf-8") as f:
+            for p in all_pkgs:
+                f.write(f"{p}\n")
+        with open(LAST_CHECK_FILE, "w", encoding="utf-8") as f:
+            f.write(f"{time.time()}\n")
+    except Exception:
+        pass
+
+    return {
+        "repo": repo_pkgs,
+        "aur": aur_pkgs,
+        "flatpak": flatpak_pkgs,
+        "all": all_pkgs,
+        "count": total_count
+    }
+
+def print_banner():
+    print(BANNER.replace("\\033", "\033"))
+
+def run_interactive():
+    print_banner()
+    print("\033[1;36m[*] Comprobando actualizaciones del sistema...\033[0m")
+    data = check_updates()
+    total = data["count"]
+
+    if total == 0:
+        print("\n\033[1;32m[✓] ¡El sistema X64 LIOS está completamente actualizado!\033[0m\n")
+        time.sleep(1.5)
+        return 0
+
+    print(f"\n\033[1;33m[!] Se encontraron {total} actualización(es) disponibles:\033[0m\n")
+
+    if data["repo"]:
+        print(f"\033[1;31m▶ Paquetes Oficiales ({len(data['repo'])}):\033[0m")
+        for p in data["repo"][:25]:
+            print(f"  • {p}")
+        if len(data["repo"]) > 25:
+            print(f"  \033[1;30m... y {len(data['repo']) - 25} más\033[0m")
+        print()
+
+    if data["aur"]:
+        print(f"\033[1;35m▶ Paquetes AUR ({len(data['aur'])}):\033[0m")
+        for p in data["aur"][:15]:
+            print(f"  • {p}")
+        if len(data["aur"]) > 15:
+            print(f"  \033[1;30m... y {len(data['aur']) - 15} más\033[0m")
+        print()
+
+    if data["flatpak"]:
+        print(f"\033[1;34m▶ Aplicaciones Flatpak ({len(data['flatpak'])}):\033[0m")
+        for p in data["flatpak"][:10]:
+            print(f"  • {p}")
+        print()
+
+    # User confirmation
+    try:
+        ans = input("\033[1;37m¿Desea proceder con la actualización del sistema ahora? [S/n]: \033[0m").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print("\nOperación cancelada.")
+        return 1
+
+    if ans in ["n", "no"]:
+        print("\nActualización pospuesta.")
+        return 0
+
+    print("\n\033[1;32m[*] Iniciando sincronización y actualización del sistema...\033[0m\n")
+
+    # Determine command
+    aur_helper = None
+    if shutil.which("paru"):
+        aur_helper = "paru"
+    elif shutil.which("yay"):
+        aur_helper = "yay"
+
+    if aur_helper and (data["aur"] or not shutil.which("pacman")):
+        cmd = [aur_helper, "-Syu"]
+    else:
+        cmd = ["sudo", "pacman", "-Syu"]
+
+    # Run system update
+    ret = subprocess.run(cmd).returncode
+
+    # If flatpak packages, run flatpak update
+    if ret == 0 and data["flatpak"]:
+        print("\n\033[1;34m[*] Actualizando aplicaciones Flatpak...\033[0m\n")
+        subprocess.run(["flatpak", "update", "-y"])
+
+    # Post-update check
+    print("\n\033[1;36m[*] Actualizando registro de estado...\033[0m")
+    check_updates()
+
+    # Kernel reboot check
+    try:
+        running_kernel = subprocess.check_output(["uname", "-r"], text=True).strip()
+        modules_dir = f"/usr/lib/modules/{running_kernel}"
+        if not os.path.exists(modules_dir):
+            print("\n\033[1;33m" + "!" * 78)
+            print("  AVISO CRÍTICO: El kernel del sistema ha sido actualizado.")
+            print("  Los controladores en memoria requieren un reinicio para completar la transición.")
+            print("!" * 78 + "\033[0m")
+    except Exception:
+        pass
+
+    if ret == 0:
+        print("\n\033[1;32m[✓] ¡Actualización completada exitosamente!\033[0m\n")
+    else:
+        print("\n\033[1;31m[✗] El proceso de actualización terminó con advertencias o errores.\033[0m\n")
+
+    try:
+        input("\033[1;30mPresione Enter para salir...\033[0m")
+    except (KeyboardInterrupt, EOFError):
+        pass
+
+    return ret
+
+def main():
+    parser = argparse.ArgumentParser(description="Gestor de actualizaciones X64 LIOS")
+    parser.add_argument("-c", "--check", action="store_true", help="Comprobar actualizaciones en segundo plano")
+    parser.add_argument("-n", "--notify", action="store_true", help="Enviar notificación de escritorio si hay actualizaciones")
+    parser.add_argument("-l", "--list", action="store_true", help="Listar paquetes pendientes")
+    parser.add_argument("--count", action="store_true", help="Mostrar número de actualizaciones pendientes")
+
+    args = parser.parse_args()
+
+    if args.count:
+        if os.path.exists(COUNT_FILE):
+            try:
+                with open(COUNT_FILE, "r", encoding="utf-8") as f:
+                    print(f.read().strip())
+                    return 0
+            except Exception:
+                pass
+        data = check_updates()
+        print(data["count"])
+        return 0
+
+    if args.list:
+        if os.path.exists(PACKAGES_FILE):
+            try:
+                with open(PACKAGES_FILE, "r", encoding="utf-8") as f:
+                    print(f.read().strip())
+                    return 0
+            except Exception:
+                pass
+        data = check_updates()
+        for p in data["all"]:
+            print(p)
+        return 0
+
+    if args.check:
+        data = check_updates()
+        count = data["count"]
+        print(f"X64 LIOS: {count} actualizaciones disponibles.")
+        if args.notify and count > 0:
+            if shutil.which("notify-send"):
+                icon_arg = ["-i", "x64-update-available"]
+                msg = f"Hay {count} actualización(es) disponibles para instalar."
+                subprocess.run(
+                    ["notify-send", "-a", "X64 LIOS", "-u", "normal"] + icon_arg + ["Actualizaciones disponibles", msg],
+                    check=False
+                )
+        return 0
+
+    return run_interactive()
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=X64 Update Tray
+Comment=Notificador de actualizaciones de X64 LIOS
+Comment[es]=Notificador de actualizaciones de X64 LIOS
+Comment[en]=X64 LIOS Update Tray Notifier
+Exec=x64-update-tray
+Icon=x64-update
+Terminal=false
+Type=Application
+Categories=System;Utility;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

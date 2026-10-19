@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=X64 Update
+Comment=Actualizar el sistema X64 LIOS
+Comment[es]=Actualizar el sistema X64 LIOS
+Comment[en]=Update X64 LIOS System
+Exec=kitty --class x64-terminal -T "X64 LIOS Update" -e x64-update
+Icon=x64-update
+Terminal=false
+Type=Application
+Categories=System;Settings;
+StartupNotify=true

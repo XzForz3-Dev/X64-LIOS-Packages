@@ -1,0 +1,14 @@
+post_install() {
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+    echo "==> x64-update instalado con éxito."
+    echo "==> Para habilitar el temporizador de comprobación automática:"
+    echo "==> systemctl --user enable --now x64-update.timer"
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+}

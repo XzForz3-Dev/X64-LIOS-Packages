@@ -1,0 +1,66 @@
+# Maintainer: X64 Studios <dev@x64lios.com>
+pkgname=x64-update
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Notificador y gestor de actualizaciones del sistema para X64 LIOS"
+arch=('any')
+url="https://x64lios.com"
+license=('GPL-3.0-or-later')
+depends=(
+    'python'
+    'python-pyqt6'
+    'pacman-contrib'
+    'libnotify'
+)
+optdepends=(
+    'paru: Soporte de comprobación y actualización de paquetes AUR'
+    'yay: Soporte de comprobación y actualización de paquetes AUR'
+    'flatpak: Soporte de comprobación y actualización de aplicaciones Flatpak'
+    'kitty: Terminal recomendada para la ejecución interactiva'
+)
+provides=('cachy-update' 'arch-update')
+conflicts=('cachy-update' 'arch-update')
+replaces=('cachy-update' 'arch-update')
+install=x64-update.install
+source=(
+    'x64-update'
+    'x64-update-tray'
+    'x64-update.desktop'
+    'x64-update-tray.desktop'
+    'x64-update.service'
+    'x64-update.timer'
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+    # Binaries
+    install -Dm755 "${srcdir}/x64-update" "${pkgdir}/usr/bin/x64-update"
+    install -Dm755 "${srcdir}/x64-update-tray" "${pkgdir}/usr/bin/x64-update-tray"
+
+    # Compatibility symlink
+    ln -sf /usr/bin/x64-update "${pkgdir}/usr/bin/cachy-update"
+    ln -sf /usr/bin/x64-update "${pkgdir}/usr/bin/arch-update"
+
+    # Desktop entries
+    install -Dm644 "${srcdir}/x64-update.desktop" "${pkgdir}/usr/share/applications/x64-update.desktop"
+    install -Dm644 "${srcdir}/x64-update-tray.desktop" "${pkgdir}/usr/share/applications/x64-update-tray.desktop"
+    install -Dm644 "${srcdir}/x64-update-tray.desktop" "${pkgdir}/etc/xdg/autostart/x64-update-tray.desktop"
+
+    # Systemd user services
+    install -Dm644 "${srcdir}/x64-update.service" "${pkgdir}/usr/lib/systemd/user/x64-update.service"
+    install -Dm644 "${srcdir}/x64-update.timer" "${pkgdir}/usr/lib/systemd/user/x64-update.timer"
+
+    # Icons
+    for size in 16 22 24 32 48 64 128 256 500; do
+        if [ -f "${startdir}/icons/${size}x${size}/apps/x64-update.png" ]; then
+            install -Dm644 "${startdir}/icons/${size}x${size}/apps/x64-update.png" \
+                "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/x64-update.png"
+            install -Dm644 "${startdir}/icons/${size}x${size}/apps/x64-update-available.png" \
+                "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/x64-update-available.png"
+        fi
+    done
+
+    # Pixmaps fallback
+    install -Dm644 "${startdir}/icons/500x500/apps/x64-update.png" "${pkgdir}/usr/share/pixmaps/x64-update.png"
+    install -Dm644 "${startdir}/icons/500x500/apps/x64-update-available.png" "${pkgdir}/usr/share/pixmaps/x64-update-available.png"
+}

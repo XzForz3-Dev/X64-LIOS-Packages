@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+x64-update-tray: Applet de Bandeja del Sistema (System Tray) para X64 LIOS.
+Desarrollado para X64 Studios.
+"""
+
+import sys
+import os
+import fcntl
+import time
+import shutil
+import subprocess
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QFileSystemWatcher
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt6.QtGui import QIcon, QAction, QCursor
+
+STATE_DIR = os.path.expanduser("~/.local/state/x64-update")
+COUNT_FILE = os.path.join(STATE_DIR, "count")
+PACKAGES_FILE = os.path.join(STATE_DIR, "packages.txt")
+LAST_CHECK_FILE = os.path.join(STATE_DIR, "last_check")
+
+# Single instance lock
+LOCK_FILE = f"/run/user/{os.getuid()}/x64-update-tray.lock" if os.path.exists(f"/run/user/{os.getuid()}") else os.path.join(STATE_DIR, "tray.lock")
+
+class CheckWorker(QThread):
+    finished_check = pyqtSignal(dict)
+
+    def run(self):
+        # Call x64-update --check
+        res = subprocess.run(["x64-update", "--check"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Load updated state
+        count = 0
+        pkgs = []
+        last_check = time.time()
+        
+        if os.path.exists(COUNT_FILE):
+            try:
+                with open(COUNT_FILE, "r", encoding="utf-8") as f:
+                    count = int(f.read().strip())
+            except Exception:
+                pass
+                
+        if os.path.exists(PACKAGES_FILE):
+            try:
+                with open(PACKAGES_FILE, "r", encoding="utf-8") as f:
+                    pkgs = [line.strip() for line in f if line.strip()]
+            except Exception:
+                pass
+                
+        if os.path.exists(LAST_CHECK_FILE):
+            try:
+                with open(LAST_CHECK_FILE, "r", encoding="utf-8") as f:
+                    last_check = float(f.read().strip())
+            except Exception:
+                pass
+
+        self.finished_check.emit({
+            "count": count,
+            "packages": pkgs,
+            "last_check": last_check
+        })
+
+class X64UpdateTray(QSystemTrayIcon):
+    def __init__(self, app):
+        super().__init__()
+        self.app = app
+        self.worker = None
+        self.count = 0
+        self.packages = []
+        self.last_check = 0.0
+
+        # Load initial state from disk
+        self.load_state_from_disk()
+
+        # Build context menu
+        self.menu = QMenu()
+        self.setContextMenu(self.menu)
+
+        # Connect click triggers
+        self.activated.connect(self.on_activated)
+
+        # Refresh UI
+        self.update_ui()
+
+        # Set up file system watcher for instant reactivity
+        self.watcher = QFileSystemWatcher()
+        os.makedirs(STATE_DIR, exist_ok=True)
+        for f in [COUNT_FILE, PACKAGES_FILE, LAST_CHECK_FILE]:
+            if not os.path.exists(f):
+                try:
+                    with open(f, "w") as fp:
+                        pass
+                except Exception:
+                    pass
+            if os.path.exists(f):
+                self.watcher.addPath(f)
+        self.watcher.fileChanged.connect(self.on_state_file_changed)
+
+        # Periodic timer: check every 1 hour (3600000 ms)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.trigger_background_check)
+        self.timer.start(3600000)
+
+        # If state was empty or older than 2 hours, trigger check in 3 seconds
+        if self.last_check == 0.0 or (time.time() - self.last_check > 7200):
+            QTimer.singleShot(3000, self.trigger_background_check)
+
+    def load_state_from_disk(self):
+        if os.path.exists(COUNT_FILE):
+            try:
+                with open(COUNT_FILE, "r", encoding="utf-8") as f:
+                    self.count = int(f.read().strip())
+            except Exception:
+                self.count = 0
+        else:
+            self.count = 0
+
+        if os.path.exists(PACKAGES_FILE):
+            try:
+                with open(PACKAGES_FILE, "r", encoding="utf-8") as f:
+                    self.packages = [line.strip() for line in f if line.strip()]
+            except Exception:
+                self.packages = []
+        else:
+            self.packages = []
+
+        if os.path.exists(LAST_CHECK_FILE):
+            try:
+                with open(LAST_CHECK_FILE, "r", encoding="utf-8") as f:
+                    self.last_check = float(f.read().strip())
+            except Exception:
+                self.last_check = 0.0
+        else:
+            self.last_check = 0.0
+
+    def on_state_file_changed(self, path):
+        # Debounce slightly and reload
+        time.sleep(0.1)
+        self.load_state_from_disk()
+        self.update_ui()
+        # Re-add path in case file was replaced atomically
+        if os.path.exists(path) and path not in self.watcher.files():
+            self.watcher.addPath(path)
+
+    def human_time_ago(self):
+        if self.last_check <= 0:
+            return "hace un momento"
+        diff = int(time.time() - self.last_check)
+        if diff < 60:
+            return f"hace {max(1, diff)}s"
+        elif diff < 3600:
+            return f"hace {diff // 60}m"
+        elif diff < 86400:
+            return f"hace {diff // 3600}h"
+        else:
+            return f"hace {diff // 86400}d"
+
+    def get_icon(self, state):
+        # state: 'ok' or 'pending'
+        icon_name = "x64-update" if state == "ok" else "x64-update-available"
+        fallback_pixmap = f"/usr/share/pixmaps/{icon_name}.png"
+        
+        # Check current running directory / local package fallback
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        local_pixmap = os.path.join(script_dir, "icons", "500x500", "apps", f"{icon_name}.png")
+        
+        icon = QIcon.fromTheme(icon_name)
+        if icon.isNull():
+            if os.path.exists(fallback_pixmap):
+                icon = QIcon(fallback_pixmap)
+            elif os.path.exists(local_pixmap):
+                icon = QIcon(local_pixmap)
+        return icon
+
+    def update_ui(self):
+        # Set icon & tooltip
+        if self.count == 0:
+            self.setIcon(self.get_icon("ok"))
+            self.setToolTip("X64 LIOS: Sistema actualizado")
+        else:
+            self.setIcon(self.get_icon("pending"))
+            msg = "1 actualización disponible" if self.count == 1 else f"{self.count} actualizaciones disponibles"
+            self.setToolTip(f"X64 LIOS: {msg}")
+
+        # Rebuild context menu
+        self.menu.clear()
+
+        # 1. Header status
+        if self.count == 0:
+            header_act = self.menu.addAction("Sistema actualizado")
+            header_act.setEnabled(False)
+        else:
+            msg = "1 actualización disponible" if self.count == 1 else f"{self.count} actualizaciones disponibles"
+            header_act = self.menu.addAction(msg)
+            header_act.setEnabled(False)
+
+            # 2. Packages submenu
+            sub_title = f"Paquetes ({self.count})"
+            pkg_menu = self.menu.addMenu(sub_title)
+            
+            # Show up to 35 packages
+            shown_pkgs = self.packages[:35]
+            for p in shown_pkgs:
+                act = pkg_menu.addAction(p)
+                act.setEnabled(False)
+            if len(self.packages) > 35:
+                extra = len(self.packages) - 35
+                act = pkg_menu.addAction(f"... y {extra} paquetes más")
+                act.setEnabled(False)
+
+        # 3. Last check info
+        check_info = self.menu.addAction(f"Última comprobación {self.human_time_ago()}")
+        check_info.setEnabled(False)
+
+        self.menu.addSeparator()
+
+        # 4. Action: Ejecutar X64-Update
+        run_act = self.menu.addAction("Ejecutar X64-Update")
+        run_act.triggered.connect(self.launch_updater)
+
+        # 5. Action: Buscar actualizaciones
+        search_act = self.menu.addAction("Buscar actualizaciones")
+        search_act.triggered.connect(self.trigger_background_check)
+
+        self.menu.addSeparator()
+
+        # 6. Action: Salir
+        exit_act = self.menu.addAction("Salir")
+        exit_act.triggered.connect(self.app.quit)
+
+    def on_activated(self, reason):
+        # Left click: popup the context menu for instant clarity
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.menu.popup(QCursor.pos())
+
+    def launch_updater(self):
+        term = None
+        if shutil.which("kitty"):
+            term = ["kitty", "--class", "x64-terminal", "-T", "X64 LIOS Update", "-e", "x64-update"]
+        elif shutil.which("xterm"):
+            term = ["xterm", "-title", "X64 LIOS Update", "-e", "x64-update"]
+        elif shutil.which("konsole"):
+            term = ["konsole", "-e", "x64-update"]
+
+        if term:
+            subprocess.Popen(term)
+        else:
+            subprocess.Popen(["x64-update"])
+
+    def trigger_background_check(self):
+        if self.worker and self.worker.isRunning():
+            return
+        self.setToolTip("X64 LIOS: Comprobando actualizaciones...")
+        self.worker = CheckWorker()
+        self.worker.finished_check.connect(self.on_check_finished)
+        self.worker.start()
+
+    def on_check_finished(self, data):
+        self.count = data["count"]
+        self.packages = data["packages"]
+        self.last_check = data["last_check"]
+        self.update_ui()
+
+def main():
+    # Enforce single instance
+    os.makedirs(os.path.dirname(LOCK_FILE), exist_ok=True)
+    try:
+        lock_fd = open(LOCK_FILE, "w")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, BlockingIOError):
+        # Another instance is already running
+        sys.exit(0)
+
+    app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
+    app.setApplicationName("x64-update-tray")
+
+    tray = X64UpdateTray(app)
+    tray.show()
+
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
