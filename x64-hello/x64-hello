@@ -2677,6 +2677,217 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'X64 Gaming Core, Proton-SLR & Wine X64': 'X64 Gaming Core & Wine X64',
         'Gamescope (Valve Micro-Compositor)': 'Gamescope (Valve Compositor)'}}
 
+SCHED_TRANSLATIONS = {
+    'es': {
+        'CPU Scheduler (scx / BORE)': 'Planificador CPU (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Cambia en vivo entre BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash y scx_rusty.',
+        'System Boot Error Log': 'Registro de Errores de Arranque',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Inspecciona errores críticos del kernel y systemd en el arranque actual (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Haz clic para abrir el Selector de Planificador CPU (BORE / sched_ext).',
+        'X64 CPU Scheduler & Latency Selector': 'Selector de Planificador CPU y Latencia X64',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Cambia el planificador de tareas de CPU del kernel en tiempo real sin necesidad de reiniciar.',
+        'Active Kernel Scheduler:': 'Planificador Activo del Kernel:',
+        'BORE (Kernel Default)': 'BORE (Nativo por Defecto)',
+        'Native Kernel + FalconD Auto': 'Kernel Nativo + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Planificador BORE integrado en el kernel con cero sobrecarga y afinidad dinámica con FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Gaming Competitivo y 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Planificador Virtual Deadline de Valve e Igalia para máxima estabilidad de frametime en juegos.',
+        'Interactive Desktop & Streaming': 'Escritorio Interactivo y Streaming',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Prioriza tareas interactivas (juegos, OBS) incluso con compilación en segundo plano al 100%.',
+        'Lightweight All-Rounder': 'Todoterreno Ligero y Rápido',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Planificador general ultrarrápido optimizado para localidad de caché de CPU y baja latencia.',
+        'Pro Audio & Multimedia EDF': 'Audio Profesional y Multimedia EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'Planificador EDF que garantiza consistencia estricta de latencia para audio y vídeo profesional.',
+        'Multi-Core / Multi-CCD Workstation': 'Workstation Multi-Núcleo / Multi-CCD',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Balanceador multidominio diseñado para CPUs de muchos núcleos y cargas pesadas de renderizado.',
+        'Workload Profile (scx_loader):': 'Perfil de Carga (scx_loader):',
+        '⚡ Gaming': '⚡ Gaming',
+        '🎯 Low Latency': '🎯 Baja Latencia',
+        '⚙️ Auto': '⚙️ Automático',
+        '🔋 Power Save': '🔋 Ahorro de Energía',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Mantener este planificador al reiniciar el sistema (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Restablecer a BORE (Por Defecto)',
+        'Apply Selected Scheduler': 'Aplicar Planificador',
+        'Applying CPU scheduler...': 'Aplicando planificador de CPU...',
+        'CPU scheduler switched to:': 'Planificador de CPU cambiado a:',
+        'Returned to native BORE kernel scheduler.': 'Restablecido al planificador nativo BORE del kernel.'
+    },
+    'fr': {
+        'CPU Scheduler (scx / BORE)': 'Ordonnanceur CPU (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Basculez en direct entre BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash et scx_rusty.',
+        'System Boot Error Log': 'Journal des Erreurs Système',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Inspecter les erreurs critiques du noyau et de systemd (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Cliquez pour ouvrir le sélecteur d’ordonnanceur CPU X64 (BORE / sched_ext).',
+        'X64 CPU Scheduler & Latency Selector': 'Sélecteur d’Ordonnanceur CPU & Latence X64',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Changez l’ordonnanceur CPU du noyau Linux en temps réel sans redémarrer.',
+        'Active Kernel Scheduler:': 'Ordonnanceur Noyau Actif :',
+        'BORE (Kernel Default)': 'BORE (Défaut du Noyau)',
+        'Native Kernel + FalconD Auto': 'Noyau Natif + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Ordonnanceur BORE intégré au noyau sans surcharge eBPF, synchronisé avec FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Gaming Compétitif & 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Ordonnanceur Virtual Deadline par Valve & Igalia pour une stabilité maximale des FPS.',
+        'Interactive Desktop & Streaming': 'Bureau Interactif & Streaming',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Priorise les tâches interactives (jeux, OBS) même sous charge CPU à 100%.',
+        'Lightweight All-Rounder': 'Polyvalent Ultra-Léger',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Ordonnanceur polyvalent optimisé pour le cache CPU et une faible latence de réveil.',
+        'Pro Audio & Multimedia EDF': 'Audio Pro & Multimédia EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'Ordonnanceur EDF garantissant une latence stricte pour l’audio et la vidéo.',
+        'Multi-Core / Multi-CCD Workstation': 'Workstation Multi-Cœurs / Multi-CCD',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Équilibreur multi-domaines conçu pour les processeurs à grand nombre de cœurs.',
+        'Workload Profile (scx_loader):': 'Profil de Charge (scx_loader) :',
+        '⚡ Gaming': '⚡ Gaming',
+        '🎯 Low Latency': '🎯 Faible Latence',
+        '⚙️ Auto': '⚙️ Automatique',
+        '🔋 Power Save': '🔋 Économie d’Énergie',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Conserver cet ordonnanceur au redémarrage (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Réinitialiser sur BORE',
+        'Apply Selected Scheduler': 'Appliquer l’Ordonnanceur',
+        'Applying CPU scheduler...': 'Application de l’ordonnanceur CPU...',
+        'CPU scheduler switched to:': 'Ordonnanceur CPU basculé sur :',
+        'Returned to native BORE kernel scheduler.': 'Retour à l’ordonnanceur natif BORE du noyau.'
+    },
+    'de': {
+        'CPU Scheduler (scx / BORE)': 'CPU-Scheduler (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Wechseln Sie live zwischen BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.',
+        'System Boot Error Log': 'System-Boot-Fehlerprotokoll',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Kritische Kernel- und Systemd-Fehler des aktuellen Starts prüfen (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Klicken, um den X64 CPU-Scheduler-Wähler (BORE / sched_ext) zu öffnen.',
+        'X64 CPU Scheduler & Latency Selector': 'X64 CPU-Scheduler & Latenz-Wähler',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Wechseln Sie den Linux-Kernel-CPU-Scheduler in Echtzeit ohne Neustart.',
+        'Active Kernel Scheduler:': 'Aktiver Kernel-Scheduler:',
+        'BORE (Kernel Default)': 'BORE (Kernel-Standard)',
+        'Native Kernel + FalconD Auto': 'Nativer Kernel + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Im Kernel integrierter BORE-Scheduler ohne eBPF-Overhead; arbeitet mit FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Kompetitives Gaming & 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Virtual-Deadline-Scheduler von Valve & Igalia für maximale Frametime-Stabilität.',
+        'Interactive Desktop & Streaming': 'Interaktiver Desktop & Streaming',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Priorisiert interaktive Aufgaben (Spiele, OBS) selbst bei 100% Hintergrundlast.',
+        'Lightweight All-Rounder': 'Leichtgewichtiger Allrounder',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Ultraschneller Allzweck-Scheduler für optimale CPU-Cache-Lokalität.',
+        'Pro Audio & Multimedia EDF': 'Pro-Audio & Multimedia EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'EDF-Scheduler für strikte Latenzkonsistenz bei Audio- und Videoworkloads.',
+        'Multi-Core / Multi-CCD Workstation': 'Multi-Core / Multi-CCD Workstation',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Multi-Domain-Load-Balancer für Prozessoren mit vielen Kernen und Rendering.',
+        'Workload Profile (scx_loader):': 'Workload-Profil (scx_loader):',
+        '⚡ Gaming': '⚡ Gaming',
+        '🎯 Low Latency': '🎯 Niedrige Latenz',
+        '⚙️ Auto': '⚙️ Automatisch',
+        '🔋 Power Save': '🔋 Energiesparen',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Ausgewählten Scheduler beim Systemstart beibehalten (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Auf BORE zurücksetzen',
+        'Apply Selected Scheduler': 'Scheduler anwenden',
+        'Applying CPU scheduler...': 'CPU-Scheduler wird angewendet...',
+        'CPU scheduler switched to:': 'CPU-Scheduler gewechselt zu:',
+        'Returned to native BORE kernel scheduler.': 'Auf nativen BORE-Kernel-Scheduler zurückgesetzt.'
+    },
+    'it': {
+        'CPU Scheduler (scx / BORE)': 'Scheduler CPU (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Passa dal vivo tra BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash e scx_rusty.',
+        'System Boot Error Log': 'Registro Errori di Avvio',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Ispeziona gli errori critici di systemd e del kernel (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Clicca per aprire il Selettore Scheduler CPU X64 (BORE / sched_ext).',
+        'X64 CPU Scheduler & Latency Selector': 'Selettore Scheduler CPU e Latenza X64',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Cambia lo scheduler CPU del kernel Linux in tempo reale senza riavviare.',
+        'Active Kernel Scheduler:': 'Scheduler del Kernel Attivo:',
+        'BORE (Kernel Default)': 'BORE (Predefinito del Kernel)',
+        'Native Kernel + FalconD Auto': 'Kernel Nativo + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Scheduler BORE integrato nel kernel con zero overhead e supporto FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Gaming Competitivo & 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Scheduler Virtual Deadline di Valve e Igalia per la massima stabilità del frametime.',
+        'Interactive Desktop & Streaming': 'Desktop Interattivo & Streaming',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Dà priorità ai task interattivi (giochi, OBS) anche con CPU al 100%.',
+        'Lightweight All-Rounder': 'Tuttofare Leggero e Veloce',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Scheduler generico ultraveloce ottimizzato per la località della cache CPU.',
+        'Pro Audio & Multimedia EDF': 'Audio Pro & Multimedia EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'Scheduler EDF che garantisce latenza rigorosa per audio e video professionale.',
+        'Multi-Core / Multi-CCD Workstation': 'Workstation Multi-Core / Multi-CCD',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Bilanciatore multi-dominio per CPU con molti core e carichi di rendering pesanti.',
+        'Workload Profile (scx_loader):': 'Profilo di Carico (scx_loader):',
+        '⚡ Gaming': '⚡ Gaming',
+        '🎯 Low Latency': '🎯 Bassa Latenza',
+        '⚙️ Auto': '⚙️ Automatico',
+        '🔋 Power Save': '🔋 Risparmio Energetico',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Mantieni lo scheduler selezionato al riavvio (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Ripristina BORE Predefinito',
+        'Apply Selected Scheduler': 'Applica Scheduler',
+        'Applying CPU scheduler...': 'Applicazione dello scheduler CPU...',
+        'CPU scheduler switched to:': 'Scheduler CPU cambiato in:',
+        'Returned to native BORE kernel scheduler.': 'Ripristinato lo scheduler nativo BORE del kernel.'
+    },
+    'pt': {
+        'CPU Scheduler (scx / BORE)': 'Escalonador de CPU (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Alterne ao vivo entre BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash e scx_rusty.',
+        'System Boot Error Log': 'Registo de Erros de Arranque',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Inspecionar erros críticos do kernel e systemd na sessão atual (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Clique para abrir o Seletor de Escalonador de CPU X64 (BORE / sched_ext).',
+        'X64 CPU Scheduler & Latency Selector': 'Seletor de Escalonador de CPU e Latência X64',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Altere o escalonador de CPU do kernel Linux em tempo real sem precisar reiniciar.',
+        'Active Kernel Scheduler:': 'Escalonador Ativo do Kernel:',
+        'BORE (Kernel Default)': 'BORE (Padrão do Kernel)',
+        'Native Kernel + FalconD Auto': 'Kernel Nativo + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Escalonador BORE integrado no kernel com zero sobrecarga e suporte FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Gaming Competitivo & 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Escalonador Virtual Deadline da Valve e Igalia para máxima estabilidade de FPS.',
+        'Interactive Desktop & Streaming': 'Desktop Interativo & Streaming',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Prioriza tarefas interativas (jogos, OBS) mesmo com compilação em 100%.',
+        'Lightweight All-Rounder': 'Versátil Leve e Rápido',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Escalonador de uso geral ultrarrápido otimizado para cache de CPU e baixa latência.',
+        'Pro Audio & Multimedia EDF': 'Áudio Pro & Multimédia EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'Escalonador EDF garantindo consistência estrita de latência para áudio e vídeo.',
+        'Multi-Core / Multi-CCD Workstation': 'Workstation Multi-Núcleo / Multi-CCD',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Balanceador multi-domínio projetado para CPUs de muitos núcleos e renderização.',
+        'Workload Profile (scx_loader):': 'Perfil de Carga (scx_loader):',
+        '⚡ Gaming': '⚡ Gaming',
+        '🎯 Low Latency': '🎯 Baixa Latência',
+        '⚙️ Auto': '⚙️ Automático',
+        '🔋 Power Save': '🔋 Economia de Energia',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Manter escalonador selecionado ao reiniciar (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Restaurar Padrão BORE',
+        'Apply Selected Scheduler': 'Aplicar Escalonador',
+        'Applying CPU scheduler...': 'A aplicar escalonador de CPU...',
+        'CPU scheduler switched to:': 'Escalonador de CPU alterado para:',
+        'Returned to native BORE kernel scheduler.': 'Restaurado para o escalonador nativo BORE do kernel.'
+    },
+    'ru': {
+        'CPU Scheduler (scx / BORE)': 'Планировщик CPU (scx / BORE)',
+        'Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty.': 'Мгновенное переключение между BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash и scx_rusty.',
+        'System Boot Error Log': 'Журнал ошибок загрузки',
+        'Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb).': 'Просмотр критических ошибок ядра и systemd за текущий сеанс (journalctl -p 3 -xb).',
+        'Click to open X64 CPU Scheduler Selector (BORE / sched_ext).': 'Нажмите, чтобы открыть селектор планировщика CPU X64 (BORE / sched_ext).',
+        'X64 CPU Scheduler & Latency Selector': 'Селектор планировщика CPU и задержки X64',
+        'Switch the Linux kernel CPU task scheduler in real time with zero reboot required.': 'Переключайте планировщик задач ядра Linux в реальном времени без перезагрузки.',
+        'Active Kernel Scheduler:': 'Активный планировщик ядра:',
+        'BORE (Kernel Default)': 'BORE (Ядро по умолчанию)',
+        'Native Kernel + FalconD Auto': 'Нативное ядро + FalconD Auto',
+        'Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD.': 'Встроенный в ядро планировщик BORE без накладных расходов eBPF с поддержкой FalconD.',
+        'Competitive Gaming & 1% Low FPS': 'Киберспорт и стабильный 1% Low FPS',
+        'Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability.': 'Планировщик Virtual Deadline от Valve и Igalia для максимальной плавности кадров.',
+        'Interactive Desktop & Streaming': 'Интерактивный рабочий стол и стриминг',
+        'Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation.': 'Приоритет интерактивным задачам (игры, OBS) даже при 100% фоновой нагрузке CPU.',
+        'Lightweight All-Rounder': 'Лёгкий универсальный режим',
+        'Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency.': 'Быстрый универсальный планировщик, оптимизированный для кэша процессора.',
+        'Pro Audio & Multimedia EDF': 'Про-аудио и мультимедиа EDF',
+        'Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video.': 'Планировщик EDF со строгим контролем задержки для работы со звуком и видео.',
+        'Multi-Core / Multi-CCD Workstation': 'Многоядерные рабочие станции',
+        'Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads.': 'Многодоменная балансировка нагрузки для многоядерных процессоров и рендеринга.',
+        'Workload Profile (scx_loader):': 'Профиль нагрузки (scx_loader):',
+        '⚡ Gaming': '⚡ Гейминг',
+        '🎯 Low Latency': '🎯 Низкая задержка',
+        '⚙️ Auto': '⚙️ Авто',
+        '🔋 Power Save': '🔋 Энергосбережение',
+        'Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)': 'Сохранить выбранный планировщик после перезагрузки (/etc/scx_loader/config.toml)',
+        'Reset to BORE Default': 'Сбросить на BORE',
+        'Apply Selected Scheduler': 'Применить планировщик',
+        'Applying CPU scheduler...': 'Применение планировщика CPU...',
+        'CPU scheduler switched to:': 'Планировщик CPU переключён на:',
+        'Returned to native BORE kernel scheduler.': 'Возвращён нативный планировщик ядра BORE.'
+    }
+}
+
+for _lc, _ldict in SCHED_TRANSLATIONS.items():
+    if _lc in TRANSLATIONS:
+        TRANSLATIONS[_lc].update(_ldict)
+
 LANG_CONF_PATH = os.path.expanduser("~/.config/x64-hello/lang.conf")
 
 def _detect_initial_lang():
@@ -3252,6 +3463,547 @@ class DnsConfigDialog(QDialog):
         )
 
 
+SCX_SCHEDULERS = [
+    {
+        "id": "bore",
+        "name": "BORE (Kernel Default)",
+        "badge": "Native C",
+        "default_mode": "auto",
+        "tag": "Native Kernel + FalconD Auto",
+        "desc": "Burst-Oriented Response Enhancer built into the kernel. Zero eBPF overhead; works with FalconD."
+    },
+    {
+        "id": "lavd",
+        "name": "scx_lavd (Valve / SteamOS)",
+        "badge": "eBPF • Gaming",
+        "default_mode": "gaming",
+        "tag": "Competitive Gaming & 1% Low FPS",
+        "desc": "Latency-critical Virtual Deadline scheduler by Valve & Igalia for maximum frame pacing stability."
+    },
+    {
+        "id": "bpfland",
+        "name": "scx_bpfland",
+        "badge": "eBPF • Interactive",
+        "default_mode": "lowlatency",
+        "tag": "Interactive Desktop & Streaming",
+        "desc": "Prioritizes interactive tasks (games, OBS streaming) even under 100% background CPU compilation."
+    },
+    {
+        "id": "cosmos",
+        "name": "scx_cosmos",
+        "badge": "eBPF • Balanced",
+        "default_mode": "auto",
+        "tag": "Lightweight All-Rounder",
+        "desc": "Ultra-fast general-purpose scheduler optimized for CPU cache locality and low wakeup latency."
+    },
+    {
+        "id": "flash",
+        "name": "scx_flash",
+        "badge": "eBPF • Multimedia",
+        "default_mode": "lowlatency",
+        "tag": "Pro Audio & Multimedia EDF",
+        "desc": "Earliest Deadline First (EDF) scheduler guaranteeing strict latency consistency for audio/video."
+    },
+    {
+        "id": "rusty",
+        "name": "scx_rusty",
+        "badge": "eBPF • Workstation",
+        "default_mode": "auto",
+        "tag": "Multi-Core / Multi-CCD Workstation",
+        "desc": "Multi-domain load balancer engineered for high-core-count CPUs and heavy rendering workloads."
+    }
+]
+
+SCX_MODES = [
+    ("gaming", "⚡ Gaming", "Gaming"),
+    ("lowlatency", "🎯 Low Latency", "LowLatency"),
+    ("auto", "⚙️ Auto", "Auto"),
+    ("powersave", "🔋 Power Save", "PowerSave")
+]
+
+_SCX_OVERRIDE_CACHE = {"sched": None, "mode": None, "until": 0.0}
+
+
+def get_active_cpu_scheduler():
+    now = time.monotonic()
+    if _SCX_OVERRIDE_CACHE["sched"] and now < _SCX_OVERRIDE_CACHE["until"]:
+        return _SCX_OVERRIDE_CACHE["sched"]
+    try:
+        if os.path.exists("/sys/kernel/sched_ext/state"):
+            with open("/sys/kernel/sched_ext/state", "r") as f:
+                st = f.read().strip()
+            if st == "enabled" and os.path.exists("/sys/kernel/sched_ext/root/ops"):
+                with open("/sys/kernel/sched_ext/root/ops", "r") as f:
+                    ops = f.read().strip()
+                if ops:
+                    short = ops.split("_")[0].strip().lower()
+                    return f"scx_{short}"
+    except Exception:
+        pass
+    return "BORE"
+
+
+def query_scxctl_runtime():
+    """Returns (active_sched_id, active_mode_id, pretty_label)"""
+    try:
+        res = subprocess.run(
+            ["scxctl", "get"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5
+        )
+        out = res.stdout.strip()
+        if out.lower().startswith("running "):
+            # e.g. "running Lavd in Gaming mode"
+            parts = out.split()
+            sched_raw = parts[1].lower() if len(parts) > 1 else "lavd"
+            mode_raw = parts[3].lower() if len(parts) > 3 else "auto"
+            mode_pretty = parts[3] if len(parts) > 3 else "Auto"
+            return sched_raw, mode_raw, f"scx_{sched_raw} ({mode_pretty})"
+    except Exception:
+        pass
+    cur = get_active_cpu_scheduler()
+    if cur.startswith("scx_"):
+        s_id = cur.replace("scx_", "").split()[0].strip().lower()
+        return s_id, "auto", cur
+    return "bore", "auto", "BORE (Kernel Default)"
+
+
+class ScxSchedulerDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_app = parent
+        self.setWindowTitle(tr("X64 CPU Scheduler & Latency Selector"))
+        self.setFixedSize(790, 565)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0b0b0e;
+                border: 1px solid #2a2a32;
+            }
+            QLabel {
+                color: #ffffff;
+                background: transparent;
+            }
+            QCheckBox {
+                background: transparent;
+                color: #e0e0e0;
+                font-size: 12.5px;
+                font-weight: bold;
+                spacing: 10px;
+                padding: 4px 2px;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 1px solid #555560;
+                background-color: #16161d;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #cc0000;
+                border: 1px solid #ff3333;
+            }
+        """)
+
+        self.selected_idx = 0
+        self.selected_mode = "gaming"
+        self.active_sched_id = "bore"
+        self.active_mode_id = "auto"
+        self.sched_buttons = []
+        self.mode_buttons = {}
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(26, 20, 26, 20)
+        layout.setSpacing(10)
+
+        hdr = QLabel(tr("X64 CPU Scheduler & Latency Selector"))
+        hdr.setStyleSheet("color: #ffffff; font-size: 21px; font-weight: bold;")
+        layout.addWidget(hdr)
+
+        sub = QLabel(tr("Switch the Linux kernel CPU task scheduler in real time with zero reboot required."))
+        sub.setStyleSheet("color: #a0a0a0; font-size: 12.5px;")
+        layout.addWidget(sub)
+
+        # Active Kernel Scheduler Bar
+        status_frame = QFrame()
+        status_frame.setFixedHeight(42)
+        status_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 9px;
+            }
+        """)
+        sf_hbox = QHBoxLayout(status_frame)
+        sf_hbox.setContentsMargins(14, 0, 14, 0)
+        sf_hbox.setSpacing(10)
+
+        lbl_act_title = QLabel(tr("Active Kernel Scheduler:"))
+        lbl_act_title.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
+        sf_hbox.addWidget(lbl_act_title)
+
+        self.lbl_active_pill = QLabel("● BORE")
+        self.lbl_active_pill.setStyleSheet("""
+            color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
+            border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
+            padding: 3px 10px; font-weight: bold; font-size: 12px;
+        """)
+        sf_hbox.addWidget(self.lbl_active_pill)
+        sf_hbox.addStretch(1)
+
+        kernel_rel = platform.release().replace('-cachyos', '')
+        lbl_kern = QLabel(f"Kernel {kernel_rel}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}")
+        lbl_kern.setStyleSheet("color: #777782; font-size: 11.5px; font-weight: bold; border: none;")
+        sf_hbox.addWidget(lbl_kern)
+        layout.addWidget(status_frame)
+
+        # 2x3 Grid of Schedulers
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(9)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+
+        for i, s in enumerate(SCX_SCHEDULERS):
+            btn = QPushButton()
+            btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+            btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            btn.setFixedHeight(86)
+            btn.setMinimumWidth(0)
+            btn.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, idx=i: self.select_scheduler(idx, auto_mode=True))
+
+            b_lay = QVBoxLayout(btn)
+            b_lay.setContentsMargins(14, 8, 14, 8)
+            b_lay.setSpacing(2)
+
+            top_h = QHBoxLayout()
+            disp_name = tr(s["name"]) if s["id"] == "bore" else s["name"]
+            lbl_n = QLabel(disp_name)
+            lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.5px; border: none; background: transparent;")
+
+            lbl_badge = QLabel(s["badge"])
+            lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            top_h.addWidget(lbl_n)
+            top_h.addStretch(1)
+            top_h.addWidget(lbl_badge)
+            b_lay.addLayout(top_h)
+
+            lbl_tag = QLabel(tr(s["tag"]))
+            lbl_tag.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            lbl_tag.setStyleSheet("color: #ff4d4d; font-size: 11px; font-weight: bold; border: none; background: transparent;")
+            b_lay.addWidget(lbl_tag)
+
+            lbl_desc = QLabel(tr(s["desc"]))
+            lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            lbl_desc.setWordWrap(True)
+            lbl_desc.setStyleSheet("color: #9999a2; font-size: 10.5px; border: none; background: transparent;")
+            b_lay.addWidget(lbl_desc)
+
+            self.sched_buttons.append((btn, lbl_badge, s))
+            grid.addWidget(btn, i // 2, i % 2)
+
+        layout.addLayout(grid)
+
+        # Mode Selector Row
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(8)
+        lbl_mode = QLabel(tr("Workload Profile (scx_loader):"))
+        lbl_mode.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold;")
+        mode_row.addWidget(lbl_mode)
+        mode_row.addSpacing(4)
+
+        for m_id, m_label, _m_toml in SCX_MODES:
+            m_btn = QPushButton(tr(m_label))
+            m_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            m_btn.setFixedHeight(32)
+            m_btn.clicked.connect(lambda checked=False, mid=m_id: self.select_mode(mid))
+            self.mode_buttons[m_id] = m_btn
+            mode_row.addWidget(m_btn)
+
+        mode_row.addStretch(1)
+        layout.addLayout(mode_row)
+
+        self.chk_persist = QCheckBox(tr("Persist selected scheduler across system reboots (/etc/scx_loader/config.toml)"))
+        self.chk_persist.setChecked(False)
+        self.chk_persist.setCursor(Qt.CursorShape.PointingHandCursor)
+        layout.addWidget(self.chk_persist)
+
+        self.status_lbl = QLabel("")
+        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
+        layout.addWidget(self.status_lbl)
+
+        layout.addStretch(1)
+
+        btn_row = QHBoxLayout()
+        btn_reset = QPushButton(tr("Reset to BORE Default"))
+        btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_reset.setFixedHeight(40)
+        btn_reset.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.06);
+                color: #cccccc;
+                border: 1px solid #33333c;
+                border-radius: 8px;
+                padding: 0 16px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+            }
+        """)
+        btn_reset.clicked.connect(self.reset_to_bore)
+
+        btn_apply = QPushButton(tr("Apply Selected Scheduler"))
+        btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_apply.setFixedHeight(40)
+        btn_apply.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #d60000, stop:1 #850000);
+                color: #ffffff;
+                border: 1px solid #ff3333;
+                border-radius: 8px;
+                padding: 0 22px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000);
+            }
+        """)
+        btn_apply.clicked.connect(self.apply_scheduler)
+
+        btn_close = QPushButton(tr("Close"))
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setFixedHeight(40)
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #888888;
+                border: 1px solid #2a2a32;
+                border-radius: 8px;
+                padding: 0 16px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                color: #ffffff;
+                border: 1px solid #555555;
+            }
+        """)
+        btn_close.clicked.connect(self.accept)
+
+        btn_row.addWidget(btn_reset)
+        btn_row.addStretch(1)
+        btn_row.addWidget(btn_close)
+        btn_row.addWidget(btn_apply)
+        layout.addLayout(btn_row)
+
+        self.refresh_runtime_state(select_active=True)
+
+    def refresh_runtime_state(self, select_active=False):
+        s_id, m_id, pretty = query_scxctl_runtime()
+        self.active_sched_id = s_id
+        self.active_mode_id = m_id
+        self.lbl_active_pill.setText(f"● {pretty}")
+
+        found_idx = 0
+        for i, (_btn, lbl_badge, s_info) in enumerate(self.sched_buttons):
+            if s_info["id"] == s_id:
+                found_idx = i
+                lbl_badge.setText(f"● {tr('ACTIVE')}")
+                lbl_badge.setStyleSheet("""
+                    color: #2ecc71; background-color: rgba(46, 204, 113, 0.15);
+                    border: 1px solid rgba(46, 204, 113, 0.5); border-radius: 6px;
+                    padding: 2px 8px; font-weight: bold; font-size: 10.5px;
+                """)
+            else:
+                lbl_badge.setText(s_info["badge"])
+                lbl_badge.setStyleSheet("""
+                    color: #888892; background-color: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+                    padding: 2px 8px; font-weight: bold; font-size: 10.5px;
+                """)
+
+        if select_active:
+            self.select_scheduler(found_idx, auto_mode=False)
+            if m_id in self.mode_buttons:
+                self.select_mode(m_id)
+            else:
+                self.select_mode(SCX_SCHEDULERS[found_idx]["default_mode"])
+        else:
+            self.select_scheduler(self.selected_idx, auto_mode=False)
+
+        if self.parent_app and hasattr(self.parent_app, "update_hardware_telemetry"):
+            self.parent_app.update_hardware_telemetry()
+
+    def select_scheduler(self, idx, auto_mode=True):
+        self.selected_idx = idx
+        for i, (btn, _lbl_badge, _s_info) in enumerate(self.sched_buttons):
+            if i == idx:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(204, 0, 0, 0.16);
+                        border: 2px solid #ff1a1a;
+                        border-radius: 10px;
+                        text-align: left;
+                    }
+                """)
+            else:
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.03);
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 10px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(255, 255, 255, 0.06);
+                        border: 1px solid rgba(204, 0, 0, 0.5);
+                    }
+                """)
+        chosen = SCX_SCHEDULERS[idx]
+        if auto_mode:
+            self.select_mode(chosen["default_mode"])
+        else:
+            self.select_mode(self.selected_mode)
+
+    def select_mode(self, mode_id):
+        self.selected_mode = mode_id
+        is_bore = (SCX_SCHEDULERS[self.selected_idx]["id"] == "bore")
+        for m_id, m_btn in self.mode_buttons.items():
+            m_btn.setEnabled(not is_bore)
+            if is_bore:
+                m_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.02);
+                        color: #55555e;
+                        border: 1px solid #22222a;
+                        border-radius: 7px;
+                        padding: 0 12px;
+                        font-weight: bold;
+                        font-size: 11.5px;
+                    }
+                """)
+            elif m_id == mode_id:
+                m_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(204, 0, 0, 0.22);
+                        color: #ffffff;
+                        border: 1px solid #ff3333;
+                        border-radius: 7px;
+                        padding: 0 12px;
+                        font-weight: bold;
+                        font-size: 11.5px;
+                    }
+                """)
+            else:
+                m_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.05);
+                        color: #aaaaaa;
+                        border: 1px solid #33333c;
+                        border-radius: 7px;
+                        padding: 0 12px;
+                        font-weight: bold;
+                        font-size: 11.5px;
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(255, 255, 255, 0.10);
+                        color: #ffffff;
+                    }
+                """)
+
+    def _build_persist_cmd(self, sched_id, mode_id):
+        mode_toml = "Auto"
+        for m_id, _m_lbl, m_t in SCX_MODES:
+            if m_id == mode_id:
+                mode_toml = m_t
+                break
+        if sched_id == "bore":
+            header_lines = (
+                "# Default scheduler at boot (BORE kernel default active; managed dynamically by FalconD)\n"
+                "# default_sched = \"scx_bpfland\"\n"
+                "# default_mode = \"Auto\"\n"
+            )
+        else:
+            header_lines = (
+                f"default_sched = \"scx_{sched_id}\"\n"
+                f"default_mode = \"{mode_toml}\"\n"
+            )
+        toml_body = (
+            "# ==============================================================================\n"
+            "# X64 LIOS Linux - sched_ext (scx_loader) Low-Latency Gaming Profile\n"
+            "# ==============================================================================\n"
+            + header_lines + "\n"
+            "[scheds.scx_bpfland]\n"
+            "auto_mode = [\"-s\", \"20000\", \"-S\", \"1000\"]\n"
+            "gaming_mode = [\"-m\", \"performance\", \"-s\", \"20000\", \"-S\", \"500\"]\n"
+            "lowlatency_mode = [\"-s\", \"5000\", \"-S\", \"500\", \"-l\", \"5000\", \"-m\", \"performance\"]\n"
+            "powersave_mode = [\"-m\", \"powersave\", \"-s\", \"20000\", \"-S\", \"5000\"]\n\n"
+            "[scheds.scx_lavd]\n"
+            "auto_mode = [\"--autopilot\"]\n"
+            "gaming_mode = [\"--performance\"]\n"
+            "lowlatency_mode = [\"--performance\"]\n"
+            "powersave_mode = [\"--powersave\"]\n\n"
+            "[scheds.scx_flash]\n"
+            "auto_mode = []\n"
+            "gaming_mode = [\"-m\", \"all\", \"-s\", \"20000\", \"-S\", \"500\"]\n"
+            "lowlatency_mode = [\"-m\", \"all\", \"-s\", \"5000\", \"-S\", \"500\", \"-L\"]\n"
+            "powersave_mode = [\"-m\", \"powersave\"]\n\n"
+            "[scheds.scx_rusty]\n"
+            "auto_mode = []\n"
+        )
+        return f"printf %s {shlex.quote(toml_body)} > /etc/scx_loader/config.toml"
+
+    def _execute_scx_change(self, sched_id, mode_id):
+        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12.5px; font-weight: bold; background: transparent;")
+        self.status_lbl.setText(f"⟳ {tr('Applying CPU scheduler...')}")
+
+        if sched_id == "bore":
+            scx_cmd = "scxctl stop >/dev/null 2>&1 || true"
+            target_cache = "BORE"
+            success_msg = tr("Returned to native BORE kernel scheduler.")
+        else:
+            scx_cmd = f"scxctl switch -s {sched_id} -m {mode_id} >/dev/null 2>&1 || scxctl start -s {sched_id} -m {mode_id}"
+            target_cache = f"scx_{sched_id}"
+            success_msg = f"{tr('CPU scheduler switched to:')} scx_{sched_id} ({mode_id.capitalize()})"
+
+        persist = self.chk_persist.isChecked()
+        proc = QProcess(self)
+
+        def _on_done(exit_code, _exit_status):
+            if exit_code == 0:
+                _SCX_OVERRIDE_CACHE["sched"] = target_cache
+                _SCX_OVERRIDE_CACHE["mode"] = mode_id
+                _SCX_OVERRIDE_CACHE["until"] = time.monotonic() + 3.5
+                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setText(f"✓ {success_msg}")
+                self.refresh_runtime_state(select_active=False)
+                QTimer.singleShot(1800, lambda: self.refresh_runtime_state(select_active=False))
+            else:
+                self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12.5px; font-weight: bold; background: transparent;")
+                self.status_lbl.setText(f"✕ {tr('Operation canceled or authentication failed.')}")
+            proc.deleteLater()
+
+        proc.finished.connect(_on_done)
+        if persist:
+            persist_cmd = self._build_persist_cmd(sched_id, mode_id)
+            proc.start("pkexec", ["sh", "-c", f"({scx_cmd}) && {persist_cmd}"])
+        else:
+            proc.start("sh", ["-c", scx_cmd])
+
+    def apply_scheduler(self):
+        chosen = SCX_SCHEDULERS[self.selected_idx]
+        self._execute_scx_change(chosen["id"], self.selected_mode)
+
+    def reset_to_bore(self):
+        self.select_scheduler(0, auto_mode=True)
+        self._execute_scx_change("bore", "auto")
+
+
 class PremiumButton(QPushButton):
     def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None):
         super().__init__()
@@ -3787,11 +4539,14 @@ class NavButton(QPushButton):
 
 
 class TelemetryCard(QFrame):
-    def __init__(self, category, model_text, sub_text, icon_name, initial_val="0%", initial_pct=0):
+    def __init__(self, category, model_text, sub_text, icon_name, initial_val="0%", initial_pct=0, on_click=None):
         super().__init__()
+        self.on_click = on_click
         self.setObjectName("TelemetryCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        if self.on_click:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(108)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -3889,6 +4644,12 @@ class TelemetryCard(QFrame):
 
         hbox.addLayout(vbox, 1)
         self.setLayout(hbox)
+
+    def mousePressEvent(self, event):
+        if self.on_click and event.button() == Qt.MouseButton.LeftButton:
+            self.on_click()
+        else:
+            super().mousePressEvent(event)
 
     def update_telemetry(self, val_str, pct, sub_str=None):
         self.lbl_val.setText(val_str)
@@ -4017,10 +4778,15 @@ class X64Hello(QWidget):
             cpu_pct = 0.0
             if diff_total > 0:
                 cpu_pct = max(0.0, min(100.0, 100.0 * (diff_total - diff_idle) / diff_total))
+            active_sched = get_active_cpu_scheduler()
+            kernel_rel = platform.release().replace('-cachyos', '')
             self.card_cpu.update_telemetry(
                 f"{cpu_pct:.1f}%  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
-                cpu_pct
+                cpu_pct,
+                f"Kernel: {kernel_rel}  •  Sched: {active_sched}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}"
             )
+            if hasattr(self, "pill_sched"):
+                self.set_sched_pill_state(self.pill_sched, active_sched)
         except Exception:
             pass
 
@@ -4080,6 +4846,19 @@ class X64Hello(QWidget):
     def open_dns_dialog(self):
         dlg = DnsConfigDialog(self)
         dlg.exec()
+
+    def open_scx_dialog(self):
+        dlg = ScxSchedulerDialog(self)
+        dlg.exec()
+        self.update_hardware_telemetry()
+
+    def set_sched_pill_state(self, pill, sched_name):
+        pill.setText(f" ●  SCHED: {sched_name.upper()} ")
+        pill.setStyleSheet("""
+            color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
+            border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
+            font-size: 10px; font-weight: bold; padding: 3px 9px;
+        """)
 
     def set_hero_pill_state(self, pill, name, is_active):
         if is_active:
@@ -4397,9 +5176,13 @@ class X64Hello(QWidget):
         self.pill_ufw = QLabel()
         self.set_hero_pill_state(self.pill_ufw, tr("FIREWALL UFW"), False)
 
+        self.pill_sched = QLabel()
+        self.set_sched_pill_state(self.pill_sched, get_active_cpu_scheduler())
+
         badges_row.addWidget(self.pill_falcond)
         badges_row.addWidget(self.pill_ananicy)
         badges_row.addWidget(self.pill_ufw)
+        badges_row.addWidget(self.pill_sched)
         badges_row.addStretch(1)
         hero_left.addLayout(badges_row)
 
@@ -4484,14 +5267,17 @@ class X64Hello(QWidget):
         hw_grid.setColumnStretch(1, 1)
 
         kernel_rel = platform.release().replace('-cachyos', '')
+        init_sched = get_active_cpu_scheduler()
         self.card_cpu = TelemetryCard(
             tr("PROCESSOR (CPU)"),
             STATIC_HW["cpu_model"],
-            f"Kernel: {kernel_rel}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
+            f"Kernel: {kernel_rel}  •  Sched: {init_sched}  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
             "cpu",
             f"0.0%  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
-            8
+            8,
+            on_click=self.open_scx_dialog
         )
+        self.card_cpu.setToolTip(f"<b>{tr('PROCESSOR (CPU)')}</b><br>{tr('Click to open X64 CPU Scheduler Selector (BORE / sched_ext).')}")
         ram_sub = tr("ZRAM Active in RAM • Zero Disk Swap") if STATIC_HW["zram_active"] else tr("High-Speed System Memory")
         self.card_ram = TelemetryCard(
             tr("PHYSICAL RAM & ZRAM"),
@@ -4626,6 +5412,12 @@ class X64Hello(QWidget):
             "refresh",
             cmd=get_system_update_cmd()
         )
+        btn_scx = PremiumButton(
+            tr("CPU Scheduler (scx / BORE)"),
+            tr("Switch live between BORE, scx_lavd, scx_bpfland, scx_cosmos, scx_flash & scx_rusty."),
+            "cpu",
+            callback=self.open_scx_dialog
+        )
         btn_dns = PremiumButton(
             tr("Change DNS Server"),
             tr("Measure ping latency and switch to Cloudflare, AdGuard, Quad9, or DoT."),
@@ -4674,25 +5466,25 @@ class X64Hello(QWidget):
         )
 
         util_grid.addWidget(btn_upd, 0, 0)
-        util_grid.addWidget(btn_dns, 0, 1)
-        util_grid.addWidget(btn_mirrors, 0, 2)
-        util_grid.addWidget(btn_orphans, 1, 0)
-        util_grid.addWidget(btn_winboat, 1, 1)
-        util_grid.addWidget(btn_cache, 1, 2)
+        util_grid.addWidget(btn_scx, 0, 1)
+        util_grid.addWidget(btn_dns, 0, 2)
+        util_grid.addWidget(btn_mirrors, 1, 0)
+        util_grid.addWidget(btn_orphans, 1, 1)
+        util_grid.addWidget(btn_winboat, 1, 2)
         layout.addLayout(util_grid)
         layout.addSpacing(10)
 
-        # SECTION 3: TROUBLESHOOTING & SYSTEM RESCUE (2x2 Symmetric Grid)
+        # SECTION 3: TROUBLESHOOTING & SYSTEM RESCUE (3x2 Symmetric Grid)
         sec3 = QLabel(tr("Troubleshooting & System Rescue").upper())
         sec3.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
         layout.addWidget(sec3)
         layout.addSpacing(5)
 
         rescue_grid = QGridLayout()
-        rescue_grid.setHorizontalSpacing(12)
+        rescue_grid.setHorizontalSpacing(10)
         rescue_grid.setVerticalSpacing(7)
-        rescue_grid.setColumnStretch(0, 1)
-        rescue_grid.setColumnStretch(1, 1)
+        for col in range(3):
+            rescue_grid.setColumnStretch(col, 1)
 
         btn_keyrings = PremiumButton(
             tr("Reset Pacman Keyrings"),
@@ -4730,11 +5522,23 @@ class X64Hello(QWidget):
             "bug",
             cmd="/usr/lib/qt6/bin/qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || dbus-send --session --dest=org.kde.KWin --type=method_call /KWin org.kde.KWin.showDebugConsole"
         )
+        btn_journal = PremiumButton(
+            tr("System Boot Error Log"),
+            tr("Inspect critical systemd and kernel errors from the current boot (journalctl -p 3 -xb)."),
+            "shield",
+            cmd=build_x64_term_cmd(
+                "X64 LIOS Boot Error Inspector",
+                "REGISTRO DE ERRORES CRÍTICOS DEL SISTEMA",
+                "printf '\\033[1;31m==> [X64 DIAGNOSTICS]\\033[0m \\033[1;37mAnalizando eventos críticos del kernel y systemd (journalctl -p 3 -xb)...\\033[0m\\n\\n'; out=$(journalctl -p 3 -xb --no-pager); if [ -n \"$out\" ]; then echo \"$out\"; else printf '\\033[1;32m✓ Cero errores críticos registrados en este arranque.\\033[0m\\n'; fi"
+            )
+        )
 
         rescue_grid.addWidget(btn_keyrings, 0, 0)
         rescue_grid.addWidget(btn_unlock, 0, 1)
+        rescue_grid.addWidget(btn_cache, 0, 2)
         rescue_grid.addWidget(btn_reinstall, 1, 0)
         rescue_grid.addWidget(btn_kwin, 1, 1)
+        rescue_grid.addWidget(btn_journal, 1, 2)
         layout.addLayout(rescue_grid)
 
         return page
@@ -4972,5 +5776,10 @@ if __name__ == '__main__':
     hello = X64Hello()
     hello.setWindowIcon(icon)
     hello.show()
+    if "--scheduler" in sys.argv:
+        QTimer.singleShot(150, hello.open_scx_dialog)
+    elif "--dns" in sys.argv:
+        QTimer.singleShot(150, hello.open_dns_dialog)
     sys.exit(app.exec())
+
 

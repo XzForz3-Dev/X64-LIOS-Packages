@@ -1,0 +1,5 @@
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.scx.loader.manage-schedulers" && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

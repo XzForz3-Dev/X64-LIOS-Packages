@@ -10,3 +10,4 @@ lowlatency_mode = ["--performance"]
 [scheds.scx_bpfland]
 gaming_mode = ["-m", "performance"]
 lowlatency_mode = ["-m", "performance"]
+

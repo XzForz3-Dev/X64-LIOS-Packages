@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -23,8 +23,9 @@ source=(
     '99-x64-user-limits.conf'
     '99-x64-wifi-powersave.conf'
     'scx_loader.toml'
+    '50-x64-scx-loader.rules'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration
@@ -83,8 +84,10 @@ package() {
     install -d "${pkgdir}/etc/NetworkManager/conf.d"
     install -m644 "${srcdir}/99-x64-wifi-powersave.conf" "${pkgdir}/etc/NetworkManager/conf.d/99-x64-wifi-powersave.conf"
 
-    # sched_ext (scx_loader) Low-Latency Gaming Profile
+    # sched_ext (scx_loader) Low-Latency Gaming Profile & Polkit Rule
     install -d "${pkgdir}/etc/scx_loader"
     install -m644 "${srcdir}/scx_loader.toml" "${pkgdir}/etc/scx_loader/config.toml"
+    install -d "${pkgdir}/etc/polkit-1/rules.d"
+    install -m644 "${srcdir}/50-x64-scx-loader.rules" "${pkgdir}/etc/polkit-1/rules.d/50-x64-scx-loader.rules"
 }
 
