@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect,
     QScrollArea, QMenu, QProgressBar, QDialog, QComboBox, QCheckBox, QSizePolicy
 )
-from PyQt6.QtGui import QPixmap, QIcon, QColor, QAction
+from PyQt6.QtGui import QPixmap, QIcon, QColor, QAction, QPainter, QPen, QBrush
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QFileSystemWatcher, QProcess
 
 INSTALLED_PKGS_CACHE = set()
@@ -78,7 +78,7 @@ def get_system_update_cmd():
         "fi; "
         "if command -v flatpak >/dev/null 2>&1; then "
         "  echo ''; printf '\\033[1;31m==> [3/3]\\033[0m \\033[1;37mVerificando aplicaciones Flatpak...\\033[0m\\n'; "
-        "  flatpak update -y || true; "
+        "  flatpak update || true; "
         "fi"
     )
     return build_x64_term_cmd("X64 LIOS System Updater", "ACTUALIZADOR OFICIAL DEL SISTEMA", body)
@@ -2968,6 +2968,8 @@ class DnsConfigDialog(QDialog):
 
         for i, p in enumerate(DNS_PROVIDERS):
             btn = QPushButton()
+            btn.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+            btn.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
             btn.setFixedHeight(82)
             btn.setMinimumWidth(0)
             btn.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -2980,8 +2982,10 @@ class DnsConfigDialog(QDialog):
 
             top_h = QHBoxLayout()
             lbl_n = QLabel(p["name"])
+            lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14px; border: none; background: transparent;")
             lbl_ms = QLabel("● — ms")
+            lbl_ms.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_ms.setStyleSheet("""
                 color: #888888; background-color: rgba(255,255,255,0.05);
                 border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
@@ -2994,10 +2998,12 @@ class DnsConfigDialog(QDialog):
 
             ipv4_pretty = p["ipv4"].replace(",", " / ")
             lbl_ip = QLabel(f"{tr(p['tag'])}  •  {ipv4_pretty}")
+            lbl_ip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_ip.setStyleSheet("color: #bbbbbb; font-size: 11px; border: none; background: transparent;")
             b_lay.addWidget(lbl_ip)
 
             lbl_dot = QLabel(f"TLS (DoT): {p['dot']}")
+            lbl_dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_dot.setStyleSheet("color: #808088; font-size: 11px; border: none; background: transparent;")
             b_lay.addWidget(lbl_dot)
 
@@ -3252,6 +3258,8 @@ class PremiumButton(QPushButton):
         self.url = url
         self.cmd = cmd
         self.callback = callback
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(66)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -3276,6 +3284,7 @@ class PremiumButton(QPushButton):
         hbox.setSpacing(10)
 
         icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         icon_box.setFixedSize(36, 36)
         icon_box.setStyleSheet("""
             QFrame {
@@ -3289,6 +3298,7 @@ class PremiumButton(QPushButton):
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         icon_label = QLabel()
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pixmap = make_svg_pixmap(icon_name, 20)
         if not pixmap.isNull():
             icon_label.setPixmap(pixmap)
@@ -3305,12 +3315,14 @@ class PremiumButton(QPushButton):
         vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         lbl_title = QLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_desc.setStyleSheet("color: #aaaaaa; font-size: 10.5px; border: none; background: transparent;")
@@ -3340,6 +3352,8 @@ class ServiceSwitchCard(QFrame):
         self.req_pkg = req_pkg
         self._active = False
         self.setObjectName("ServiceCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(63)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -3361,6 +3375,7 @@ class ServiceSwitchCard(QFrame):
         hbox.setSpacing(8)
 
         icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         icon_box.setFixedSize(34, 34)
         icon_box.setStyleSheet("""
             QFrame {
@@ -3374,6 +3389,7 @@ class ServiceSwitchCard(QFrame):
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         icon_label = QLabel()
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pix = make_svg_pixmap(icon_name, 18)
         if not pix.isNull():
             icon_label.setPixmap(pix)
@@ -3390,12 +3406,14 @@ class ServiceSwitchCard(QFrame):
         vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         lbl_title = QLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_desc.setStyleSheet("color: #999999; font-size: 10.5px; border: none; background: transparent;")
@@ -3408,6 +3426,7 @@ class ServiceSwitchCard(QFrame):
         self.toggle_btn.setFixedHeight(26)
         self.toggle_btn.setMinimumWidth(78)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_btn.setToolTip(f"<b>{title}</b> ({unit_name})<br>{desc}")
         self.toggle_btn.clicked.connect(self.toggle_service)
         hbox.addWidget(self.toggle_btn)
 
@@ -3464,7 +3483,7 @@ class ServiceSwitchCard(QFrame):
                 )
             body = (
                 f"printf '\\033[1;31m==>\\033[0m Instalando componente requerido para: \\033[1;37m{self.title}\\033[0m...\\n'; "
-                f"sudo pacman -Sy --needed --noconfirm {self.req_pkg} && {enable_part}"
+                f"sudo pacman -Sy --needed {self.req_pkg} && {enable_part}"
             )
             cmd = build_x64_term_cmd("X64 LIOS Service Installer", f"ACTIVANDO {self.title.upper()}", body)
             os.system(f"{cmd} &")
@@ -3538,6 +3557,8 @@ class GamingInstallCard(QFrame):
         self.install_pkgs = install_pkgs
         self.is_suite = is_suite
         self.setObjectName("GamingCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(90 if is_suite else 86)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -3562,6 +3583,7 @@ class GamingInstallCard(QFrame):
         hbox.setSpacing(12)
 
         icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         box_sz = 48 if is_suite else 42
         icon_box.setFixedSize(box_sz, box_sz)
         icon_box.setStyleSheet("""
@@ -3576,6 +3598,7 @@ class GamingInstallCard(QFrame):
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         icon_label = QLabel()
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pix = make_svg_pixmap(icon_name, 26 if is_suite else 22)
         if not pix.isNull():
             icon_label.setPixmap(pix)
@@ -3592,6 +3615,7 @@ class GamingInstallCard(QFrame):
         vbox.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         lbl_title = QLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         t_sz = 16 if is_suite else 13.5
@@ -3599,6 +3623,7 @@ class GamingInstallCard(QFrame):
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         d_sz = 12 if is_suite else 11
@@ -3612,6 +3637,7 @@ class GamingInstallCard(QFrame):
         self.btn_action.setFixedHeight(36 if is_suite else 32)
         self.btn_action.setMinimumWidth(136 if is_suite else 106)
         self.btn_action.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_action.setToolTip(f"<b>{title}</b><br>{desc}")
         self.btn_action.clicked.connect(self.install_action)
         hbox.addWidget(self.btn_action)
 
@@ -3661,10 +3687,40 @@ class GamingInstallCard(QFrame):
             f"if ! grep -q '^\\[multilib\\]' /etc/pacman.conf; then "
             f"  sudo sed -i '/^#\\[multilib\\]/,/^#Include/ s/^#//' /etc/pacman.conf; "
             f"fi; "
-            f"sudo pacman -Syu --needed --ask 4 {extra_gpu_pkgs}{self.install_pkgs}"
+            f"sudo pacman -Syu --needed {extra_gpu_pkgs}{self.install_pkgs}"
         )
         cmd = build_x64_term_cmd("X64 LIOS Gaming Installer", "INSTALADOR MODULAR DE GAMING", body)
         os.system(f"{cmd} &")
+
+
+class MiniToggleSwitch(QWidget):
+    def __init__(self, checked=True, parent=None):
+        super().__init__(parent)
+        self._checked = checked
+        self.setFixedSize(34, 18)
+
+    def set_checked(self, checked):
+        self._checked = bool(checked)
+        self.update()
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if self._checked:
+            p.setPen(QPen(QColor("#ff3333"), 1))
+            p.setBrush(QBrush(QColor("#b80000")))
+            p.drawRoundedRect(1, 1, 32, 16, 8, 8)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor("#ffffff")))
+            p.drawEllipse(18, 3, 12, 12)
+        else:
+            p.setPen(QPen(QColor("#383842"), 1))
+            p.setBrush(QBrush(QColor("#1a1a20")))
+            p.drawRoundedRect(1, 1, 32, 16, 8, 8)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor("#777782")))
+            p.drawEllipse(4, 3, 12, 12)
+        p.end()
 
 
 class NavButton(QPushButton):
@@ -3672,6 +3728,8 @@ class NavButton(QPushButton):
         super().__init__()
         self.index = index
         self.parent_app = parent_app
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(48)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -3680,6 +3738,7 @@ class NavButton(QPushButton):
         hbox.setSpacing(12)
 
         icon_lbl = QLabel()
+        icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         icon = QIcon.fromTheme(icon_name)
         if not icon.isNull():
             icon_lbl.setPixmap(icon.pixmap(22, 22))
@@ -3687,6 +3746,7 @@ class NavButton(QPushButton):
         hbox.addWidget(icon_lbl)
 
         text_lbl = QLabel(title)
+        text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 14px; background: transparent; border: none;")
         self.text_lbl = text_lbl
         hbox.addWidget(text_lbl)
@@ -3730,6 +3790,8 @@ class TelemetryCard(QFrame):
     def __init__(self, category, model_text, sub_text, icon_name, initial_val="0%", initial_pct=0):
         super().__init__()
         self.setObjectName("TelemetryCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(108)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -3750,6 +3812,7 @@ class TelemetryCard(QFrame):
         hbox.setSpacing(18)
 
         icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         icon_box.setFixedSize(54, 54)
         icon_box.setStyleSheet("""
             QFrame {
@@ -3762,6 +3825,7 @@ class TelemetryCard(QFrame):
         ibox_layout.setContentsMargins(0, 0, 0, 0)
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_lbl = QLabel()
+        icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pix = make_svg_pixmap(icon_name, 28)
         if not pix.isNull():
             icon_lbl.setPixmap(pix)
@@ -3780,8 +3844,10 @@ class TelemetryCard(QFrame):
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
         self.lbl_cat = QLabel(category)
+        self.lbl_cat.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_cat.setStyleSheet("color: #888888; font-size: 11px; font-weight: bold; letter-spacing: 0.6px; background: transparent; border: none;")
         self.lbl_val = QLabel(initial_val)
+        self.lbl_val.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_val.setStyleSheet("color: #ff3333; font-size: 13px; font-weight: bold; background: transparent; border: none;")
         top_row.addWidget(self.lbl_cat)
         top_row.addStretch(1)
@@ -3789,18 +3855,21 @@ class TelemetryCard(QFrame):
         vbox.addLayout(top_row)
 
         self.lbl_model = QLabel(model_text)
+        self.lbl_model.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_model.setMinimumWidth(0)
         self.lbl_model.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_model.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; background: transparent; border: none;")
         vbox.addWidget(self.lbl_model)
 
         self.lbl_sub = QLabel(sub_text)
+        self.lbl_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_sub.setMinimumWidth(0)
         self.lbl_sub.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_sub.setStyleSheet("color: #999999; font-size: 12px; background: transparent; border: none;")
         vbox.addWidget(self.lbl_sub)
 
         self.bar = QProgressBar()
+        self.bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.bar.setFixedHeight(7)
         self.bar.setRange(0, 100)
         self.bar.setValue(initial_pct)
@@ -3832,10 +3901,13 @@ class CommunityPillCard(QPushButton):
     def __init__(self, title, desc, badge_text, icon_name, url):
         super().__init__()
         self.url = url
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedHeight(112)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"<b>{title}</b><br>{desc}")
         self.setStyleSheet("""
             CommunityPillCard {
                 background-color: rgba(255, 255, 255, 0.03);
@@ -3854,6 +3926,7 @@ class CommunityPillCard(QPushButton):
         hbox.setSpacing(14)
 
         icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         icon_box.setFixedSize(48, 48)
         icon_box.setStyleSheet("""
             QFrame {
@@ -3866,6 +3939,7 @@ class CommunityPillCard(QPushButton):
         ibox_layout.setContentsMargins(0, 0, 0, 0)
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_lbl = QLabel()
+        icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pix = make_svg_pixmap(icon_name, 24)
         if not pix.isNull():
             icon_lbl.setPixmap(pix)
@@ -3879,12 +3953,14 @@ class CommunityPillCard(QPushButton):
         vbox.setSpacing(4)
 
         lbl_title = QLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_title.setMinimumWidth(0)
         lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 15px; background: transparent; border: none;")
         vbox.addWidget(lbl_title)
 
         lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_desc.setMinimumWidth(0)
         lbl_desc.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_desc.setStyleSheet("color: #a0a0a0; font-size: 12px; line-height: 1.3; background: transparent; border: none;")
@@ -3894,6 +3970,7 @@ class CommunityPillCard(QPushButton):
         vbox.addStretch(1)
 
         lbl_badge = QLabel(badge_text)
+        lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_badge.setMinimumWidth(0)
         lbl_badge.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         lbl_badge.setStyleSheet("color: #ff3333; font-size: 11px; font-weight: bold; background: transparent; border: none;")
@@ -4039,9 +4116,22 @@ class X64Hello(QWidget):
         QTimer.singleShot(1500, self.refresh_services_async)
 
     def initUI(self):
+        self.setObjectName("X64HelloRoot")
         self.setWindowTitle('X64 LIOS - Hello')
         self.setFixedSize(1250, 720)
-        self.setStyleSheet("background-color: #080808;")
+        self.setStyleSheet("""
+            QWidget#X64HelloRoot {
+                background-color: #080808;
+            }
+            QToolTip {
+                background-color: #141419;
+                color: #f2f2f2;
+                border: 1px solid #cc0000;
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+        """)
 
         self.main_layout = QHBoxLayout()
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -4117,13 +4207,43 @@ class X64Hello(QWidget):
         sidebar_layout.addWidget(info_label)
         sidebar_layout.addSpacing(12)
 
+        sidebar_sep = QFrame()
+        sidebar_sep.setFixedHeight(1)
+        sidebar_sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.06); border: none;")
+        sidebar_layout.addWidget(sidebar_sep)
+        sidebar_layout.addSpacing(8)
+
         self.autostart_btn = QPushButton()
-        self.autostart_btn.setFixedHeight(38)
+        self.autostart_btn.setFixedHeight(30)
         self.autostart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.autostart_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 15px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+        """)
+        auto_hbox = QHBoxLayout(self.autostart_btn)
+        auto_hbox.setContentsMargins(10, 0, 8, 0)
+        auto_hbox.setSpacing(8)
+
+        self.autostart_lbl = QLabel(tr("Launch at startup"))
+        self.autostart_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        auto_hbox.addWidget(self.autostart_lbl)
+        auto_hbox.addStretch(1)
+
+        self.autostart_switch = MiniToggleSwitch()
+        self.autostart_switch.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        auto_hbox.addWidget(self.autostart_switch)
+
         self.autostart_btn.clicked.connect(self.toggle_autostart)
         self.update_autostart_btn()
         sidebar_layout.addWidget(self.autostart_btn)
-        sidebar_layout.addSpacing(10)
+        sidebar_layout.addSpacing(6)
 
         lang_hbox = QHBoxLayout()
         lang_hbox.addStretch(1)
@@ -4207,37 +4327,14 @@ class X64Hello(QWidget):
         return os.path.exists(AUTOSTART_PATH)
 
     def update_autostart_btn(self):
-        if self.is_autostart_enabled():
-            self.autostart_btn.setText(f"✓  {tr('Launch at startup')}")
-            self.autostart_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(204, 0, 0, 0.16);
-                    color: #ffffff;
-                    border: 1px solid #cc0000;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(204, 0, 0, 0.28);
-                }
-            """)
-        else:
-            self.autostart_btn.setText(f"○  {tr('Launch at startup')}")
-            self.autostart_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.04);
-                    color: #777777;
-                    border: 1px solid #2a2a2a;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(255, 255, 255, 0.08);
-                    color: #bbbbbb;
-                }
-            """)
+        enabled = self.is_autostart_enabled()
+        if hasattr(self, "autostart_switch"):
+            self.autostart_switch.set_checked(enabled)
+        if hasattr(self, "autostart_lbl"):
+            color = "#cccccc" if enabled else "#666666"
+            self.autostart_lbl.setStyleSheet(
+                f"color: {color}; font-size: 11.5px; font-weight: 600; background: transparent; border: none;"
+            )
 
     def toggle_autostart(self):
         try:
@@ -4562,7 +4659,7 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Winboat Installer",
                 "INSTALADOR DE WINBOAT Y CONTENEDORES",
-                "printf '\\033[1;31m==> [X64 WINBOAT]\\033[0m \\033[1;37mInstalando Winboat y motor de contenedores Docker...\\033[0m\\n\\n'; sudo pacman -Sy --needed --noconfirm winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
+                "printf '\\033[1;31m==> [X64 WINBOAT]\\033[0m \\033[1;37mInstalando Winboat y motor de contenedores Docker...\\033[0m\\n\\n'; sudo pacman -Sy --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
             )
         )
         btn_cache = PremiumButton(
@@ -4797,6 +4894,8 @@ class X64Hello(QWidget):
         for p_title, p_desc in filosofia:
             frame = QFrame()
             frame.setObjectName("FiloCard")
+            frame.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+            frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
             frame.setStyleSheet("""
                 QFrame#FiloCard {
                     background-color: rgba(255, 255, 255, 0.03);
@@ -4810,9 +4909,11 @@ class X64Hello(QWidget):
             flayout.setSpacing(5)
 
             lbl_t = QLabel(p_title)
+            lbl_t.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
 
             lbl_d = QLabel(p_desc)
+            lbl_d.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_d.setStyleSheet("color: #a0a0a0; font-size: 14px; line-height: 1.5; border: none; background: transparent;")
             lbl_d.setWordWrap(True)
 
