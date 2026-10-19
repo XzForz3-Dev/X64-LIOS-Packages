@@ -3,7 +3,7 @@
 pkgname=falcond-profiles
 pkgver=r25.2c521cb
 _pkgver=2c521cbe01a3fb092ef3ddf61b111a600ef9f673 # commit version
-pkgrel=1
+pkgrel=2
 pkgdesc='Default falcond profiles'
 url='https://github.com/PikaOS-Linux/falcond-profiles'
 arch=(any)
@@ -35,4 +35,6 @@ package() {
 
     install -Dm 644 usr/share/falcond/profiles/htpc/*.conf \
         -t "$pkgdir/usr/share/falcond/profiles/htpc/"
+
+    install -dm 755 "$pkgdir/usr/share/falcond/profiles/user"
 }
