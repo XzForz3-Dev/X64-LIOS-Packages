@@ -1,0 +1,12 @@
+# ==============================================================================
+# X64 LIOS Linux - sched_ext (scx_loader) Low-Latency Gaming Profile
+# ==============================================================================
+default_mode = "Gaming"
+
+[scheds.scx_lavd]
+gaming_mode = ["--performance"]
+lowlatency_mode = ["--performance"]
+
+[scheds.scx_bpfland]
+gaming_mode = ["-m", "performance"]
+lowlatency_mode = ["-m", "performance"]

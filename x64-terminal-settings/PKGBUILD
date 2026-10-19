@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -19,8 +19,12 @@ source=(
     'x64-gaming-shaders.sh'
     '99-x64-lowlatency.conf'
     '99-x64-idle.conf'
+    '99-x64-gaming-limits.conf'
+    '99-x64-user-limits.conf'
+    '99-x64-wifi-powersave.conf'
+    'scx_loader.toml'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration
@@ -68,5 +72,19 @@ package() {
     install -m644 "${srcdir}/99-x64-idle.conf" "${pkgdir}/etc/systemd/system/man-db.service.d/99-x64-idle.conf"
     install -d "${pkgdir}/etc/systemd/system/plocate-updatedb.service.d"
     install -m644 "${srcdir}/99-x64-idle.conf" "${pkgdir}/etc/systemd/system/plocate-updatedb.service.d/99-x64-idle.conf"
+
+    # Gaming, Proton Esync & Emulator Resource Limits (nofile + memlock infinity)
+    install -d "${pkgdir}/etc/security/limits.d"
+    install -m644 "${srcdir}/99-x64-gaming-limits.conf" "${pkgdir}/etc/security/limits.d/99-x64-gaming-limits.conf"
+    install -d "${pkgdir}/etc/systemd/user.conf.d"
+    install -m644 "${srcdir}/99-x64-user-limits.conf" "${pkgdir}/etc/systemd/user.conf.d/99-x64-user-limits.conf"
+
+    # NetworkManager Wi-Fi Power-Save Disable (Eliminate Wireless Ping Jitter)
+    install -d "${pkgdir}/etc/NetworkManager/conf.d"
+    install -m644 "${srcdir}/99-x64-wifi-powersave.conf" "${pkgdir}/etc/NetworkManager/conf.d/99-x64-wifi-powersave.conf"
+
+    # sched_ext (scx_loader) Low-Latency Gaming Profile
+    install -d "${pkgdir}/etc/scx_loader"
+    install -m644 "${srcdir}/scx_loader.toml" "${pkgdir}/etc/scx_loader/config.toml"
 }
 
