@@ -23,7 +23,7 @@ panel.addWidget("org.kde.plasma.pager");
 
 var icontasks = panel.addWidget("org.kde.plasma.icontasks");
 icontasks.currentConfigGroup = ["General"];
-icontasks.writeConfig("launchers", "applications:org.kde.dolphin.desktop,applications:chromium.desktop,applications:kitty.desktop,applications:systemsettings.desktop,applications:x64-hello.desktop");
+icontasks.writeConfig("launchers", "applications:org.kde.dolphin.desktop,applications:org.kde.discover.desktop,applications:com.shellyorg.shelly.desktop,applications:chromium.desktop,applications:kitty.desktop,applications:systemsettings.desktop,applications:x64-hello.desktop");
 
 panel.addWidget("org.kde.plasma.marginsseparator");
 var systemtray = panel.addWidget("org.kde.plasma.systemtray");
