@@ -4906,7 +4906,14 @@ class GamingInstallCard(QFrame):
         hbox.addWidget(self.btn_action)
 
         self.setLayout(hbox)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refresh_state()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.install_action()
+        else:
+            super().mousePressEvent(event)
 
     def is_installed(self):
         for group in self.check_pkg.split():
@@ -6378,7 +6385,7 @@ class X64Hello(QWidget):
                 "waydroid",
                 "android",
                 "sudo systemctl enable --now waydroid-container.service; printf '\\n\\033[1;32m[✓] Waydroid instalado y servicio waydroid-container activo.\\033[0m\\nPara inicializar la imagen de Android ejecuta: \\033[1;37mwaydroid init\\033[0m\\n'",
-                "waydroid show-full-ui"
+                "x64-waydroid-launcher"
             )
         ]
 

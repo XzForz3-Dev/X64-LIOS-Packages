@@ -1,0 +1,63 @@
+#!/bin/bash
+# ==============================================================================
+# X64 LIOS - Official Smart Waydroid Launcher
+# ==============================================================================
+
+if ! command -v waydroid >/dev/null 2>&1; then
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "X64 LIOS" "Waydroid no está instalado en el sistema." -i android
+    fi
+    exit 1
+fi
+
+# Seleccionar emulador de terminal disponible
+TERM_CMD=""
+if command -v kitty >/dev/null 2>&1; then
+    TERM_CMD="kitty --title 'X64 Android Gaming - Waydroid'"
+elif command -v konsole >/dev/null 2>&1; then
+    TERM_CMD="konsole --title 'X64 Android Gaming - Waydroid' -e"
+elif command -v gnome-terminal >/dev/null 2>&1; then
+    TERM_CMD="gnome-terminal --title 'X64 Android Gaming - Waydroid' --"
+elif command -v xterm >/dev/null 2>&1; then
+    TERM_CMD="xterm -title 'X64 Android Gaming - Waydroid' -e"
+fi
+
+# Comprobar si Waydroid está inicializado
+if waydroid status 2>&1 | grep -qi "not initialized"; then
+    if [ -n "$TERM_CMD" ]; then
+        eval "$TERM_CMD bash -c '
+            printf \"\\033[1;31m============================================================\\033[0m\\n\"
+            printf \"\\033[1;37m   X64 LIOS — INICIALIZADOR DE ANDROID (WAYDROID)\\033[0m\\n\"
+            printf \"\\033[1;31m============================================================\\033[0m\\n\\n\"
+            printf \"Waydroid está instalado en el sistema, pero requiere descargar\\n\"
+            printf \"e inicializar la imagen del sistema Android (LineageOS) por primera vez.\\n\\n\"
+            printf \"\\033[1;33mDetalles de la descarga:\\033[0m\\n\"
+            printf \"  • Tamaño: ~800 MB (LineageOS Android Image)\\n\"
+            printf \"  • Ubicación: /var/lib/waydroid\\n\\n\"
+            printf \"Presione \\033[1;32m[Enter]\\033[0m para iniciar la descarga con sudo\\n\"
+            printf \"o cierre esta ventana para cancelar...\\n\"
+            read -r _
+            sudo waydroid init
+            if [ \$? -eq 0 ]; then
+                printf \"\\n\\033[1;32m[✓] ¡Waydroid inicializado con éxito!\\033[0m\\n\"
+                printf \"Iniciando contenedor y lanzando interfaz gráfica...\\n\"
+                sudo systemctl enable --now waydroid-container.service 2>/dev/null || true
+                sleep 2
+                waydroid show-full-ui &
+                sleep 2
+            else
+                printf \"\\n\\033[1;31m[X] Error o cancelación durante la inicialización de Waydroid.\\033[0m\\n\"
+                printf \"Presione [Enter] para salir...\"; read -r _
+            fi
+        '" &
+    fi
+    exit 0
+fi
+
+# Si ya está inicializado: garantizar que el servicio del contenedor esté activo
+if ! systemctl is-active --quiet waydroid-container.service; then
+    sudo systemctl start waydroid-container.service 2>/dev/null || true
+fi
+
+# Lanzar la interfaz gráfica completa
+waydroid show-full-ui &
