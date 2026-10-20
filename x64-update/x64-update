@@ -279,20 +279,6 @@ def parse_pkg_line(line):
     return line, ""
 
 def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
-    col_name_w = 26
-    col_trans_w = 32
-    col_type_w = 14
-
-    header_top = f"{C_GRAY}  ┌{'─' * col_name_w}┬{'─' * col_trans_w}┬{'─' * col_type_w}┐{C_RESET}"
-    header_mid = f"{C_GRAY}  ├{'─' * col_name_w}┼{'─' * col_trans_w}┼{'─' * col_type_w}┤{C_RESET}"
-    header_bot = f"{C_GRAY}  └{'─' * col_name_w}┴{'─' * col_trans_w}┴{'─' * col_type_w}┘{C_RESET}"
-
-    print(header_top)
-    print(f"{C_GRAY}  │{C_RESET} {C_WHITE}{C_BOLD}{'PAQUETE':<{col_name_w-2}}{C_RESET} "
-          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{'TRANSICIÓN DE VERSIÓN':<{col_trans_w-2}}{C_RESET} "
-          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{'TIPO / ORIGEN':<{col_type_w-2}}{C_RESET} {C_GRAY}│{C_RESET}")
-    print(header_mid)
-
     items = []
     for line in repo_pkgs:
         p, trans = parse_pkg_line(line)
@@ -306,13 +292,41 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
 
     shown_count = 0
     max_display = 28
+    visible_items = items[:max_display]
 
-    for p, trans, orig, col in items[:max_display]:
+    # Cálculo dinámico de ancho de columnas para garantizar alineación absoluta
+    max_p_len = max([len(p) for p, _, _, _ in visible_items], default=15)
+    col_name_w = max(28, max_p_len + 6)
+
+    max_trans_len = max([len(trans) for _, trans, _, _ in visible_items], default=20)
+    col_trans_w = max(32, max_trans_len + 4)
+
+    col_type_w = 15
+
+    header_top = f"{C_GRAY}  ┌{'─' * col_name_w}┬{'─' * col_trans_w}┬{'─' * col_type_w}┐{C_RESET}"
+    header_mid = f"{C_GRAY}  ├{'─' * col_name_w}┼{'─' * col_trans_w}┼{'─' * col_type_w}┤{C_RESET}"
+    header_bot = f"{C_GRAY}  └{'─' * col_name_w}┴{'─' * col_trans_w}┴{'─' * col_type_w}┘{C_RESET}"
+
+    hdr_name = "PAQUETE"
+    hdr_trans = "TRANSICIÓN DE VERSIÓN"
+    hdr_type = "TIPO / ORIGEN"
+
+    print(header_top)
+    print(f"{C_GRAY}  │{C_RESET} {C_WHITE}{C_BOLD}{hdr_name:<{col_name_w-2}}{C_RESET} "
+          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{hdr_trans:<{col_trans_w-2}}{C_RESET} "
+          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{hdr_type:<{col_type_w-2}}{C_RESET} {C_GRAY}│{C_RESET}")
+    print(header_mid)
+
+    has_critical = False
+
+    for p, trans, orig, col in visible_items:
         shown_count += 1
         is_crit = is_critical_package(p)
+        if is_crit:
+            has_critical = True
         tag = f"{C_YELLOW}[!] {C_RESET}" if is_crit else "    "
         pkg_display = (tag + f"{col}{p}{C_RESET}")
-        raw_name_len = len(p) + (4 if is_crit else 4)
+        raw_name_len = len(p) + 4
         pad_name = max(0, col_name_w - 2 - raw_name_len)
 
         raw_trans_len = len(trans)
@@ -334,6 +348,8 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
         print(f"{C_GRAY}  │{C_RESET} {C_GRAY}{msg}{' ' * pad}{C_RESET} {C_GRAY}│{C_RESET}")
 
     print(header_bot)
+    if has_critical:
+        print(f"  {C_YELLOW}[!] {C_GRAY}Componente crítico del sistema (Kernel, Core, Drivers, Schedulers){C_RESET}")
     print()
 
 def run_interactive():
