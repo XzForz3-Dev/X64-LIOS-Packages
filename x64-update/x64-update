@@ -59,6 +59,8 @@ def get_telemetry():
     kernel = "Linux Desconocido"
     try:
         raw_k = subprocess.check_output(["uname", "-r"], text=True).strip()
+        # Cleanse distro branding from kernel string
+        raw_k = raw_k.replace("-cachyos", "").replace("cachyos", "")
         kernel = raw_k
     except Exception:
         pass
