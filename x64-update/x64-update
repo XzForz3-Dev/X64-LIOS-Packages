@@ -349,7 +349,7 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
 
     print(header_bot)
     if has_critical:
-        print(f"  {C_YELLOW}[!] {C_GRAY}Componente crítico del sistema (Kernel, Core, Drivers, Schedulers){C_RESET}")
+        print(f"  {C_YELLOW}[!] {C_WHITE}Componente crítico del sistema {C_CYAN}(Kernel, Core, Drivers, Schedulers){C_RESET}")
     print()
 
 def run_interactive():
