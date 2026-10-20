@@ -1,7 +1,8 @@
 var panel = new Panel;
 var panelScreen = panel.screen;
 
-panel.height = 2 * Math.ceil(gridUnit * 2.5 / 2);
+panel.height = 30;
+panel.floating = true;
 
 const maximumAspectRatio = 21/9;
 if (panel.formFactor === "horizontal") {
@@ -23,7 +24,7 @@ panel.addWidget("org.kde.plasma.pager");
 
 var icontasks = panel.addWidget("org.kde.plasma.icontasks");
 icontasks.currentConfigGroup = ["General"];
-icontasks.writeConfig("launchers", "applications:org.kde.dolphin.desktop,applications:org.kde.discover.desktop,applications:com.shellyorg.shelly.desktop,applications:chromium.desktop,applications:kitty.desktop,applications:systemsettings.desktop,applications:x64-hello.desktop");
+icontasks.writeConfig("launchers", "applications:systemsettings.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.discover.desktop,applications:com.shellyorg.shelly.desktop,applications:chromium.desktop,applications:kitty.desktop");
 
 panel.addWidget("org.kde.plasma.marginsseparator");
 var systemtray = panel.addWidget("org.kde.plasma.systemtray");

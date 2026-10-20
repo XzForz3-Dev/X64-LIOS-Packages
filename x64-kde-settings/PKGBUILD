@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -9,8 +9,14 @@ depends=('plasma-desktop' 'sddm')
 source=('x64-lios-v2.jpg'
         'x64-lios-v3.jpg'
         'x64-logo.png'
-        'x64-layout.js')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'x64-layout.js'
+        'plasmashellrc'
+        'plasma-org.kde.plasma.desktop-appletsrc'
+        'kdeglobals'
+        'kwinrc'
+        'gtk3-settings.ini'
+        'gtk4-settings.ini')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar fondos de pantalla
@@ -25,6 +31,20 @@ package() {
     # Instalar layout en ruta segura
     mkdir -p "${pkgdir}/usr/share/x64-lios"
     cp "${srcdir}/x64-layout.js" "${pkgdir}/usr/share/x64-lios/x64-layout.js"
+
+    # Instalar configuraciones maestras en /etc/skel para nuevos usuarios / Calamares
+    mkdir -p "${pkgdir}/etc/skel/.config/kdedefaults"
+    mkdir -p "${pkgdir}/etc/skel/.config/gtk-3.0"
+    mkdir -p "${pkgdir}/etc/skel/.config/gtk-4.0"
+
+    cp "${srcdir}/plasmashellrc" "${pkgdir}/etc/skel/.config/plasmashellrc"
+    cp "${srcdir}/plasma-org.kde.plasma.desktop-appletsrc" "${pkgdir}/etc/skel/.config/plasma-org.kde.plasma.desktop-appletsrc"
+    cp "${srcdir}/kdeglobals" "${pkgdir}/etc/skel/.config/kdeglobals"
+    cp "${srcdir}/kdeglobals" "${pkgdir}/etc/skel/.config/kdedefaults/kdeglobals"
+    cp "${srcdir}/kwinrc" "${pkgdir}/etc/skel/.config/kwinrc"
+    cp "${srcdir}/kwinrc" "${pkgdir}/etc/skel/.config/kdedefaults/kwinrc"
+    cp "${srcdir}/gtk3-settings.ini" "${pkgdir}/etc/skel/.config/gtk-3.0/settings.ini"
+    cp "${srcdir}/gtk4-settings.ini" "${pkgdir}/etc/skel/.config/gtk-4.0/settings.ini"
 
     # Crear script de auto-arranque para forzar el tema oscuro y el wallpaper v3 en KDE
     mkdir -p "${pkgdir}/etc/xdg/autostart"
@@ -43,4 +63,3 @@ SCRIPT
 background=/usr/share/backgrounds/x64-lios/x64-lios-v2.jpg
 SDDMCONF
 }
-
