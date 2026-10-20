@@ -2911,6 +2911,7 @@ LACT_TRANSLATIONS = {
     'en': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (GPU Overclock & Fan Control)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.',
         'OPEN ↗': 'OPEN ↗',
         'Installed. Click to open application.': 'Installed. Click to open application.',
         'Component is installed.': 'Component is installed.'
@@ -2918,6 +2919,7 @@ LACT_TRANSLATIONS = {
     'es': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (Control GPU y Ventiladores)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Curvas de ventilador, undervolt, límites de energía (TDP), frecuencias y telemetría para GPU AMD, NVIDIA e Intel.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Arsenal completo: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt y librerías 32-bits.',
         'OPEN ↗': 'ABRIR ↗',
         'Installed. Click to open application.': 'Instalado. Clic para abrir la aplicación.',
         'Component is installed.': 'El componente está instalado.'
@@ -2925,6 +2927,7 @@ LACT_TRANSLATIONS = {
     'fr': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (Contrôle GPU & Ventilateurs)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Courbes de ventilateur, undervolt, limites TDP, fréquences et températures pour GPU AMD, NVIDIA et Intel.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Arsenal complet : Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt et libs 32 bits.',
         'OPEN ↗': 'OUVRIR ↗',
         'Installed. Click to open application.': "Installé. Cliquez pour ouvrir l'application.",
         'Component is installed.': 'Le composant est installé.'
@@ -2932,6 +2935,7 @@ LACT_TRANSLATIONS = {
     'de': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (GPU-Takt & Lüftersteuerung)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Lüfterkurven, Undervolting, TDP-Grenzwerte, Taktraten und Live-Temperaturen für AMD-, NVIDIA- und Intel-GPUs.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-Bit-Libs.': 'Komplettes Arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-Bit-Libs.',
         'OPEN ↗': 'ÖFFNEN ↗',
         'Installed. Click to open application.': 'Installiert. Klicken zum Öffnen.',
         'Component is installed.': 'Komponente ist installiert.'
@@ -2939,6 +2943,7 @@ LACT_TRANSLATIONS = {
     'it': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (Controllo GPU e Ventole)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Curve ventole, undervolt, limiti TDP, frequenze e temperature per GPU AMD, NVIDIA e Intel.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Arsenale completo: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt e librerie a 32 bit.',
         'OPEN ↗': 'APRI ↗',
         'Installed. Click to open application.': "Installato. Clicca per aprire l'applicazione.",
         'Component is installed.': 'Il componente è installato.'
@@ -2946,6 +2951,7 @@ LACT_TRANSLATIONS = {
     'pt': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (Controle de GPU e Ventoinhas)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Curvas de ventoinha, undervolt, limites TDP, frequências e temperaturas para GPUs AMD, NVIDIA e Intel.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Arsenal completo: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt e bibliotecas de 32 bits.',
         'OPEN ↗': 'ABRIR ↗',
         'Installed. Click to open application.': 'Instalado. Clique para abrir o aplicativo.',
         'Component is installed.': 'O componente está instalado.'
@@ -2953,6 +2959,7 @@ LACT_TRANSLATIONS = {
     'ru': {
         'LACT (GPU Overclock & Fan Control)': 'LACT (Разгон GPU и Вентиляторы)',
         'Fan curves, undervolt, power limits (TDP), clock frequencies, and live thermals for AMD, NVIDIA & Intel GPUs.': 'Кривые вентиляторов, андервольтинг, лимиты TDP, частоты и мониторинг для видеокарт AMD, NVIDIA и Intel.',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Полный арсенал: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt и 32-битные библиотеки.',
         'OPEN ↗': 'ОТКРЫТЬ ↗',
         'Installed. Click to open application.': 'Установлено. Нажмите для запуска.',
         'Component is installed.': 'Компонент установлен.'
@@ -6272,11 +6279,12 @@ class X64Hello(QWidget):
         # TOP FULL-WIDTH HERO CARD: FULL GAMING SUITE
         suite_card = GamingInstallCard(
             tr("Full X64 Gaming Suite (All-in-One)"),
-            tr("Complete arsenal: Steam, Lutris, Heroic, Faugus, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs."),
-            "cachyos-gaming-meta cachyos-gaming-applications protonup-qt",
-            "cachyos-gaming-meta cachyos-gaming-applications protonup-qt",
+            tr("Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs."),
+            "cachyos-gaming-meta cachyos-gaming-applications protonup-qt lact|lact-git",
+            "cachyos-gaming-meta cachyos-gaming-applications protonup-qt lact",
             "gamepad",
-            is_suite=True
+            is_suite=True,
+            post_cmd="sudo systemctl enable --now lactd.service 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Suite Gaming X64 instalada al completo y servicio lactd activo.\\033[0m\\n'"
         )
         self.gaming_cards.append(suite_card)
         layout.addWidget(suite_card)
