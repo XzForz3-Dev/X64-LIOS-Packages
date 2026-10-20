@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -52,7 +52,7 @@ package() {
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop && plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg'
+Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop; sleep 1; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg'
 X-KDE-autostart-phase=1
 SCRIPT
 
