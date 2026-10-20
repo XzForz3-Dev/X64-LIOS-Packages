@@ -10,4 +10,5 @@ Type=Application
 Categories=System;Utility;
 StartupNotify=false
 X-GNOME-Autostart-enabled=true
+X-systemd-skip=true
 

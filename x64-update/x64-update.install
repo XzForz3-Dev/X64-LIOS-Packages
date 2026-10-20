@@ -1,8 +1,9 @@
 post_install() {
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+    systemctl --global enable x64-update-tray.service 2>/dev/null || true
+    systemctl --global enable x64-update.timer 2>/dev/null || true
     echo "==> x64-update instalado con éxito."
-    echo "==> Para habilitar el temporizador de comprobación automática:"
-    echo "==> systemctl --user enable --now x64-update.timer"
+    echo "==> Servicio x64-update-tray habilitado como centinela en segundo plano."
 }
 
 post_upgrade() {
@@ -11,5 +12,7 @@ post_upgrade() {
 
 post_remove() {
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+    systemctl --global disable x64-update-tray.service 2>/dev/null || true
+    systemctl --global disable x64-update.timer 2>/dev/null || true
 }
 

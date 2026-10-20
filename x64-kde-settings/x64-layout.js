@@ -26,6 +26,8 @@ icontasks.currentConfigGroup = ["General"];
 icontasks.writeConfig("launchers", "applications:org.kde.dolphin.desktop,applications:chromium.desktop,applications:kitty.desktop,applications:systemsettings.desktop,applications:x64-hello.desktop");
 
 panel.addWidget("org.kde.plasma.marginsseparator");
-panel.addWidget("org.kde.plasma.systemtray");
+var systemtray = panel.addWidget("org.kde.plasma.systemtray");
+systemtray.currentConfigGroup = ["General"];
+systemtray.writeConfig("shownItems", "x64-update-tray");
 panel.addWidget("org.kde.plasma.digitalclock");
 panel.addWidget("org.kde.plasma.showdesktop");

@@ -1,0 +1,14 @@
+[Unit]
+Description=X64 LIOS Update System Tray Daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/x64-update-tray
+Restart=on-failure
+RestartSec=3
+KillMode=process
+
+[Install]
+WantedBy=graphical-session.target
