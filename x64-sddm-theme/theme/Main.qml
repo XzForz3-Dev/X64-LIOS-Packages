@@ -56,14 +56,14 @@ Rectangle {
       xhr.send();
   }
 
-  function updateSysInfo() {
-      // 1. Kernel
+  function updateStaticSysInfo() {
+      // 1. Kernel (una sola vez)
       readSysFile("file:///proc/sys/kernel/osrelease", function(data) {
           var v = data.trim().replace(/-cachyos/gi, "-x64").replace(/cachyos/gi, "x64");
           if (v !== "") root.kernelInfo = v;
       });
 
-      // 2. CPU
+      // 2. CPU (una sola vez)
       readSysFile("file:///proc/cpuinfo", function(data) {
           var m = data.match(/model name\s*:\s*([^\n\r]+)/);
           if (m && m[1]) {
@@ -72,8 +72,10 @@ Rectangle {
               root.cpuInfo = c + (cores > 0 ? " (" + cores + "T)" : "");
           }
       });
+  }
 
-      // 3. RAM
+  function updateDynamicSysInfo() {
+      // 3. RAM (tiempo real a cada segundo)
       readSysFile("file:///proc/meminfo", function(data) {
           var mt = data.match(/MemTotal:\s*(\d+)/);
           var ma = data.match(/MemAvailable:\s*(\d+)/);
@@ -86,14 +88,15 @@ Rectangle {
           }
       });
 
-      // 4. Uptime
+      // 4. Uptime (tiempo real con segundos a cada segundo)
       readSysFile("file:///proc/uptime", function(data) {
           var parts = data.trim().split(" ");
           if (parts.length > 0) {
-              var sec = parseFloat(parts[0]);
+              var sec = Math.floor(parseFloat(parts[0]));
               var h = Math.floor(sec / 3600);
               var m = Math.floor((sec % 3600) / 60);
-              root.uptimeInfo = (h > 0 ? (h + "h " + m + "m") : (m + "m"));
+              var s = sec % 60;
+              root.uptimeInfo = (h > 0 ? (h + "h " + m + "m " + s + "s") : (m + "m " + s + "s"));
           }
       });
   }
@@ -560,13 +563,14 @@ Rectangle {
 
   Component.onCompleted: {
       password.forceActiveFocus()
-      root.updateSysInfo()
+      root.updateStaticSysInfo()
+      root.updateDynamicSysInfo()
   }
 
   Timer {
-      interval: 10000
+      interval: 1000
       running: true
       repeat: true
-      onTriggered: root.updateSysInfo()
+      onTriggered: root.updateDynamicSysInfo()
   }
 }

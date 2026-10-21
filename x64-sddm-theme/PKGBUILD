@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <contact@x64studios.com>
 pkgname=x64-sddm-theme
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Official X64 LIOS Cyberpunk Video SDDM Theme with interactive wallpaper switcher"
 arch=(any)
 license=(GPL)
