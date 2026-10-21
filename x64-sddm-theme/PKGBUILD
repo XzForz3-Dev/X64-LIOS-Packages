@@ -1,0 +1,15 @@
+# Maintainer: X64 Studios <contact@x64studios.com>
+pkgname=x64-sddm-theme
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS Cyberpunk Video SDDM Theme with interactive wallpaper switcher"
+arch=(any)
+license=(GPL)
+depends=(sddm qt6-declarative qt6-multimedia qt6-multimedia-ffmpeg gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav)
+
+package() {
+    install -d "${pkgdir}/usr/share/sddm/themes/x64-lios"
+    cp -r "${startdir}/theme/"* "${pkgdir}/usr/share/sddm/themes/x64-lios/"
+    
+    install -Dm644 "${startdir}/sddm.conf.d/10-x64-theme.conf" "${pkgdir}/usr/lib/sddm/sddm.conf.d/10-x64-theme.conf"
+}

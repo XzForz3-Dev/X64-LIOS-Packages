@@ -1,0 +1,7 @@
+[SddmGreeterTheme]
+Name=X64 LIOS
+Description=X64 LIOS Cyberpunk Video SDDM Theme
+Author=X64 Studios
+Type=sddm-theme
+Version=1.0
+QtVersion=6

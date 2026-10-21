@@ -3,3 +3,4 @@ Type=Application
 Name=KDE Connect
 Exec=/usr/lib/kdeconnectd
 Hidden=true
+
