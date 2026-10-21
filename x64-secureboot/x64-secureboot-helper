@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+X64 LIOS Secure Boot & sbctl Backend Helper
+Manages UEFI detection, key generation, automated binary signing, and key enrollment.
+"""
+
+import sys
+import os
+import glob
+import json
+import subprocess
+import shutil
+
+def check_uefi():
+    return os.path.exists('/sys/firmware/efi')
+
+def check_sbctl_installed():
+    return shutil.which('sbctl') is not None
+
+def check_keys_created():
+    pk_paths = [
+        '/var/lib/sbctl/keys/PK/PK.key',
+        '/usr/share/secureboot/keys/PK/PK.key'
+    ]
+    return any(os.path.exists(p) for p in pk_paths)
+
+def get_secure_boot_state():
+    if not check_uefi():
+        return 'legacy'
+
+    # Check efivars for SetupMode
+    setup_files = glob.glob('/sys/firmware/efi/efivars/SetupMode-*')
+    if setup_files:
+        try:
+            with open(setup_files[0], 'rb') as f:
+                data = f.read()
+                # 4 bytes attributes + 1 byte value
+                if len(data) >= 5 and data[4] == 1:
+                    return 'setup_mode'
+        except Exception:
+            pass
+
+    # Check efivars for SecureBoot
+    sb_files = glob.glob('/sys/firmware/efi/efivars/SecureBoot-*')
+    if sb_files:
+        try:
+            with open(sb_files[0], 'rb') as f:
+                data = f.read()
+                if len(data) >= 5 and data[4] == 1:
+                    return 'enabled'
+        except Exception:
+            pass
+
+    # Fallback to bootctl status
+    try:
+        res = subprocess.run(['bootctl', 'status'], capture_output=True, text=True, timeout=5)
+        for line in res.stdout.splitlines():
+            if 'Secure Boot:' in line:
+                val = line.split(':', 1)[1].strip().lower()
+                if 'enabled' in val:
+                    return 'enabled'
+                elif 'setup' in val:
+                    return 'setup_mode'
+                elif 'disabled' in val:
+                    return 'disabled'
+    except Exception:
+        pass
+
+    return 'disabled'
+
+def find_candidate_files():
+    candidates = []
+    # EFI binaries in all standard EFI mount points
+    search_roots = ['/boot/efi', '/boot', '/efi']
+    for root in search_roots:
+        if os.path.isdir(root):
+            for dirpath, _, filenames in os.walk(root):
+                for f in filenames:
+                    if f.lower().endswith('.efi'):
+                        candidates.append(os.path.join(dirpath, f))
+
+    # Kernel vmlinuz images
+    for k in glob.glob('/boot/vmlinuz-*'):
+        if os.path.isfile(k):
+            candidates.append(k)
+
+    return sorted(list(set(candidates)))
+
+def get_status():
+    uefi = check_uefi()
+    installed = check_sbctl_installed()
+    keys = check_keys_created()
+    sb_state = get_secure_boot_state()
+
+    files_list = []
+    total_files = 0
+    signed_files = 0
+
+    candidates = find_candidate_files()
+
+    enrolled_dict = {}
+    if os.path.exists('/var/lib/sbctl/files.json'):
+        try:
+            with open('/var/lib/sbctl/files.json', 'r') as fp:
+                enrolled_dict = json.load(fp)
+        except Exception:
+            pass
+
+    if installed and keys:
+        try:
+            res = subprocess.run(['sbctl', 'verify', '--json'], capture_output=True, text=True, timeout=10)
+            if res.returncode == 0 and res.stdout.strip():
+                verified = json.loads(res.stdout)
+                for item in verified:
+                    fpath = item.get('file_name', '')
+                    is_signed = bool(item.get('is_signed', 0) == 1)
+                    files_list.append({
+                        'path': fpath,
+                        'name': os.path.basename(fpath),
+                        'signed': is_signed
+                    })
+                    total_files += 1
+                    if is_signed:
+                        signed_files += 1
+        except Exception:
+            pass
+
+    # If sbctl verify produced no files or wasn't run as root, fallback to candidates + enrolled_dict
+    if not files_list:
+        for c in candidates:
+            is_signed = bool(c in enrolled_dict)
+            files_list.append({
+                'path': c,
+                'name': os.path.basename(c),
+                'signed': is_signed
+            })
+            total_files += 1
+            if is_signed:
+                signed_files += 1
+
+    return {
+        'uefi': uefi,
+        'sbctl_installed': installed,
+        'keys_created': keys,
+        'secure_boot_state': sb_state,
+        'total_files': total_files,
+        'signed_files': signed_files,
+        'files': files_list
+    }
+
+def action_create_keys():
+    print("==> [X64 SECURE BOOT] Generando pares de claves criptográficas maestras (PK, KEK, db)...")
+    cmd = ['sbctl', 'create-keys']
+    proc = subprocess.run(cmd, text=True)
+    if proc.returncode == 0:
+        print("\n✓ Claves criptográficas generadas exitosamente en /var/lib/sbctl/keys.")
+        return 0
+    else:
+        print(f"\n✗ Error al generar claves (código {proc.returncode}).", file=sys.stderr)
+        return proc.returncode
+
+def action_sign_all():
+    print("==> [X64 SECURE BOOT] Localizando ejecutables de arranque EFI y kernels del sistema...")
+    candidates = find_candidate_files()
+    if not candidates:
+        print("✗ No se encontraron ejecutables EFI ni imágenes de kernel en /boot o particiones ESP.")
+        return 1
+
+    success_count = 0
+    for f in candidates:
+        print(f"Firmando y enrolando: {f} ...")
+        res = subprocess.run(['sbctl', 'sign', '-s', f], text=True)
+        if res.returncode == 0:
+            success_count += 1
+
+    print(f"\n✓ Proceso completado: {success_count}/{len(candidates)} archivos firmados y registrados.")
+    print("Los hooks automáticos de pacman los mantendrán firmados en futuras actualizaciones.")
+    return 0
+
+def action_enroll_keys():
+    print("==> [X64 SECURE BOOT] Enrolando claves en la NVRAM de la placa base (incluyendo certificados Microsoft)...")
+    res = subprocess.run(['sbctl', 'enroll-keys', '-m'], capture_output=True, text=True)
+    if res.returncode == 0:
+        print(res.stdout)
+        print("\n✓ Claves maestras y certificados de Microsoft enrolados exitosamente en la BIOS/UEFI.")
+        print("Ahora puedes reiniciar tu equipo y mantener Secure Boot ACTIVADO permanentemente.")
+        return 0
+    else:
+        print(res.stdout)
+        err = res.stderr.strip()
+        print(f"✗ Error al enrolar claves: {err}", file=sys.stderr)
+        if "SetupMode" in err or "not enabled" in err or "Setup Mode" in err:
+            print("\n" + "="*70)
+            print("⚠ LA PLACA BASE NO ESTÁ EN MODO CONFIGURACIÓN (SETUP MODE) ⚠")
+            print("="*70)
+            print("Para enrolar claves personalizadas por primera vez:")
+            print("1. Reinicia tu PC y pulsa Supr / F2 para entrar a la BIOS/UEFI.")
+            print("2. Ve a la pestaña 'Security' o 'Boot' -> 'Secure Boot'.")
+            print("3. Selecciona 'Clear Secure Boot Keys' o 'Erase PK' (Borrar claves de fábrica).")
+            print("4. Guarda los cambios con F10 y vuelve a arrancar en X64 LIOS.")
+            print("5. Abre este asistente y pulsa de nuevo 'Enrolar Claves'.")
+            print("="*70)
+        return res.returncode
+
+def action_install_sbctl():
+    print("==> [X64 SECURE BOOT] Instalando el paquete oficial sbctl...")
+    cmd = ['pacman', '-S', '--needed', '--noconfirm', 'sbctl']
+    proc = subprocess.run(cmd, text=True)
+    return proc.returncode
+
+def main():
+    if len(sys.argv) < 2:
+        print("Uso: x64-secureboot-helper {status|create-keys|sign-all|enroll-keys|verify|install-sbctl}")
+        sys.exit(1)
+
+    action = sys.argv[1].lower()
+
+    if action == 'status':
+        data = get_status()
+        print(json.dumps(data, indent=2))
+        sys.exit(0)
+    elif action == 'create-keys':
+        sys.exit(action_create_keys())
+    elif action == 'sign-all':
+        sys.exit(action_sign_all())
+    elif action == 'enroll-keys':
+        sys.exit(action_enroll_keys())
+    elif action == 'verify':
+        res = subprocess.run(['sbctl', 'verify'], text=True)
+        sys.exit(res.returncode)
+    elif action == 'install-sbctl':
+        sys.exit(action_install_sbctl())
+    else:
+        print(f"Acción desconocida: {action}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,33 @@
+pkgname=x64-secureboot
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="X64 LIOS Graphical Secure Boot & sbctl Key Manager Assistant"
+arch=('any')
+license=('GPL')
+depends=('python' 'python-pyqt6' 'qt6-svg' 'polkit')
+optdepends=('sbctl: Secure Boot key manager CLI')
+source=('x64-secureboot'
+        'x64-secureboot-helper'
+        'x64-secureboot.desktop'
+        'x64-secureboot-icon.svg'
+        'org.x64.secureboot.policy')
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+package() {
+    # Instalar binarios y backend helper
+    install -Dm755 "${srcdir}/x64-secureboot" "${pkgdir}/usr/bin/x64-secureboot"
+    install -Dm755 "${srcdir}/x64-secureboot-helper" "${pkgdir}/usr/bin/x64-secureboot-helper"
+
+    # Instalar lanzador de escritorio
+    install -Dm644 "${srcdir}/x64-secureboot.desktop" "${pkgdir}/usr/share/applications/x64-secureboot.desktop"
+
+    # Instalar icono SVG
+    install -Dm644 "${srcdir}/x64-secureboot-icon.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-secureboot-icon.svg"
+
+    # Instalar política de Polkit
+    install -Dm644 "${srcdir}/org.x64.secureboot.policy" "${pkgdir}/usr/share/polkit-1/actions/org.x64.secureboot.policy"
+}

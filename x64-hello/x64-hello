@@ -3067,6 +3067,82 @@ for _lc, _d in SUNSHINE_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
         TRANSLATIONS[_lc].update(_d)
 
+SECUREBOOT_TRANSLATIONS = {
+    'en': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Secure Boot & UEFI Key Manager (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.',
+        'OPEN ASSISTANT ↗': 'OPEN ASSISTANT ↗',
+        'ACTIVE': 'ACTIVE',
+        'DISABLED': 'DISABLED',
+        'SETUP MODE': 'SETUP MODE',
+        'LEGACY BIOS': 'LEGACY BIOS'
+    },
+    'es': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SEGURIDAD DE FIRMWARE Y HARDWARE (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Asistente de Secure Boot y Firmas UEFI (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enrola claves personalizadas en UEFI manteniendo activos los certificados de Microsoft para Windows 11 y anticheats.',
+        'OPEN ASSISTANT ↗': 'ABRIR ASISTENTE ↗',
+        'ACTIVE': 'ACTIVADO',
+        'DISABLED': 'DESACTIVADO',
+        'SETUP MODE': 'MODO SETUP',
+        'LEGACY BIOS': 'BIOS LEGACY'
+    },
+    'fr': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SÉCURITÉ DU FIRMWARE ET HARDWARE (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Gestionnaire de Clés UEFI & Secure Boot (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enregistrez des clés personnalisées dans UEFI tout en conservant les certificats Microsoft pour Windows 11 et anticheats.',
+        'OPEN ASSISTANT ↗': 'OUVRIR ASSISTANT ↗',
+        'ACTIVE': 'ACTIVÉ',
+        'DISABLED': 'DÉSACTIVÉ',
+        'SETUP MODE': 'MODE SETUP',
+        'LEGACY BIOS': 'BIOS LEGACY'
+    },
+    'de': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'FIRMWARE- & HARDWARE-SICHERHEIT (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Secure Boot & UEFI-Schlüsselmanager (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Eigene kryptografische Schlüssel im UEFI registrieren und Microsoft-Zertifikate für Windows 11 Dual-Boot behalten.',
+        'OPEN ASSISTANT ↗': 'ASSISTENT ÖFFNEN ↗',
+        'ACTIVE': 'AKTIV',
+        'DISABLED': 'DEAKTIVIERT',
+        'SETUP MODE': 'SETUP-MODUS',
+        'LEGACY BIOS': 'LEGACY-BIOS'
+    },
+    'it': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SICUREZZA FIRMWARE E HARDWARE (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Gestore Chiavi UEFI & Secure Boot (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Registra chiavi personalizzate in UEFI mantenendo i certificati Microsoft per Windows 11 e anticheat.',
+        'OPEN ASSISTANT ↗': 'APRI ASSISTENTE ↗',
+        'ACTIVE': 'ATTIVO',
+        'DISABLED': 'DISATTIVATO',
+        'SETUP MODE': 'MODO SETUP',
+        'LEGACY BIOS': 'BIOS LEGACY'
+    },
+    'pt': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SEGURANÇA DE FIRMWARE E HARDWARE (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Assistente de Secure Boot e Chaves UEFI (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Inscreva chaves personalizadas no UEFI mantendo certificados da Microsoft para Windows 11 e anticheats.',
+        'OPEN ASSISTANT ↗': 'ABRIR ASSISTENTE ↗',
+        'ACTIVE': 'ATIVADO',
+        'DISABLED': 'DESATIVADO',
+        'SETUP MODE': 'MODO SETUP',
+        'LEGACY BIOS': 'BIOS LEGACY'
+    },
+    'ru': {
+        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'БЕЗОПАСНОСТЬ ПРОШИВКИ И ОБОРУДОВАНИЯ (SECURE BOOT)',
+        'Secure Boot & UEFI Key Manager (sbctl)': 'Менеджер ключей UEFI и Secure Boot (sbctl)',
+        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Регистрация пользовательских ключей в UEFI с сохранением сертификатов Microsoft для Windows 11 и античитов.',
+        'OPEN ASSISTANT ↗': 'ОТКРЫТЬ АССИСТЕНТ ↗',
+        'ACTIVE': 'АКТИВЕН',
+        'DISABLED': 'ОТКЛЮЧЕН',
+        'SETUP MODE': 'РЕЖИМ SETUP',
+        'LEGACY BIOS': 'LEGACY BIOS'
+    }
+}
+for _lc, _d in SECUREBOOT_TRANSLATIONS.items():
+    if _lc in TRANSLATIONS:
+        TRANSLATIONS[_lc].update(_d)
+
 _lang_code = _detect_initial_lang()
 
 def tr(text):
@@ -4244,6 +4320,153 @@ class KernelStatusCard(QFrame):
             font-size: 11px;
         """)
         hbox.addWidget(lbl_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+
+
+class SecureBootCard(QFrame):
+    def __init__(self, parent=None, height=76):
+        super().__init__(parent)
+        self.setObjectName("SecureBootCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setFixedHeight(height)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("""
+            QFrame#SecureBootCard {
+                background-color: rgba(255, 255, 255, 0.03);
+                border-radius: 11px;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+            }
+            QFrame#SecureBootCard:hover {
+                background-color: rgba(255, 255, 255, 0.055);
+                border: 1px solid #cc0000;
+            }
+        """)
+
+        hbox = QHBoxLayout(self)
+        hbox.setContentsMargins(14, 6, 14, 6)
+        hbox.setSpacing(12)
+
+        icon_box = QFrame()
+        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        icon_box.setFixedSize(40, 40)
+        icon_box.setStyleSheet("""
+            QFrame {
+                background-color: rgba(204, 0, 0, 0.13);
+                border: 1px solid rgba(204, 0, 0, 0.35);
+                border-radius: 9px;
+            }
+        """)
+        ibox_layout = QVBoxLayout(icon_box)
+        ibox_layout.setContentsMargins(0, 0, 0, 0)
+        ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        icon_label = QLabel()
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        pix = make_svg_pixmap("shield-warn", 20)
+        if not pix.isNull():
+            icon_label.setPixmap(pix)
+        icon_label.setStyleSheet("background: transparent; border: none;")
+        ibox_layout.addWidget(icon_label)
+        hbox.addWidget(icon_box)
+
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(2)
+        vbox.addStretch(1)
+
+        title = tr("Secure Boot & UEFI Key Manager (sbctl)")
+        desc = tr("Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.")
+        self.setToolTip(f"<b>{title}</b><br>{desc}")
+
+        lbl_title = FitLabel(title)
+        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
+        vbox.addWidget(lbl_title)
+
+        lbl_desc = QLabel(desc)
+        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lbl_desc.setStyleSheet("color: #a0a0a8; font-size: 11px; border: none; background: transparent;")
+        lbl_desc.setWordWrap(True)
+        vbox.addWidget(lbl_desc)
+        vbox.addStretch(1)
+        hbox.addLayout(vbox, 1)
+
+        # Detect status
+        sb_state, color, bg_col, border_col = self._detect_sb_state()
+
+        self.lbl_badge = QLabel(f"● {sb_state}")
+        self.lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lbl_badge.setStyleSheet(f"""
+            color: {color};
+            background-color: {bg_col};
+            border: 1px solid {border_col};
+            border-radius: 7px;
+            padding: 4px 10px;
+            font-weight: bold;
+            font-size: 11px;
+        """)
+        hbox.addWidget(self.lbl_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.btn_open = QPushButton(tr("OPEN ASSISTANT ↗"))
+        self.btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open.setStyleSheet("""
+            QPushButton {
+                background: rgba(16, 185, 129, 0.15);
+                color: #10b981;
+                border: 1px solid rgba(16, 185, 129, 0.45);
+                border-radius: 7px;
+                padding: 5px 12px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background: #10b981;
+                color: #ffffff;
+            }
+        """)
+        self.btn_open.clicked.connect(self._launch)
+        hbox.addWidget(self.btn_open, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def _detect_sb_state(self):
+        if not os.path.exists('/sys/firmware/efi'):
+            return tr("LEGACY BIOS"), "#888899", "rgba(136, 136, 153, 0.15)", "rgba(136, 136, 153, 0.4)"
+
+        import glob
+        setup_files = glob.glob('/sys/firmware/efi/efivars/SetupMode-*')
+        if setup_files:
+            try:
+                with open(setup_files[0], 'rb') as f:
+                    d = f.read()
+                    if len(d) >= 5 and d[4] == 1:
+                        return tr("SETUP MODE"), "#f59e0b", "rgba(245, 158, 11, 0.15)", "rgba(245, 158, 11, 0.4)"
+            except Exception:
+                pass
+
+        sb_files = glob.glob('/sys/firmware/efi/efivars/SecureBoot-*')
+        if sb_files:
+            try:
+                with open(sb_files[0], 'rb') as f:
+                    d = f.read()
+                    if len(d) >= 5 and d[4] == 1:
+                        return tr("ACTIVE"), "#10b981", "rgba(16, 185, 129, 0.15)", "rgba(16, 185, 129, 0.4)"
+            except Exception:
+                pass
+
+        return tr("DISABLED"), "#ef4444", "rgba(239, 68, 68, 0.15)", "rgba(239, 68, 68, 0.4)"
+
+    def _launch(self):
+        try:
+            import subprocess
+            subprocess.Popen(["x64-secureboot"], preexec_fn=os.setsid)
+        except Exception:
+            pass
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._launch()
+        super().mousePressEvent(event)
 
 
 class PremiumButton(QPushButton):
@@ -6116,6 +6339,15 @@ class X64Hello(QWidget):
         net_grid.addWidget(card_bbr, 1, 0)
         net_grid.addWidget(card_wifi, 1, 1)
         layout.addLayout(net_grid)
+        layout.addSpacing(12)
+
+        sec3 = QLabel(tr("FIRMWARE & HARDWARE SECURITY (SECURE BOOT)"))
+        sec3.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        layout.addWidget(sec3)
+        layout.addSpacing(6)
+
+        self.sb_card = SecureBootCard(self)
+        layout.addWidget(self.sb_card)
         return page
 
     def create_page_maintenance(self):

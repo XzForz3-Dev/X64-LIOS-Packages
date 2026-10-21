@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=X64 Secure Boot Assistant
+Name[es]=Asistente Secure Boot X64
+GenericName=Secure Boot & sbctl Key Manager
+GenericName[es]=Gestor de Firmas y Claves Secure Boot
+Comment=Create keys, sign kernels and enable Secure Boot for Windows 11 dual-boot and anti-cheat games
+Comment[es]=Crea claves, firma kernels y habilita Secure Boot para arranque dual con Windows 11 y juegos con anti-cheat
+Exec=/usr/bin/x64-secureboot
+Icon=x64-secureboot-icon
+Terminal=false
+Type=Application
+Categories=System;Security;Settings;
+StartupNotify=true
