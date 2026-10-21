@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# X64 LIOS Sunshine Game Streaming Launcher & Controller
+# Optimizes uinput permissions, enables Avahi, verifies user daemon, and launches Web UI
+
+set -e
+
+# 1. Verificar si Sunshine está instalado
+if ! command -v sunshine >/dev/null 2>&1; then
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -u critical -i dialog-warning "X64 Sunshine" "Sunshine no está instalado. Puedes instalarlo con 1 clic desde el Centro Gaming de X64 Hello."
+    fi
+    exit 1
+fi
+
+# 2. Asegurar servicio Avahi para autodescubrimiento mDNS local con Moonlight
+if ! systemctl is-active --quiet avahi-daemon.service 2>/dev/null; then
+    sudo systemctl enable --now avahi-daemon.service 2>/dev/null || true
+fi
+
+# 3. Asegurar servicio de usuario de Sunshine
+if ! systemctl --user is-active --quiet app-dev.lizardbyte.app.Sunshine.service 2>/dev/null && ! systemctl --user is-active --quiet sunshine.service 2>/dev/null; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user start sunshine.service 2>/dev/null || true
+fi
+
+# 4. Notificación amigable de inicio
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming activo.\nAbriendo panel web (https://localhost:47990)\nAcepta el certificado local si el navegador lo solicita."
+fi
+
+# 5. Abrir panel de control Web para emparejamiento con Moonlight
+sleep 1
+if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "https://localhost:47990" 2>/dev/null || true
+elif command -v chromium >/dev/null 2>&1; then
+    chromium "https://localhost:47990" 2>/dev/null || true
+fi

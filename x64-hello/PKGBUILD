@@ -1,6 +1,6 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=10
+pkgrel=11
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
@@ -8,11 +8,15 @@ depends=('python' 'python-pyqt6' 'qt6-svg')
 source=('x64-hello'
         'x64-toggle-mitigations'
         'x64-waydroid-launcher'
+        'x64-sunshine-launcher'
+        'x64-sunshine.desktop'
         'x64-hello.desktop'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
         'x64-cube.png')
 sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -25,9 +29,11 @@ package() {
     install -Dm755 "${srcdir}/x64-hello" "${pkgdir}/usr/bin/x64-hello"
     install -Dm755 "${srcdir}/x64-toggle-mitigations" "${pkgdir}/usr/bin/x64-toggle-mitigations"
     install -Dm755 "${srcdir}/x64-waydroid-launcher" "${pkgdir}/usr/bin/x64-waydroid-launcher"
+    install -Dm755 "${srcdir}/x64-sunshine-launcher" "${pkgdir}/usr/bin/x64-sunshine-launcher"
     
     # Instalar acceso directo en menú de aplicaciones
     install -Dm644 "${srcdir}/x64-hello.desktop" "${pkgdir}/usr/share/applications/x64-hello.desktop"
+    install -Dm644 "${srcdir}/x64-sunshine.desktop" "${pkgdir}/usr/share/applications/x64-sunshine.desktop"
     
     # Instalar autostart en /etc/skel para que inicie en el primer arranque del usuario instalado
     install -Dm644 "${srcdir}/x64-hello.desktop" "${pkgdir}/etc/skel/.config/autostart/x64-hello.desktop"
