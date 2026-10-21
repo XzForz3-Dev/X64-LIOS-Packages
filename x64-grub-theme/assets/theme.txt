@@ -1,5 +1,5 @@
 # ============================================================
-#  X64 LIOS - GRUB Theme (Cyber-Terminal Compacta)
+#  X64 LIOS - GRUB Theme (Cyber-Terminal HD)
 #  Tarjeta de cristal oscuro centrada (820x480) que contiene
 #  cabecera, menu, cuenta atras y ayuda. Seleccion = barra roja fina.
 #  Fuentes: JetBrains Mono -> PF2 (mono_*.pf2, cargadas en grub.cfg)
@@ -14,10 +14,10 @@ desktop-image: "background.png"
 desktop-image-scale-method: "crop"
 desktop-color: "#000000"
 
-message-font: "X64 Mono Regular 14"
+message-font: "X64 Mono Regular 16"
 message-color: "#cccccc"
 
-terminal-font: "X64 Mono Regular 14"
+terminal-font: "X64 Mono Regular 16"
 terminal-box: "panel_*.png"
 terminal-left: "50%-440"
 terminal-top: "50%-260"
@@ -30,39 +30,39 @@ terminal-border: "0"
     left = 50%-410
     top = 50%-224
     width = 820
-    height = 32
+    height = 34
     align = "center"
     text = "X64 LIOS"
-    font = "X64 Mono Bold 24"
+    font = "X64 Mono Bold 28"
     color = "#ffffff"
 }
 
 + label {
     left = 50%-410
-    top = 50%-186
+    top = 50%-184
     width = 820
     height = 20
     align = "center"
     text = "SISTEMA OPERATIVO  ·  GAMING EDITION"
-    font = "X64 Mono Bold 12"
+    font = "X64 Mono Bold 14"
     color = "#ff3b3b"
 }
 # (linea divisoria roja dibujada en card.png en y = 84)
 
 # ---------- Menu ----------
-# Altura: 7 entradas * (28 + 3) - 3 + 2*6 padding = 226
+# Altura: 7 entradas * (30 + 3) - 3 + 2*6 padding = 240
 + boot_menu {
     left = 50%-390
     top = 50%-146
     width = 780
-    height = 240
+    height = 244
 
-    item_font = "X64 Mono Regular 14"
-    selected_item_font = "X64 Mono Bold 14"
-    item_color = "#a8a8a8"
+    item_font = "X64 Mono Regular 16"
+    selected_item_font = "X64 Mono Bold 16"
+    item_color = "#b0b0b0"
     selected_item_color = "#ffffff"
 
-    item_height = 28
+    item_height = 30
     item_spacing = 3
     item_padding = 6
 
@@ -70,22 +70,20 @@ terminal-border: "0"
     icon_height = 0
     item_icon_space = 8
 
-    # Solo select_w (barra roja de 4px) + select_c (degradado).
-    # Sin piezas n/s: la seleccion no invade las lineas vecinas.
+    # Solo select_w (barra roja de 4px) + select_c (degradado sutil).
     selected_item_pixmap_style = "select_*.png"
     scrollbar = false
 }
 
-# ---------- Cuenta atras ----------
+# ---------- Cuenta atras (Linea laser fina de 3px) ----------
 + progress_bar {
     id = "__timeout__"
     left = 50%-360
     top = 50%+112
     width = 720
-    height = 2
-    fg_color = "#ff2b2b"
-    bg_color = "#262626"
-    border_color = "#262626"
+    height = 3
+    bar_style = "progress_bar_*.png"
+    highlight_style = "progress_highlight_*.png"
     show_text = false
 }
 
