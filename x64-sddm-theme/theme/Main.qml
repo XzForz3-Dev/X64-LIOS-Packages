@@ -15,7 +15,7 @@ Rectangle {
 
   Settings {
       id: sddmSettings
-      category: "X64SddmTheme"
+      fileName: "/var/lib/sddm/.config/x64-sddm-theme.conf"
       property int lastVideoIndex: 0
   }
 
@@ -391,7 +391,7 @@ Rectangle {
                   visible: password.text.length === 0
               }
 
-              Keys.onPressed: {
+              Keys.onPressed: (event) => {
                   if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                       sddm.login(root.currentUser, password.text, root.currentSessionIndex)
                       event.accepted = true
