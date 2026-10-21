@@ -4,6 +4,7 @@
 X64 LIOS Secure Boot & sbctl Assistant
 Graphic utility to create custom cryptographic keys, sign bootloader/kernels,
 and enroll them into UEFI with Microsoft certificates preserved for Windows 11 dual-boot.
+Fully localized for 7 languages: EN, ES, FR, DE, IT, PT, RU.
 """
 
 import sys
@@ -19,7 +20,7 @@ from PyQt6.QtCore import Qt, QProcess, QSize, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont, QColor
 from PyQt6.QtSvg import QSvgRenderer
 
-# Multi-language translations
+# Multi-language translations for 7 languages
 TRANSLATIONS = {
     'en': {
         'title': 'X64 LIOS - Secure Boot Assistant',
@@ -41,14 +42,24 @@ TRANSLATIONS = {
         'step1_desc': 'Create unique PK (Platform Key), KEK (Key Exchange Key) and db (Signature Database) key pairs stored in /var/lib/sbctl/keys.',
         'btn_create_keys': 'Generate X64 Keys',
         'btn_recreate_keys': 'Regenerate Keys',
+        'badge_keys_ready': '✓ Keys ready',
+        'badge_keys_pending': 'Pending',
         'step2_title': 'Step 2: Sign Bootloader & Linux Kernels',
         'step2_desc': 'Digitally sign all detected EFI bootloaders and kernel vmlinuz binaries. Pacman hooks will automatically keep future updates signed.',
         'btn_sign_all': 'Sign All Boot Files',
         'btn_verify': 'Verify Signatures',
+        'badge_signed_all': '✓ {signed}/{total} files signed',
+        'badge_signed_partial': '⚠ {signed}/{total} signed',
+        'badge_signed_none': 'No files analyzed',
         'step3_title': 'Step 3: Enroll Keys to UEFI (with Microsoft Support)',
         'step3_desc': 'Enroll your keys into the motherboard NVRAM with Microsoft keys preserved (-m) for Windows 11, discrete GPUs, and anti-cheats.',
         'btn_enroll_keys': 'Enroll Keys in UEFI',
+        'badge_sb_ready_enroll': 'Ready to enroll (Setup Mode)',
+        'badge_sb_active_ok': '✓ Keys enrolled & active',
+        'badge_sb_legacy': 'Not available in Legacy',
+        'badge_sb_need_setup': 'Requires Setup Mode',
         'btn_bios_guide': 'How to enter Setup Mode in BIOS?',
+        'btn_understood': 'Understood',
         'log_title': 'LIVE OPERATION LOG',
         'btn_clear_log': 'Clear Log',
         'status_loading': 'Querying firmware and cryptographic status...',
@@ -64,7 +75,13 @@ TRANSLATIONS = {
   <li>Save changes and restart (<b>F10</b>), booting back into <b>X64 LIOS</b>.</li>
   <li>Open this Assistant and click <b>"Enroll Keys in UEFI"</b>.</li>
 </ol>
-<p style="color:#10b981;"><b>Note:</b> Your Windows 11 installation and games will remain fully functional because the assistant preserves Microsoft vendor keys.</p>'''
+<p style="color:#10b981;"><b>Note:</b> Your Windows 11 installation and games will remain fully functional because the assistant preserves Microsoft vendor keys.</p>''',
+        'log_querying': '[i] Querying firmware and Secure Boot telemetry...',
+        'log_query_fail': '[!] Failed to query status: {err}',
+        'log_query_error': '[!] Error running helper: {err}',
+        'log_executing': '>>> Executing action: {action}...',
+        'log_success': "✓ Action '{action}' completed successfully.",
+        'log_fail': "[!] Action '{action}' finished with exit code: {code}"
     },
     'es': {
         'title': 'X64 LIOS - Asistente de Secure Boot',
@@ -86,14 +103,24 @@ TRANSLATIONS = {
         'step1_desc': 'Crea el par de claves privadas PK (Platform Key), KEK (Key Exchange Key) y db (Signature Database) únicas para este equipo.',
         'btn_create_keys': 'Generar Claves X64',
         'btn_recreate_keys': 'Regenerar Claves',
+        'badge_keys_ready': '✓ Claves listas',
+        'badge_keys_pending': 'Pendiente',
         'step2_title': 'Paso 2: Firmar Bootloader y Kernels del Sistema',
         'step2_desc': 'Firma digitalmente todos los ejecutables EFI y kernels vmlinuz. Los hooks automáticos de pacman los mantendrán firmados en cada actualización.',
         'btn_sign_all': 'Firmar Todos los Archivos',
         'btn_verify': 'Verificar Firmas',
+        'badge_signed_all': '✓ {signed}/{total} archivos firmados',
+        'badge_signed_partial': '⚠ {signed}/{total} firmados',
+        'badge_signed_none': 'Sin archivos analizados',
         'step3_title': 'Paso 3: Enrolar Claves en UEFI (Con soporte Microsoft)',
         'step3_desc': 'Registra las claves en la NVRAM de la placa base preservando los certificados de Microsoft (-m) para compatibilidad con Windows 11 y anticheats.',
         'btn_enroll_keys': 'Enrolar Claves en UEFI',
+        'badge_sb_ready_enroll': 'Listo para enrolar (Setup Mode)',
+        'badge_sb_active_ok': '✓ Claves enroladas y activo',
+        'badge_sb_legacy': 'No disponible en Legacy',
+        'badge_sb_need_setup': 'Requiere Setup Mode',
         'btn_bios_guide': '¿Cómo activar Setup Mode en la BIOS?',
+        'btn_understood': 'Entendido',
         'log_title': 'REGISTRO DE OPERACIONES EN VIVO',
         'btn_clear_log': 'Limpiar Log',
         'status_loading': 'Consultando telemetría de firmware y claves criptográficas...',
@@ -109,18 +136,365 @@ TRANSLATIONS = {
   <li>Guarda los cambios y reinicia (<b>F10</b>), arrancando nuevamente en <b>X64 LIOS</b>.</li>
   <li>Vuelve a abrir este Asistente y haz clic en <b>"Enrolar Claves en UEFI"</b>.</li>
 </ol>
-<p style="color:#10b981;"><b>Nota:</b> Tu instalación de Windows 11 y tus juegos seguirán funcionando al 100% gracias a que el asistente preserva las claves de Microsoft.</p>'''
+<p style="color:#10b981;"><b>Nota:</b> Tu instalación de Windows 11 y tus juegos seguirán funcionando al 100% gracias a que el asistente preserva las claves de Microsoft.</p>''',
+        'log_querying': '[i] Consultando telemetría de firmware y Secure Boot...',
+        'log_query_fail': '[!] Fallo al consultar estado: {err}',
+        'log_query_error': '[!] Error ejecutando helper: {err}',
+        'log_executing': '>>> Ejecutando acción: {action}...',
+        'log_success': "✓ Acción '{action}' finalizada correctamente.",
+        'log_fail': "[!] Acción '{action}' terminó con código: {code}"
+    },
+    'fr': {
+        'title': 'X64 LIOS - Assistant Secure Boot',
+        'header_title': 'ASSISTANT SECURE BOOT ET CLÉS UEFI',
+        'header_desc': 'Inscrivez des clés cryptographiques dans UEFI tout en conservant les certificats Microsoft pour le dual-boot Windows 11 et les anti-triches (Vanguard / EAC).',
+        'btn_refresh': 'Actualiser',
+        'card_uefi_title': 'MODE FIRMWARE',
+        'card_sb_title': 'SECURE BOOT DANS LE BIOS',
+        'card_keys_title': 'CLÉS CRYPTOGRAPHIQUES',
+        'state_uefi_ok': 'UEFI x86_64',
+        'state_uefi_legacy': 'BIOS Legacy / MBR',
+        'state_sb_setup': 'MODE CONFIGURATION (SETUP)',
+        'state_sb_enabled': 'ACTIVÉ ET PROTÉGÉ',
+        'state_sb_disabled': 'DÉSACTIVÉ',
+        'state_sb_legacy': 'NON COMPATIBLE',
+        'state_keys_ready': 'GÉNÉRÉES ET PRÊTES',
+        'state_keys_missing': 'SANS CLÉS',
+        'step1_title': 'Étape 1 : Générer les Clés Cryptographiques Maîtresses',
+        'step1_desc': 'Créez les paires de clés privées PK, KEK et db uniques pour cette machine dans /var/lib/sbctl/keys.',
+        'btn_create_keys': 'Générer les Clés X64',
+        'btn_recreate_keys': 'Régénérer les Clés',
+        'badge_keys_ready': '✓ Clés prêtes',
+        'badge_keys_pending': 'En attente',
+        'step2_title': 'Étape 2 : Signer Bootloader et Noyaux Linux',
+        'step2_desc': 'Signez numériquement tous les exécutables EFI et noyaux vmlinuz. Les hooks pacman les maintiendront automatiquement signés.',
+        'btn_sign_all': 'Signer Tous les Fichiers',
+        'btn_verify': 'Vérifier Signatures',
+        'badge_signed_all': '✓ {signed}/{total} fichiers signés',
+        'badge_signed_partial': '⚠ {signed}/{total} signés',
+        'badge_signed_none': 'Aucun fichier analysé',
+        'step3_title': 'Étape 3 : Inscrire les Clés dans l\'UEFI (Support Microsoft)',
+        'step3_desc': 'Enregistrez les clés dans la NVRAM en préservant les certificats Microsoft (-m) pour Windows 11 et les anti-triches.',
+        'btn_enroll_keys': 'Enrôler dans l\'UEFI',
+        'badge_sb_ready_enroll': 'Prêt à inscrire (Mode Setup)',
+        'badge_sb_active_ok': '✓ Clés inscrites et actif',
+        'badge_sb_legacy': 'Non disponible en Legacy',
+        'badge_sb_need_setup': 'Nécessite le Mode Setup',
+        'btn_bios_guide': 'Comment activer le Mode Setup dans le BIOS ?',
+        'btn_understood': 'Compris',
+        'log_title': 'JOURNAL DES OPÉRATIONS EN DIRECT',
+        'btn_clear_log': 'Effacer le Journal',
+        'status_loading': 'Interrogation de la télémétrie du firmware...',
+        'not_installed_warn': 'sbctl n\'est pas installé sur ce système. Cliquez pour l\'installer automatiquement.',
+        'btn_install_sbctl': 'Installer sbctl Maintenant',
+        'bios_guide_title': 'Guide du Mode Configuration (Setup Mode) dans le BIOS',
+        'bios_guide_body': '''<h3 style="color:#ff3333;">Comment activer le Mode Configuration (Setup Mode) dans le BIOS/UEFI :</h3>
+<p>Pour inscrire des clés personnalisées pour la première fois, la carte mère doit être en <b>Mode Setup</b>.</p>
+<ol style="line-height: 1.6;">
+  <li>Redémarrez et appuyez sur <b>Suppr</b>, <b>F2</b> ou <b>F12</b> pour entrer dans le BIOS.</li>
+  <li>Allez dans le menu <b>Security</b> ou <b>Boot</b> &rarr; <b>Secure Boot</b>.</li>
+  <li>Sélectionnez <b>"Clear Secure Boot Keys"</b>, <b>"Erase PK"</b> ou changez en mode <i>Custom</i>.</li>
+  <li>Enregistrez (<b>F10</b>) et redémarrez sous <b>X64 LIOS</b>.</li>
+  <li>Ouvrez cet Assistant et cliquez sur <b>"Inscrire les Clés dans l'UEFI"</b>.</li>
+</ol>
+<p style="color:#10b981;"><b>Remarque :</b> Windows 11 et vos jeux continueront de fonctionner car l'assistant préserve les clés Microsoft.</p>''',
+        'log_querying': '[i] Consultation de la télémétrie du firmware et de Secure Boot...',
+        'log_query_fail': '[!] Échec de la requête d\'état : {err}',
+        'log_query_error': '[!] Erreur d\'exécution de l\'assistant : {err}',
+        'log_executing': '>>> Exécution de l\'action : {action}...',
+        'log_success': "✓ Action '{action}' terminée avec succès.",
+        'log_fail': "[!] L'action '{action}' s'est terminée avec le code : {code}"
+    },
+    'de': {
+        'title': 'X64 LIOS - Secure Boot Assistent',
+        'header_title': 'SECURE BOOT & UEFI SCHLÜSSEL-ASSISTENT',
+        'header_desc': 'Registrieren Sie eigene kryptografische Schlüssel im UEFI und behalten Sie Microsoft-Zertifikate für Windows 11 Dual-Boot und Anti-Cheat-Spiele (Vanguard / EAC).',
+        'btn_refresh': 'Aktualisieren',
+        'card_uefi_title': 'FIRMWARE-MODUS',
+        'card_sb_title': 'SECURE BOOT IM BIOS',
+        'card_keys_title': 'KRYPTOGRAFISCHE SCHLÜSSEL',
+        'state_uefi_ok': 'UEFI x86_64',
+        'state_uefi_legacy': 'Legacy BIOS / MBR',
+        'state_sb_setup': 'SETUP-MODUS',
+        'state_sb_enabled': 'AKTIV UND GESCHÜTZT',
+        'state_sb_disabled': 'DEAKTIVIERT',
+        'state_sb_legacy': 'NICHT UNTERSTÜTZT',
+        'state_keys_ready': 'BEREIT & GENERIERT',
+        'state_keys_missing': 'KEINE SCHLÜSSEL',
+        'step1_title': 'Schritt 1: Kryptografische Hauptschlüssel Generieren',
+        'step1_desc': 'Erstellen Sie eindeutige PK-, KEK- und db-Schlüsselpaare für diesen Computer in /var/lib/sbctl/keys.',
+        'btn_create_keys': 'X64-Schlüssel Generieren',
+        'btn_recreate_keys': 'Schlüssel Neu Erstellen',
+        'badge_keys_ready': '✓ Schlüssel bereit',
+        'badge_keys_pending': 'Ausstehend',
+        'step2_title': 'Schritt 2: Bootloader und Linux-Kernel Signieren',
+        'step2_desc': 'Signieren Sie alle EFI-Bootloader und vmlinuz-Kernel digital. Pacman-Hooks halten Updates automatisch signiert.',
+        'btn_sign_all': 'Alle Dateien Signieren',
+        'btn_verify': 'Signaturen Überprüfen',
+        'badge_signed_all': '✓ {signed}/{total} Dateien signiert',
+        'badge_signed_partial': '⚠ {signed}/{total} signiert',
+        'badge_signed_none': 'Keine Dateien analysiert',
+        'step3_title': 'Schritt 3: Schlüssel im UEFI Registrieren (Microsoft-Support)',
+        'step3_desc': 'Tragen Sie die Schlüssel im NVRAM des Mainboards ein und behalten Sie Microsoft-Schlüssel (-m) für Windows 11.',
+        'btn_enroll_keys': 'Im UEFI Registrieren',
+        'badge_sb_ready_enroll': 'Bereit zur Registrierung (Setup-Modus)',
+        'badge_sb_active_ok': '✓ Schlüssel registriert & aktiv',
+        'badge_sb_legacy': 'In Legacy nicht verfügbar',
+        'badge_sb_need_setup': 'Erfordert Setup-Modus',
+        'btn_bios_guide': 'Wie aktiviere ich den Setup-Modus im BIOS?',
+        'btn_understood': 'Verstanden',
+        'log_title': 'LIVE-BETRIEBSPROTOKOLL',
+        'btn_clear_log': 'Protokoll Löschen',
+        'status_loading': 'Firmware- und Secure Boot-Status abfragen...',
+        'not_installed_warn': 'sbctl ist auf diesem System nicht installiert. Klicken Sie hier zur automatischen Installation.',
+        'btn_install_sbctl': 'sbctl Jetzt Installieren',
+        'bios_guide_title': 'Anleitung zum Setup-Modus im BIOS',
+        'bios_guide_body': '''<h3 style="color:#ff3333;">So aktivieren Sie den Setup-Modus im BIOS/UEFI:</h3>
+<p>Um zum ersten Mal eigene Schlüssel einzutragen, muss sich das Mainboard im <b>Setup-Modus</b> befinden.</p>
+<ol style="line-height: 1.6;">
+  <li>Starten Sie den PC neu und drücken Sie <b>Entf</b>, <b>F2</b> oder <b>F12</b>, um das BIOS zu öffnen.</li>
+  <li>Navigieren Sie zu <b>Security</b> oder <b>Boot</b> &rarr; <b>Secure Boot</b>.</li>
+  <li>Wählen Sie <b>"Clear Secure Boot Keys"</b>, <b>"Erase PK"</b> oder wechseln Sie in den <i>Custom</i>-Modus.</li>
+  <li>Speichern Sie mit <b>F10</b> und starten Sie neu in <b>X64 LIOS</b>.</li>
+  <li>Öffnen Sie diesen Assistenten und klicken Sie auf <b>"Schlüssel im UEFI Registrieren"</b>.</li>
+</ol>
+<p style="color:#10b981;"><b>Hinweis:</b> Windows 11 und Ihre Spiele funktionieren weiterhin problemlos, da Microsoft-Schlüssel beibehalten werden.</p>''',
+        'log_querying': '[i] Firmware- und Secure Boot-Telemetrie abfragen...',
+        'log_query_fail': '[!] Statusabfrage fehlgeschlagen: {err}',
+        'log_query_error': '[!] Fehler beim Ausführen des Helpers: {err}',
+        'log_executing': '>>> Aktion ausführen: {action}...',
+        'log_success': "✓ Aktion '{action}' erfolgreich abgeschlossen.",
+        'log_fail': "[!] Aktion '{action}' beendet mit Code: {code}"
+    },
+    'it': {
+        'title': 'X64 LIOS - Assistente Secure Boot',
+        'header_title': 'ASSISTENTE SECURE BOOT E CHIAVI UEFI',
+        'header_desc': 'Registra chiavi personalizzate in UEFI mantenendo attivi i certificati Microsoft per il dual-boot Windows 11 e giochi con anti-cheat (Vanguard / EAC).',
+        'btn_refresh': 'Aggiorna',
+        'card_uefi_title': 'MODO FIRMWARE',
+        'card_sb_title': 'SECURE BOOT NEL BIOS',
+        'card_keys_title': 'CHIAVI CRITTOGRAFICHE',
+        'state_uefi_ok': 'UEFI x86_64',
+        'state_uefi_legacy': 'BIOS Legacy / MBR',
+        'state_sb_setup': 'MODALITÀ SETUP',
+        'state_sb_enabled': 'ATTIVO E PROTETTO',
+        'state_sb_disabled': 'DISATTIVATO',
+        'state_sb_legacy': 'NON SUPPORTATO',
+        'state_keys_ready': 'PRONTE & GENERATE',
+        'state_keys_missing': 'NESSUNA CHIAVE',
+        'step1_title': 'Passo 1: Genera Chiavi Crittografiche Principali',
+        'step1_desc': 'Crea le coppie di chiavi private PK, KEK e db uniche per questo computer in /var/lib/sbctl/keys.',
+        'btn_create_keys': 'Genera Chiavi X64',
+        'btn_recreate_keys': 'Rigenera Chiavi',
+        'badge_keys_ready': '✓ Chiavi pronte',
+        'badge_keys_pending': 'In attesa',
+        'step2_title': 'Passo 2: Firma Bootloader e Kernel Linux',
+        'step2_desc': 'Firma digitalmente tutti i bootloader EFI e i kernel vmlinuz. Gli hook di pacman li manterranno automaticamente firmati.',
+        'btn_sign_all': 'Firma Tutti i File',
+        'btn_verify': 'Verifica Firme',
+        'badge_signed_all': '✓ {signed}/{total} file firmati',
+        'badge_signed_partial': '⚠ {signed}/{total} firmati',
+        'badge_signed_none': 'Nessun file analizzato',
+        'step3_title': 'Passo 3: Registra Chiavi in UEFI (Supporto Microsoft)',
+        'step3_desc': 'Registra le chiavi nella NVRAM preservando i certificati Microsoft (-m) per Windows 11 e anti-cheat.',
+        'btn_enroll_keys': 'Registra Chiavi in UEFI',
+        'badge_sb_ready_enroll': 'Pronto per registrare (Setup Mode)',
+        'badge_sb_active_ok': '✓ Chiavi registrate e attivo',
+        'badge_sb_legacy': 'Non disponibile in Legacy',
+        'badge_sb_need_setup': 'Richiede Setup Mode',
+        'btn_bios_guide': 'Come attivare la Modalità Setup nel BIOS?',
+        'btn_understood': 'Ho capito',
+        'log_title': 'REGISTRO OPERAZIONI IN TEMPO REALE',
+        'btn_clear_log': 'Pulisci Registro',
+        'status_loading': 'Interrogazione telemetria firmware...',
+        'not_installed_warn': 'sbctl non è installato in questo sistema. Fai clic per installarlo automaticamente.',
+        'btn_install_sbctl': 'Installa sbctl Adesso',
+        'bios_guide_title': 'Guida Modalità Setup nel BIOS',
+        'bios_guide_body': '''<h3 style="color:#ff3333;">Come attivare la Modalità Setup nel BIOS/UEFI:</h3>
+<p>Per registrare chiavi personalizzate, la scheda madre deve essere in <b>Modalità Setup</b>.</p>
+<ol style="line-height: 1.6;">
+  <li>Riavvia il computer e premi <b>Canc</b>, <b>F2</b> o <b>F12</b> per accedere al BIOS.</li>
+  <li>Vai al menu <b>Security</b> o <b>Boot</b> &rarr; <b>Secure Boot</b>.</li>
+  <li>Seleziona <b>"Clear Secure Boot Keys"</b>, <b>"Erase PK"</b> o imposta su <i>Custom</i>.</li>
+  <li>Salva con <b>F10</b> e riavvia in <b>X64 LIOS</b>.</li>
+  <li>Apri questo Assistente e fai clic su <b>"Registra Chiavi in UEFI"</b>.</li>
+</ol>
+<p style="color:#10b981;"><b>Nota:</b> Windows 11 e i tuoi giochi continueranno a funzionare regolarmente poiché vengono preservate le chiavi Microsoft.</p>''',
+        'log_querying': '[i] Consultazione telemetria firmware e Secure Boot...',
+        'log_query_fail': '[!] Impossibile consultare lo stato: {err}',
+        'log_query_error': '[!] Errore durante l\'esecuzione dell\'helper: {err}',
+        'log_executing': '>>> Esecuzione azione: {action}...',
+        'log_success': "✓ Azione '{action}' completata con successo.",
+        'log_fail': "[!] L'azione '{action}' è terminata con codice: {code}"
+    },
+    'pt': {
+        'title': 'X64 LIOS - Assistente de Secure Boot',
+        'header_title': 'ASSISTENTE DE SECURE BOOT E CHAVES UEFI',
+        'header_desc': 'Inscreva chaves criptográficas personalizadas no UEFI mantendo ativos os certificados da Microsoft para dual-boot com Windows 11 e anti-cheats (Vanguard / EAC).',
+        'btn_refresh': 'Atualizar',
+        'card_uefi_title': 'MODO DE FIRMWARE',
+        'card_sb_title': 'SECURE BOOT NA BIOS',
+        'card_keys_title': 'CHAVES CRIPTOGRÁFICAS',
+        'state_uefi_ok': 'UEFI x86_64',
+        'state_uefi_legacy': 'BIOS Legacy / MBR',
+        'state_sb_setup': 'MODO SETUP',
+        'state_sb_enabled': 'ATIVADO E PROTEGIDO',
+        'state_sb_disabled': 'DESATIVADO',
+        'state_sb_legacy': 'NÃO SUPORTADO',
+        'state_keys_ready': 'GERADAS E PRONTAS',
+        'state_keys_missing': 'SEM CHAVES',
+        'step1_title': 'Passo 1: Gerar Chaves Criptográficas Mestras',
+        'step1_desc': 'Crie os pares de chaves privadas PK, KEK e db exclusivos para este computador em /var/lib/sbctl/keys.',
+        'btn_create_keys': 'Gerar Chaves X64',
+        'btn_recreate_keys': 'Regenerar Chaves',
+        'badge_keys_ready': '✓ Chaves prontas',
+        'badge_keys_pending': 'Pendente',
+        'step2_title': 'Passo 2: Assinar Bootloader e Kernels Linux',
+        'step2_desc': 'Assine digitalmente todos os executáveis EFI e kernels vmlinuz. Os hooks do pacman manterão as atualizações assinadas automaticamente.',
+        'btn_sign_all': 'Assinar Todos os Arquivos',
+        'btn_verify': 'Verificar Assinaturas',
+        'badge_signed_all': '✓ {signed}/{total} arquivos assinados',
+        'badge_signed_partial': '⚠ {signed}/{total} assinados',
+        'badge_signed_none': 'Nenhum arquivo analisado',
+        'step3_title': 'Passo 3: Inscrever Chaves no UEFI (Suporte Microsoft)',
+        'step3_desc': 'Registre as chaves na NVRAM da placa-mãe preservando os certificados da Microsoft (-m) para o Windows 11 e anti-cheats.',
+        'btn_enroll_keys': 'Inscrever Chaves no UEFI',
+        'badge_sb_ready_enroll': 'Pronto para inscrever (Modo Setup)',
+        'badge_sb_active_ok': '✓ Chaves inscritas e ativo',
+        'badge_sb_legacy': 'Indisponível em Legacy',
+        'badge_sb_need_setup': 'Requer Modo Setup',
+        'btn_bios_guide': 'Como ativar o Modo Setup na BIOS?',
+        'btn_understood': 'Entendido',
+        'log_title': 'REGISTRO DE OPERAÇÕES EM TEMPO REAL',
+        'btn_clear_log': 'Limpar Registro',
+        'status_loading': 'Consultando telemetria de firmware...',
+        'not_installed_warn': 'O sbctl não está instalado neste sistema. Clique para instalar automaticamente.',
+        'btn_install_sbctl': 'Instalar sbctl Agora',
+        'bios_guide_title': 'Guia do Modo Setup na BIOS',
+        'bios_guide_body': '''<h3 style="color:#ff3333;">Como ativar o Modo Setup na BIOS/UEFI:</h3>
+<p>Para inscrever chaves personalizadas pela primeira vez, a placa-mãe precisa estar em <b>Modo Setup</b>.</p>
+<ol style="line-height: 1.6;">
+  <li>Reinicie o computador e pressione <b>Del</b>, <b>F2</b> ou <b>F12</b> para entrar na BIOS.</li>
+  <li>Navegue até o menu <b>Security</b> ou <b>Boot</b> &rarr; <b>Secure Boot</b>.</li>
+  <li>Selecione <b>"Clear Secure Boot Keys"</b>, <b>"Erase PK"</b> ou mude para o modo <i>Custom</i>.</li>
+  <li>Salve com <b>F10</b> e reinicie no <b>X64 LIOS</b>.</li>
+  <li>Abra este Assistente e clique em <b>"Inscrever Chaves no UEFI"</b>.</li>
+</ol>
+<p style="color:#10b981;"><b>Observação:</b> O Windows 11 e seus jogos continuarão funcionando perfeitamente pois as chaves da Microsoft são preservadas.</p>''',
+        'log_querying': '[i] Consultando telemetria de firmware e Secure Boot...',
+        'log_query_fail': '[!] Falha ao consultar estado: {err}',
+        'log_query_error': '[!] Erro ao executar o helper: {err}',
+        'log_executing': '>>> Executando ação: {action}...',
+        'log_success': "✓ Ação '{action}' concluída com sucesso.",
+        'log_fail': "[!] Ação '{action}' finalizada com código: {code}"
+    },
+    'ru': {
+        'title': 'X64 LIOS - Помощник Secure Boot',
+        'header_title': 'ПОМОЩНИК SECURE BOOT И КЛЮЧЕЙ UEFI',
+        'header_desc': 'Регистрация собственных криптографических ключей в UEFI с сохранением сертификатов Microsoft для dual-boot Windows 11 и античитов (Vanguard / EAC).',
+        'btn_refresh': 'Обновить',
+        'card_uefi_title': 'РЕЖИМ ПРОШИВКИ',
+        'card_sb_title': 'SECURE BOOT В BIOS',
+        'card_keys_title': 'КРИПТОГРАФИЧЕСКИЕ КЛЮЧИ',
+        'state_uefi_ok': 'UEFI x86_64',
+        'state_uefi_legacy': 'Legacy BIOS / MBR',
+        'state_sb_setup': 'РЕЖИМ SETUP',
+        'state_sb_enabled': 'АКТИВЕН И ЗАЩИЩЕН',
+        'state_sb_disabled': 'ОТКЛЮЧЕН',
+        'state_sb_legacy': 'НЕ ПОДДЕРЖИВАЕТСЯ',
+        'state_keys_ready': 'ГОТОВЫ И СОЗДАНЫ',
+        'state_keys_missing': 'НЕТ КЛЮЧЕЙ',
+        'step1_title': 'Шаг 1: Создание Мастер-Ключей Безопасности',
+        'step1_desc': 'Создание уникальных закрытых ключей PK, KEK и db для этого ПК в /var/lib/sbctl/keys.',
+        'btn_create_keys': 'Создать Ключи X64',
+        'btn_recreate_keys': 'Пересоздать Ключи',
+        'badge_keys_ready': '✓ Ключи готовы',
+        'badge_keys_pending': 'Ожидание',
+        'step2_title': 'Шаг 2: Подпись Загрузчика и Ядер Linux',
+        'step2_desc': 'Цифровая подпись всех загрузчиков EFI и ядер vmlinuz. Хуки pacman будут автоматически поддерживать подписи при обновлениях.',
+        'btn_sign_all': 'Подписать Все Файлы',
+        'btn_verify': 'Проверить Подписи',
+        'badge_signed_all': '✓ {signed}/{total} файлов подписано',
+        'badge_signed_partial': '⚠ {signed}/{total} подписано',
+        'badge_signed_none': 'Нет проанализированных файлов',
+        'step3_title': 'Шаг 3: Регистрация Ключей в UEFI (Поддержка Microsoft)',
+        'step3_desc': 'Запись ключей в NVRAM материнской платы с сохранением сертификатов Microsoft (-m) для Windows 11 и античитов.',
+        'btn_enroll_keys': 'Записать Ключи в UEFI',
+        'badge_sb_ready_enroll': 'Готово к записи (Режим Setup)',
+        'badge_sb_active_ok': '✓ Ключи записаны и активны',
+        'badge_sb_legacy': 'Недоступно в Legacy',
+        'badge_sb_need_setup': 'Требуется Режим Setup',
+        'btn_bios_guide': 'Как включить Режим Setup в BIOS?',
+        'btn_understood': 'Понятно',
+        'log_title': 'ЖУРНАЛ ОПЕРАЦИЙ В РЕАЛЬНОМ ВРЕМЕНИ',
+        'btn_clear_log': 'Очистить Журнал',
+        'status_loading': 'Запрос телеметрии прошивки...',
+        'not_installed_warn': 'sbctl не установлен в системе. Нажмите для автоматической установки.',
+        'btn_install_sbctl': 'Установить sbctl Сейчас',
+        'bios_guide_title': 'Инструкция по Режиму Setup в BIOS',
+        'bios_guide_body': '''<h3 style="color:#ff3333;">Как включить Режим Setup в BIOS/UEFI:</h3>
+<p>Для первой записи собственных ключей материнская плата должна находиться в <b>Режиме Setup</b>.</p>
+<ol style="line-height: 1.6;">
+  <li>Перезагрузите ПК и нажмите <b>Del</b>, <b>F2</b> или <b>F12</b> для входа в BIOS.</li>
+  <li>Перейдите в меню <b>Security</b> или <b>Boot</b> &rarr; <b>Secure Boot</b>.</li>
+  <li>Выберите <b>"Clear Secure Boot Keys"</b>, <b>"Erase PK"</b> или переключите в режим <i>Custom</i>.</li>
+  <li>Сохраните настройки (<b>F10</b>) и загрузитесь в <b>X64 LIOS</b>.</li>
+  <li>Откройте этого Помощника и нажмите <b>"Записать Ключи в UEFI"</b>.</li>
+</ol>
+<p style="color:#10b981;"><b>Примечание:</b> Windows 11 и ваши игры продолжат работать нормально, так как сертификаты Microsoft сохраняются.</p>''',
+        'log_querying': '[i] Запрос телеметрии прошивки и Secure Boot...',
+        'log_query_fail': '[!] Не удалось запросить статус: {err}',
+        'log_query_error': '[!] Ошибка выполнения помощника: {err}',
+        'log_executing': '>>> Выполнение действия: {action}...',
+        'log_success': "✓ Действие '{action}' успешно завершено.",
+        'log_fail': "[!] Действие '{action}' завершилось с кодом: {code}"
     }
 }
 
 def detect_language():
-    lang = os.environ.get('LANG', 'es').split('_')[0].lower()
-    return lang if lang in TRANSLATIONS else 'es'
+    # 1. Check CLI argument --lang <code>
+    if '--lang' in sys.argv:
+        try:
+            idx = sys.argv.index('--lang')
+            code = sys.argv[idx + 1].lower()
+            if code in TRANSLATIONS:
+                return code
+        except Exception:
+            pass
+
+    # 2. Check X64_LANG environment variable
+    if 'X64_LANG' in os.environ:
+        code = os.environ['X64_LANG'].lower().strip()
+        if code in TRANSLATIONS:
+            return code
+
+    # 3. Check ~/.config/x64-hello/lang.conf
+    try:
+        cfg = os.path.expanduser('~/.config/x64-hello/lang.conf')
+        if os.path.exists(cfg):
+            with open(cfg, 'r', encoding='utf-8') as f:
+                code = f.read().strip().lower()
+                if code in TRANSLATIONS:
+                    return code
+    except Exception:
+        pass
+
+    # 4. Check system locale (LANG, LC_ALL, LC_MESSAGES)
+    for env_var in ('LC_ALL', 'LC_MESSAGES', 'LANG'):
+        raw = os.environ.get(env_var, '')
+        if raw:
+            code = raw.split('.')[0].split('_')[0].lower()
+            if code in TRANSLATIONS:
+                return code
+
+    # 5. Default fallback to English
+    return 'en'
 
 CURRENT_LANG = detect_language()
 
 def tr(key):
-    return TRANSLATIONS.get(CURRENT_LANG, TRANSLATIONS['es']).get(key, key)
+    lang_dict = TRANSLATIONS.get(CURRENT_LANG, TRANSLATIONS['en'])
+    return lang_dict.get(key, TRANSLATIONS['en'].get(key, key))
 
 SVG_ICONS = {
     'shield': '''<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="#ff3333" fill-opacity="0.18"/><rect x="9" y="11" width="6" height="5" rx="1" fill="#ffffff" stroke="#ffffff"/><path d="M10 11V9a2 2 0 1 1 4 0v2" stroke="#ffffff" stroke-width="1.8"/><circle cx="12" cy="13.5" r="0.8" fill="#ff3333"/></svg>''',
@@ -176,7 +550,7 @@ class BiosGuideDialog(QDialog):
         browser.setHtml(tr('bios_guide_body'))
         layout.addWidget(browser)
 
-        btn_close = QPushButton("Entendido")
+        btn_close = QPushButton(tr('btn_understood'))
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -268,7 +642,7 @@ class StepCard(QFrame):
                 border: none;
                 border-radius: 6px;
                 padding: 8px 16px;
-                min-width: 140px;
+                min-width: 165px;
             }
             QPushButton:hover {
                 background: #ff1a1a;
@@ -297,7 +671,7 @@ class StepCard(QFrame):
                     border: none;
                     border-radius: 6px;
                     padding: 8px 16px;
-                    min-width: 140px;
+                    min-width: 165px;
                 }
                 QPushButton:hover {
                     background: #059669;
@@ -313,7 +687,7 @@ class StepCard(QFrame):
                     border: none;
                     border-radius: 6px;
                     padding: 8px 16px;
-                    min-width: 140px;
+                    min-width: 165px;
                 }
                 QPushButton:hover {
                     background: #ff1a1a;
@@ -324,7 +698,7 @@ class X64SecureBootWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(tr('title'))
-        self.resize(860, 720)
+        self.resize(900, 720)
         self.setWindowIcon(QIcon(render_svg('shield', 64)))
         self.setStyleSheet("""
             QMainWindow {
@@ -505,7 +879,7 @@ class X64SecureBootWindow(QMainWindow):
         dlg.exec()
 
     def refresh_status(self):
-        self.log("[i] Consultando telemetría de firmware y Secure Boot...")
+        self.log(tr('log_querying'))
         cmd = [self.helper_path, "status"]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -513,9 +887,9 @@ class X64SecureBootWindow(QMainWindow):
                 data = json.loads(res.stdout)
                 self.update_telemetry(data)
             else:
-                self.log(f"[!] Fallo al consultar estado: {res.stderr}")
+                self.log(tr('log_query_fail').format(err=res.stderr.strip()))
         except Exception as e:
-            self.log(f"[!] Error ejecutando helper: {e}")
+            self.log(tr('log_query_error').format(err=str(e)))
 
     def update_telemetry(self, data):
         # 1. Firmware Mode
@@ -535,42 +909,42 @@ class X64SecureBootWindow(QMainWindow):
         keys_ok = data.get('keys_created', False)
         if keys_ok:
             self.card_keys.set_value(tr('state_keys_ready'), '#10b981')
-            self.step1.set_badge("✓ Claves listas", True)
+            self.step1.set_badge(tr('badge_keys_ready'), True)
             self.step1.action_btn.setText(tr('btn_recreate_keys'))
         else:
             self.card_keys.set_value(tr('state_keys_missing'), '#f59e0b')
-            self.step1.set_badge("Pendiente", False)
+            self.step1.set_badge(tr('badge_keys_pending'), False)
             self.step1.action_btn.setText(tr('btn_create_keys'))
 
         # 4. Signed Files
         total = data.get('total_files', 0)
         signed = data.get('signed_files', 0)
         if total > 0 and signed == total:
-            self.step2.set_badge(f"✓ {signed}/{total} archivos firmados", True)
+            self.step2.set_badge(tr('badge_signed_all').format(signed=signed, total=total), True)
         elif total > 0:
-            self.step2.set_badge(f"⚠ {signed}/{total} firmados", False)
+            self.step2.set_badge(tr('badge_signed_partial').format(signed=signed, total=total), False)
         else:
-            self.step2.set_badge("Sin archivos analizados", False)
+            self.step2.set_badge(tr('badge_signed_none'), False)
 
         # 5. BIOS Secure Boot State
         sb_state = data.get('secure_boot_state', 'disabled')
         if sb_state == 'setup_mode':
             self.card_sb.set_value(tr('state_sb_setup'), '#f59e0b')
-            self.step3.set_badge("Listo para enrolar (Setup Mode)", True)
+            self.step3.set_badge(tr('badge_sb_ready_enroll'), True)
             self.step3.set_button_style("success")
         elif sb_state == 'enabled':
             self.card_sb.set_value(tr('state_sb_enabled'), '#10b981')
-            self.step3.set_badge("✓ Claves enroladas y activo", True)
+            self.step3.set_badge(tr('badge_sb_active_ok'), True)
             self.step3.set_button_style("success")
         elif sb_state == 'legacy':
             self.card_sb.set_value(tr('state_sb_legacy'), '#888899')
-            self.step3.set_badge("No disponible en Legacy", False)
+            self.step3.set_badge(tr('badge_sb_legacy'), False)
         else:
             self.card_sb.set_value(tr('state_sb_disabled'), '#ef4444')
-            self.step3.set_badge("Requiere Setup Mode", False)
+            self.step3.set_badge(tr('badge_sb_need_setup'), False)
 
     def run_action(self, action_name):
-        self.log(f"\n>>> Ejecutando acción: {action_name}...")
+        self.log(f"\n{tr('log_executing').format(action=action_name)}")
         self.set_buttons_enabled(False)
 
         self.proc = QProcess(self)
@@ -592,9 +966,9 @@ class X64SecureBootWindow(QMainWindow):
     def on_finished(self, exit_code, action_name):
         self.set_buttons_enabled(True)
         if exit_code == 0:
-            self.log(f"✓ Acción '{action_name}' finalizada correctamente.")
+            self.log(tr('log_success').format(action=action_name))
         else:
-            self.log(f"[!] Acción '{action_name}' terminó con código: {exit_code}")
+            self.log(tr('log_fail').format(action=action_name, code=exit_code))
         self.refresh_status()
 
     def set_buttons_enabled(self, enabled):

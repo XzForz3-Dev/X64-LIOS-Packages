@@ -11,3 +11,4 @@ Terminal=false
 Type=Application
 Categories=System;Security;Settings;
 StartupNotify=true
+

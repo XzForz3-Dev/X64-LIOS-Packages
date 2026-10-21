@@ -4459,7 +4459,10 @@ class SecureBootCard(QFrame):
     def _launch(self):
         try:
             import subprocess
-            subprocess.Popen(["x64-secureboot"], preexec_fn=os.setsid)
+            cmd = ["x64-secureboot"]
+            if _lang_code:
+                cmd.extend(["--lang", _lang_code])
+            subprocess.Popen(cmd, preexec_fn=os.setsid)
         except Exception:
             pass
 
@@ -6825,7 +6828,7 @@ if __name__ == '__main__':
     hello.show()
     if "--scheduler" in sys.argv:
         hello.change_page(1)
-    elif "--dns" in sys.argv:
+    elif "--dns" in sys.argv or "--security" in sys.argv or "--secureboot" in sys.argv:
         hello.change_page(2)
     elif "--gaming" in sys.argv:
         hello.change_page(4)

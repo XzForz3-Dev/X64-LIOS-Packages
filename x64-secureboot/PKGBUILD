@@ -1,6 +1,6 @@
 pkgname=x64-secureboot
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="X64 LIOS Graphical Secure Boot & sbctl Key Manager Assistant"
 arch=('any')
 license=('GPL')
@@ -31,3 +31,4 @@ package() {
     # Instalar política de Polkit
     install -Dm644 "${srcdir}/org.x64.secureboot.policy" "${pkgdir}/usr/share/polkit-1/actions/org.x64.secureboot.policy"
 }
+
