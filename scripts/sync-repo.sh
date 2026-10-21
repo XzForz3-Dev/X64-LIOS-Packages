@@ -23,3 +23,4 @@ cd "$REPO_DIR"
 rsync -avzP --delete "${REPO_DIR}/" x64vps:/var/www/x64-repo/x86_64/
 
 echo "✅ [COMPLETADO] Repositorio de X64 LIOS sincronizado y en paridad al 100% en https://repo.x64lios.com/x86_64/"
+

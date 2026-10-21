@@ -1,6 +1,6 @@
 # ============================================================
-#  X64 LIOS - GRUB Theme
-#  Tarjeta de cristal oscuro centrada (760x560) que contiene
+#  X64 LIOS - GRUB Theme (Cyber-Terminal Compacta)
+#  Tarjeta de cristal oscuro centrada (820x480) que contiene
 #  cabecera, menu, cuenta atras y ayuda. Seleccion = barra roja fina.
 #  Fuentes: JetBrains Mono -> PF2 (mono_*.pf2, cargadas en grub.cfg)
 #
@@ -14,61 +14,61 @@ desktop-image: "background.png"
 desktop-image-scale-method: "crop"
 desktop-color: "#000000"
 
-message-font: "X64 Mono Regular 16"
+message-font: "X64 Mono Regular 14"
 message-color: "#cccccc"
 
-terminal-font: "X64 Mono Regular 16"
+terminal-font: "X64 Mono Regular 14"
 terminal-box: "panel_*.png"
-terminal-left: "50%-480"
-terminal-top: "50%-300"
-terminal-width: "960"
-terminal-height: "600"
+terminal-left: "50%-440"
+terminal-top: "50%-260"
+terminal-width: "880"
+terminal-height: "520"
 terminal-border: "0"
 
 # ---------- Cabecera ----------
 + label {
-    left = 50%-380
-    top = 50%-252
-    width = 760
-    height = 48
+    left = 50%-410
+    top = 50%-224
+    width = 820
+    height = 32
     align = "center"
     text = "X64 LIOS"
-    font = "X64 Mono Bold 40"
+    font = "X64 Mono Bold 24"
     color = "#ffffff"
 }
 
 + label {
-    left = 50%-380
-    top = 50%-198
-    width = 760
-    height = 24
+    left = 50%-410
+    top = 50%-186
+    width = 820
+    height = 20
     align = "center"
     text = "SISTEMA OPERATIVO  ·  GAMING EDITION"
-    font = "X64 Mono Bold 18"
+    font = "X64 Mono Bold 12"
     color = "#ff3b3b"
 }
-# (linea divisoria roja dibujada en card.png en y = 118)
+# (linea divisoria roja dibujada en card.png en y = 84)
 
 # ---------- Menu ----------
-# Altura: 6 entradas UEFI * (38 + 4) - 4 + 2*8 padding = 264
+# Altura: 7 entradas * (28 + 3) - 3 + 2*6 padding = 226
 + boot_menu {
-    left = 50%-360
-    top = 50%-138
-    width = 720
-    height = 268
+    left = 50%-390
+    top = 50%-146
+    width = 780
+    height = 240
 
-    item_font = "X64 Mono Regular 20"
-    selected_item_font = "X64 Mono Bold 20"
+    item_font = "X64 Mono Regular 14"
+    selected_item_font = "X64 Mono Bold 14"
     item_color = "#a8a8a8"
     selected_item_color = "#ffffff"
 
-    item_height = 38
-    item_spacing = 4
-    item_padding = 8
+    item_height = 28
+    item_spacing = 3
+    item_padding = 6
 
     icon_width = 0
     icon_height = 0
-    item_icon_space = 14
+    item_icon_space = 8
 
     # Solo select_w (barra roja de 4px) + select_c (degradado).
     # Sin piezas n/s: la seleccion no invade las lineas vecinas.
@@ -79,10 +79,10 @@ terminal-border: "0"
 # ---------- Cuenta atras ----------
 + progress_bar {
     id = "__timeout__"
-    left = 50%-340
-    top = 50%+160
-    width = 680
-    height = 3
+    left = 50%-360
+    top = 50%+112
+    width = 720
+    height = 2
     fg_color = "#ff2b2b"
     bg_color = "#262626"
     border_color = "#262626"
@@ -91,33 +91,33 @@ terminal-border: "0"
 
 + label {
     id = "__timeout__"
-    left = 50%-380
-    top = 50%+174
-    width = 760
-    height = 22
+    left = 50%-410
+    top = 50%+122
+    width = 820
+    height = 18
     align = "center"
     text = "Arranque automático en %d s"
-    font = "X64 Mono Regular 16"
-    color = "#9a9a9a"
+    font = "X64 Mono Regular 12"
+    color = "#888888"
 }
 
 # ---------- Ayuda ----------
 + label {
-    left = 50%-380
-    top = 50%+228
-    width = 760
-    height = 22
+    left = 50%-410
+    top = 50%+170
+    width = 820
+    height = 18
     align = "center"
     text = "↑↓ Navegar   •   Enter Arrancar   •   E Editar   •   C Consola"
-    font = "X64 Mono Regular 16"
-    color = "#6f6f6f"
+    font = "X64 Mono Regular 12"
+    color = "#666666"
 }
 
 # ---------- Tarjeta (CAPA DE FONDO: debe ir la ultima) ----------
 + image {
-    left = 50%-380
-    top = 50%-280
-    width = 760
-    height = 560
+    left = 50%-410
+    top = 50%-240
+    width = 820
+    height = 480
     file = "card.png"
 }

@@ -26,15 +26,12 @@ fi
 
 echo "📦 [1/5] Compilando ${PKG_TARGET}..."
 cd "$PKG_DIR"
+
+# Obtener nombre exacto del paquete que generará makepkg
+TARGET_PKG_PATH=$(makepkg --packagelist | head -n 1)
+BUILT_PKG=$(basename "$TARGET_PKG_PATH")
+
 makepkg -d -f
-
-# Localizar el paquete recién compilado
-BUILT_PKG=$(find . -maxdepth 1 -name "${PKG_TARGET}-*.pkg.tar.zst" -printf "%f\n" | head -n 1)
-
-if [ -z "$BUILT_PKG" ]; then
-    # Manejar paquetes con pkgname diferente a la carpeta (ej. calamares)
-    BUILT_PKG=$(find . -maxdepth 1 -name "*.pkg.tar.zst" -printf "%f\n" | head -n 1)
-fi
 
 if [ -z "$BUILT_PKG" ]; then
     echo "❌ [ERROR] No se encontró el binario .pkg.tar.zst generado para ${PKG_TARGET}."
@@ -64,3 +61,4 @@ echo "🚀 [5/5] Sincronizando con el servidor de producción VPS..."
 rsync -avzP --delete "${REPO_DIR}/" x64vps:/var/www/x64-repo/x86_64/
 
 echo "🎉 [ÉXITO TOTAL] '${PKG_TARGET}' desplegado, auditado y activo en https://repo.x64lios.com/x86_64/"
+

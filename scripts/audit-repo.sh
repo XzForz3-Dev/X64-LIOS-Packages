@@ -59,3 +59,4 @@ else
     echo "⚠️ [ALERTA] Se encontraron $DESYNC_COUNT paquetes desincronizados de $TOTAL_COUNT."
     exit 1
 fi
+
