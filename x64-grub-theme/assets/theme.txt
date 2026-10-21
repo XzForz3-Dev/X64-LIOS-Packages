@@ -59,7 +59,7 @@ terminal-border: "0"
 
     item_font = "X64 Mono Regular 16"
     selected_item_font = "X64 Mono Bold 16"
-    item_color = "#b0b0b0"
+    item_color = "#8a8a92"
     selected_item_color = "#ffffff"
 
     item_height = 30
@@ -70,21 +70,22 @@ terminal-border: "0"
     icon_height = 0
     item_icon_space = 8
 
-    # Solo select_w (barra roja de 4px) + select_c (degradado sutil).
+    # Selector: barra roja de 4px al extremo izquierdo con sutil tinte oscuro (9-slice completa)
     selected_item_pixmap_style = "select_*.png"
     scrollbar = false
 }
 
-# ---------- Cuenta atras (Linea laser fina de 3px) ----------
+# ---------- Cuenta atras (Linea laser fina de 2px nativa) ----------
 + progress_bar {
     id = "__timeout__"
     left = 50%-360
     top = 50%+112
     width = 720
-    height = 3
-    bar_style = "progress_bar_*.png"
-    highlight_style = "progress_highlight_*.png"
+    height = 2
     show_text = false
+    fg_color = "#ff2b2b"
+    bg_color = "#202024"
+    border_color = "#202024"
 }
 
 + label {
