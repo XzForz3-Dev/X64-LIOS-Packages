@@ -37,6 +37,66 @@ Rectangle {
       "SYNTHWAVE"
   ]
   property int currentVideoIndex: 0
+
+  property string kernelInfo: "Linux (x86_64)"
+  property string cpuInfo: "x86-64-v3 CPU"
+  property string ramInfo: "3.8 GiB"
+  property string uptimeInfo: "0m"
+
+  function readSysFile(path, callback) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path, true);
+      xhr.onreadystatechange = function() {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+              if (xhr.status === 200 || xhr.status === 0) {
+                  callback(xhr.responseText);
+              }
+          }
+      };
+      xhr.send();
+  }
+
+  function updateSysInfo() {
+      // 1. Kernel
+      readSysFile("file:///proc/sys/kernel/osrelease", function(data) {
+          var v = data.trim().replace(/-cachyos/gi, "-x64").replace(/cachyos/gi, "x64");
+          if (v !== "") root.kernelInfo = v;
+      });
+
+      // 2. CPU
+      readSysFile("file:///proc/cpuinfo", function(data) {
+          var m = data.match(/model name\s*:\s*([^\n\r]+)/);
+          if (m && m[1]) {
+              var c = m[1].replace(/\(R\)|\(TM\)|CPU|Processor|@.*/g, "").trim().replace(/\s+/g, " ");
+              var cores = (data.match(/^processor/gm) || []).length;
+              root.cpuInfo = c + (cores > 0 ? " (" + cores + "T)" : "");
+          }
+      });
+
+      // 3. RAM
+      readSysFile("file:///proc/meminfo", function(data) {
+          var mt = data.match(/MemTotal:\s*(\d+)/);
+          var ma = data.match(/MemAvailable:\s*(\d+)/);
+          if (mt && ma) {
+              var tot = parseInt(mt[1]);
+              var av = parseInt(ma[1]);
+              var usedGib = ((tot - av) / 1048576).toFixed(1);
+              var totGib = (tot / 1048576).toFixed(1);
+              root.ramInfo = usedGib + " / " + totGib + " GiB";
+          }
+      });
+
+      // 4. Uptime
+      readSysFile("file:///proc/uptime", function(data) {
+          var parts = data.trim().split(" ");
+          if (parts.length > 0) {
+              var sec = parseFloat(parts[0]);
+              var h = Math.floor(sec / 3600);
+              var m = Math.floor((sec % 3600) / 60);
+              root.uptimeInfo = (h > 0 ? (h + "h " + m + "m") : (m + "m"));
+          }
+      });
+  }
   
   ListView {
       id: sessionList
@@ -214,8 +274,8 @@ Rectangle {
       
       // Fastfetch System Info Widget
       Rectangle {
-          width: 320
-          height: sysCol.implicitHeight + 40
+          width: 350
+          height: sysCol.implicitHeight + 36
           color: "#0a0a10"
           border.color: "#333344"
           border.width: 1
@@ -226,54 +286,58 @@ Rectangle {
           Column {
               id: sysCol
               anchors.centerIn: parent
-              spacing: 14
+              spacing: 12
               
               // --- SYSTEM INFO ---
-              Text { text: "SYSTEM INFO"; color: "#555566"; font.pixelSize: 12; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.horizontalCenter: parent.horizontalCenter }
+              Text { text: "SYSTEM INFO"; color: "#555566"; font.pixelSize: 11; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; font.letterSpacing: 2; anchors.horizontalCenter: parent.horizontalCenter }
               
+              // 1. OS
               Row {
                   spacing: 12
                   Text { width: 22; text: ""; color: "#00f0ff"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "OS: X64 LIOS Linux"; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "OS: X64 LIOS Linux"; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 2. Host
               Row {
                   spacing: 12
                   Text { width: 22; text: "󰒋"; color: "#00ffcc"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "Host: " + ((typeof sddm !== "undefined" && sddm.hostName && sddm.hostName !== "") ? sddm.hostName : "x64-machine"); color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "Host: " + ((typeof sddm !== "undefined" && sddm.hostName && sddm.hostName !== "") ? sddm.hostName : "x64-machine"); color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 3. Kernel
               Row {
                   spacing: 12
                   Text { width: 22; text: "󰌽"; color: "#ff007f"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text {
-                      id: kernelText
-                      text: "Kernel: Linux (x86_64)"
-                      color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter
-                  }
+                  Text { text: "Kernel: " + root.kernelInfo; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 4. Uptime
               Row {
                   spacing: 12
-                  Text { width: 22; text: "󰧨"; color: "#7000ff"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "WM: KWin (Wayland)"; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { width: 22; text: "󰔛"; color: "#ffaa00"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "Uptime: " + root.uptimeInfo; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 5. CPU
               Row {
                   spacing: 12
-                  Text { width: 22; text: "󰞷"; color: "#ffaa00"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "DE: KDE Plasma 6"; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { width: 22; text: "󰍛"; color: "#bd93f9"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "CPU: " + root.cpuInfo; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 6. RAM
               Row {
                   spacing: 12
-                  Text { width: 22; text: "󰍹"; color: "#00ffcc"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "Res: " + root.width + "x" + root.height; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { width: 22; text: "󰘚"; color: "#50fa7b"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "RAM: " + root.ramInfo; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 7. Desktop / Session
               Row {
                   spacing: 12
-                  Text { width: 22; text: "󰏘"; color: "#00f0ff"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "Theme: X64 Cyberpunk Video"; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { width: 22; text: "󰞷"; color: "#ff79c6"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "DE: " + (root.currentSessionName !== "" ? root.currentSessionName : "KDE Plasma 6"); color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
+              // 8. Res
               Row {
                   spacing: 12
-                  Text { width: 22; text: "󰛖"; color: "#ff007f"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
-                  Text { text: "Font: JetBrainsMono NF"; color: "#ffffff"; font.pixelSize: 15; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
+                  Text { width: 22; text: "󰍹"; color: "#8be9fd"; font.pixelSize: 18; font.family: "JetBrainsMono Nerd Font"; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                  Text { text: "Res: " + root.width + "x" + root.height; color: "#ffffff"; font.pixelSize: 14; font.family: "JetBrainsMono Nerd Font"; font.weight: Font.Bold; anchors.verticalCenter: parent.verticalCenter }
               }
           }
       }
@@ -494,5 +558,15 @@ Rectangle {
       }
   }
 
-  Component.onCompleted: password.forceActiveFocus()
+  Component.onCompleted: {
+      password.forceActiveFocus()
+      root.updateSysInfo()
+  }
+
+  Timer {
+      interval: 10000
+      running: true
+      repeat: true
+      onTriggered: root.updateSysInfo()
+  }
 }
