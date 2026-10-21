@@ -1,7 +1,6 @@
 import QtQuick 2.15
 import SddmComponents 2.0
 import QtMultimedia
-import QtCore
 
 Rectangle {
   id: root
@@ -13,23 +12,17 @@ Rectangle {
       GradientStop { position: 1.0; color: "#12101c" }
   }
 
-  Settings {
-      id: sddmSettings
-      fileName: "/var/lib/sddm/.config/x64-sddm-theme.conf"
-      property int lastVideoIndex: 0
-  }
-
   property var videos: [
-      "videos/background.mp4",
-      "videos/matrix.mp4",
-      "videos/hexagons.mp4",
-      "videos/galaxy.mp4",
-      "videos/particles.mp4",
-      "videos/fluid.mp4",
-      "videos/glass.mp4",
-      "videos/binary.mp4",
-      "videos/radar.mp4",
-      "videos/synthwave.mp4"
+      Qt.resolvedUrl("videos/background.mp4"),
+      Qt.resolvedUrl("videos/matrix.mp4"),
+      Qt.resolvedUrl("videos/hexagons.mp4"),
+      Qt.resolvedUrl("videos/galaxy.mp4"),
+      Qt.resolvedUrl("videos/particles.mp4"),
+      Qt.resolvedUrl("videos/fluid.mp4"),
+      Qt.resolvedUrl("videos/glass.mp4"),
+      Qt.resolvedUrl("videos/binary.mp4"),
+      Qt.resolvedUrl("videos/radar.mp4"),
+      Qt.resolvedUrl("videos/synthwave.mp4")
   ]
   property var videoNames: [
       "CYBER GRID",
@@ -43,8 +36,7 @@ Rectangle {
       "RADAR SCAN",
       "SYNTHWAVE"
   ]
-  property int currentVideoIndex: (sddmSettings.lastVideoIndex >= 0 && sddmSettings.lastVideoIndex < 10) ? sddmSettings.lastVideoIndex : 0
-  onCurrentVideoIndexChanged: sddmSettings.lastVideoIndex = currentVideoIndex
+  property int currentVideoIndex: 0
   
   ListView {
       id: sessionList
@@ -98,9 +90,16 @@ Rectangle {
       id: bgVideo
       source: root.videos[root.currentVideoIndex]
       loops: MediaPlayer.Infinite
-      autoPlay: true
       videoOutput: videoOutput
       audioOutput: AudioOutput { muted: true }
+
+      onSourceChanged: bgVideo.play()
+      onMediaStatusChanged: {
+          if (mediaStatus === MediaPlayer.LoadedMedia && playbackState !== MediaPlayer.PlayingState) {
+              bgVideo.play()
+          }
+      }
+      Component.onCompleted: bgVideo.play()
   }
 
   VideoOutput {
@@ -137,7 +136,10 @@ Rectangle {
                   id: leftArrowMouse
                   anchors.fill: parent; anchors.margins: -10
                   hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                  onClicked: root.currentVideoIndex = (root.currentVideoIndex - 1 + root.videos.length) % root.videos.length
+                  onClicked: {
+                      root.currentVideoIndex = (root.currentVideoIndex - 1 + root.videos.length) % root.videos.length
+                      bgVideo.play()
+                  }
               }
           }
 
@@ -160,7 +162,10 @@ Rectangle {
                   id: rightArrowMouse
                   anchors.fill: parent; anchors.margins: -10
                   hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                  onClicked: root.currentVideoIndex = (root.currentVideoIndex + 1) % root.videos.length
+                  onClicked: {
+                      root.currentVideoIndex = (root.currentVideoIndex + 1) % root.videos.length
+                      bgVideo.play()
+                  }
               }
           }
       }
