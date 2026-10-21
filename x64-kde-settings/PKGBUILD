@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -15,8 +15,11 @@ source=('x64-lios-v2.jpg'
         'kdeglobals'
         'kwinrc'
         'gtk3-settings.ini'
-        'gtk4-settings.ini')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'gtk4-settings.ini'
+        'baloofilerc'
+        'org.kde.discover.notifier.desktop'
+        'org.kde.kdeconnect.daemon.desktop')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar fondos de pantalla
@@ -45,6 +48,16 @@ package() {
     cp "${srcdir}/kwinrc" "${pkgdir}/etc/skel/.config/kdedefaults/kwinrc"
     cp "${srcdir}/gtk3-settings.ini" "${pkgdir}/etc/skel/.config/gtk-3.0/settings.ini"
     cp "${srcdir}/gtk4-settings.ini" "${pkgdir}/etc/skel/.config/gtk-4.0/settings.ini"
+
+    # Desactivar indexador Baloo (cero sobrecarga de disco/CPU para gaming)
+    cp "${srcdir}/baloofilerc" "${pkgdir}/etc/skel/.config/baloofilerc"
+    mkdir -p "${pkgdir}/etc/xdg"
+    cp "${srcdir}/baloofilerc" "${pkgdir}/etc/xdg/baloofilerc"
+
+    # Desactivar demonios de fondo redundantes en autostart (DiscoverNotifier y KDE Connect)
+    mkdir -p "${pkgdir}/etc/skel/.config/autostart"
+    cp "${srcdir}/org.kde.discover.notifier.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.discover.notifier.desktop"
+    cp "${srcdir}/org.kde.kdeconnect.daemon.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop"
 
     # Crear script de auto-arranque para forzar el tema oscuro y el wallpaper v3 en KDE
     mkdir -p "${pkgdir}/etc/xdg/autostart"
