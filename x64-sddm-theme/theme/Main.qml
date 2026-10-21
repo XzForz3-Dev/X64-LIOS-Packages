@@ -38,9 +38,9 @@ Rectangle {
   ]
   property int currentVideoIndex: 0
 
-  property string kernelInfo: "Linux (x86_64)"
+  property string kernelInfo: "Linux"
   property string cpuInfo: "x86-64-v3 CPU"
-  property string ramInfo: "3.8 GiB"
+  property string ramInfo: "... MiB"
   property string uptimeInfo: "0m"
 
   function readSysFile(path, callback) {
@@ -59,7 +59,7 @@ Rectangle {
   function updateStaticSysInfo() {
       // 1. Kernel (una sola vez)
       readSysFile("file:///proc/sys/kernel/osrelease", function(data) {
-          var v = data.trim().replace(/-cachyos/gi, "-x64").replace(/cachyos/gi, "x64");
+          var v = data.trim().replace(/-(cachyos|x64).*/gi, "");
           if (v !== "") root.kernelInfo = v;
       });
 
@@ -75,16 +75,16 @@ Rectangle {
   }
 
   function updateDynamicSysInfo() {
-      // 3. RAM (tiempo real a cada segundo)
+      // 3. RAM (tiempo real a cada segundo en MiB exactos)
       readSysFile("file:///proc/meminfo", function(data) {
           var mt = data.match(/MemTotal:\s*(\d+)/);
           var ma = data.match(/MemAvailable:\s*(\d+)/);
           if (mt && ma) {
               var tot = parseInt(mt[1]);
               var av = parseInt(ma[1]);
-              var usedGib = ((tot - av) / 1048576).toFixed(1);
-              var totGib = (tot / 1048576).toFixed(1);
-              root.ramInfo = usedGib + " / " + totGib + " GiB";
+              var usedMib = Math.round((tot - av) / 1024);
+              var totMib = Math.round(tot / 1024);
+              root.ramInfo = usedMib + " / " + totMib + " MiB";
           }
       });
 
