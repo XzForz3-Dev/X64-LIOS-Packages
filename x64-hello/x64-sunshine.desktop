@@ -1,7 +1,14 @@
 [Desktop Entry]
-Name=X64 Sunshine Game Streaming
+Name=Sunshine
 GenericName=Game Stream Server
-Comment=Servidor de streaming de juegos para Moonlight en móviles, TVs y consolas
+GenericName[es]=Servidor de Streaming de Juegos
+Comment=Self-hosted game stream host for Moonlight clients
+Comment[es]=Servidor de streaming de juegos para Moonlight en móviles, TVs y consolas
+Comment[fr]=Serveur de streaming de jeux auto-hébergé pour les clients Moonlight
+Comment[de]=Selbstgehosteter Game-Streaming-Server für Moonlight-Clients
+Comment[it]=Server di streaming di giochi self-hosted per client Moonlight
+Comment[pt]=Servidor de streaming de jogos auto-hospedado para clientes Moonlight
+Comment[ru]=Локальный сервер стриминга игр для клиентов Moonlight
 Exec=/usr/bin/x64-sunshine-launcher
 Icon=dev.lizardbyte.app.Sunshine
 Terminal=false
