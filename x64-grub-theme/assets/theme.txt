@@ -1,8 +1,8 @@
 # ============================================================
-#  X64 LIOS - GRUB Theme (Cyber-Terminal HD v1.0.0-5)
+#  X64 LIOS - GRUB Theme (Cyber-Terminal HD v1.0.0-6 - Terminus Pixel-Perfect)
 #  Tarjeta de cristal oscuro centrada (900x480) que contiene
 #  cabecera, menu, cuenta atras y ayuda. Seleccion = barra roja fina.
-#  Fuentes: JetBrains Mono Bold (trazos solidos de 2px, maxima nitidez)
+#  Fuentes: Terminus Bitmap Native -> PF2 (maxima nitidez quirurgica)
 #
 #  ⚠️ ORDEN DE CAPAS: GRUB pinta los componentes en orden INVERSO
 #  al declarado (el ultimo del archivo queda al fondo). Por eso la
@@ -14,10 +14,10 @@ desktop-image: "background.png"
 desktop-image-scale-method: "crop"
 desktop-color: "#000000"
 
-message-font: "X64 Mono Bold 14"
+message-font: "Terminus Bold 14"
 message-color: "#cccccc"
 
-terminal-font: "X64 Mono Bold 14"
+terminal-font: "Terminus Bold 14"
 terminal-box: "panel_*.png"
 terminal-left: "50%-470"
 terminal-top: "50%-260"
@@ -33,7 +33,7 @@ terminal-border: "0"
     height = 34
     align = "center"
     text = "X64 LIOS"
-    font = "X64 Mono Bold 28"
+    font = "Terminus Bold 28"
     color = "#ffffff"
 }
 
@@ -44,23 +44,23 @@ terminal-border: "0"
     height = 20
     align = "center"
     text = "SISTEMA OPERATIVO  ·  GAMING EDITION"
-    font = "X64 Mono Bold 14"
+    font = "Terminus Bold 14"
     color = "#ff3b3b"
 }
 # (linea divisoria roja dibujada en card.png en y = 84)
 
 # ---------- Menu ----------
 # Ancho ampliado a 860px para dar espacio completo a snapshots
-# Fuentes Bold 14 con trazo solido de 2px para eliminar desenfoque
+# Fuentes Terminus Pixel-Perfect para nitidez cristalina en 1 bit
 + boot_menu {
     left = 50%-430
     top = 50%-146
     width = 860
     height = 244
 
-    item_font = "X64 Mono Bold 14"
-    selected_item_font = "X64 Mono Bold 14"
-    item_color = "#8e8e98"
+    item_font = "Terminus Regular 16"
+    selected_item_font = "Terminus Bold 16"
+    item_color = "#9e9ea8"
     selected_item_color = "#ffffff"
 
     item_height = 28
@@ -97,7 +97,7 @@ terminal-border: "0"
     height = 18
     align = "center"
     text = "Arranque automático en %d s"
-    font = "X64 Mono Regular 12"
+    font = "Terminus Regular 12"
     color = "#888888"
 }
 
@@ -109,7 +109,7 @@ terminal-border: "0"
     height = 18
     align = "center"
     text = "↑↓ Navegar   •   Enter Arrancar   •   E Editar   •   C Consola"
-    font = "X64 Mono Regular 12"
+    font = "Terminus Regular 12"
     color = "#666666"
 }
 

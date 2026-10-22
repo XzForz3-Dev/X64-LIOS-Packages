@@ -1,6 +1,6 @@
 pkgname=x64-grub-theme
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Official X64 LIOS GRUB Bootloader Theme (Dark Glass + Crimson Bar + PF2 Fonts)"
 arch=('any')
 license=('GPL')
