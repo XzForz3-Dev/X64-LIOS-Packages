@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-update
 pkgver=1.0.0
-pkgrel=15
+pkgrel=16
 pkgdesc="Notificador y gestor de actualizaciones del sistema para X64 LIOS"
 arch=('any')
 url="https://x64lios.com"

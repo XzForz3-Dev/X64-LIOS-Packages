@@ -242,6 +242,16 @@ ANSI_MAP = {
 }
 
 def ansi_to_html(text):
+    # 1. Strip OSC sequences (e.g. terminal notifications, systemd / shell integration)
+    text = re.sub(r'\x1b\].*?(?:\x07|\x1b\\|$)', '', text, flags=re.DOTALL)
+    # 2. Strip leftover literal shell notifications like []3008;end=...
+    text = re.sub(r'\[\]\d+;[^\r\n]*', '', text)
+    # 3. Strip non-color CSI sequences (cursor moves, line clears, title changes, etc.)
+    text = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', lambda m: m.group(0) if m.group(0).endswith('m') else '', text)
+    # 4. Strip other stray escape sequences
+    text = re.sub(r'\x1b[PX^_][^\x1b]*\x1b\\', '', text)
+    text = re.sub(r'\x1b[0-9A-Za-z]', '', text)
+
     text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
     def repl(m):
         code = m.group(1)
@@ -259,7 +269,6 @@ def ansi_to_html(text):
         return f'<span style="color: {color}; {b_style}">'
     
     html = re.sub(r'\x1b\[([0-9;]*)m', repl, text)
-    html = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', html)
     return html
 
 
@@ -935,11 +944,11 @@ def run_gui():
             vbox.setSpacing(2)
 
             title_row = QHBoxLayout()
-            lbl_live = QLabel("EN VIVO")
-            lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_live = QLabel("EN VIVO")
+            self.lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
             self.lbl_tx_title = QLabel("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
             self.lbl_tx_title.setStyleSheet("color: #ffffff; font-weight: 800; font-size: 18px; letter-spacing: 0.5px;")
-            title_row.addWidget(lbl_live)
+            title_row.addWidget(self.lbl_live)
             title_row.addWidget(self.lbl_tx_title)
             title_row.addStretch()
 
@@ -971,7 +980,7 @@ def run_gui():
                     border-radius: 4px;
                 }
                 QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:1 #22c55e);
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:0.7 #f59e0b, stop:1 #22c55e);
                     border-radius: 4px;
                 }
             """)
@@ -980,6 +989,7 @@ def run_gui():
             # Embedded Console Log View
             self.log_view = QTextEdit()
             self.log_view.setReadOnly(True)
+            self.log_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
             self.log_view.setStyleSheet("""
                 QTextEdit {
                     background-color: #07070b;
@@ -1008,21 +1018,39 @@ def run_gui():
                 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                     height: 0px;
                 }
+                QScrollBar:horizontal {
+                    background: #07070b;
+                    height: 10px;
+                    margin: 0px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:horizontal {
+                    background: #2a2a38;
+                    min-width: 35px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:horizontal:hover {
+                    background: #ff1a1a;
+                }
+                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                    width: 0px;
+                }
             """)
             layout.addWidget(self.log_view, stretch=1)
 
             # Transaction Footer
             tx_footer = QFrame()
+            tx_footer.setObjectName("tx_footer")
             tx_footer.setStyleSheet("""
-                QFrame {
-                    background-color: #13131b;
+                QFrame#tx_footer {
+                    background-color: #111118;
                     border: 1px solid #222230;
                     border-radius: 10px;
                     padding: 8px 16px;
                 }
             """)
             footer_box = QHBoxLayout(tx_footer)
-            footer_box.setContentsMargins(12, 10, 12, 10)
+            footer_box.setContentsMargins(14, 10, 14, 10)
             footer_box.setSpacing(16)
 
             self.lbl_tx_status = QLabel("⏳ Ejecutando comandos de actualización...")
@@ -1049,21 +1077,17 @@ def run_gui():
             self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot"))
             footer_box.addWidget(self.btn_tx_reboot)
 
-            self.btn_tx_done = QPushButton("Cerrar")
+            self.btn_tx_done = QPushButton("Procesando...")
             self.btn_tx_done.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_tx_done.setStyleSheet("""
                 QPushButton {
-                    background: #1c1c26;
-                    color: #9292a4;
-                    border: 1px solid #2a2a3a;
+                    background: #181822;
+                    color: #555566;
+                    border: 1px solid #222230;
                     border-radius: 8px;
-                    padding: 10px 22px;
-                    font-weight: 600;
+                    padding: 10px 24px;
+                    font-weight: bold;
                     font-size: 13px;
-                }
-                QPushButton:hover {
-                    background: #262634;
-                    color: #ffffff;
                 }
             """)
             self.btn_tx_done.setEnabled(False) # Enabled only on finish
@@ -1293,10 +1317,41 @@ def run_gui():
                 f"<div style='color: #71717a;'>Comandos: {' && '.join(commands)}</div><hr style='border: 1px solid #222230;'><br>"
             )
 
+            # Reset header and transaction state
+            self.lbl_live.setText("EN VIVO")
+            self.lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
+            self.lbl_tx_stage.setText("Inicializando transacción de paquetes...")
+            self.lbl_tx_stage.setStyleSheet("color: #38bdf8; font-size: 13px; font-weight: bold;")
+            self.lbl_tx_status.setText("⏳ Ejecutando comandos de actualización...")
+            self.lbl_tx_status.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px;")
+
             self.btn_tx_done.setEnabled(False)
             self.btn_tx_done.setText("Procesando...")
+            self.btn_tx_done.setStyleSheet("""
+                QPushButton {
+                    background: #181822;
+                    color: #555566;
+                    border: 1px solid #222230;
+                    border-radius: 8px;
+                    padding: 10px 24px;
+                    font-weight: bold;
+                    font-size: 13px;
+                }
+            """)
             self.btn_tx_reboot.setVisible(False)
             self.tx_progress.setValue(10)
+            self.tx_progress.setStyleSheet("""
+                QProgressBar {
+                    background-color: #14141e;
+                    border: 1px solid #252536;
+                    border-radius: 4px;
+                }
+                QProgressBar::chunk {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:0.7 #f59e0b, stop:1 #22c55e);
+                    border-radius: 4px;
+                }
+            """)
             self.tx_start_time = time.time()
             self.timer_elapsed.start(1000)
 
@@ -1307,12 +1362,29 @@ def run_gui():
             self.tx_worker.transaction_done.connect(self.on_tx_finished)
             self.tx_worker.start()
 
-        def on_tx_output(self, text):
-            html = ansi_to_html(text).replace("\n", "<br>")
+        def on_tx_output(self, raw_text):
+            raw_text = raw_text.replace("\r\n", "\n")
+            tokens = re.split(r'([\r\n])', raw_text)
+
             cursor = self.log_view.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
+
+            for t in tokens:
+                if not t:
+                    continue
+                if t == "\n":
+                    cursor.movePosition(QTextCursor.MoveOperation.End)
+                    cursor.insertBlock()
+                elif t == "\r":
+                    cursor.movePosition(QTextCursor.MoveOperation.End)
+                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine, QTextCursor.MoveMode.KeepAnchor)
+                    cursor.removeSelectedText()
+                else:
+                    html = ansi_to_html(t)
+                    if html:
+                        cursor.insertHtml(html)
+
             self.log_view.setTextCursor(cursor)
-            self.log_view.insertHtml(html)
             self.log_view.ensureCursorVisible()
 
         def on_tx_stage(self, stage_text, percent):
@@ -1322,27 +1394,91 @@ def run_gui():
         def on_tx_finished(self, success, exit_code, kernel_updated):
             self.timer_elapsed.stop()
             self.btn_tx_done.setEnabled(True)
-            self.btn_tx_done.setText("Cerrar")
 
             if success:
-                self.lbl_tx_stage.setText("✓ ¡Actualización completada con éxito!")
+                self.lbl_live.setText("COMPLETADO")
+                self.lbl_live.setStyleSheet("background-color: #22c55e; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+                self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA FINALIZADA")
+                self.lbl_tx_stage.setText("✓ ¡Todos los paquetes se han instalado y verificado con éxito!")
                 self.lbl_tx_stage.setStyleSheet("color: #22c55e; font-size: 13px; font-weight: bold;")
-                self.lbl_tx_status.setText("✓ Sistema actualizado y seguro.")
+                self.lbl_tx_status.setText("🛡️ Sistema X64 LIOS actualizado, sincronizado y seguro.")
+                self.lbl_tx_status.setStyleSheet("color: #4ade80; font-weight: bold; font-size: 13px;")
                 self.tx_progress.setValue(100)
+                self.tx_progress.setStyleSheet("""
+                    QProgressBar {
+                        background-color: #14141e;
+                        border: 1px solid #14532d;
+                        border-radius: 4px;
+                    }
+                    QProgressBar::chunk {
+                        background: #22c55e;
+                        border-radius: 4px;
+                    }
+                """)
+
+                self.btn_tx_done.setText("✓ Cerrar y Salir")
+                self.btn_tx_done.setStyleSheet("""
+                    QPushButton {
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #22c55e, stop:1 #15803d);
+                        color: #ffffff;
+                        border: 1px solid #4ade80;
+                        border-radius: 8px;
+                        padding: 10px 24px;
+                        font-weight: 800;
+                        font-size: 13px;
+                    }
+                    QPushButton:hover {
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4ade80, stop:1 #16a34a);
+                        border: 1px solid #86efac;
+                    }
+                """)
 
                 if kernel_updated:
                     self.lbl_tx_status.setText("⚡ Se actualizó el Kernel o Driver gráfico. Se recomienda reiniciar.")
+                    self.lbl_tx_status.setStyleSheet("color: #facc15; font-weight: bold; font-size: 13px;")
                     self.btn_tx_reboot.setVisible(True)
             else:
-                self.lbl_tx_stage.setText(f"✕ Error en la transacción (código: {exit_code})")
+                self.lbl_live.setText("ERROR")
+                self.lbl_live.setStyleSheet("background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+                self.lbl_tx_title.setText("ERROR EN LA ACTUALIZACIÓN")
+                self.lbl_tx_stage.setText(f"✕ La transacción se interrumpió (código de salida: {exit_code})")
                 self.lbl_tx_stage.setStyleSheet("color: #ef4444; font-size: 13px; font-weight: bold;")
                 self.lbl_tx_status.setText("✕ La actualización no se pudo completar completamente.")
-                self.btn_tx_done.setText("Volver")
+                self.lbl_tx_status.setStyleSheet("color: #f87171; font-weight: bold; font-size: 13px;")
+                self.tx_progress.setStyleSheet("""
+                    QProgressBar {
+                        background-color: #14141e;
+                        border: 1px solid #7f1d1d;
+                        border-radius: 4px;
+                    }
+                    QProgressBar::chunk {
+                        background: #ef4444;
+                        border-radius: 4px;
+                    }
+                """)
+                self.btn_tx_done.setText("← Volver")
+                self.btn_tx_done.setStyleSheet("""
+                    QPushButton {
+                        background: #27273a;
+                        color: #ffffff;
+                        border: 1px solid #3e3e56;
+                        border-radius: 8px;
+                        padding: 10px 24px;
+                        font-weight: bold;
+                        font-size: 13px;
+                    }
+                    QPushButton:hover {
+                        background: #32324a;
+                        border: 1px solid #555577;
+                    }
+                """)
 
         def on_tx_close_clicked(self):
-            # If successfully completed, switch back to Page 0 and trigger refresh
-            self.stacked_widget.setCurrentIndex(0)
-            self.trigger_refresh()
+            if self.btn_tx_done.text().startswith("←") or "Volver" in self.btn_tx_done.text():
+                self.stacked_widget.setCurrentIndex(0)
+                self.trigger_refresh()
+            else:
+                self.close()
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
