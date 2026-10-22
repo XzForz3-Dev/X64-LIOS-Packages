@@ -1,0 +1,7 @@
+# ==============================================================================
+# X64 LIOS Linux - Systemd Presets Override
+# Prioridad de gaming: desactivar OOM killer y daemons en segundo plano
+# ==============================================================================
+disable systemd-oomd.service
+disable systemd-oomd.socket
+disable fwupd-refresh.timer

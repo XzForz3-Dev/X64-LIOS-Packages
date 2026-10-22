@@ -1,11 +1,12 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
 license=('GPL3')
+install='x64-terminal-settings.install'
 depends=('fish' 'starship' 'fastfetch')
 optdepends=('kitty: GPU-accelerated terminal emulator')
 source=(
@@ -24,8 +25,9 @@ source=(
     '99-x64-wifi-powersave.conf'
     'scx_loader.toml'
     '50-x64-scx-loader.rules'
+    '00-x64-lios.preset'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration
@@ -89,5 +91,9 @@ package() {
     install -m644 "${srcdir}/scx_loader.toml" "${pkgdir}/etc/scx_loader/config.toml"
     install -d "${pkgdir}/etc/polkit-1/rules.d"
     install -m644 "${srcdir}/50-x64-scx-loader.rules" "${pkgdir}/etc/polkit-1/rules.d/50-x64-scx-loader.rules"
+
+    # Systemd Presets (Ensure systemd-oomd and fwupd-refresh are disabled by default)
+    install -d "${pkgdir}/usr/lib/systemd/system-preset"
+    install -m644 "${srcdir}/00-x64-lios.preset" "${pkgdir}/usr/lib/systemd/system-preset/00-x64-lios.preset"
 }
 
