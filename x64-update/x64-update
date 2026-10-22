@@ -370,13 +370,15 @@ def run_gui():
                         if "vmlinuz" in low or "initramfs" in low or "linux-cachyos" in low or "nvidia" in low:
                             self.kernel_updated = True
 
-                        if "downloading" in low or "descargando" in low:
+                        if "retrieving" in low or "recuperando" in low or "downloading" in low or "descargando" in low:
                             self.stage_changed.emit("Descargando paquetes de repositorios...", 35)
-                        elif "checking keyring" in low or "verificando" in low:
-                            self.stage_changed.emit("Verificando integridad y claves de seguridad...", 55)
-                        elif "upgrading" in low or "actualizando" in low or "installing" in low:
+                        elif "checking keyring" in low or "comprobando el depósito" in low:
+                            self.stage_changed.emit("Verificando claves y firmas de seguridad...", 55)
+                        elif "checking package integrity" in low or "verificando la integridad" in low:
+                            self.stage_changed.emit("Verificando integridad de archivos...", 65)
+                        elif "upgrading" in low or "actualizando" in low or "installing" in low or "instalando" in low:
                             self.stage_changed.emit("Instalando y descomprimiendo paquetes...", 75)
-                        elif "running post-transaction hooks" in low or "ejecutando" in low:
+                        elif "running post-transaction hooks" in low or "ejecutando" in low or "hooks" in low:
                             self.stage_changed.emit("Ejecutando ganchos del sistema (initramfs, kernel)...", 90)
 
                     except OSError:
@@ -397,12 +399,13 @@ def run_gui():
 
             self.transaction_done.emit(success, ret, self.kernel_updated)
 
-    class PasswordDialog(QDialog):
-        def __init__(self, parent=None):
+    class ConfirmDialog(QDialog):
+        def __init__(self, items_count, crit_count, cached_sudo, parent=None):
             super().__init__(parent)
-            self.setWindowTitle("Autenticación de Administrador")
-            self.setFixedSize(460, 240)
+            self.setWindowTitle("Confirmar Actualización del Sistema")
+            self.setFixedSize(500, 310 if not cached_sudo else 240)
             self.setModal(True)
+            self.cached_sudo = cached_sudo
             self.setStyleSheet("""
                 QDialog {
                     background-color: #0d0d13;
@@ -417,42 +420,79 @@ def run_gui():
 
             # Header
             hdr = QHBoxLayout()
-            lbl_badge = QLabel("🔒")
+            lbl_badge = QLabel("⚡")
             lbl_badge.setStyleSheet("font-size: 24px;")
-            lbl_title = QLabel("Privilegios de Administrador")
+            lbl_title = QLabel("Confirmar Actualización del Sistema")
             lbl_title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;")
             hdr.addWidget(lbl_badge)
             hdr.addWidget(lbl_title)
             hdr.addStretch()
             vbox.addLayout(hdr)
 
-            lbl_sub = QLabel("Se requiere autenticación para actualizar los paquetes del sistema:")
-            lbl_sub.setStyleSheet("color: #9292a4; font-size: 12px;")
-            vbox.addWidget(lbl_sub)
-
-            self.pwd_input = QLineEdit()
-            self.pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
-            self.pwd_input.setPlaceholderText("Contraseña...")
-            self.pwd_input.setStyleSheet("""
-                QLineEdit {
+            # Summary Card
+            summary_frame = QFrame()
+            summary_frame.setStyleSheet("""
+                QFrame {
                     background: #14141e;
-                    color: #ffffff;
                     border: 1px solid #28283a;
                     border-radius: 8px;
-                    padding: 10px 14px;
-                    font-size: 14px;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #ff1a1a;
-                    background: #181826;
+                    padding: 8px 12px;
                 }
             """)
-            vbox.addWidget(self.pwd_input)
+            sbox = QVBoxLayout(summary_frame)
+            sbox.setContentsMargins(10, 8, 10, 8)
+            sbox.setSpacing(5)
 
-            self.lbl_error = QLabel("")
-            self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold;")
-            self.lbl_error.setVisible(False)
-            vbox.addWidget(self.lbl_error)
+            lbl_pkgs = QLabel(f"📦 Se actualizarán <b>{items_count}</b> paquete(s) detectado(s).")
+            lbl_pkgs.setStyleSheet("color: #e4e4e7; font-size: 12px;")
+            sbox.addWidget(lbl_pkgs)
+
+            if crit_count > 0:
+                lbl_crit = QLabel(f"⚠️ Incluye <b>{crit_count}</b> componente(s) crítico(s) (Kernel / Drivers).")
+                lbl_crit.setStyleSheet("color: #f59e0b; font-size: 11px; font-weight: bold;")
+                sbox.addWidget(lbl_crit)
+
+            lbl_desc = QLabel("¿Deseas autorizar y comenzar la transacción del sistema ahora?")
+            lbl_desc.setStyleSheet("color: #9292a4; font-size: 11px;")
+            sbox.addWidget(lbl_desc)
+
+            vbox.addWidget(summary_frame)
+
+            if not self.cached_sudo:
+                lbl_auth = QLabel("🔒 Introduce tu contraseña de administrador para autorizar:")
+                lbl_auth.setStyleSheet("color: #9292a4; font-size: 12px;")
+                vbox.addWidget(lbl_auth)
+
+                self.pwd_input = QLineEdit()
+                self.pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
+                self.pwd_input.setPlaceholderText("Contraseña de administrador...")
+                self.pwd_input.setStyleSheet("""
+                    QLineEdit {
+                        background: #14141e;
+                        color: #ffffff;
+                        border: 1px solid #28283a;
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        font-size: 13px;
+                    }
+                    QLineEdit:focus {
+                        border: 1px solid #ff1a1a;
+                        background: #181826;
+                    }
+                """)
+                vbox.addWidget(self.pwd_input)
+
+                self.lbl_error = QLabel("")
+                self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold;")
+                self.lbl_error.setVisible(False)
+                vbox.addWidget(self.lbl_error)
+                self.pwd_input.returnPressed.connect(self.verify_and_confirm)
+                self.pwd_input.setFocus()
+            else:
+                self.pwd_input = None
+                lbl_auth_ok = QLabel("✓ Privilegios de administrador activos en la sesión actual.")
+                lbl_auth_ok.setStyleSheet("color: #22c55e; font-size: 11px; font-weight: bold;")
+                vbox.addWidget(lbl_auth_ok)
 
             # Buttons
             btn_row = QHBoxLayout()
@@ -477,9 +517,9 @@ def run_gui():
             """)
             btn_cancel.clicked.connect(self.reject)
 
-            btn_auth = QPushButton("Autorizar Actualización")
-            btn_auth.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_auth.setStyleSheet("""
+            btn_confirm = QPushButton("⚡ Iniciar Actualización")
+            btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_confirm.setStyleSheet("""
                 QPushButton {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
                     color: #ffffff;
@@ -493,40 +533,39 @@ def run_gui():
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
                 }
             """)
-            btn_auth.clicked.connect(self.verify_password)
+            btn_confirm.clicked.connect(self.verify_and_confirm)
 
             btn_row.addStretch()
             btn_row.addWidget(btn_cancel)
-            btn_row.addWidget(btn_auth)
+            btn_row.addWidget(btn_confirm)
             vbox.addLayout(btn_row)
 
-            self.pwd_input.returnPressed.connect(self.verify_password)
-            self.pwd_input.setFocus()
+        def verify_and_confirm(self):
+            if not self.cached_sudo:
+                pwd = self.pwd_input.text()
+                if not pwd:
+                    self.lbl_error.setText("Por favor, ingresa tu contraseña.")
+                    self.lbl_error.setVisible(True)
+                    return
 
-        def verify_password(self):
-            pwd = self.pwd_input.text()
-            if not pwd:
-                self.lbl_error.setText("Por favor, ingresa tu contraseña.")
-                self.lbl_error.setVisible(True)
-                return
-
-            # Test password with sudo -S -v
-            p = subprocess.run(
-                ["sudo", "-S", "-v"],
-                input=f"{pwd}\n".encode(),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            if p.returncode == 0:
-                self.accept()
+                p = subprocess.run(
+                    ["sudo", "-S", "-v"],
+                    input=f"{pwd}\n".encode(),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                if p.returncode == 0:
+                    self.accept()
+                else:
+                    self.lbl_error.setText("✕ Contraseña incorrecta. Inténtalo de nuevo.")
+                    self.lbl_error.setVisible(True)
+                    self.pwd_input.selectAll()
+                    self.pwd_input.setFocus()
             else:
-                self.lbl_error.setText("✕ Contraseña incorrecta. Inténtalo de nuevo.")
-                self.lbl_error.setVisible(True)
-                self.pwd_input.selectAll()
-                self.pwd_input.setFocus()
+                self.accept()
 
         def get_password(self):
-            return self.pwd_input.text()
+            return self.pwd_input.text() if self.pwd_input else None
 
     class X64UpdateWindow(QMainWindow):
         def __init__(self):
@@ -1282,13 +1321,15 @@ def run_gui():
         def start_inapp_transaction(self):
             # Check if sudo credentials are required
             cached_sudo = (subprocess.run(["sudo", "-n", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
-            password = None
 
-            if not cached_sudo:
-                dlg = PasswordDialog(self)
-                if dlg.exec() != QDialog.DialogCode.Accepted:
-                    return # User canceled
-                password = dlg.get_password()
+            # Count total items and critical components
+            items_count = len(self.all_items)
+            crit_count = sum(1 for item in self.all_items if item.get("crit", False))
+
+            dlg = ConfirmDialog(items_count, crit_count, cached_sudo, self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return # User canceled
+            password = dlg.get_password()
 
             # Assemble transaction commands
             aur_enabled = self.chk_aur.isChecked() and self.chk_aur.isVisible()
@@ -1363,8 +1404,12 @@ def run_gui():
             self.tx_worker.start()
 
         def on_tx_output(self, raw_text):
+            # Translate VT100 CNL \x1b[<n>E (Cursor Next Line) to \n * count
+            raw_text = re.sub(r'\x1b\[(\d*)E', lambda m: "\n" * (int(m.group(1)) if m.group(1) else 1), raw_text)
+
+            # Normalize \r\n to \n
             raw_text = raw_text.replace("\r\n", "\n")
-            tokens = re.split(r'([\r\n])', raw_text)
+            tokens = re.split(r'([\r\n]|\x1b\[\d*F)', raw_text)
 
             cursor = self.log_view.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
@@ -1379,10 +1424,22 @@ def run_gui():
                     cursor.movePosition(QTextCursor.MoveOperation.End)
                     cursor.movePosition(QTextCursor.MoveOperation.StartOfLine, QTextCursor.MoveMode.KeepAnchor)
                     cursor.removeSelectedText()
+                elif re.match(r'\x1b\[\d*F', t):
+                    # VT100 CPL: Cursor Previous Line
+                    m = re.match(r'\x1b\[(\d*)F', t)
+                    count = int(m.group(1)) if m.group(1) else 1
+                    for _ in range(count):
+                        cursor.movePosition(QTextCursor.MoveOperation.PreviousBlock)
+                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+                    cursor.movePosition(QTextCursor.MoveOperation.EndOfLine, QTextCursor.MoveMode.KeepAnchor)
+                    cursor.removeSelectedText()
                 else:
                     html = ansi_to_html(t)
                     if html:
                         cursor.insertHtml(html)
+
+            self.log_view.setTextCursor(cursor)
+            self.log_view.ensureCursorVisible()
 
             self.log_view.setTextCursor(cursor)
             self.log_view.ensureCursorVisible()
