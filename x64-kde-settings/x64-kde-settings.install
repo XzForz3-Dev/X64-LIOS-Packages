@@ -3,6 +3,10 @@ post_install() {
     if [ -d /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents ]; then
         cp -f /usr/share/x64-lios/x64-layout.js /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents/layout.js
     fi
+    if [ -d /usr/share/wallpapers/Next/contents/images ]; then
+        echo "=> [X64 Theme] Inyectando wallpaper oficial de X64 LIOS en Next..."
+        cp -f /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg /usr/share/wallpapers/Next/contents/images/5120x2880.png 2>/dev/null || true
+    fi
 }
 
 post_upgrade() {

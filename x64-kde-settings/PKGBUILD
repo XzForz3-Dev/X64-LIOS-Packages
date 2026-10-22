@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=8
+pkgrel=9
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -59,13 +59,13 @@ package() {
     cp "${srcdir}/org.kde.discover.notifier.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.discover.notifier.desktop"
     cp "${srcdir}/org.kde.kdeconnect.daemon.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop"
 
-    # Crear script de auto-arranque para forzar el tema oscuro y el wallpaper v3 en KDE
+    # Crear script de auto-arranque para aplicar el wallpaper oficial en Plasma
     mkdir -p "${pkgdir}/etc/xdg/autostart"
     cat << 'SCRIPT' > "${pkgdir}/etc/xdg/autostart/x64-theme-init.desktop"
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c 'lookandfeeltool -a org.kde.breezedark.desktop; sleep 1; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg'
+Exec=sh -c '(while ! qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.dumpCurrentLayoutMainScript >/dev/null 2>&1; do sleep 0.5; done; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg) &'
 X-KDE-autostart-phase=1
 SCRIPT
 
