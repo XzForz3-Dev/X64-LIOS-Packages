@@ -1,7 +1,8 @@
 post_install() {
     # 1. Sanitizar nombres de kernels en /etc/grub.d/10_linux (Kernel Gaming / Kernel LTS)
     if [ -f /etc/grub.d/10_linux ]; then
-        python3 -c "
+        if ! grep -q 'Kernel Gaming' /etc/grub.d/10_linux; then
+            python3 -c "
 with open('/etc/grub.d/10_linux', 'r') as f:
     lines = f.readlines()
 
@@ -47,6 +48,7 @@ for line in lines:
 with open('/etc/grub.d/10_linux', 'w') as f:
     f.writelines(new_lines)
 " 2>/dev/null || true
+        fi
     fi
 
     # 2. Sanitizar formato de snapshots en grub-btrfs (eliminar encabezado y ruta redundante)
@@ -54,7 +56,9 @@ with open('/etc/grub.d/10_linux', 'w') as f:
         sed -i 's/#GRUB_BTRFS_TITLE_FORMAT=.*/GRUB_BTRFS_TITLE_FORMAT=("date" "type" "description")/' /etc/default/grub-btrfs/config 2>/dev/null || true
     fi
     if [ -f /etc/grub.d/41_snapshots-btrfs ]; then
-        sed -i 's/^header_menu()/header_menu() { return 0; }\n_old_header_menu()/' /etc/grub.d/41_snapshots-btrfs 2>/dev/null || true
+        if ! grep -q 'header_menu() { return 0; }' /etc/grub.d/41_snapshots-btrfs; then
+            sed -i 's/^header_menu()/header_menu() { return 0; }\n_old_header_menu()/' /etc/grub.d/41_snapshots-btrfs 2>/dev/null || true
+        fi
     fi
 }
 
