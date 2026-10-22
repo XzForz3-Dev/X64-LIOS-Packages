@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
