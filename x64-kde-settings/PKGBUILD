@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -65,9 +65,13 @@ package() {
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c '(while ! qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.dumpCurrentLayoutMainScript >/dev/null 2>&1; do sleep 0.5; done; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg) &'
+Exec=sh -c '(for i in $(seq 1 20); do if qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.dumpCurrentLayoutMainScript >/dev/null 2>&1; then break; fi; sleep 0.5; done; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg) &'
 X-KDE-autostart-phase=1
 SCRIPT
+
+    # Enlace de compatibilidad qdbus -> qdbus6
+    mkdir -p "${pkgdir}/usr/bin"
+    ln -sf /usr/bin/qdbus6 "${pkgdir}/usr/bin/qdbus"
 
     # Configurar SDDM para que use el wallpaper v2
     mkdir -p "${pkgdir}/usr/share/sddm/themes/breeze"

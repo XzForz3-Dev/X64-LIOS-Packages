@@ -87,7 +87,7 @@ immutability=1
 plugin=org.kde.plasma.icontasks
 
 [Containments][23][Applets][26][Configuration][General]
-launchers=applications:systemsettings.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.discover.desktop,applications:com.shellyorg.shelly.desktop,applications:chromium.desktop,applications:kitty.desktop
+launchers=applications:systemsettings.desktop,applications:org.kde.dolphin.desktop,applications:org.kde.discover.desktop,applications:com.shellyorg.shelly.desktop,applications:chromium.desktop,applications:kitty.desktop,applications:x64-welcome.desktop
 
 [Containments][23][Applets][27]
 immutability=1
