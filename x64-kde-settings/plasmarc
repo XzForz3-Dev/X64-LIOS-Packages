@@ -1,0 +1,8 @@
+[Wallpaper]
+defaultWallpaperTheme=X64-LIOS
+defaultFileSuffix=.jpg
+defaultWidth=2752
+defaultHeight=1536
+
+[AdaptiveTransparency]
+enabled=true

@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=10
+pkgrel=11
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -18,8 +18,11 @@ source=('x64-lios-v2.jpg'
         'gtk4-settings.ini'
         'baloofilerc'
         'org.kde.discover.notifier.desktop'
-        'org.kde.kdeconnect.daemon.desktop')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'org.kde.kdeconnect.daemon.desktop'
+        'wallpaper-metadata.json'
+        'screenshot.png'
+        'plasmarc')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar fondos de pantalla
@@ -27,6 +30,16 @@ package() {
     cp "${srcdir}/x64-lios-v2.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
     cp "${srcdir}/x64-lios-v3.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
     
+    # Instalar Paquete Oficial de Wallpaper de KDE Plasma (X64-LIOS)
+    mkdir -p "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images"
+    cp "${srcdir}/wallpaper-metadata.json" "${pkgdir}/usr/share/wallpapers/X64-LIOS/metadata.json"
+    cp "${srcdir}/screenshot.png" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/screenshot.png"
+    cp "${srcdir}/x64-lios-v3.jpg" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2752x1536.jpg"
+    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/1920x1080.jpg"
+    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2560x1440.jpg"
+    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/3840x2160.jpg"
+    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/5120x2880.jpg"
+
     # Instalar logo
     mkdir -p "${pkgdir}/usr/share/pixmaps"
     cp "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/pixmaps/x64-logo.png"
@@ -49,9 +62,14 @@ package() {
     cp "${srcdir}/gtk3-settings.ini" "${pkgdir}/etc/skel/.config/gtk-3.0/settings.ini"
     cp "${srcdir}/gtk4-settings.ini" "${pkgdir}/etc/skel/.config/gtk-4.0/settings.ini"
 
+    # Configuración de plasmarc (Wallpaper oficial X64-LIOS por defecto del sistema)
+    mkdir -p "${pkgdir}/etc/xdg"
+    cp "${srcdir}/plasmarc" "${pkgdir}/etc/xdg/plasmarc"
+    cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/plasmarc"
+    cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/kdedefaults/plasmarc"
+
     # Desactivar indexador Baloo (cero sobrecarga de disco/CPU para gaming)
     cp "${srcdir}/baloofilerc" "${pkgdir}/etc/skel/.config/baloofilerc"
-    mkdir -p "${pkgdir}/etc/xdg"
     cp "${srcdir}/baloofilerc" "${pkgdir}/etc/xdg/baloofilerc"
 
     # Desactivar demonios de fondo redundantes en autostart (DiscoverNotifier y KDE Connect)
@@ -59,14 +77,14 @@ package() {
     cp "${srcdir}/org.kde.discover.notifier.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.discover.notifier.desktop"
     cp "${srcdir}/org.kde.kdeconnect.daemon.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop"
 
-    # Crear script de auto-arranque para aplicar el wallpaper oficial en Plasma
+    # Script de auto-arranque seguro para aplicar el wallpaper KPackage oficial en Plasma 6
     mkdir -p "${pkgdir}/etc/xdg/autostart"
     cat << 'SCRIPT' > "${pkgdir}/etc/xdg/autostart/x64-theme-init.desktop"
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c '(for i in $(seq 1 20); do if qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.dumpCurrentLayoutMainScript >/dev/null 2>&1; then break; fi; sleep 0.5; done; plasma-apply-wallpaperimage /usr/share/backgrounds/x64-lios/x64-lios-v3.jpg) &'
-X-KDE-autostart-phase=1
+Exec=sh -c 'sleep 1.5; plasma-apply-wallpaperimage /usr/share/wallpapers/X64-LIOS || true'
+X-KDE-autostart-phase=2
 SCRIPT
 
     # Enlace de compatibilidad qdbus -> qdbus6

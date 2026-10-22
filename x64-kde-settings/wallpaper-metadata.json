@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "info@x64lios.com",
+                "Name": "X64 Studios"
+            }
+        ],
+        "Id": "X64-LIOS",
+        "License": "GPLv3",
+        "Name": "X64 LIOS Stealth Monolith",
+        "Version": "2.0"
+    }
+}

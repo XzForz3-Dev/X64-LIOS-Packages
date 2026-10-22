@@ -14,8 +14,8 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
-PreviewImage=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
+Image=file:///usr/share/wallpapers/X64-LIOS
+PreviewImage=/usr/share/wallpapers/X64-LIOS/contents/screenshot.png
 
 [Containments][4]
 formfactor=0
@@ -26,8 +26,8 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][4][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
-PreviewImage=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
+Image=file:///usr/share/wallpapers/X64-LIOS
+PreviewImage=/usr/share/wallpapers/X64-LIOS/contents/screenshot.png
 
 [Containments][22]
 formfactor=0
@@ -38,8 +38,8 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][22][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
-PreviewImage=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
+Image=file:///usr/share/wallpapers/X64-LIOS
+PreviewImage=/usr/share/wallpapers/X64-LIOS/contents/screenshot.png
 
 [Containments][44]
 formfactor=0
@@ -50,8 +50,8 @@ plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
 [Containments][44][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
-PreviewImage=file:///usr/share/backgrounds/x64-lios/x64-lios-v3.jpg
+Image=file:///usr/share/wallpapers/X64-LIOS
+PreviewImage=/usr/share/wallpapers/X64-LIOS/contents/screenshot.png
 
 [Containments][23]
 activityId=
