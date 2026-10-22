@@ -41,9 +41,9 @@ BANNER = rf"""{C_RED}
    ██╔██╗ ██╔═══██╗╚════██║     ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝  
   ██╔╝ ██╗╚██████╔╝     ██║     ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗
   ╚═╝  ╚═╝ ╚═════╝      ╚═╝      ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝{C_RESET}
-{C_GRAY}  ─────────────────────────────────────────────────────────────────────────────{C_RESET}
-{C_WHITE}{C_BOLD}                     CENTRO DE ACTUALIZACIONES OFICIAL X64 LIOS                {C_RESET}
-{C_GRAY}  ─────────────────────────────────────────────────────────────────────────────{C_RESET}"""
+{C_GRAY}  {'─' * 82}{C_RESET}
+{C_WHITE}{C_BOLD}{'CENTRO DE ACTUALIZACIONES OFICIAL X64 LIOS':^86}{C_RESET}
+{C_GRAY}  {'─' * 82}{C_RESET}"""
 
 def ensure_state_dir():
     os.makedirs(STATE_DIR, exist_ok=True)
@@ -96,7 +96,7 @@ def get_telemetry():
 
 def print_telemetry_box():
     t = get_telemetry()
-    box_w = 75
+    box_w = 82
     line_content = f"  {C_CYAN}Equipo:{C_RESET} {C_WHITE}{t['hostname']}{C_RESET}     {C_CYAN}Kernel:{C_RESET} {C_WHITE}{t['kernel']}{C_RESET}     {C_CYAN}Uptime:{C_RESET} {C_WHITE}{t['uptime']}{C_RESET}"
     
     # Calculate visible length (without ANSI codes)
@@ -290,18 +290,22 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
         p, trans = parse_pkg_line(line)
         items.append((p, trans, "Flatpak", C_BLUE))
 
-    shown_count = 0
-    max_display = 28
+    # Priorizar componentes críticos en la parte superior (Kernel, Drivers, Core)
+    items.sort(key=lambda x: (0 if is_critical_package(x[0]) else 1, x[0]))
+
+    term_size = shutil.get_terminal_size((112, 35))
+    term_w = term_size.columns
+    term_h = term_size.lines
+
+    # Límite dinámico adaptativo para que NUNCA desborde la ventana verticalmente
+    max_display = max(7, min(14, term_h - 24))
     visible_items = items[:max_display]
 
-    # Cálculo dinámico de ancho de columnas para garantizar alineación absoluta
-    max_p_len = max([len(p) for p, _, _, _ in visible_items], default=15)
-    col_name_w = max(28, max_p_len + 6)
-
-    max_trans_len = max([len(trans) for _, trans, _, _ in visible_items], default=20)
-    col_trans_w = max(32, max_trans_len + 4)
-
-    col_type_w = 15
+    # Geometría estricta de columnas para evitar line-wrap en terminales de 90c a 112c
+    col_name_w = 32
+    col_trans_w = 36
+    col_type_w = 12
+    tot_inner_w = col_name_w + col_trans_w + col_type_w + 2
 
     header_top = f"{C_GRAY}  ┌{'─' * col_name_w}┬{'─' * col_trans_w}┬{'─' * col_type_w}┐{C_RESET}"
     header_mid = f"{C_GRAY}  ├{'─' * col_name_w}┼{'─' * col_trans_w}┼{'─' * col_type_w}┤{C_RESET}"
@@ -309,7 +313,7 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
 
     hdr_name = "PAQUETE"
     hdr_trans = "TRANSICIÓN DE VERSIÓN"
-    hdr_type = "TIPO / ORIGEN"
+    hdr_type = "ORIGEN"
 
     print(header_top)
     print(f"{C_GRAY}  │{C_RESET} {C_WHITE}{C_BOLD}{hdr_name:<{col_name_w-2}}{C_RESET} "
@@ -320,36 +324,41 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
     has_critical = False
 
     for p, trans, orig, col in visible_items:
-        shown_count += 1
         is_crit = is_critical_package(p)
         if is_crit:
             has_critical = True
-        tag = f"{C_YELLOW}[!] {C_RESET}" if is_crit else "    "
-        pkg_display = (tag + f"{col}{p}{C_RESET}")
-        raw_name_len = len(p) + 4
-        pad_name = max(0, col_name_w - 2 - raw_name_len)
+        tag = f"{C_YELLOW}[!]{C_RESET} " if is_crit else "    "
 
-        raw_trans_len = len(trans)
-        pad_trans = max(0, col_trans_w - 2 - raw_trans_len)
+        # Truncar con seguridad si excede el ancho de la columna
+        max_p_w = col_name_w - 6
+        p_str = p if len(p) <= max_p_w else p[:max_p_w-2] + ".."
+        pad_name = max(0, max_p_w - len(p_str))
+        pkg_display = f"{tag}{col}{p_str}{C_RESET}{' ' * pad_name}"
 
-        raw_orig_len = len(orig)
-        pad_orig = max(0, col_type_w - 2 - raw_orig_len)
+        max_t_w = col_trans_w - 2
+        t_str = trans if len(trans) <= max_t_w else trans[:max_t_w-2] + ".."
+        pad_trans = max(0, max_t_w - len(t_str))
 
-        print(f"{C_GRAY}  │{C_RESET} {pkg_display}{' ' * pad_name} "
-              f"{C_GRAY}│{C_RESET} {C_WHITE}{trans}{C_RESET}{' ' * pad_trans} "
-              f"{C_GRAY}│{C_RESET} {col}{orig}{C_RESET}{' ' * pad_orig} {C_GRAY}│{C_RESET}")
+        max_o_w = col_type_w - 2
+        o_str = orig[:max_o_w]
+        pad_orig = max(0, max_o_w - len(o_str))
+
+        print(f"{C_GRAY}  │{C_RESET} {pkg_display} "
+              f"{C_GRAY}│{C_RESET} {C_WHITE}{t_str}{C_RESET}{' ' * pad_trans} "
+              f"{C_GRAY}│{C_RESET} {col}{o_str}{C_RESET}{' ' * pad_orig} {C_GRAY}│{C_RESET}")
 
     if len(items) > max_display:
         diff = len(items) - max_display
-        tot_w = col_name_w + col_trans_w + col_type_w + 2
-        msg = f"... y {diff} paquetes adicionales pendientes de actualización"
-        pad = max(0, tot_w - len(msg) - 2)
-        print(header_mid)
+        sep_summary = f"{C_GRAY}  ├{'─' * col_name_w}┴{'─' * col_trans_w}┴{'─' * col_type_w}┤{C_RESET}"
+        print(sep_summary)
+        msg = f"... y {diff} paquetes más pendientes de actualización"
+        pad = max(0, tot_inner_w - len(msg) - 2)
         print(f"{C_GRAY}  │{C_RESET} {C_GRAY}{msg}{' ' * pad}{C_RESET} {C_GRAY}│{C_RESET}")
+        header_bot = f"{C_GRAY}  └{'─' * tot_inner_w}┘{C_RESET}"
 
     print(header_bot)
     if has_critical:
-        print(f"  {C_YELLOW}[!] {C_WHITE}Componente crítico del sistema {C_CYAN}(Kernel, Core, Drivers, Schedulers){C_RESET}")
+        print(f"  {C_YELLOW}[!]{C_RESET} {C_WHITE}Componente crítico del sistema {C_CYAN}(Kernel, Core, Drivers, Schedulers){C_RESET}")
     print()
 
 def run_interactive():

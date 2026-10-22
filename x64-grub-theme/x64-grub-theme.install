@@ -65,3 +65,4 @@ with open('/etc/grub.d/10_linux', 'w') as f:
 post_upgrade() {
     post_install
 }
+

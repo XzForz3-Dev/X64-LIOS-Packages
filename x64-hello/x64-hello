@@ -66,7 +66,7 @@ def build_x64_term_cmd(title, banner_title, shell_body):
 
 
 def get_system_update_cmd():
-    return "kitty --app-id x64-update --class x64-update -T 'X64 LIOS Update' -o remember_window_size=no -o initial_window_width=94c -o initial_window_height=26c -o background_opacity=0.96 -e x64-update"
+    return "kitty --app-id x64-update --class x64-update -T 'X64 LIOS Update' -o remember_window_size=no -o initial_window_width=112c -o initial_window_height=35c -o background_opacity=1.0 -e x64-update"
 
 
 def get_static_hw_info():
