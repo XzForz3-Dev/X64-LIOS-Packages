@@ -1,0 +1,63 @@
+post_install() {
+    # 1. Sanitizar nombres de kernels en /etc/grub.d/10_linux (Kernel Gaming / Kernel LTS)
+    if [ -f /etc/grub.d/10_linux ]; then
+        python3 -c "
+with open('/etc/grub.d/10_linux', 'r') as f:
+    lines = f.readlines()
+
+new_lines = []
+skip = False
+for line in lines:
+    if 'if [ x\$type != xsimple ] ; then' in line:
+        new_lines.append('''  case \"\$version\" in
+      linux-cachyos-lts) version_display=\"Kernel LTS\" ;;
+      linux-cachyos)     version_display=\"Kernel Gaming\" ;;
+      linux-lts)         version_display=\"Kernel LTS\" ;;
+      linux-zen)         version_display=\"Kernel Zen\" ;;
+      linux-hardened)    version_display=\"Kernel Hardened\" ;;
+      linux)             version_display=\"Kernel Estándar\" ;;
+      *)                 version_display=\"\$(echo \"\$version\" | sed -e 's/linux-//' -e 's/-cachyos//' -e 's/cachyos-//')\" ;;
+  esac
+
+  if [ x\$type != xsimple ] ; then
+      case \$type in
+	  booster)
+	      title=\"\${os} (\${version_display} - booster initramfs)\" ;;
+	  fallback)
+	      title=\"\${os} (\${version_display} - fallback initramfs)\" ;;
+	  recovery)
+	      title=\"\${os} (\${version_display} - recovery mode)\"
+	      allowed_user_list=\"\$(grub_get_auth_user_list \$GRUB_RECOVERY_ACCESS_LEVEL)\"
+	      ;;
+	  *)
+	      title=\"\${os} (\${version_display})\"
+	      allowed_user_list=\"\$(grub_get_auth_user_list \$GRUB_ADVANCED_ACCESS_LEVEL)\"
+	      ;;
+      esac
+''')
+        skip = True
+        continue
+    if skip:
+        if 'if [ x\"\$title\" = x\"\$GRUB_ACTUAL_DEFAULT\" ]' in line:
+            skip = False
+            new_lines.append(line)
+        continue
+    new_lines.append(line)
+
+with open('/etc/grub.d/10_linux', 'w') as f:
+    f.writelines(new_lines)
+" 2>/dev/null || true
+    fi
+
+    # 2. Sanitizar formato de snapshots en grub-btrfs (eliminar encabezado y ruta redundante)
+    if [ -f /etc/default/grub-btrfs/config ]; then
+        sed -i 's/#GRUB_BTRFS_TITLE_FORMAT=.*/GRUB_BTRFS_TITLE_FORMAT=("date" "type" "description")/' /etc/default/grub-btrfs/config 2>/dev/null || true
+    fi
+    if [ -f /etc/grub.d/41_snapshots-btrfs ]; then
+        sed -i 's/^header_menu()/header_menu() { return 0; }\n_old_header_menu()/' /etc/grub.d/41_snapshots-btrfs 2>/dev/null || true
+    fi
+}
+
+post_upgrade() {
+    post_install
+}
