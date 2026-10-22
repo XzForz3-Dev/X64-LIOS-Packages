@@ -3,10 +3,9 @@ Name=X64 Update
 Comment=Actualizar el sistema X64 LIOS
 Comment[es]=Actualizar el sistema X64 LIOS
 Comment[en]=Update X64 LIOS System
-Exec=kitty --app-id x64-update --class x64-update -T "X64 LIOS Update" -o remember_window_size=no -o initial_window_width=112c -o initial_window_height=35c -o background_opacity=1.0 -e x64-update
+Exec=x64-update
 Icon=x64-update
 Terminal=false
 Type=Application
 Categories=System;Settings;
 StartupNotify=true
-

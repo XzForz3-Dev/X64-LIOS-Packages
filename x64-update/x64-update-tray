@@ -274,30 +274,10 @@ class X64UpdateTray(QSystemTrayIcon):
                 self.trigger_background_check()
 
     def launch_updater(self):
-        term = None
-        if shutil.which("kitty"):
-            term = [
-                "kitty",
-                "--app-id", "x64-update",
-                "--class", "x64-update",
-                "-T", "X64 LIOS Update",
-                "-o", "remember_window_size=no",
-                "-o", "initial_window_width=112c",
-                "-o", "initial_window_height=35c",
-                "-o", "background_opacity=1.0",
-                "-e", "x64-update"
-            ]
-        elif shutil.which("xterm"):
-            term = ["xterm", "-title", "X64 LIOS Update", "-geometry", "94x26", "-e", "x64-update"]
-        elif shutil.which("konsole"):
-            term = ["konsole", "-e", "x64-update"]
-
         try:
-            if term:
-                subprocess.Popen(term)
-            else:
-                subprocess.Popen(["x64-update"])
+            subprocess.Popen(["x64-update"])
         except Exception:
+            pass
             pass
 
     def trigger_background_check(self):

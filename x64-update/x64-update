@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-x64-update: Gestor y Notificador de Actualizaciones de X64 LIOS.
+x64-update: Gestor Oficial y Notificador de Actualizaciones de X64 LIOS.
 Desarrollado para X64 Studios.
-Interfaz interactiva Cyberpunk, animada y persistente para terminal.
+Interfaz Gráfica Nativa Moderna (PyQt6) con soporte CLI / Headless (--check).
 """
 
 import sys
@@ -20,7 +20,7 @@ COUNT_FILE = os.path.join(STATE_DIR, "count")
 PACKAGES_FILE = os.path.join(STATE_DIR, "packages.txt")
 LAST_CHECK_FILE = os.path.join(STATE_DIR, "last_check")
 
-# ANSI Color Codes
+# ANSI Color Codes for CLI fallback
 C_RESET   = "\033[0m"
 C_BOLD    = "\033[1m"
 C_DIM     = "\033[2m"
@@ -59,7 +59,6 @@ def get_telemetry():
     kernel = "Linux Desconocido"
     try:
         raw_k = subprocess.check_output(["uname", "-r"], text=True).strip()
-        # Cleanse distro branding from kernel string
         raw_k = raw_k.replace("-cachyos", "").replace("cachyos", "")
         kernel = raw_k
     except Exception:
@@ -94,51 +93,30 @@ def get_telemetry():
         "hostname": hostname
     }
 
-def print_telemetry_box():
-    t = get_telemetry()
-    box_w = 82
-    line_content = f"  {C_CYAN}Equipo:{C_RESET} {C_WHITE}{t['hostname']}{C_RESET}     {C_CYAN}Kernel:{C_RESET} {C_WHITE}{t['kernel']}{C_RESET}     {C_CYAN}Uptime:{C_RESET} {C_WHITE}{t['uptime']}{C_RESET}"
-    
-    # Calculate visible length (without ANSI codes)
-    visible_content = f"  Equipo: {t['hostname']}     Kernel: {t['kernel']}     Uptime: {t['uptime']}"
-    pad = max(0, box_w - len(visible_content))
+def is_critical_package(name):
+    lower = name.lower()
+    critical_stems = [
+        "linux", "kernel", "nvidia", "mesa", "vulkan", "systemd",
+        "glibc", "pipewire", "wayland", "dracut", "mkinitcpio",
+        "grub", "limine", "refind", "btrfs", "zfs", "scx"
+    ]
+    for stem in critical_stems:
+        if stem in lower:
+            return True
+    return False
 
-    print(f"{C_GRAY}  ┌{'─' * box_w}┐{C_RESET}")
-    print(f"{C_GRAY}  │{C_RESET}{line_content}{' ' * pad}{C_GRAY}│{C_RESET}")
-    print(f"{C_GRAY}  └{'─' * box_w}┘{C_RESET}")
-    print()
-
-class Spinner:
-    def __init__(self, message="Procesando..."):
-        self.message = message
-        self.frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        self.stop_event = threading.Event()
-        self.thread = None
-
-    def _animate(self):
-        idx = 0
-        while not self.stop_event.is_set():
-            frame = self.frames[idx % len(self.frames)]
-            sys.stdout.write(f"\r  {C_CYAN}[ {frame} ]{C_RESET} {self.message} ")
-            sys.stdout.flush()
-            idx += 1
-            time.sleep(0.08)
-        sys.stdout.write("\r" + " " * (len(self.message) + 16) + "\r")
-        sys.stdout.flush()
-
-    def start(self):
-        self.stop_event.clear()
-        self.thread = threading.Thread(target=self._animate, daemon=True)
-        self.thread.start()
-
-    def stop(self, final_msg="", is_alert=False):
-        self.stop_event.set()
-        if self.thread:
-            self.thread.join()
-        if final_msg:
-            # Check mark in green for clean status
-            icon = f"{C_YELLOW}[ ! ]{C_RESET}" if is_alert else f"{C_GREEN}[ ✓ ]{C_RESET}"
-            print(f"  {icon} {final_msg}")
+def parse_pkg_line(line):
+    # Formato de checkupdates: "paquete versión_actual -> versión_nueva"
+    line_clean = line.replace("(AUR)", "").replace("(Flatpak)", "").strip()
+    parts = line_clean.split()
+    if len(parts) >= 4 and parts[2] == "->":
+        pkg = parts[0]
+        old_v = parts[1]
+        new_v = parts[3]
+        return pkg, old_v, new_v
+    elif len(parts) >= 2:
+        return parts[0], parts[1], ""
+    return line_clean, "", ""
 
 def check_official_repos():
     repo_pkgs = []
@@ -255,81 +233,768 @@ def run_background_check_and_save():
         "count": total_count
     }
 
-def is_critical_package(name):
-    lower = name.lower()
-    critical_stems = [
-        "linux", "kernel", "nvidia", "mesa", "vulkan", "systemd",
-        "glibc", "pipewire", "wayland", "dracut", "mkinitcpio",
-        "grub", "limine", "refind", "btrfs", "zfs", "scx"
-    ]
-    for stem in critical_stems:
-        if stem in lower:
-            return True
-    return False
 
-def parse_pkg_line(line):
-    parts = line.split()
-    if len(parts) >= 4 and parts[2] == "->":
-        pkg = parts[0]
-        old_v = parts[1]
-        new_v = parts[3]
-        return pkg, f"{old_v} ➔ {new_v}"
-    elif len(parts) >= 2:
-        return parts[0], " ".join(parts[1:])
-    return line, ""
+# ==============================================================================
+# GUI NATIVA (PyQt6)
+# ==============================================================================
 
-def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
-    items = []
-    for line in repo_pkgs:
-        p, trans = parse_pkg_line(line)
-        items.append((p, trans, "Oficial", C_CYAN))
-    for line in aur_pkgs:
-        p, trans = parse_pkg_line(line)
-        items.append((p, trans, "AUR", C_MAGENTA))
-    for line in flatpak_pkgs:
-        p, trans = parse_pkg_line(line)
-        items.append((p, trans, "Flatpak", C_BLUE))
+def run_gui():
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem,
+        QHeaderView, QCheckBox, QFrame, QButtonGroup, QAbstractItemView,
+        QProgressBar, QGraphicsDropShadowEffect
+    )
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
+    from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen
 
-    # Priorizar componentes críticos en la parte superior (Kernel, Drivers, Core)
-    items.sort(key=lambda x: (0 if is_critical_package(x[0]) else 1, x[0]))
+    class CheckWorker(QThread):
+        finished = pyqtSignal(dict)
+        status = pyqtSignal(str)
 
-    term_size = shutil.get_terminal_size((112, 35))
-    term_w = term_size.columns
-    term_h = term_size.lines
+        def run(self):
+            self.status.emit("Comprobando repositorios oficiales...")
+            repo_pkgs = check_official_repos()
+            self.status.emit("Inspeccionando catálogo AUR...")
+            aur_pkgs = check_aur_packages()
+            self.status.emit("Verificando paquetes Flatpak...")
+            flatpak_pkgs = check_flatpak_packages()
 
-    # Límite dinámico adaptativo para que NUNCA desborde la ventana verticalmente
-    max_display = max(7, min(14, term_h - 24))
-    visible_items = items[:max_display]
+            data = run_background_check_and_save()
+            self.finished.emit({
+                "repo": repo_pkgs,
+                "aur": aur_pkgs,
+                "flatpak": flatpak_pkgs,
+                "count": data["count"]
+            })
 
-    # Geometría estricta de columnas para evitar line-wrap en terminales de 90c a 112c
+    class X64UpdateWindow(QMainWindow):
+        def __init__(self):
+            super().__init__()
+            self.setWindowTitle("X64 LIOS Update")
+            self.resize(1020, 680)
+            self.setMinimumSize(850, 520)
+
+            # Icon
+            for icon_path in [
+                "/usr/share/pixmaps/x64-update.png",
+                "/usr/share/icons/hicolor/128x128/apps/x64-update.png",
+                os.path.expanduser("~/Proyectos/X64-LIOS-Packages/x64-update/icons/128x128/apps/x64-update.png")
+            ]:
+                if os.path.exists(icon_path):
+                    self.setWindowIcon(QIcon(icon_path))
+                    break
+
+            self.all_items = []
+            self.active_filter = "all"
+            self.worker = None
+
+            self.init_ui()
+            self.load_cached_state()
+            self.trigger_refresh()
+
+        def init_ui(self):
+            central = QWidget()
+            central.setObjectName("centralWidget")
+            self.setCentralWidget(central)
+
+            main_layout = QVBoxLayout(central)
+            main_layout.setContentsMargins(24, 20, 24, 20)
+            main_layout.setSpacing(16)
+
+            # -------------------------------------------------------------
+            # 1. HEADER HERO
+            # -------------------------------------------------------------
+            header_layout = QHBoxLayout()
+            header_layout.setSpacing(16)
+
+            # Logo & Titles
+            title_vbox = QVBoxLayout()
+            title_vbox.setSpacing(2)
+
+            title_row = QHBoxLayout()
+            lbl_badge = QLabel("X64")
+            lbl_badge.setStyleSheet("""
+                background-color: #ff1a1a;
+                color: #ffffff;
+                font-weight: 900;
+                font-size: 13px;
+                padding: 2px 8px;
+                border-radius: 4px;
+            """)
+            lbl_title = QLabel("LIOS UPDATE")
+            lbl_title.setStyleSheet("color: #ffffff; font-weight: 800; font-size: 20px; letter-spacing: 1px;")
+            title_row.addWidget(lbl_badge)
+            title_row.addWidget(lbl_title)
+            title_row.addStretch()
+
+            lbl_sub = QLabel("Centro Oficial de Actualizaciones y Seguridad del Sistema")
+            lbl_sub.setStyleSheet("color: #8c8c9a; font-size: 12px;")
+
+            title_vbox.addLayout(title_row)
+            title_vbox.addWidget(lbl_sub)
+            header_layout.addLayout(title_vbox)
+
+            header_layout.addStretch()
+
+            # Telemetry Pills
+            t = get_telemetry()
+            lbl_kernel = QLabel(f"⚡ Kernel: {t['kernel']}")
+            lbl_kernel.setStyleSheet("background: #181822; color: #a0a0b2; border: 1px solid #282834; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: bold;")
+            
+            lbl_uptime = QLabel(f"⏱ Uptime: {t['uptime']}")
+            lbl_uptime.setStyleSheet("background: #181822; color: #a0a0b2; border: 1px solid #282834; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: bold;")
+
+            self.btn_refresh = QPushButton("⟳ Comprobar")
+            self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_refresh.setStyleSheet("""
+                QPushButton {
+                    background: #1f1f2a;
+                    color: #ffffff;
+                    border: 1px solid #363648;
+                    border-radius: 6px;
+                    padding: 6px 16px;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background: #2a2a3a;
+                    border: 1px solid #ff1a1a;
+                }
+            """)
+            self.btn_refresh.clicked.connect(self.trigger_refresh)
+
+            header_layout.addWidget(lbl_kernel)
+            header_layout.addWidget(lbl_uptime)
+            header_layout.addWidget(self.btn_refresh)
+
+            main_layout.addLayout(header_layout)
+
+            # -------------------------------------------------------------
+            # 2. SEARCH & FILTER CHIPS BAR
+            # -------------------------------------------------------------
+            filter_layout = QHBoxLayout()
+            filter_layout.setSpacing(12)
+
+            self.search_input = QLineEdit()
+            self.search_input.setPlaceholderText("🔍 Filtrar paquetes por nombre o versión...")
+            self.search_input.setStyleSheet("""
+                QLineEdit {
+                    background: #121218;
+                    color: #ffffff;
+                    border: 1px solid #2b2b38;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                    font-size: 13px;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #ff1a1a;
+                    background: #151520;
+                }
+            """)
+            self.search_input.textChanged.connect(self.apply_filter)
+            filter_layout.addWidget(self.search_input, stretch=2)
+
+            # Filter Buttons Group
+            self.btn_group = QButtonGroup(self)
+            self.btn_group.setExclusive(True)
+
+            self.f_all = QPushButton("Todos (0)")
+            self.f_all.setCheckable(True)
+            self.f_all.setChecked(True)
+            self.f_all.setProperty("filter", "all")
+
+            self.f_crit = QPushButton("Críticos (0)")
+            self.f_crit.setCheckable(True)
+            self.f_crit.setProperty("filter", "crit")
+
+            self.f_repo = QPushButton("Oficiales (0)")
+            self.f_repo.setCheckable(True)
+            self.f_repo.setProperty("filter", "repo")
+
+            self.f_aur = QPushButton("AUR (0)")
+            self.f_aur.setCheckable(True)
+            self.f_aur.setProperty("filter", "aur")
+
+            self.f_fp = QPushButton("Flatpak (0)")
+            self.f_fp.setCheckable(True)
+            self.f_fp.setProperty("filter", "fp")
+
+            chip_style = """
+                QPushButton {
+                    background: #161620;
+                    color: #9292a4;
+                    border: 1px solid #282836;
+                    border-radius: 7px;
+                    padding: 6px 14px;
+                    font-weight: 600;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background: #20202c;
+                    color: #ffffff;
+                }
+                QPushButton:checked {
+                    background: #ff1a1a;
+                    color: #ffffff;
+                    border: 1px solid #ff3333;
+                    font-weight: bold;
+                }
+            """
+            for btn in [self.f_all, self.f_crit, self.f_repo, self.f_aur, self.f_fp]:
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setStyleSheet(chip_style)
+                self.btn_group.addButton(btn)
+                btn.clicked.connect(self.on_filter_clicked)
+                filter_layout.addWidget(btn)
+
+            main_layout.addLayout(filter_layout)
+
+            # Progress Bar (Thin Laser Line)
+            self.prog_bar = QProgressBar()
+            self.prog_bar.setFixedHeight(3)
+            self.prog_bar.setTextVisible(False)
+            self.prog_bar.setRange(0, 0) # Indeterminate spinner
+            self.prog_bar.setStyleSheet("""
+                QProgressBar {
+                    background: #181822;
+                    border: none;
+                }
+                QProgressBar::chunk {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:1 #ff5555);
+                }
+            """)
+            self.prog_bar.setVisible(False)
+            main_layout.addWidget(self.prog_bar)
+
+            # -------------------------------------------------------------
+            # 3. MAIN TABLE OF PACKAGES
+            # -------------------------------------------------------------
+            self.table = QTableWidget()
+            self.table.setColumnCount(4)
+            self.table.setHorizontalHeaderLabels(["PRIORIDAD / TIPO", "PAQUETE", "VERSIÓN ACTUAL", "NUEVA VERSIÓN"])
+            self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self.table.verticalHeader().setVisible(False)
+            self.table.setAlternatingRowColors(True)
+            self.table.setSortingEnabled(True)
+
+            self.table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #0f0f15;
+                    alternate-background-color: #14141c;
+                    color: #ffffff;
+                    gridline-color: #1c1c26;
+                    border: 1px solid #242432;
+                    border-radius: 8px;
+                    selection-background-color: #2e1216;
+                    selection-color: #ffffff;
+                    font-size: 13px;
+                }
+                QTableWidget::item {
+                    padding: 8px 14px;
+                    border-bottom: 1px solid #181822;
+                }
+                QHeaderView::section {
+                    background-color: #181822;
+                    color: #9292a4;
+                    padding: 10px 14px;
+                    border: none;
+                    border-bottom: 2px solid #ff1a1a;
+                    font-weight: bold;
+                    font-size: 11px;
+                    letter-spacing: 0.5px;
+                }
+                QHeaderView::section:hover {
+                    background-color: #20202c;
+                    color: #ffffff;
+                }
+                QScrollBar:vertical {
+                    background: #0f0f15;
+                    width: 10px;
+                    margin: 0px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:vertical {
+                    background: #2a2a38;
+                    min-height: 35px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background: #ff1a1a;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+            """)
+            main_layout.addWidget(self.table, stretch=1)
+
+            # Zero Updates Card (Placeholder when system is up to date)
+            self.zero_card = QFrame()
+            self.zero_card.setStyleSheet("""
+                QFrame {
+                    background-color: #111118;
+                    border: 1px solid #22c55e;
+                    border-radius: 12px;
+                    padding: 40px;
+                }
+            """)
+            zero_vbox = QVBoxLayout(self.zero_card)
+            zero_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            zero_vbox.setSpacing(12)
+
+            lbl_zero_icon = QLabel("✓")
+            lbl_zero_icon.setStyleSheet("color: #22c55e; font-size: 48px; font-weight: bold;")
+            lbl_zero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            lbl_zero_title = QLabel("¡TU SISTEMA X64 LIOS ESTÁ COMPLETAMENTE AL DÍA!")
+            lbl_zero_title.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;")
+            lbl_zero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            lbl_zero_desc = QLabel("Todos los paquetes de los repositorios oficiales, catálogo AUR y aplicaciones Flatpak están en su última versión.")
+            lbl_zero_desc.setStyleSheet("color: #8c8c9a; font-size: 13px;")
+            lbl_zero_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            zero_vbox.addWidget(lbl_zero_icon)
+            zero_vbox.addWidget(lbl_zero_title)
+            zero_vbox.addWidget(lbl_zero_desc)
+
+            self.zero_card.setVisible(False)
+            main_layout.addWidget(self.zero_card, stretch=1)
+
+            # -------------------------------------------------------------
+            # 4. FOOTER ACTION BAR
+            # -------------------------------------------------------------
+            footer_frame = QFrame()
+            footer_frame.setStyleSheet("""
+                QFrame {
+                    background-color: #13131b;
+                    border: 1px solid #222230;
+                    border-radius: 10px;
+                    padding: 8px 16px;
+                }
+            """)
+            footer_layout = QHBoxLayout(footer_frame)
+            footer_layout.setContentsMargins(12, 10, 12, 10)
+            footer_layout.setSpacing(16)
+
+            # Left side: Options Checkboxes
+            opts_vbox = QVBoxLayout()
+            opts_vbox.setSpacing(6)
+
+            self.lbl_summary = QLabel("Analizando estado de los paquetes...")
+            self.lbl_summary.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px;")
+            opts_vbox.addWidget(self.lbl_summary)
+
+            chk_row = QHBoxLayout()
+            chk_row.setSpacing(18)
+
+            self.chk_aur = QCheckBox("Incluir AUR (Yay / Paru)")
+            self.chk_aur.setChecked(True)
+            self.chk_aur.setStyleSheet("QCheckBox { color: #b0b0c2; font-size: 12px; } QCheckBox::indicator:checked { background: #ff1a1a; border: 1px solid #ff3333; }")
+
+            self.chk_flatpak = QCheckBox("Incluir Flatpaks")
+            self.chk_flatpak.setChecked(True)
+            self.chk_flatpak.setStyleSheet("QCheckBox { color: #b0b0c2; font-size: 12px; } QCheckBox::indicator:checked { background: #ff1a1a; border: 1px solid #ff3333; }")
+
+            self.chk_clean = QCheckBox("Limpiar caché de paquetes (pacman -Sc)")
+            self.chk_clean.setChecked(False)
+            self.chk_clean.setStyleSheet("QCheckBox { color: #b0b0c2; font-size: 12px; } QCheckBox::indicator:checked { background: #ff1a1a; border: 1px solid #ff3333; }")
+
+            chk_row.addWidget(self.chk_aur)
+            chk_row.addWidget(self.chk_flatpak)
+            chk_row.addWidget(self.chk_clean)
+            chk_row.addStretch()
+
+            opts_vbox.addLayout(chk_row)
+            footer_layout.addLayout(opts_vbox, stretch=2)
+
+            # Right side: Action Buttons
+            btn_box = QHBoxLayout()
+            btn_box.setSpacing(12)
+
+            btn_close = QPushButton("Cerrar")
+            btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_close.setStyleSheet("""
+                QPushButton {
+                    background: #1c1c26;
+                    color: #9292a4;
+                    border: 1px solid #2a2a3a;
+                    border-radius: 8px;
+                    padding: 10px 20px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background: #262634;
+                    color: #ffffff;
+                }
+            """)
+            btn_close.clicked.connect(self.close)
+
+            self.btn_update = QPushButton("⚡ Actualizar Sistema")
+            self.btn_update.setObjectName("btn-update")
+            self.btn_update.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_update.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
+                    color: #ffffff;
+                    border: 1px solid #ff3b3b;
+                    border-radius: 8px;
+                    padding: 10px 28px;
+                    font-weight: 800;
+                    font-size: 14px;
+                    letter-spacing: 0.5px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
+                    border: 1px solid #ff5555;
+                }
+                QPushButton:disabled {
+                    background: #252530;
+                    color: #606070;
+                    border: 1px solid #333342;
+                }
+            """)
+            self.btn_update.clicked.connect(self.launch_update_transaction)
+
+            btn_box.addWidget(btn_close)
+            btn_box.addWidget(self.btn_update)
+            footer_layout.addLayout(btn_box)
+
+            main_layout.addWidget(footer_frame)
+
+            # Global Window Style
+            self.setStyleSheet("""
+                QMainWindow {
+                    background-color: #09090d;
+                }
+            """)
+
+        def load_cached_state(self):
+            # Fast-load from disk cache for instantaneous UI launch
+            if not os.path.exists(PACKAGES_FILE):
+                return
+            try:
+                lines = []
+                with open(PACKAGES_FILE, "r", encoding="utf-8") as f:
+                    lines = [l.strip() for l in f if l.strip()]
+                
+                repo_l = [l for l in lines if not l.endswith("(AUR)") and not l.endswith("(Flatpak)")]
+                aur_l  = [l.replace(" (AUR)", "") for l in lines if l.endswith("(AUR)")]
+                fp_l   = [l.replace(" (Flatpak)", "") for l in lines if l.endswith("(Flatpak)")]
+
+                self.populate_items(repo_l, aur_l, fp_l)
+            except Exception:
+                pass
+
+        def trigger_refresh(self):
+            if self.worker and self.worker.isRunning():
+                return
+            self.prog_bar.setVisible(True)
+            self.btn_refresh.setEnabled(False)
+            self.btn_refresh.setText("Analizando...")
+
+            self.worker = CheckWorker()
+            self.worker.finished.connect(self.on_check_finished)
+            self.worker.start()
+
+        def on_check_finished(self, data):
+            self.prog_bar.setVisible(False)
+            self.btn_refresh.setEnabled(True)
+            self.btn_refresh.setText("⟳ Comprobar")
+
+            self.populate_items(data["repo"], data["aur"], data["flatpak"])
+
+        def populate_items(self, repo_pkgs, aur_pkgs, flatpak_pkgs):
+            self.all_items = []
+            
+            for line in repo_pkgs:
+                p, old_v, new_v = parse_pkg_line(line)
+                is_crit = is_critical_package(p)
+                self.all_items.append({
+                    "pkg": p,
+                    "old_v": old_v,
+                    "new_v": new_v,
+                    "type": "Oficial",
+                    "crit": is_crit
+                })
+
+            for line in aur_pkgs:
+                p, old_v, new_v = parse_pkg_line(line)
+                is_crit = is_critical_package(p)
+                self.all_items.append({
+                    "pkg": p,
+                    "old_v": old_v,
+                    "new_v": new_v,
+                    "type": "AUR",
+                    "crit": is_crit
+                })
+
+            for line in flatpak_pkgs:
+                p, old_v, new_v = parse_pkg_line(line)
+                self.all_items.append({
+                    "pkg": p,
+                    "old_v": old_v,
+                    "new_v": new_v,
+                    "type": "Flatpak",
+                    "crit": False
+                })
+
+            # Sort critical packages first, then alphabetically
+            self.all_items.sort(key=lambda x: (0 if x["crit"] else 1, x["pkg"]))
+
+            # Update filter counts
+            tot = len(self.all_items)
+            crit_cnt = sum(1 for x in self.all_items if x["crit"])
+            repo_cnt = sum(1 for x in self.all_items if x["type"] == "Oficial")
+            aur_cnt  = sum(1 for x in self.all_items if x["type"] == "AUR")
+            fp_cnt   = sum(1 for x in self.all_items if x["type"] == "Flatpak")
+
+            self.f_all.setText(f"Todos ({tot})")
+            self.f_crit.setText(f"Críticos ({crit_cnt})")
+            self.f_repo.setText(f"Oficiales ({repo_cnt})")
+            self.f_aur.setText(f"AUR ({aur_cnt})")
+            self.f_fp.setText(f"Flatpak ({fp_cnt})")
+
+            # Checkbox enable/disable
+            self.chk_aur.setVisible(aur_cnt > 0)
+            self.chk_flatpak.setVisible(fp_cnt > 0)
+
+            # Summary label
+            if tot == 0:
+                self.lbl_summary.setText("No hay actualizaciones pendientes.")
+                self.btn_update.setEnabled(False)
+                self.table.setVisible(False)
+                self.zero_card.setVisible(True)
+            else:
+                crit_msg = f" • <span style='color: #ffb822;'>{crit_cnt} componentes críticos</span>" if crit_cnt > 0 else ""
+                self.lbl_summary.setText(f"📦 <b>{tot}</b> paquetes detectados para actualización{crit_msg}")
+                self.btn_update.setEnabled(True)
+                self.btn_update.setText(f"⚡ Actualizar Sistema ({tot})")
+                self.table.setVisible(True)
+                self.zero_card.setVisible(False)
+
+            self.apply_filter()
+
+        def on_filter_clicked(self):
+            sender = self.sender()
+            if sender:
+                self.active_filter = sender.property("filter")
+                self.apply_filter()
+
+        def apply_filter(self):
+            query = self.search_input.text().strip().lower()
+
+            self.table.setSortingEnabled(False)
+            self.table.setRowCount(0)
+
+            for item in self.all_items:
+                # Type filter
+                if self.active_filter == "crit" and not item["crit"]:
+                    continue
+                if self.active_filter == "repo" and item["type"] != "Oficial":
+                    continue
+                if self.active_filter == "aur" and item["type"] != "AUR":
+                    continue
+                if self.active_filter == "fp" and item["type"] != "Flatpak":
+                    continue
+
+                # Query filter
+                if query:
+                    if query not in item["pkg"].lower() and query not in item["new_v"].lower():
+                        continue
+
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+
+                # Col 0: Badge / Type
+                lbl_badge = QLabel()
+                if item["crit"]:
+                    lbl_badge.setText("  [!] Crítico  ")
+                    lbl_badge.setStyleSheet("background: #3b2800; color: #ffb822; font-weight: bold; font-size: 11px; border-radius: 4px; border: 1px solid #664500;")
+                elif item["type"] == "Oficial":
+                    lbl_badge.setText("  Oficial  ")
+                    lbl_badge.setStyleSheet("background: #002b3d; color: #38bdf8; font-weight: bold; font-size: 11px; border-radius: 4px; border: 1px solid #024b6b;")
+                elif item["type"] == "AUR":
+                    lbl_badge.setText("  AUR  ")
+                    lbl_badge.setStyleSheet("background: #36003b; color: #e879f9; font-weight: bold; font-size: 11px; border-radius: 4px; border: 1px solid #660070;")
+                else:
+                    lbl_badge.setText("  Flatpak  ")
+                    lbl_badge.setStyleSheet("background: #121245; color: #818cf8; font-weight: bold; font-size: 11px; border-radius: 4px; border: 1px solid #22227a;")
+                
+                lbl_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                badge_cell = QWidget()
+                b_layout = QHBoxLayout(badge_cell)
+                b_layout.setContentsMargins(6, 4, 6, 4)
+                b_layout.addWidget(lbl_badge)
+                self.table.setCellWidget(row, 0, badge_cell)
+
+                # Col 1: Package Name
+                p_item = QTableWidgetItem(item["pkg"])
+                p_font = QFont()
+                p_font.setBold(True)
+                p_item.setFont(p_font)
+                p_item.setForeground(QColor("#ffffff"))
+                self.table.setItem(row, 1, p_item)
+
+                # Col 2: Current Version
+                old_item = QTableWidgetItem(item["old_v"] if item["old_v"] else "—")
+                old_item.setForeground(QColor("#9292a4"))
+                self.table.setItem(row, 2, old_item)
+
+                # Col 3: New Version
+                new_str = f"➔ {item['new_v']}" if item["new_v"] else "disponible"
+                new_item = QTableWidgetItem(new_str)
+                new_item.setForeground(QColor("#22c55e") if not item["crit"] else QColor("#ffb822"))
+                n_font = QFont()
+                n_font.setBold(True)
+                new_item.setFont(n_font)
+                self.table.setItem(row, 3, new_item)
+
+            self.table.setSortingEnabled(True)
+
+        def launch_update_transaction(self):
+            # Build transaction command
+            aur_enabled = self.chk_aur.isChecked() and self.chk_aur.isVisible()
+            fp_enabled = self.chk_flatpak.isChecked() and self.chk_flatpak.isVisible()
+            clean_cache = self.chk_clean.isChecked()
+
+            aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
+
+            commands = []
+            if aur_enabled and aur_helper:
+                commands.append(f"{aur_helper} -Syu")
+            else:
+                commands.append("sudo pacman -Syu")
+
+            if fp_enabled and shutil.which("flatpak"):
+                commands.append("flatpak update -y")
+
+            if clean_cache:
+                commands.append("sudo pacman -Sc --noconfirm")
+
+            combined_cmd = " && ".join(commands)
+            
+            script = (
+                f"clear; "
+                f"printf '\\033[1;31m' && "
+                f"echo '  ██╗  ██╗ ██████╗ ██╗  ██╗     ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗' && "
+                f"echo '  ╚██╗██╔╝██╔════╝ ██║  ██║     ██║   ██║██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔════╝' && "
+                f"echo '   ╚███╔╝ ███████╗ ███████║     ██║   ██║██████╔╝██║  ██║███████║   ██║   █████╗  ' && "
+                f"echo '   ██╔██╗ ██╔═══██╗╚════██║     ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝  ' && "
+                f"echo '  ██╔╝ ██╗╚██████╔╝     ██║     ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗' && "
+                f"echo '  ╚═╝  ╚═╝ ╚═════╝      ╚═╝      ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝' && "
+                f"printf '\\033[0m' && "
+                f"echo '  ─────────────────────────────────────────────────────────────────────────────' && "
+                f"echo '                 EJECUTANDO TRANSACCIÓN DE ACTUALIZACIÓN X64 LIOS              ' && "
+                f"echo '  ─────────────────────────────────────────────────────────────────────────────' && "
+                f"echo '' && "
+                f"{combined_cmd}; status=$?; "
+                f"echo ''; "
+                f"if [ $status -eq 0 ]; then "
+                f"  x64-update --check 2>/dev/null || true; "
+                f"  printf '\\033[1;32m  [✓] ¡Actualización finalizada con éxito!\\033[0m\\n'; "
+                f"else "
+                f"  printf '\\033[1;31m  [✗] La actualización se interrumpió o devolvió código: %d\\033[0m\\n' $status; "
+                f"fi; "
+                f"echo ''; "
+                f"read -p '  Presiona [Enter] para cerrar esta ventana y regresar al gestor...'"
+            )
+
+            import shlex
+            term_cmd = (
+                f"kitty --app-id x64-update-runner --class x64-update-runner "
+                f"-T 'X64 LIOS - Transacción de Actualización' "
+                f"-o remember_window_size=no -o initial_window_width=112c -o initial_window_height=32c "
+                f"-o background_opacity=1.0 bash -c {shlex.quote(script)}"
+            )
+
+            self.btn_update.setEnabled(False)
+            self.btn_update.setText("Actualizando en Terminal...")
+
+            # Run terminal process and wait asynchronously
+            def runner():
+                subprocess.run(term_cmd, shell=True)
+                # When finished, re-trigger check
+                QTimer.singleShot(500, self.trigger_refresh)
+
+            threading.Thread(target=runner, daemon=True).start()
+
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    win = X64UpdateWindow()
+    win.show()
+    sys.exit(app.exec())
+
+
+# ==============================================================================
+# CLI INTERACTIVO (Fallback para consola/TTY pura)
+# ==============================================================================
+
+def run_cli_interactive():
+    if sys.stdout.isatty():
+        os.system("clear")
+
+    print(BANNER)
+    t = get_telemetry()
+    box_w = 82
+    line_content = f"  {C_CYAN}Equipo:{C_RESET} {C_WHITE}{t['hostname']}{C_RESET}     {C_CYAN}Kernel:{C_RESET} {C_WHITE}{t['kernel']}{C_RESET}     {C_CYAN}Uptime:{C_RESET} {C_WHITE}{t['uptime']}{C_RESET}"
+    visible_content = f"  Equipo: {t['hostname']}     Kernel: {t['kernel']}     Uptime: {t['uptime']}"
+    pad = max(0, box_w - len(visible_content))
+
+    print(f"{C_GRAY}  ┌{'─' * box_w}┐{C_RESET}")
+    print(f"{C_GRAY}  │{C_RESET}{line_content}{' ' * pad}{C_GRAY}│{C_RESET}")
+    print(f"{C_GRAY}  └{'─' * box_w}┘{C_RESET}\n")
+
+    print(f"  {C_CYAN}[*]{C_RESET} Comprobando repositorios oficiales...")
+    repo_pkgs = check_official_repos()
+    aur_pkgs = check_aur_packages()
+    flatpak_pkgs = check_flatpak_packages()
+
+    total_updates = len(repo_pkgs) + len(aur_pkgs) + len(flatpak_pkgs)
+    if total_updates == 0:
+        print(f"\n  {C_GREEN}{C_BOLD}✓ ¡Tu sistema X64 LIOS está completamente al día!{C_RESET}\n")
+        wait_for_user()
+        return 0
+
+    print(f"\n  {C_RED}{C_BOLD}▶ PAQUETES DETECTADOS PARA ACTUALIZACIÓN ({total_updates}):{C_RESET}\n")
+    
+    # Imprimir TODOS los paquetes sin límite artificial en CLI
     col_name_w = 32
     col_trans_w = 36
     col_type_w = 12
-    tot_inner_w = col_name_w + col_trans_w + col_type_w + 2
-
     header_top = f"{C_GRAY}  ┌{'─' * col_name_w}┬{'─' * col_trans_w}┬{'─' * col_type_w}┐{C_RESET}"
     header_mid = f"{C_GRAY}  ├{'─' * col_name_w}┼{'─' * col_trans_w}┼{'─' * col_type_w}┤{C_RESET}"
     header_bot = f"{C_GRAY}  └{'─' * col_name_w}┴{'─' * col_trans_w}┴{'─' * col_type_w}┘{C_RESET}"
 
-    hdr_name = "PAQUETE"
-    hdr_trans = "TRANSICIÓN DE VERSIÓN"
-    hdr_type = "ORIGEN"
-
     print(header_top)
-    print(f"{C_GRAY}  │{C_RESET} {C_WHITE}{C_BOLD}{hdr_name:<{col_name_w-2}}{C_RESET} "
-          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{hdr_trans:<{col_trans_w-2}}{C_RESET} "
-          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{hdr_type:<{col_type_w-2}}{C_RESET} {C_GRAY}│{C_RESET}")
+    print(f"{C_GRAY}  │{C_RESET} {C_WHITE}{C_BOLD}{'PAQUETE':<{col_name_w-2}}{C_RESET} "
+          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{'TRANSICIÓN DE VERSIÓN':<{col_trans_w-2}}{C_RESET} "
+          f"{C_GRAY}│{C_RESET} {C_WHITE}{C_BOLD}{'ORIGEN':<{col_type_w-2}}{C_RESET} {C_GRAY}│{C_RESET}")
     print(header_mid)
 
-    has_critical = False
+    all_list = []
+    for line in repo_pkgs:
+        p, old_v, new_v = parse_pkg_line(line)
+        trans = f"{old_v} ➔ {new_v}" if new_v else old_v
+        all_list.append((p, trans, "Oficial", C_CYAN, is_critical_package(p)))
+    for line in aur_pkgs:
+        p, old_v, new_v = parse_pkg_line(line)
+        trans = f"{old_v} ➔ {new_v}" if new_v else old_v
+        all_list.append((p, trans, "AUR", C_MAGENTA, is_critical_package(p)))
+    for line in flatpak_pkgs:
+        p, old_v, new_v = parse_pkg_line(line)
+        all_list.append((p, old_v, "Flatpak", C_BLUE, False))
 
-    for p, trans, orig, col in visible_items:
-        is_crit = is_critical_package(p)
-        if is_crit:
-            has_critical = True
+    all_list.sort(key=lambda x: (0 if x[4] else 1, x[0]))
+
+    for p, trans, orig, col, is_crit in all_list:
         tag = f"{C_YELLOW}[!]{C_RESET} " if is_crit else "    "
-
-        # Truncar con seguridad si excede el ancho de la columna
         max_p_w = col_name_w - 6
         p_str = p if len(p) <= max_p_w else p[:max_p_w-2] + ".."
         pad_name = max(0, max_p_w - len(p_str))
@@ -347,91 +1012,14 @@ def render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs):
               f"{C_GRAY}│{C_RESET} {C_WHITE}{t_str}{C_RESET}{' ' * pad_trans} "
               f"{C_GRAY}│{C_RESET} {col}{o_str}{C_RESET}{' ' * pad_orig} {C_GRAY}│{C_RESET}")
 
-    if len(items) > max_display:
-        diff = len(items) - max_display
-        sep_summary = f"{C_GRAY}  ├{'─' * col_name_w}┴{'─' * col_trans_w}┴{'─' * col_type_w}┤{C_RESET}"
-        print(sep_summary)
-        msg = f"... y {diff} paquetes más pendientes de actualización"
-        pad = max(0, tot_inner_w - len(msg) - 2)
-        print(f"{C_GRAY}  │{C_RESET} {C_GRAY}{msg}{' ' * pad}{C_RESET} {C_GRAY}│{C_RESET}")
-        header_bot = f"{C_GRAY}  └{'─' * tot_inner_w}┘{C_RESET}"
-
     print(header_bot)
-    if has_critical:
-        print(f"  {C_YELLOW}[!]{C_RESET} {C_WHITE}Componente crítico del sistema {C_CYAN}(Kernel, Core, Drivers, Schedulers){C_RESET}")
     print()
 
-def run_interactive():
-    if sys.stdout.isatty():
-        os.system("clear")
-
-    print(BANNER)
-    print_telemetry_box()
-
-    # Dynamic checks with animated spinner
-    sp_repo = Spinner("Consultando repositorios oficiales de X64 LIOS...")
-    sp_repo.start()
-    repo_pkgs = check_official_repos()
-    msg_repo = f"Repositorios Oficiales: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(repo_pkgs) == 0 else f"Repositorios Oficiales: {C_WHITE}{len(repo_pkgs)} actualizaciones disponibles{C_RESET}"
-    sp_repo.stop(msg_repo, is_alert=False)
-
-    sp_aur = Spinner("Inspeccionando paquetes de usuario (AUR vía Yay/Paru)...")
-    sp_aur.start()
-    aur_pkgs = check_aur_packages()
-    msg_aur = f"Catálogo AUR: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(aur_pkgs) == 0 else f"Catálogo AUR: {C_WHITE}{len(aur_pkgs)} actualizaciones disponibles{C_RESET}"
-    sp_aur.stop(msg_aur, is_alert=False)
-
-    sp_fp = Spinner("Verificando aplicaciones en contenedor Flatpak...")
-    sp_fp.start()
-    flatpak_pkgs = check_flatpak_packages()
-    msg_fp = f"Aplicaciones Flatpak: {C_GREEN}Al día (0 pendientes){C_RESET}" if len(flatpak_pkgs) == 0 else f"Aplicaciones Flatpak: {C_WHITE}{len(flatpak_pkgs)} actualizaciones listas{C_RESET}"
-    sp_fp.stop(msg_fp, is_alert=False)
-
-    total_updates = len(repo_pkgs) + len(aur_pkgs) + len(flatpak_pkgs)
-    print()
-
-    # Synchronize state files
-    ensure_state_dir()
-    try:
-        with open(COUNT_FILE, "w", encoding="utf-8") as f:
-            f.write(f"{total_updates}\n")
-        with open(PACKAGES_FILE, "w", encoding="utf-8") as f:
-            for p in repo_pkgs:
-                f.write(f"{p}\n")
-            for p in aur_pkgs:
-                f.write(f"{p} (AUR)\n")
-            for p in flatpak_pkgs:
-                f.write(f"{p} (Flatpak)\n")
-        with open(LAST_CHECK_FILE, "w", encoding="utf-8") as f:
-            f.write(f"{time.time()}\n")
-    except Exception:
-        pass
-
-    # Case 0 updates: UP TO DATE! (Clean symmetrical centered box, NEVER auto-close!)
-    if total_updates == 0:
-        box_width = 75
-        content_text = "✓  ¡TU SISTEMA X64 LIOS ESTÁ BLINDADO Y COMPLETAMENTE AL DÍA!"
-        pad_left = (box_width - len(content_text)) // 2
-        pad_right = box_width - len(content_text) - pad_left
-
-        print(f"{C_GREEN}{C_BOLD}  ╔{'═' * box_width}╗{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ║{' ' * pad_left}{content_text}{' ' * pad_right}║{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ╚{'═' * box_width}╝{C_RESET}")
-        print(f"\n  {C_WHITE}Todos los paquetes, controladores y dependencias están en su última versión.{C_RESET}")
-        wait_for_user()
-        return 0
-
-    # Case updates available: Show table
-    print(f"  {C_RED}{C_BOLD}▶ PAQUETES DETECTADOS PARA ACTUALIZACIÓN ({total_updates}):{C_RESET}\n")
-    render_package_table(repo_pkgs, aur_pkgs, flatpak_pkgs)
-
-    # Decision Menu
     print(f"{C_WHITE}{C_BOLD}  OPCIONES DE ACTUALIZACIÓN:{C_RESET}")
     print(f"   {C_RED}[1]{C_RESET} {C_WHITE}Actualizar TODO el sistema ahora (Recomendado: Oficial + AUR + Flatpak){C_RESET}")
-    print(f"   {C_RED}[2]{C_RESET} {C_WHITE}Solo repositorios oficiales (omitir AUR y Flatpak temporalmente){C_RESET}")
-    print(f"   {C_RED}[3]{C_RESET} {C_WHITE}Actualizar y realizar purga de caché de paquetes (pacman -Sc){C_RESET}")
-    print(f"   {C_RED}[4]{C_RESET} {C_LIGHT}Cancelar y salir{C_RESET}")
-    print()
+    print(f"   {C_RED}[2]{C_RESET} {C_WHITE}Solo repositorios oficiales{C_RESET}")
+    print(f"   {C_RED}[3]{C_RESET} {C_WHITE}Actualizar y purgar caché de paquetes (pacman -Sc){C_RESET}")
+    print(f"   {C_RED}[4]{C_RESET} {C_LIGHT}Cancelar y salir{C_RESET}\n")
 
     choice = "1"
     try:
@@ -439,147 +1027,55 @@ def run_interactive():
         if raw_choice:
             choice = raw_choice
     except (KeyboardInterrupt, EOFError):
-        print(f"\n\n  {C_YELLOW}Operación cancelada por el usuario.{C_RESET}")
-        wait_for_user()
+        print(f"\n  {C_YELLOW}Operación cancelada.{C_RESET}")
         return 0
 
     if choice == "4":
-        print(f"\n  {C_YELLOW}Actualización pospuesta. No se realizaron cambios en el equipo.{C_RESET}")
-        wait_for_user()
         return 0
 
-    # Determine commands to execute
     aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
-    clean_cache = (choice == "3")
-    only_official = (choice == "2")
-
-    print(f"\n{C_GREEN}{C_BOLD}  ─────────────────────────────────────────────────────────────────────────────{C_RESET}")
-    print(f"{C_GREEN}{C_BOLD}  [*] INICIANDO PROCESO DE SINCRONIZACIÓN Y DESCARGA{C_RESET}")
-    print(f"{C_GREEN}{C_BOLD}  ─────────────────────────────────────────────────────────────────────────────{C_RESET}\n")
-
-    main_ret = 0
-
-    if only_official or not aur_helper:
-        main_cmd = ["sudo", "pacman", "-Syu"]
+    cmds = []
+    if choice in ["1", "3"] and aur_helper:
+        cmds.append(f"{aur_helper} -Syu")
     else:
-        main_cmd = [aur_helper, "-Syu"]
+        cmds.append("sudo pacman -Syu")
 
-    # Run system upgrade
-    try:
-        main_ret = subprocess.run(main_cmd).returncode
-    except KeyboardInterrupt:
-        print(f"\n  {C_RED}[!] Proceso interrumpido por el usuario.{C_RESET}")
-        wait_for_user()
-        return 1
+    if choice == "1" and shutil.which("flatpak") and len(flatpak_pkgs) > 0:
+        cmds.append("flatpak update -y")
 
-    # Flatpak upgrade if selected and available
-    if main_ret == 0 and not only_official and flatpak_pkgs:
-        print(f"\n  {C_CYAN}[*] Actualizando aplicaciones Flatpak...{C_RESET}\n")
-        try:
-            subprocess.run(["flatpak", "update", "-y"])
-        except Exception:
-            pass
+    if choice == "3":
+        cmds.append("sudo pacman -Sc --noconfirm")
 
-    # Clean cache if selected
-    if main_ret == 0 and clean_cache:
-        print(f"\n  {C_YELLOW}[*] Purgando paquetes antiguos de la caché local (pacman -Sc)...{C_RESET}\n")
-        try:
-            subprocess.run(["sudo", "pacman", "-Sc", "--noconfirm"])
-        except Exception:
-            pass
-
-    # Post update check & state refresh
-    print(f"\n  {C_CYAN}[*] Actualizando registros de estado del sistema...{C_RESET}")
+    subprocess.run(" && ".join(cmds), shell=True)
     run_background_check_and_save()
-
-    # Kernel reboot check
-    kernel_updated = False
-    try:
-        running_k = subprocess.check_output(["uname", "-r"], text=True).strip()
-        modules_dir = f"/usr/lib/modules/{running_k}"
-        if not os.path.exists(modules_dir):
-            kernel_updated = True
-    except Exception:
-        pass
-
-    print()
-    if main_ret == 0:
-        box_width = 75
-        success_msg = "✓  ¡SISTEMA X64 LIOS ACTUALIZADO CON ÉXITO!"
-        pad_l = (box_width - len(success_msg)) // 2
-        pad_r = box_width - len(success_msg) - pad_l
-
-        print(f"{C_GREEN}{C_BOLD}  ╔{'═' * box_width}╗{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ║{' ' * pad_l}{success_msg}{' ' * pad_r}║{C_RESET}")
-        print(f"{C_GREEN}{C_BOLD}  ╚{'═' * box_width}╝{C_RESET}")
-        
-        if kernel_updated:
-            print(f"\n{C_YELLOW}{C_BOLD}  ⚠️  ADVERTENCIA DE CIBERSEGURIDAD Y CONTROLADORES:{C_RESET}")
-            print(f"{C_YELLOW}  Se han actualizado el Kernel Linux o módulos del sistema.{C_RESET}")
-            print(f"{C_YELLOW}  Para aplicar las mejoras y mantener la máxima estabilidad gráfica,{C_RESET}")
-            print(f"{C_YELLOW}  se recomienda reiniciar el equipo.{C_RESET}")
-    else:
-        print(f"{C_RED}{C_BOLD}  ╔════════════════════════════════════════════════════════════════════════════╗{C_RESET}")
-        print(f"{C_RED}{C_BOLD}  ║  ✗  EL PROCESO TERMINÓ CON ADVERTENCIAS O ERRORES (Código: {main_ret})        ║{C_RESET}")
-        print(f"{C_RED}{C_BOLD}  ╚════════════════════════════════════════════════════════════════════════════╝{C_RESET}")
-        print(f"  {C_WHITE}Revise los mensajes de error mostrados arriba para más detalles.{C_RESET}")
-
     wait_for_user()
-    return main_ret
+    return 0
+
+
+# ==============================================================================
+# MAIN ENTRYPOINT
+# ==============================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Gestor de actualizaciones X64 LIOS")
-    parser.add_argument("-c", "--check", action="store_true", help="Comprobar actualizaciones en segundo plano")
-    parser.add_argument("-n", "--notify", action="store_true", help="Enviar notificación de escritorio si hay actualizaciones")
-    parser.add_argument("-l", "--list", action="store_true", help="Listar paquetes pendientes")
-    parser.add_argument("--count", action="store_true", help="Mostrar número de actualizaciones pendientes")
+    parser = argparse.ArgumentParser(description="x64-update: Gestor Oficial de Actualizaciones de X64 LIOS")
+    parser.add_argument("--check", action="store_true", help="Comprueba en segundo plano y actualiza el estado")
+    parser.add_argument("--cli", action="store_true", help="Fuerza la ejecución en terminal/CLI interactivo")
+    args, unknown = parser.parse_known_args()
 
-    args = parser.parse_args()
-
-    # Fast non-interactive count query
-    if args.count:
-        if os.path.exists(COUNT_FILE):
-            try:
-                with open(COUNT_FILE, "r", encoding="utf-8") as f:
-                    print(f.read().strip())
-                    return 0
-            except Exception:
-                pass
-        data = run_background_check_and_save()
-        print(data["count"])
-        return 0
-
-    # Fast non-interactive list query
-    if args.list:
-        if os.path.exists(PACKAGES_FILE):
-            try:
-                with open(PACKAGES_FILE, "r", encoding="utf-8") as f:
-                    print(f.read().strip())
-                    return 0
-            except Exception:
-                pass
-        data = run_background_check_and_save()
-        for p in data["all"]:
-            print(p)
-        return 0
-
-    # Fast non-interactive check (used by timer, tray and cron)
     if args.check:
-        data = run_background_check_and_save()
-        count = data["count"]
-        print(f"X64 LIOS: {count} actualizaciones disponibles.")
-        if args.notify and count > 0:
-            if shutil.which("notify-send"):
-                icon_arg = ["-i", "x64-update-available"]
-                msg = f"Hay {count} actualización(es) disponibles para instalar."
-                subprocess.run(
-                    ["notify-send", "-a", "X64 LIOS", "-u", "normal"] + icon_arg + ["Actualizaciones disponibles", msg],
-                    check=False
-                )
+        run_background_check_and_save()
         return 0
 
-    # Interactive Terminal UI
-    return run_interactive()
+    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+    if args.cli or not has_display:
+        return run_cli_interactive()
+
+    try:
+        run_gui()
+    except Exception as e:
+        print(f"Error iniciando GUI PyQt6: {e}. Entrando a modo terminal...")
+        return run_cli_interactive()
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main() or 0)
