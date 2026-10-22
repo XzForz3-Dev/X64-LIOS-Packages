@@ -1282,7 +1282,7 @@ def run_gui():
             # Switch to In-App Transaction View
             self.stacked_widget.setCurrentIndex(1)
             self.log_view.clear()
-            self.log_view.appendHtml(
+            self.log_view.append(
                 f"<div style='color: #ef4444; font-weight: bold;'>[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
                 f"<div style='color: #71717a;'>Comandos: {' && '.join(commands)}</div><hr style='border: 1px solid #222230;'><br>"
             )
