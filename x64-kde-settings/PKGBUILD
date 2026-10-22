@@ -1,13 +1,17 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=12
+pkgrel=13
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
 install='x64-kde-settings.install'
 depends=('plasma-desktop' 'sddm')
-source=('x64-lios-v2.jpg'
-        'x64-lios-v3.jpg'
+source=('01-monolith.jpg'
+        '02-v3-carbon.jpg'
+        '03-v2-shield.jpg'
+        '04-hybrid-plate.jpg'
+        '05-faceted-armor.jpg'
+        '06-stealth-dark.jpg'
         'x64-logo.png'
         'x64-layout.js'
         'plasmashellrc'
@@ -21,20 +25,29 @@ source=('x64-lios-v2.jpg'
         'org.kde.kdeconnect.daemon.desktop'
         'wallpaper-metadata.json'
         'screenshot.png'
-        'plasmarc')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'plasmarc'
+        'kscreenlockerrc')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
-    # Instalar fondos de pantalla
+    # Instalar colección oficial de fondos de pantalla de X64 LIOS
     mkdir -p "${pkgdir}/usr/share/backgrounds/x64-lios"
-    cp "${srcdir}/x64-lios-v2.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
-    cp "${srcdir}/x64-lios-v3.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
-    
-    # Instalar Paquete Oficial de Wallpaper de KDE Plasma (X64-LIOS)
+    cp "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/02-v3-carbon.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/03-v2-shield.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/04-hybrid-plate.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/05-faceted-armor.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+    cp "${srcdir}/06-stealth-dark.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/"
+
+    # Enlaces simbólicos de compatibilidad para rutas históricas
+    ln -sf 03-v2-shield.jpg "${pkgdir}/usr/share/backgrounds/x64-lios/x64-lios-v2.jpg"
+    ln -sf 02-v3-carbon.jpg "${pkgdir}/usr/share/backgrounds/x64-lios/x64-lios-v3.jpg"
+
+    # Instalar Paquete Oficial de Wallpaper de KDE Plasma (X64-LIOS) -> 01-monolith.jpg
     mkdir -p "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images"
     cp "${srcdir}/wallpaper-metadata.json" "${pkgdir}/usr/share/wallpapers/X64-LIOS/metadata.json"
     cp "${srcdir}/screenshot.png" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/screenshot.png"
-    cp "${srcdir}/x64-lios-v3.jpg" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2752x1536.jpg"
+    cp "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2752x1536.jpg"
     ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/1920x1080.jpg"
     ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2560x1440.jpg"
     ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/3840x2160.jpg"
@@ -67,6 +80,11 @@ package() {
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/xdg/plasmarc"
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/plasmarc"
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/kdedefaults/plasmarc"
+
+    # Configuración de kscreenlockerrc (Pantalla de bloqueo oficial -> 05-faceted-armor.jpg)
+    cp "${srcdir}/kscreenlockerrc" "${pkgdir}/etc/xdg/kscreenlockerrc"
+    cp "${srcdir}/kscreenlockerrc" "${pkgdir}/etc/skel/.config/kscreenlockerrc"
+    cp "${srcdir}/kscreenlockerrc" "${pkgdir}/etc/skel/.config/kdedefaults/kscreenlockerrc"
 
     # Desactivar indexador Baloo (cero sobrecarga de disco/CPU para gaming)
     cp "${srcdir}/baloofilerc" "${pkgdir}/etc/skel/.config/baloofilerc"
