@@ -790,28 +790,33 @@ def run_gui():
 
             # Zero Updates Card (Placeholder when system is up to date)
             self.zero_card = QFrame()
+            self.zero_card.setObjectName("zero_card")
             self.zero_card.setStyleSheet("""
-                QFrame {
-                    background-color: #111118;
-                    border: 1px solid #22c55e;
+                QFrame#zero_card {
+                    background-color: #101018;
+                    border: 1px solid #1e3a29;
                     border-radius: 12px;
-                    padding: 40px;
+                }
+                QFrame#zero_card QLabel {
+                    border: none;
+                    background: transparent;
                 }
             """)
             zero_vbox = QVBoxLayout(self.zero_card)
+            zero_vbox.setContentsMargins(40, 50, 40, 50)
             zero_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            zero_vbox.setSpacing(12)
+            zero_vbox.setSpacing(14)
 
-            lbl_zero_icon = QLabel("✓")
-            lbl_zero_icon.setStyleSheet("color: #22c55e; font-size: 48px; font-weight: bold;")
+            lbl_zero_icon = QLabel("🛡️")
+            lbl_zero_icon.setStyleSheet("font-size: 56px;")
             lbl_zero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             lbl_zero_title = QLabel("¡TU SISTEMA X64 LIOS ESTÁ COMPLETAMENTE AL DÍA!")
-            lbl_zero_title.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;")
+            lbl_zero_title.setStyleSheet("color: #22c55e; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;")
             lbl_zero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             lbl_zero_desc = QLabel("Todos los paquetes de los repositorios oficiales, catálogo AUR y aplicaciones Flatpak están en su última versión.")
-            lbl_zero_desc.setStyleSheet("color: #8c8c9a; font-size: 13px;")
+            lbl_zero_desc.setStyleSheet("color: #8c8c9a; font-size: 13px; font-weight: 500;")
             lbl_zero_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             zero_vbox.addWidget(lbl_zero_icon)
@@ -1162,6 +1167,7 @@ def run_gui():
             if tot == 0:
                 self.lbl_summary.setText("No hay actualizaciones pendientes.")
                 self.btn_update.setEnabled(False)
+                self.btn_update.setText("⚡ Sistema al Día")
                 self.table.setVisible(False)
                 self.zero_card.setVisible(True)
             else:
