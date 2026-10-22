@@ -964,14 +964,19 @@ class X64Welcome(QWidget):
             msg.setStyleSheet("""
                 QMessageBox {
                     background-color: #121214;
-                    color: #ffffff;
                     border: 1px solid #cc0000;
                     border-radius: 12px;
                 }
-                QLabel {
+                QMessageBox QLabel {
+                    background: transparent;
+                    background-color: transparent;
                     color: #ffffff;
                     font-size: 14px;
                     line-height: 1.5;
+                }
+                QMessageBox QDialogButtonBox {
+                    background: transparent;
+                    background-color: transparent;
                 }
                 QPushButton {
                     background-color: #cc0000;
