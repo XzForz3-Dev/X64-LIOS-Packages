@@ -3,7 +3,7 @@
 """
 x64-update: Gestor Oficial y Notificador de Actualizaciones de X64 LIOS.
 Desarrollado para X64 Studios.
-Interfaz Gráfica Nativa Moderna (PyQt6) con soporte CLI / Headless (--check).
+Interfaz Gráfica Nativa 100% Integrada (PyQt6) con Consola Embebida en Vivo y Soporte CLI / Headless.
 """
 
 import sys
@@ -14,6 +14,8 @@ import time
 import argparse
 import tempfile
 import threading
+import pty
+import re
 
 STATE_DIR = os.path.expanduser("~/.local/state/x64-update")
 COUNT_FILE = os.path.join(STATE_DIR, "count")
@@ -106,7 +108,6 @@ def is_critical_package(name):
     return False
 
 def parse_pkg_line(line):
-    # Formato de checkupdates: "paquete versión_actual -> versión_nueva"
     line_clean = line.replace("(AUR)", "").replace("(Flatpak)", "").strip()
     parts = line_clean.split()
     if len(parts) >= 4 and parts[2] == "->":
@@ -233,9 +234,37 @@ def run_background_check_and_save():
         "count": total_count
     }
 
+ANSI_MAP = {
+    '30': '#71717a', '31': '#ef4444', '32': '#22c55e', '33': '#f59e0b',
+    '34': '#3b82f6', '35': '#d946ef', '36': '#06b6d4', '37': '#f4f4f5',
+    '90': '#71717a', '91': '#f87171', '92': '#4ade80', '93': '#fbbf24',
+    '94': '#60a5fa', '95': '#e879f9', '96': '#22d3ee', '97': '#ffffff',
+}
+
+def ansi_to_html(text):
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    def repl(m):
+        code = m.group(1)
+        if code in ('0', ''):
+            return '</span>'
+        parts = code.split(';')
+        color = '#ffffff'
+        bold = False
+        for p in parts:
+            if p == '1':
+                bold = True
+            elif p in ANSI_MAP:
+                color = ANSI_MAP[p]
+        b_style = 'font-weight: bold;' if bold else ''
+        return f'<span style="color: {color}; {b_style}">'
+    
+    html = re.sub(r'\x1b\[([0-9;]*)m', repl, text)
+    html = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', html)
+    return html
+
 
 # ==============================================================================
-# GUI NATIVA (PyQt6)
+# GUI NATIVA (PyQt6) 100% INTEGRADA
 # ==============================================================================
 
 def run_gui():
@@ -243,10 +272,10 @@ def run_gui():
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem,
         QHeaderView, QCheckBox, QFrame, QButtonGroup, QAbstractItemView,
-        QProgressBar, QGraphicsDropShadowEffect
+        QProgressBar, QTextEdit, QStackedWidget, QDialog
     )
-    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
-    from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QBrush, QPen
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
+    from PyQt6.QtGui import QColor, QFont, QIcon, QTextCursor
 
     class CheckWorker(QThread):
         finished = pyqtSignal(dict)
@@ -268,6 +297,228 @@ def run_gui():
                 "count": data["count"]
             })
 
+    class TransactionWorker(QThread):
+        output_received = pyqtSignal(str)
+        stage_changed = pyqtSignal(str, int) # (stage_text, percent)
+        transaction_done = pyqtSignal(bool, int, bool) # (success, exit_code, kernel_updated)
+
+        def __init__(self, commands, password=None):
+            super().__init__()
+            self.commands = commands
+            self.password = password
+            self.master_fd = None
+            self.proc = None
+            self.kernel_updated = False
+
+        def run(self):
+            # Pre-authenticate sudo credentials if provided
+            if self.password:
+                try:
+                    subprocess.run(
+                        ["sudo", "-S", "-v"],
+                        input=f"{self.password}\n".encode(),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                except Exception:
+                    pass
+
+            master, slave = pty.openpty()
+            self.master_fd = master
+
+            env = os.environ.copy()
+            env["TERM"] = "xterm-256color"
+            env["COLUMNS"] = "110"
+            env["LINES"] = "32"
+            env["LC_ALL"] = "C.UTF-8"
+
+            cmd_str = " && ".join(self.commands)
+
+            self.stage_changed.emit("Iniciando transacción de paquetes...", 10)
+
+            try:
+                self.proc = subprocess.Popen(
+                    cmd_str,
+                    shell=True,
+                    stdin=slave,
+                    stdout=slave,
+                    stderr=slave,
+                    env=env,
+                    close_fds=True
+                )
+                os.close(slave)
+
+                while True:
+                    try:
+                        data = os.read(master, 1024)
+                        if not data:
+                            break
+                        text = data.decode("utf-8", errors="replace")
+                        self.output_received.emit(text)
+
+                        # Detect critical kernel / driver replacements
+                        low = text.lower()
+                        if "vmlinuz" in low or "initramfs" in low or "linux-cachyos" in low or "nvidia" in low:
+                            self.kernel_updated = True
+
+                        if "downloading" in low or "descargando" in low:
+                            self.stage_changed.emit("Descargando paquetes de repositorios...", 35)
+                        elif "checking keyring" in low or "verificando" in low:
+                            self.stage_changed.emit("Verificando integridad y claves de seguridad...", 55)
+                        elif "upgrading" in low or "actualizando" in low or "installing" in low:
+                            self.stage_changed.emit("Instalando y descomprimiendo paquetes...", 75)
+                        elif "running post-transaction hooks" in low or "ejecutando" in low:
+                            self.stage_changed.emit("Ejecutando ganchos del sistema (initramfs, kernel)...", 90)
+
+                    except OSError:
+                        break
+
+                os.close(master)
+                ret = self.proc.wait() if self.proc else 1
+            except Exception as e:
+                self.output_received.emit(f"\nError interno ejecutando transacción: {e}\n")
+                ret = 1
+
+            success = (ret == 0)
+            if success:
+                self.stage_changed.emit("¡Transacción finalizada con éxito!", 100)
+                run_background_check_and_save()
+            else:
+                self.stage_changed.emit(f"Transacción abortada con código: {ret}", 100)
+
+            self.transaction_done.emit(success, ret, self.kernel_updated)
+
+    class PasswordDialog(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("Autenticación de Administrador")
+            self.setFixedSize(460, 240)
+            self.setModal(True)
+            self.setStyleSheet("""
+                QDialog {
+                    background-color: #0d0d13;
+                    border: 1px solid #ff1a1a;
+                    border-radius: 12px;
+                }
+            """)
+
+            vbox = QVBoxLayout(self)
+            vbox.setContentsMargins(24, 20, 24, 20)
+            vbox.setSpacing(12)
+
+            # Header
+            hdr = QHBoxLayout()
+            lbl_badge = QLabel("🔒")
+            lbl_badge.setStyleSheet("font-size: 24px;")
+            lbl_title = QLabel("Privilegios de Administrador")
+            lbl_title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;")
+            hdr.addWidget(lbl_badge)
+            hdr.addWidget(lbl_title)
+            hdr.addStretch()
+            vbox.addLayout(hdr)
+
+            lbl_sub = QLabel("Se requiere autenticación para actualizar los paquetes del sistema:")
+            lbl_sub.setStyleSheet("color: #9292a4; font-size: 12px;")
+            vbox.addWidget(lbl_sub)
+
+            self.pwd_input = QLineEdit()
+            self.pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self.pwd_input.setPlaceholderText("Contraseña...")
+            self.pwd_input.setStyleSheet("""
+                QLineEdit {
+                    background: #14141e;
+                    color: #ffffff;
+                    border: 1px solid #28283a;
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-size: 14px;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #ff1a1a;
+                    background: #181826;
+                }
+            """)
+            vbox.addWidget(self.pwd_input)
+
+            self.lbl_error = QLabel("")
+            self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold;")
+            self.lbl_error.setVisible(False)
+            vbox.addWidget(self.lbl_error)
+
+            # Buttons
+            btn_row = QHBoxLayout()
+            btn_row.setSpacing(10)
+
+            btn_cancel = QPushButton("Cancelar")
+            btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_cancel.setStyleSheet("""
+                QPushButton {
+                    background: #1a1a26;
+                    color: #9292a4;
+                    border: 1px solid #2a2a3a;
+                    border-radius: 7px;
+                    padding: 8px 18px;
+                    font-weight: 600;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background: #252536;
+                    color: #ffffff;
+                }
+            """)
+            btn_cancel.clicked.connect(self.reject)
+
+            btn_auth = QPushButton("Autorizar Actualización")
+            btn_auth.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_auth.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
+                    color: #ffffff;
+                    border: 1px solid #ff3b3b;
+                    border-radius: 7px;
+                    padding: 8px 22px;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
+                }
+            """)
+            btn_auth.clicked.connect(self.verify_password)
+
+            btn_row.addStretch()
+            btn_row.addWidget(btn_cancel)
+            btn_row.addWidget(btn_auth)
+            vbox.addLayout(btn_row)
+
+            self.pwd_input.returnPressed.connect(self.verify_password)
+            self.pwd_input.setFocus()
+
+        def verify_password(self):
+            pwd = self.pwd_input.text()
+            if not pwd:
+                self.lbl_error.setText("Por favor, ingresa tu contraseña.")
+                self.lbl_error.setVisible(True)
+                return
+
+            # Test password with sudo -S -v
+            p = subprocess.run(
+                ["sudo", "-S", "-v"],
+                input=f"{pwd}\n".encode(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            if p.returncode == 0:
+                self.accept()
+            else:
+                self.lbl_error.setText("✕ Contraseña incorrecta. Inténtalo de nuevo.")
+                self.lbl_error.setVisible(True)
+                self.pwd_input.selectAll()
+                self.pwd_input.setFocus()
+
+        def get_password(self):
+            return self.pwd_input.text()
+
     class X64UpdateWindow(QMainWindow):
         def __init__(self):
             super().__init__()
@@ -275,7 +526,6 @@ def run_gui():
             self.resize(1020, 680)
             self.setMinimumSize(850, 520)
 
-            # Icon
             for icon_path in [
                 "/usr/share/pixmaps/x64-update.png",
                 "/usr/share/icons/hicolor/128x128/apps/x64-update.png",
@@ -287,41 +537,51 @@ def run_gui():
 
             self.all_items = []
             self.active_filter = "all"
-            self.worker = None
+            self.check_worker = None
+            self.tx_worker = None
+            self.tx_start_time = 0
+            self.timer_elapsed = QTimer(self)
+            self.timer_elapsed.timeout.connect(self.update_elapsed_time)
 
             self.init_ui()
             self.load_cached_state()
             self.trigger_refresh()
 
         def init_ui(self):
-            central = QWidget()
-            central.setObjectName("centralWidget")
-            self.setCentralWidget(central)
+            self.stacked_widget = QStackedWidget()
+            self.setCentralWidget(self.stacked_widget)
 
-            main_layout = QVBoxLayout(central)
-            main_layout.setContentsMargins(24, 20, 24, 20)
-            main_layout.setSpacing(16)
+            # PAGE 0: Packages List View
+            self.page_packages = QWidget()
+            self.init_packages_page(self.page_packages)
+            self.stacked_widget.addWidget(self.page_packages)
 
-            # -------------------------------------------------------------
-            # 1. HEADER HERO
-            # -------------------------------------------------------------
+            # PAGE 1: In-App Live Transaction View
+            self.page_transaction = QWidget()
+            self.init_transaction_page(self.page_transaction)
+            self.stacked_widget.addWidget(self.page_transaction)
+
+            self.setStyleSheet("""
+                QMainWindow {
+                    background-color: #09090d;
+                }
+            """)
+
+        def init_packages_page(self, parent):
+            layout = QVBoxLayout(parent)
+            layout.setContentsMargins(24, 20, 24, 20)
+            layout.setSpacing(16)
+
+            # Header Hero
             header_layout = QHBoxLayout()
             header_layout.setSpacing(16)
 
-            # Logo & Titles
             title_vbox = QVBoxLayout()
             title_vbox.setSpacing(2)
 
             title_row = QHBoxLayout()
             lbl_badge = QLabel("X64")
-            lbl_badge.setStyleSheet("""
-                background-color: #ff1a1a;
-                color: #ffffff;
-                font-weight: 900;
-                font-size: 13px;
-                padding: 2px 8px;
-                border-radius: 4px;
-            """)
+            lbl_badge.setStyleSheet("background-color: #ff1a1a; color: #ffffff; font-weight: 900; font-size: 13px; padding: 2px 8px; border-radius: 4px;")
             lbl_title = QLabel("LIOS UPDATE")
             lbl_title.setStyleSheet("color: #ffffff; font-weight: 800; font-size: 20px; letter-spacing: 1px;")
             title_row.addWidget(lbl_badge)
@@ -337,7 +597,6 @@ def run_gui():
 
             header_layout.addStretch()
 
-            # Telemetry Pills
             t = get_telemetry()
             lbl_kernel = QLabel(f"⚡ Kernel: {t['kernel']}")
             lbl_kernel.setStyleSheet("background: #181822; color: #a0a0b2; border: 1px solid #282834; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: bold;")
@@ -367,12 +626,9 @@ def run_gui():
             header_layout.addWidget(lbl_kernel)
             header_layout.addWidget(lbl_uptime)
             header_layout.addWidget(self.btn_refresh)
+            layout.addLayout(header_layout)
 
-            main_layout.addLayout(header_layout)
-
-            # -------------------------------------------------------------
-            # 2. SEARCH & FILTER CHIPS BAR
-            # -------------------------------------------------------------
+            # Search & Filter Chips Bar
             filter_layout = QHBoxLayout()
             filter_layout.setSpacing(12)
 
@@ -395,7 +651,6 @@ def run_gui():
             self.search_input.textChanged.connect(self.apply_filter)
             filter_layout.addWidget(self.search_input, stretch=2)
 
-            # Filter Buttons Group
             self.btn_group = QButtonGroup(self)
             self.btn_group.setExclusive(True)
 
@@ -448,13 +703,13 @@ def run_gui():
                 btn.clicked.connect(self.on_filter_clicked)
                 filter_layout.addWidget(btn)
 
-            main_layout.addLayout(filter_layout)
+            layout.addLayout(filter_layout)
 
             # Progress Bar (Thin Laser Line)
             self.prog_bar = QProgressBar()
             self.prog_bar.setFixedHeight(3)
             self.prog_bar.setTextVisible(False)
-            self.prog_bar.setRange(0, 0) # Indeterminate spinner
+            self.prog_bar.setRange(0, 0)
             self.prog_bar.setStyleSheet("""
                 QProgressBar {
                     background: #181822;
@@ -465,11 +720,9 @@ def run_gui():
                 }
             """)
             self.prog_bar.setVisible(False)
-            main_layout.addWidget(self.prog_bar)
+            layout.addWidget(self.prog_bar)
 
-            # -------------------------------------------------------------
-            # 3. MAIN TABLE OF PACKAGES
-            # -------------------------------------------------------------
+            # Main Table of Packages
             self.table = QTableWidget()
             self.table.setColumnCount(4)
             self.table.setHorizontalHeaderLabels(["PRIORIDAD / TIPO", "PAQUETE", "VERSIÓN ACTUAL", "NUEVA VERSIÓN"])
@@ -533,7 +786,7 @@ def run_gui():
                     height: 0px;
                 }
             """)
-            main_layout.addWidget(self.table, stretch=1)
+            layout.addWidget(self.table, stretch=1)
 
             # Zero Updates Card (Placeholder when system is up to date)
             self.zero_card = QFrame()
@@ -566,11 +819,9 @@ def run_gui():
             zero_vbox.addWidget(lbl_zero_desc)
 
             self.zero_card.setVisible(False)
-            main_layout.addWidget(self.zero_card, stretch=1)
+            layout.addWidget(self.zero_card, stretch=1)
 
-            # -------------------------------------------------------------
-            # 4. FOOTER ACTION BAR
-            # -------------------------------------------------------------
+            # Footer Action Bar
             footer_frame = QFrame()
             footer_frame.setStyleSheet("""
                 QFrame {
@@ -584,7 +835,6 @@ def run_gui():
             footer_layout.setContentsMargins(12, 10, 12, 10)
             footer_layout.setSpacing(16)
 
-            # Left side: Options Checkboxes
             opts_vbox = QVBoxLayout()
             opts_vbox.setSpacing(6)
 
@@ -603,7 +853,7 @@ def run_gui():
             self.chk_flatpak.setChecked(True)
             self.chk_flatpak.setStyleSheet("QCheckBox { color: #b0b0c2; font-size: 12px; } QCheckBox::indicator:checked { background: #ff1a1a; border: 1px solid #ff3333; }")
 
-            self.chk_clean = QCheckBox("Limpiar caché de paquetes (pacman -Sc)")
+            self.chk_clean = QCheckBox("Limpiar caché tras actualizar (pacman -Sc)")
             self.chk_clean.setChecked(False)
             self.chk_clean.setStyleSheet("QCheckBox { color: #b0b0c2; font-size: 12px; } QCheckBox::indicator:checked { background: #ff1a1a; border: 1px solid #ff3333; }")
 
@@ -615,7 +865,6 @@ def run_gui():
             opts_vbox.addLayout(chk_row)
             footer_layout.addLayout(opts_vbox, stretch=2)
 
-            # Right side: Action Buttons
             btn_box = QHBoxLayout()
             btn_box.setSpacing(12)
 
@@ -662,23 +911,169 @@ def run_gui():
                     border: 1px solid #333342;
                 }
             """)
-            self.btn_update.clicked.connect(self.launch_update_transaction)
+            self.btn_update.clicked.connect(self.start_inapp_transaction)
 
             btn_box.addWidget(btn_close)
             btn_box.addWidget(self.btn_update)
             footer_layout.addLayout(btn_box)
 
-            main_layout.addWidget(footer_frame)
+            layout.addWidget(footer_frame)
 
-            # Global Window Style
-            self.setStyleSheet("""
-                QMainWindow {
-                    background-color: #09090d;
+        def init_transaction_page(self, parent):
+            layout = QVBoxLayout(parent)
+            layout.setContentsMargins(24, 20, 24, 20)
+            layout.setSpacing(14)
+
+            # Hero Header
+            hdr_layout = QHBoxLayout()
+            vbox = QVBoxLayout()
+            vbox.setSpacing(2)
+
+            title_row = QHBoxLayout()
+            lbl_live = QLabel("EN VIVO")
+            lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_tx_title = QLabel("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
+            self.lbl_tx_title.setStyleSheet("color: #ffffff; font-weight: 800; font-size: 18px; letter-spacing: 0.5px;")
+            title_row.addWidget(lbl_live)
+            title_row.addWidget(self.lbl_tx_title)
+            title_row.addStretch()
+
+            self.lbl_tx_stage = QLabel("Inicializando transacción de paquetes...")
+            self.lbl_tx_stage.setStyleSheet("color: #38bdf8; font-size: 13px; font-weight: bold;")
+
+            vbox.addLayout(title_row)
+            vbox.addWidget(self.lbl_tx_stage)
+            hdr_layout.addLayout(vbox)
+
+            hdr_layout.addStretch()
+
+            self.lbl_elapsed = QLabel("⏱ Tiempo: 00:00")
+            self.lbl_elapsed.setStyleSheet("background: #181822; color: #a0a0b2; border: 1px solid #282834; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: bold;")
+            hdr_layout.addWidget(self.lbl_elapsed)
+
+            layout.addLayout(hdr_layout)
+
+            # Main Progress Bar
+            self.tx_progress = QProgressBar()
+            self.tx_progress.setFixedHeight(8)
+            self.tx_progress.setTextVisible(False)
+            self.tx_progress.setRange(0, 100)
+            self.tx_progress.setValue(10)
+            self.tx_progress.setStyleSheet("""
+                QProgressBar {
+                    background-color: #14141e;
+                    border: 1px solid #252536;
+                    border-radius: 4px;
+                }
+                QProgressBar::chunk {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:1 #22c55e);
+                    border-radius: 4px;
                 }
             """)
+            layout.addWidget(self.tx_progress)
+
+            # Embedded Console Log View
+            self.log_view = QTextEdit()
+            self.log_view.setReadOnly(True)
+            self.log_view.setStyleSheet("""
+                QTextEdit {
+                    background-color: #07070b;
+                    color: #e4e4e7;
+                    border: 1px solid #222230;
+                    border-radius: 8px;
+                    padding: 12px;
+                    font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace;
+                    font-size: 12px;
+                    line-height: 1.4;
+                }
+                QScrollBar:vertical {
+                    background: #07070b;
+                    width: 10px;
+                    margin: 0px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:vertical {
+                    background: #2a2a38;
+                    min-height: 35px;
+                    border-radius: 5px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background: #ff1a1a;
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+            """)
+            layout.addWidget(self.log_view, stretch=1)
+
+            # Transaction Footer
+            tx_footer = QFrame()
+            tx_footer.setStyleSheet("""
+                QFrame {
+                    background-color: #13131b;
+                    border: 1px solid #222230;
+                    border-radius: 10px;
+                    padding: 8px 16px;
+                }
+            """)
+            footer_box = QHBoxLayout(tx_footer)
+            footer_box.setContentsMargins(12, 10, 12, 10)
+            footer_box.setSpacing(16)
+
+            self.lbl_tx_status = QLabel("⏳ Ejecutando comandos de actualización...")
+            self.lbl_tx_status.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px;")
+            footer_box.addWidget(self.lbl_tx_status, stretch=2)
+
+            self.btn_tx_reboot = QPushButton("🔄 Reiniciar Sistema")
+            self.btn_tx_reboot.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_tx_reboot.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
+                    color: #ffffff;
+                    border: 1px solid #ff3b3b;
+                    border-radius: 8px;
+                    padding: 10px 24px;
+                    font-weight: 800;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
+                }
+            """)
+            self.btn_tx_reboot.setVisible(False)
+            self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot"))
+            footer_box.addWidget(self.btn_tx_reboot)
+
+            self.btn_tx_done = QPushButton("Cerrar")
+            self.btn_tx_done.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_tx_done.setStyleSheet("""
+                QPushButton {
+                    background: #1c1c26;
+                    color: #9292a4;
+                    border: 1px solid #2a2a3a;
+                    border-radius: 8px;
+                    padding: 10px 22px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background: #262634;
+                    color: #ffffff;
+                }
+            """)
+            self.btn_tx_done.setEnabled(False) # Enabled only on finish
+            self.btn_tx_done.clicked.connect(self.on_tx_close_clicked)
+            footer_box.addWidget(self.btn_tx_done)
+
+            layout.addWidget(tx_footer)
+
+        def update_elapsed_time(self):
+            elapsed = int(time.time() - self.tx_start_time)
+            mins = elapsed // 60
+            secs = elapsed % 60
+            self.lbl_elapsed.setText(f"⏱ Tiempo: {mins:02d}:{secs:02d}")
 
         def load_cached_state(self):
-            # Fast-load from disk cache for instantaneous UI launch
             if not os.path.exists(PACKAGES_FILE):
                 return
             try:
@@ -695,15 +1090,15 @@ def run_gui():
                 pass
 
         def trigger_refresh(self):
-            if self.worker and self.worker.isRunning():
+            if self.check_worker and self.check_worker.isRunning():
                 return
             self.prog_bar.setVisible(True)
             self.btn_refresh.setEnabled(False)
             self.btn_refresh.setText("Analizando...")
 
-            self.worker = CheckWorker()
-            self.worker.finished.connect(self.on_check_finished)
-            self.worker.start()
+            self.check_worker = CheckWorker()
+            self.check_worker.finished.connect(self.on_check_finished)
+            self.check_worker.start()
 
         def on_check_finished(self, data):
             self.prog_bar.setVisible(False)
@@ -747,10 +1142,8 @@ def run_gui():
                     "crit": False
                 })
 
-            # Sort critical packages first, then alphabetically
             self.all_items.sort(key=lambda x: (0 if x["crit"] else 1, x["pkg"]))
 
-            # Update filter counts
             tot = len(self.all_items)
             crit_cnt = sum(1 for x in self.all_items if x["crit"])
             repo_cnt = sum(1 for x in self.all_items if x["type"] == "Oficial")
@@ -763,11 +1156,9 @@ def run_gui():
             self.f_aur.setText(f"AUR ({aur_cnt})")
             self.f_fp.setText(f"Flatpak ({fp_cnt})")
 
-            # Checkbox enable/disable
             self.chk_aur.setVisible(aur_cnt > 0)
             self.chk_flatpak.setVisible(fp_cnt > 0)
 
-            # Summary label
             if tot == 0:
                 self.lbl_summary.setText("No hay actualizaciones pendientes.")
                 self.btn_update.setEnabled(False)
@@ -796,7 +1187,6 @@ def run_gui():
             self.table.setRowCount(0)
 
             for item in self.all_items:
-                # Type filter
                 if self.active_filter == "crit" and not item["crit"]:
                     continue
                 if self.active_filter == "repo" and item["type"] != "Oficial":
@@ -806,7 +1196,6 @@ def run_gui():
                 if self.active_filter == "fp" and item["type"] != "Flatpak":
                     continue
 
-                # Query filter
                 if query:
                     if query not in item["pkg"].lower() and query not in item["new_v"].lower():
                         continue
@@ -860,8 +1249,18 @@ def run_gui():
 
             self.table.setSortingEnabled(True)
 
-        def launch_update_transaction(self):
-            # Build transaction command
+        def start_inapp_transaction(self):
+            # Check if sudo credentials are required
+            cached_sudo = (subprocess.run(["sudo", "-n", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
+            password = None
+
+            if not cached_sudo:
+                dlg = PasswordDialog(self)
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return # User canceled
+                password = dlg.get_password()
+
+            # Assemble transaction commands
             aur_enabled = self.chk_aur.isChecked() and self.chk_aur.isVisible()
             fp_enabled = self.chk_flatpak.isChecked() and self.chk_flatpak.isVisible()
             clean_cache = self.chk_clean.isChecked()
@@ -870,9 +1269,9 @@ def run_gui():
 
             commands = []
             if aur_enabled and aur_helper:
-                commands.append(f"{aur_helper} -Syu")
+                commands.append(f"{aur_helper} -Syu --noconfirm")
             else:
-                commands.append("sudo pacman -Syu")
+                commands.append("sudo pacman -Syu --noconfirm")
 
             if fp_enabled and shutil.which("flatpak"):
                 commands.append("flatpak update -y")
@@ -880,52 +1279,64 @@ def run_gui():
             if clean_cache:
                 commands.append("sudo pacman -Sc --noconfirm")
 
-            combined_cmd = " && ".join(commands)
-            
-            script = (
-                f"clear; "
-                f"printf '\\033[1;31m' && "
-                f"echo '  ██╗  ██╗ ██████╗ ██╗  ██╗     ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗' && "
-                f"echo '  ╚██╗██╔╝██╔════╝ ██║  ██║     ██║   ██║██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔════╝' && "
-                f"echo '   ╚███╔╝ ███████╗ ███████║     ██║   ██║██████╔╝██║  ██║███████║   ██║   █████╗  ' && "
-                f"echo '   ██╔██╗ ██╔═══██╗╚════██║     ██║   ██║██╔═══╝ ██║  ██║██╔══██║   ██║   ██╔══╝  ' && "
-                f"echo '  ██╔╝ ██╗╚██████╔╝     ██║     ╚██████╔╝██║     ██████╔╝██║  ██║   ██║   ███████╗' && "
-                f"echo '  ╚═╝  ╚═╝ ╚═════╝      ╚═╝      ╚═════╝ ╚═╝     ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝' && "
-                f"printf '\\033[0m' && "
-                f"echo '  ─────────────────────────────────────────────────────────────────────────────' && "
-                f"echo '                 EJECUTANDO TRANSACCIÓN DE ACTUALIZACIÓN X64 LIOS              ' && "
-                f"echo '  ─────────────────────────────────────────────────────────────────────────────' && "
-                f"echo '' && "
-                f"{combined_cmd}; status=$?; "
-                f"echo ''; "
-                f"if [ $status -eq 0 ]; then "
-                f"  x64-update --check 2>/dev/null || true; "
-                f"  printf '\\033[1;32m  [✓] ¡Actualización finalizada con éxito!\\033[0m\\n'; "
-                f"else "
-                f"  printf '\\033[1;31m  [✗] La actualización se interrumpió o devolvió código: %d\\033[0m\\n' $status; "
-                f"fi; "
-                f"echo ''; "
-                f"read -p '  Presiona [Enter] para cerrar esta ventana y regresar al gestor...'"
+            # Switch to In-App Transaction View
+            self.stacked_widget.setCurrentIndex(1)
+            self.log_view.clear()
+            self.log_view.appendHtml(
+                f"<div style='color: #ef4444; font-weight: bold;'>[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
+                f"<div style='color: #71717a;'>Comandos: {' && '.join(commands)}</div><hr style='border: 1px solid #222230;'><br>"
             )
 
-            import shlex
-            term_cmd = (
-                f"kitty --app-id x64-update-runner --class x64-update-runner "
-                f"-T 'X64 LIOS - Transacción de Actualización' "
-                f"-o remember_window_size=no -o initial_window_width=112c -o initial_window_height=32c "
-                f"-o background_opacity=1.0 bash -c {shlex.quote(script)}"
-            )
+            self.btn_tx_done.setEnabled(False)
+            self.btn_tx_done.setText("Procesando...")
+            self.btn_tx_reboot.setVisible(False)
+            self.tx_progress.setValue(10)
+            self.tx_start_time = time.time()
+            self.timer_elapsed.start(1000)
 
-            self.btn_update.setEnabled(False)
-            self.btn_update.setText("Actualizando en Terminal...")
+            # Start worker thread
+            self.tx_worker = TransactionWorker(commands, password)
+            self.tx_worker.output_received.connect(self.on_tx_output)
+            self.tx_worker.stage_changed.connect(self.on_tx_stage)
+            self.tx_worker.transaction_done.connect(self.on_tx_finished)
+            self.tx_worker.start()
 
-            # Run terminal process and wait asynchronously
-            def runner():
-                subprocess.run(term_cmd, shell=True)
-                # When finished, re-trigger check
-                QTimer.singleShot(500, self.trigger_refresh)
+        def on_tx_output(self, text):
+            html = ansi_to_html(text).replace("\n", "<br>")
+            cursor = self.log_view.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.log_view.setTextCursor(cursor)
+            self.log_view.insertHtml(html)
+            self.log_view.ensureCursorVisible()
 
-            threading.Thread(target=runner, daemon=True).start()
+        def on_tx_stage(self, stage_text, percent):
+            self.lbl_tx_stage.setText(stage_text)
+            self.tx_progress.setValue(percent)
+
+        def on_tx_finished(self, success, exit_code, kernel_updated):
+            self.timer_elapsed.stop()
+            self.btn_tx_done.setEnabled(True)
+            self.btn_tx_done.setText("Cerrar")
+
+            if success:
+                self.lbl_tx_stage.setText("✓ ¡Actualización completada con éxito!")
+                self.lbl_tx_stage.setStyleSheet("color: #22c55e; font-size: 13px; font-weight: bold;")
+                self.lbl_tx_status.setText("✓ Sistema actualizado y seguro.")
+                self.tx_progress.setValue(100)
+
+                if kernel_updated:
+                    self.lbl_tx_status.setText("⚡ Se actualizó el Kernel o Driver gráfico. Se recomienda reiniciar.")
+                    self.btn_tx_reboot.setVisible(True)
+            else:
+                self.lbl_tx_stage.setText(f"✕ Error en la transacción (código: {exit_code})")
+                self.lbl_tx_stage.setStyleSheet("color: #ef4444; font-size: 13px; font-weight: bold;")
+                self.lbl_tx_status.setText("✕ La actualización no se pudo completar completamente.")
+                self.btn_tx_done.setText("Volver")
+
+        def on_tx_close_clicked(self):
+            # If successfully completed, switch back to Page 0 and trigger refresh
+            self.stacked_widget.setCurrentIndex(0)
+            self.trigger_refresh()
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
@@ -966,7 +1377,6 @@ def run_cli_interactive():
 
     print(f"\n  {C_RED}{C_BOLD}▶ PAQUETES DETECTADOS PARA ACTUALIZACIÓN ({total_updates}):{C_RESET}\n")
     
-    # Imprimir TODOS los paquetes sin límite artificial en CLI
     col_name_w = 32
     col_trans_w = 36
     col_type_w = 12
