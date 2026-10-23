@@ -638,7 +638,7 @@ class PremiumButton(QPushButton):
             elif self.cmd == "minimize":
                 self.window().showMinimized()
             else:
-                os.system(f"{self.cmd} &")
+                os.system(f"QT_QPA_PLATFORMTHEME=kde GTK_THEME=Breeze-Dark {self.cmd} &")
 
 class NavButton(QPushButton):
     def __init__(self, title, icon_name, index, parent_app):
