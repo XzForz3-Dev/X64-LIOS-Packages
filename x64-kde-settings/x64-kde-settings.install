@@ -3,6 +3,11 @@ post_install() {
     if [ -d /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents ]; then
         cp -f /usr/share/x64-lios/x64-layout.js /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents/layout.js
     fi
+
+    echo "=> [X64 Theme] Configurando wallpaper soberano X64-LIOS por defecto en Look-and-Feel..."
+    if [ -x /usr/share/x64-lios/set-default-wallpaper.sh ]; then
+        /usr/share/x64-lios/set-default-wallpaper.sh
+    fi
 }
 
 post_upgrade() {

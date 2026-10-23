@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=15
+pkgrel=16
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -30,8 +30,11 @@ source=('01-monolith.jpg'
         'org.kde.discover.notifier.desktop'
         'org.kde.kdeconnect.daemon.desktop'
         'plasmarc'
-        'kscreenlockerrc')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'kscreenlockerrc'
+        'x64-theme-init.sh'
+        'set-default-wallpaper.sh'
+        'x64-kde-wallpaper-defaults.hook')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar colección oficial de fondos de pantalla de X64 LIOS
@@ -94,9 +97,20 @@ EOF
     mkdir -p "${pkgdir}/usr/share/pixmaps"
     cp "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/pixmaps/x64-logo.png"
 
-    # Instalar layout en ruta segura
+    # Instalar layout y script de look-and-feel en ruta segura
     mkdir -p "${pkgdir}/usr/share/x64-lios"
     cp "${srcdir}/x64-layout.js" "${pkgdir}/usr/share/x64-lios/x64-layout.js"
+    cp "${srcdir}/set-default-wallpaper.sh" "${pkgdir}/usr/share/x64-lios/set-default-wallpaper.sh"
+    chmod 755 "${pkgdir}/usr/share/x64-lios/set-default-wallpaper.sh"
+
+    # Instalar hook oficial de ALPM para mantener X64-LIOS al actualizar plasma-workspace
+    mkdir -p "${pkgdir}/usr/share/libalpm/hooks"
+    cp "${srcdir}/x64-kde-wallpaper-defaults.hook" "${pkgdir}/usr/share/libalpm/hooks/x64-kde-wallpaper-defaults.hook"
+
+    # Instalar inicializador activo en /usr/bin
+    mkdir -p "${pkgdir}/usr/bin"
+    cp "${srcdir}/x64-theme-init.sh" "${pkgdir}/usr/bin/x64-theme-init"
+    chmod 755 "${pkgdir}/usr/bin/x64-theme-init"
 
     # Instalar configuraciones maestras en /etc/skel para nuevos usuarios / Calamares
     mkdir -p "${pkgdir}/etc/skel/.config/kdedefaults"
@@ -112,8 +126,9 @@ EOF
     cp "${srcdir}/gtk3-settings.ini" "${pkgdir}/etc/skel/.config/gtk-3.0/settings.ini"
     cp "${srcdir}/gtk4-settings.ini" "${pkgdir}/etc/skel/.config/gtk-4.0/settings.ini"
 
-    # Configuración de plasmarc (Wallpaper oficial X64-LIOS por defecto del sistema)
+    # Configuración de fallback del sistema en /etc/xdg
     mkdir -p "${pkgdir}/etc/xdg"
+    cp "${srcdir}/plasma-org.kde.plasma.desktop-appletsrc" "${pkgdir}/etc/xdg/plasma-org.kde.plasma.desktop-appletsrc"
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/xdg/plasmarc"
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/plasmarc"
     cp "${srcdir}/plasmarc" "${pkgdir}/etc/skel/.config/kdedefaults/plasmarc"
@@ -132,18 +147,17 @@ EOF
     cp "${srcdir}/org.kde.discover.notifier.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.discover.notifier.desktop"
     cp "${srcdir}/org.kde.kdeconnect.daemon.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop"
 
-    # Script de auto-arranque seguro para aplicar el wallpaper KPackage oficial en Plasma 6
+    # Inicializador activo y dinámico sin timers ciegos en autostart
     mkdir -p "${pkgdir}/etc/xdg/autostart"
     cat << 'SCRIPT' > "${pkgdir}/etc/xdg/autostart/x64-theme-init.desktop"
 [Desktop Entry]
 Type=Application
 Name=X64 LIOS Theme Initializer
-Exec=sh -c 'sleep 1.5; plasma-apply-wallpaperimage /usr/share/wallpapers/X64-LIOS || true'
+Exec=/usr/bin/x64-theme-init
 X-KDE-autostart-phase=2
 SCRIPT
 
     # Enlace de compatibilidad qdbus -> qdbus6
-    mkdir -p "${pkgdir}/usr/bin"
     ln -sf /usr/bin/qdbus6 "${pkgdir}/usr/bin/qdbus"
 
     # Configurar SDDM para que use el wallpaper v2
