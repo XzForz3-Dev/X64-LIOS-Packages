@@ -58,7 +58,7 @@ echo "🔍 [4/5] Ejecutando auditoría de paridad..."
 "${SCRIPT_DIR}/audit-repo.sh"
 
 echo "🚀 [5/5] Sincronizando con el servidor de producción VPS..."
-rsync -avzP --delete "${REPO_DIR}/" x64vps:/var/www/x64-repo/x86_64/
+rsync -avz --delete "${REPO_DIR}/" x64vps:/var/www/x64-repo/x86_64/
 
 echo "🎉 [ÉXITO TOTAL] '${PKG_TARGET}' desplegado, auditado y activo en https://repo.x64lios.com/x86_64/"
 
