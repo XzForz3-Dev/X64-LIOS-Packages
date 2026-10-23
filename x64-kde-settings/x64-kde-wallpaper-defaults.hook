@@ -8,3 +8,4 @@ Target = plasma-workspace
 Description = Asegurando wallpaper soberano X64-LIOS en Look-and-Feel de Plasma...
 When = PostTransaction
 Exec = /usr/share/x64-lios/set-default-wallpaper.sh
+

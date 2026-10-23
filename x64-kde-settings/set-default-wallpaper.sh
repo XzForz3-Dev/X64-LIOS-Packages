@@ -5,3 +5,4 @@ for f in /usr/share/plasma/look-and-feel/org.kde.breeze*/contents/defaults; do
         sed -i 's/^Image=Next/Image=X64-LIOS/' "$f" 2>/dev/null || true
     fi
 done
+
