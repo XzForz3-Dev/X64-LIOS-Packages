@@ -589,14 +589,14 @@ class PremiumButton(QPushButton):
         """)
         
         hbox = QHBoxLayout()
-        pad_v = 8 if height < 80 else 15
-        pad_h = 16 if height < 80 else 20
+        pad_v = 8 if height < 80 else 13
+        pad_h = 16 if height < 80 else 18
         hbox.setContentsMargins(pad_h, pad_v, pad_h, pad_v)
-        hbox.setSpacing(14 if height < 80 else 20)
+        hbox.setSpacing(14 if height < 80 else 18)
         
         icon_label = QLabel()
         icon = QIcon.fromTheme(icon_name)
-        icon_px = 32 if height < 80 else 42
+        icon_px = 32 if height < 80 else 38
         if not icon.isNull():
             pixmap = icon.pixmap(icon_px, icon_px)
             icon_label.setPixmap(pixmap)
@@ -610,16 +610,16 @@ class PremiumButton(QPushButton):
         
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(2)
+        vbox.setSpacing(3)
         
         lbl_title = QLabel(title)
-        title_size = 14 if height < 80 else 16
+        title_size = 14 if height < 80 else 15
         lbl_title.setStyleSheet(f"color: #ffffff; font-weight: bold; font-size: {title_size}px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
         
         lbl_desc = QLabel(desc)
-        desc_size = 11 if height < 80 else 13
-        lbl_desc.setStyleSheet(f"color: #aaaaaa; font-size: {desc_size}px; border: none; background: transparent;")
+        desc_size = 11 if height < 80 else 12
+        lbl_desc.setStyleSheet(f"color: #9e9ea7; font-size: {desc_size}px; line-height: 1.35; border: none; background: transparent;")
         lbl_desc.setWordWrap(True)
         vbox.addWidget(lbl_desc)
         
@@ -706,7 +706,7 @@ class TelemetryCard(QFrame):
             TelemetryCard {
                 background-color: rgba(255, 255, 255, 0.025);
                 border: 1px solid rgba(255, 255, 255, 0.06);
-                border-radius: 8px;
+                border-radius: 10px;
             }
             TelemetryCard:hover {
                 background-color: rgba(255, 255, 255, 0.045);
@@ -714,8 +714,8 @@ class TelemetryCard(QFrame):
             }
         """)
         layout = QVBoxLayout()
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(3)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(4)
         
         top_hbox = QHBoxLayout()
         top_hbox.setContentsMargins(0, 0, 0, 0)
@@ -739,12 +739,12 @@ class TelemetryCard(QFrame):
         layout.addLayout(top_hbox)
         
         self.lbl_val = QLabel(value_str)
-        self.lbl_val.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.5px; background: transparent; border: none;")
+        self.lbl_val.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 14.5px; background: transparent; border: none;")
         layout.addWidget(self.lbl_val)
         
         if sub_str:
             self.lbl_sub = QLabel(sub_str)
-            self.lbl_sub.setStyleSheet("color: #71717a; font-size: 11px; background: transparent; border: none;")
+            self.lbl_sub.setStyleSheet("color: #71717a; font-size: 11.5px; background: transparent; border: none;")
             layout.addWidget(self.lbl_sub)
         else:
             self.lbl_sub = None
@@ -1243,7 +1243,12 @@ class X64Welcome(QWidget):
 
         screen_text = "Wayland Display"
         try:
-            res = subprocess.run(["kscreen-doctor", "-o"], capture_output=True, text=True, env=dict(os.environ, WAYLAND_DISPLAY="wayland-1", DISPLAY=":1", XDG_RUNTIME_DIR="/run/user/1000"))
+            env = os.environ.copy()
+            if "WAYLAND_DISPLAY" not in env:
+                env["WAYLAND_DISPLAY"] = "wayland-1"
+            if "XDG_RUNTIME_DIR" not in env:
+                env["XDG_RUNTIME_DIR"] = "/run/user/1000"
+            res = subprocess.run(["kscreen-doctor", "-o"], capture_output=True, text=True, timeout=1.5, env=env)
             clean = re.sub(r"\x1b\[[0-9;]*m", "", res.stdout)
             for token in clean.split():
                 if "*!" in token:
@@ -1287,13 +1292,13 @@ class X64Welcome(QWidget):
     def create_page_sistema(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(48, 24, 48, 24)
-        layout.setSpacing(12)
+        layout.setContentsMargins(48, 30, 48, 30)
+        layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
 
         header_vbox = QVBoxLayout()
-        header_vbox.setSpacing(3)
+        header_vbox.setSpacing(4)
         sub_tag = QLabel(f"// {tr('HARDWARE DIAGNOSTICS & CONTROL')}")
         sub_tag.setStyleSheet("color: #cc0000; font-size: 11px; font-weight: 800; letter-spacing: 2px; background: transparent;")
         header_vbox.addWidget(sub_tag)
@@ -1303,7 +1308,7 @@ class X64Welcome(QWidget):
         header_vbox.addWidget(title)
 
         desc = QLabel(tr("Real-time hardware audit, idle memory telemetry, and express verification tools to tune your machine."))
-        desc.setStyleSheet("color: #9e9ea7; font-size: 12.5px; line-height: 1.45; background: transparent;")
+        desc.setStyleSheet("color: #9e9ea7; font-size: 13px; line-height: 1.45; background: transparent;")
         desc.setWordWrap(True)
         header_vbox.addWidget(desc)
         layout.addLayout(header_vbox)
@@ -1312,7 +1317,7 @@ class X64Welcome(QWidget):
         self.cached_tele = tele
         
         telem_hbox = QHBoxLayout()
-        telem_hbox.setSpacing(12)
+        telem_hbox.setSpacing(14)
         
         is_live = os.path.exists("/run/archiso")
         sub_ram = tr("Live session (~200MB ISO layers in RAM)") if is_live else tr("Ultra-low idle footprint")
@@ -1325,15 +1330,15 @@ class X64Welcome(QWidget):
         telem_hbox.addWidget(self.card_ram)
         telem_hbox.addWidget(c_gpu)
         layout.addLayout(telem_hbox)
-        layout.addSpacing(4)
+        layout.addSpacing(10)
 
         cols_hbox = QHBoxLayout()
-        cols_hbox.setSpacing(14)
+        cols_hbox.setSpacing(16)
 
         left_vbox = QVBoxLayout()
-        left_vbox.setSpacing(8)
+        left_vbox.setSpacing(14)
         lbl_left = QLabel(f"// {tr('LIVE VERIFICATIONS')}")
-        lbl_left.setStyleSheet("color: #888888; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; background: transparent;")
+        lbl_left.setStyleSheet("color: #888888; font-size: 11.5px; font-weight: 800; letter-spacing: 1.5px; background: transparent; padding-bottom: 2px;")
         left_vbox.addWidget(lbl_left)
 
         btn_sound = PremiumButton(
@@ -1341,21 +1346,21 @@ class X64Welcome(QWidget):
             tr("Verify left and right channels to ensure speakers and headphones work properly."),
             "audio-speakers",
             callback=self.run_audio_test,
-            height=72
+            height=96
         )
         btn_gpu = PremiumButton(
             tr("3D Graphics & FPS Test"),
             tr("Launch an interactive 3D benchmark to measure GPU fluidity and frame rates."),
             "video-display",
             callback=self.run_gpu_test,
-            height=72
+            height=96
         )
         btn_display = PremiumButton(
             tr("Display Configuration"),
             tr("Adjust monitor refresh rate (Hz), screen resolution, and desktop scaling."),
             "preferences-desktop-display",
             cmd="systemsettings kcm_kscreen",
-            height=72
+            height=96
         )
         left_vbox.addWidget(btn_sound)
         left_vbox.addWidget(btn_gpu)
@@ -1363,9 +1368,9 @@ class X64Welcome(QWidget):
         cols_hbox.addLayout(left_vbox)
 
         right_vbox = QVBoxLayout()
-        right_vbox.setSpacing(8)
+        right_vbox.setSpacing(14)
         lbl_right = QLabel(f"// {tr('MASTER UTILITIES')}")
-        lbl_right.setStyleSheet("color: #888888; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; background: transparent;")
+        lbl_right.setStyleSheet("color: #888888; font-size: 11.5px; font-weight: 800; letter-spacing: 1.5px; background: transparent; padding-bottom: 2px;")
         right_vbox.addWidget(lbl_right)
 
         btn_btop = PremiumButton(
@@ -1373,21 +1378,21 @@ class X64Welcome(QWidget):
             tr("Audit real-time CPU, RAM, and process usage with btop."),
             "utilities-system-monitor",
             cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop",
-            height=72
+            height=96
         )
         btn_gparted = PremiumButton(
             tr("Partition Manager (GParted)"),
             tr("Open GParted to partition, format, or prepare disks."),
             "drive-harddisk",
             cmd="pkexec gparted",
-            height=72
+            height=96
         )
         btn_kitty = PremiumButton(
             tr("Hacker Terminal (Kitty)"),
             tr("Launch Kitty with your transparent profile and ASCII logo."),
             "utilities-terminal",
             cmd="kitty -o remember_window_size=no -o initial_window_width=110c -o initial_window_height=30c",
-            height=72
+            height=96
         )
         right_vbox.addWidget(btn_btop)
         right_vbox.addWidget(btn_gparted)
