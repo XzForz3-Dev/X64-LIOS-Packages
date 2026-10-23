@@ -4,3 +4,4 @@ WallpaperPlugin=org.kde.image
 [Greeter][Wallpaper][org.kde.image][General]
 Image=/usr/share/backgrounds/x64-lios/05-faceted-armor.jpg
 PreviewImage=/usr/share/backgrounds/x64-lios/05-faceted-armor.jpg
+

@@ -16,6 +16,9 @@ import tempfile
 import threading
 import pty
 import re
+import fcntl
+import termios
+import struct
 
 STATE_DIR = os.path.expanduser("~/.local/state/x64-update")
 COUNT_FILE = os.path.join(STATE_DIR, "count")
@@ -334,6 +337,13 @@ def run_gui():
 
             master, slave = pty.openpty()
             self.master_fd = master
+
+            # Set PTY window size (32 rows, 110 columns) so pacman/ncurses format progress bars properly
+            try:
+                winsize = struct.pack("HHHH", 32, 110, 0, 0)
+                fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+            except Exception:
+                pass
 
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
@@ -1352,6 +1362,9 @@ def run_gui():
 
             # Switch to In-App Transaction View
             self.stacked_widget.setCurrentIndex(1)
+            self.tx_overwrite_mode = False
+            self.tx_active_block_offset = 0
+            self.tx_pending_escape = ""
             self.log_view.clear()
             self.log_view.append(
                 f"<div style='color: #ef4444; font-weight: bold;'>[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
@@ -1404,44 +1417,77 @@ def run_gui():
             self.tx_worker.start()
 
         def on_tx_output(self, raw_text):
-            # Translate VT100 CNL \x1b[<n>E (Cursor Next Line) to \n * count
-            raw_text = re.sub(r'\x1b\[(\d*)E', lambda m: "\n" * (int(m.group(1)) if m.group(1) else 1), raw_text)
+            data = getattr(self, "tx_pending_escape", "") + raw_text
+            self.tx_pending_escape = ""
 
-            # Normalize \r\n to \n
-            raw_text = raw_text.replace("\r\n", "\n")
-            tokens = re.split(r'([\r\n]|\x1b\[\d*F)', raw_text)
+            # Retain incomplete trailing escape sequences across chunk boundaries
+            m = re.search(r"(\x1b(?:\[[0-9;?]*)?)$", data)
+            if m:
+                self.tx_pending_escape = m.group(1)
+                data = data[:-len(self.tx_pending_escape)]
 
-            cursor = self.log_view.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
+            if not data:
+                return
+
+            doc = self.log_view.document()
+            data = data.replace("\r\n", "\n")
+            tokens = re.split(r"(\x1b\[\d*[A-Za-z]|\n|\r)", data)
 
             for t in tokens:
                 if not t:
                     continue
+
                 if t == "\n":
-                    cursor.movePosition(QTextCursor.MoveOperation.End)
-                    cursor.insertBlock()
+                    if getattr(self, "tx_active_block_offset", 0) < 0:
+                        self.tx_active_block_offset += 1
+                    else:
+                        cursor = QTextCursor(doc)
+                        cursor.movePosition(QTextCursor.MoveOperation.End)
+                        cursor.insertBlock()
+                        self.tx_active_block_offset = 0
+                    self.tx_overwrite_mode = False
+
                 elif t == "\r":
-                    cursor.movePosition(QTextCursor.MoveOperation.End)
-                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine, QTextCursor.MoveMode.KeepAnchor)
-                    cursor.removeSelectedText()
-                elif re.match(r'\x1b\[\d*F', t):
-                    # VT100 CPL: Cursor Previous Line
-                    m = re.match(r'\x1b\[(\d*)F', t)
-                    count = int(m.group(1)) if m.group(1) else 1
-                    for _ in range(count):
-                        cursor.movePosition(QTextCursor.MoveOperation.PreviousBlock)
-                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
-                    cursor.movePosition(QTextCursor.MoveOperation.EndOfLine, QTextCursor.MoveMode.KeepAnchor)
-                    cursor.removeSelectedText()
+                    self.tx_overwrite_mode = True
+
+                elif t.startswith("\x1b["):
+                    cmd = t[-1]
+                    arg = t[2:-1]
+                    count = int(arg) if arg.isdigit() else 1
+
+                    if cmd in ("F", "A"):
+                        self.tx_active_block_offset = getattr(self, "tx_active_block_offset", 0) - count
+                        self.tx_overwrite_mode = True
+                    elif cmd in ("E", "B"):
+                        self.tx_active_block_offset = min(0, getattr(self, "tx_active_block_offset", 0) + count)
+                        self.tx_overwrite_mode = False
+                    elif cmd == "K":
+                        pass
+
                 else:
+                    total_blocks = doc.blockCount()
+                    if total_blocks == 0:
+                        c = QTextCursor(doc)
+                        c.insertBlock()
+                        total_blocks = 1
+
+                    offset = getattr(self, "tx_active_block_offset", 0)
+                    target_block_idx = max(0, min(total_blocks - 1, total_blocks - 1 + offset))
+                    target_block = doc.findBlockByNumber(target_block_idx)
+                    cursor = QTextCursor(target_block)
+
+                    if getattr(self, "tx_overwrite_mode", False):
+                        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+                        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+                        cursor.removeSelectedText()
+                        self.tx_overwrite_mode = False
+                    else:
+                        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+
                     html = ansi_to_html(t)
                     if html:
                         cursor.insertHtml(html)
 
-            self.log_view.setTextCursor(cursor)
-            self.log_view.ensureCursorVisible()
-
-            self.log_view.setTextCursor(cursor)
             self.log_view.ensureCursorVisible()
 
         def on_tx_stage(self, stage_text, percent):
