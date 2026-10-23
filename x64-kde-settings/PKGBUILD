@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=14
+pkgrel=15
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -83,15 +83,12 @@ EOF
     }
 
     # Instalar los 6 Fondos Soberanos de X64 LIOS como paquetes KPackage nativos de KDE Plasma
-    install_wallpaper_kpackage "X64-LIOS-01-Monolith" "X64 LIOS 01 - Stealth Monolith" "01-monolith.jpg" "screenshot-01.png"
+    install_wallpaper_kpackage "X64-LIOS"            "X64 LIOS 01 - Stealth Monolith" "01-monolith.jpg" "screenshot-01.png"
     install_wallpaper_kpackage "X64-LIOS-02-Carbon"   "X64 LIOS 02 - Carbon Fiber"    "02-v3-carbon.jpg" "screenshot-02.png"
     install_wallpaper_kpackage "X64-LIOS-03-Shield"   "X64 LIOS 03 - Sovereign Shield" "03-v2-shield.jpg" "screenshot-03.png"
     install_wallpaper_kpackage "X64-LIOS-04-Hybrid"   "X64 LIOS 04 - Hybrid Plate"    "04-hybrid-plate.jpg" "screenshot-04.png"
     install_wallpaper_kpackage "X64-LIOS-05-Armor"    "X64 LIOS 05 - Faceted Armor"   "05-faceted-armor.jpg" "screenshot-05.png"
     install_wallpaper_kpackage "X64-LIOS-06-Stealth"  "X64 LIOS 06 - Deep Stealth"    "06-stealth-dark.jpg" "screenshot-06.png"
-
-    # Enlace de compatibilidad absoluta: /usr/share/wallpapers/X64-LIOS -> X64-LIOS-01-Monolith
-    ln -sf X64-LIOS-01-Monolith "${pkgdir}/usr/share/wallpapers/X64-LIOS"
 
     # Instalar logo
     mkdir -p "${pkgdir}/usr/share/pixmaps"
