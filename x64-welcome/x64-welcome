@@ -4,12 +4,16 @@ import os
 import platform
 import webbrowser
 import socket
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect, QScrollArea, QComboBox, QMenu, QWidgetAction, QMessageBox)
-from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QAction
-from PyQt6.QtCore import Qt, QSize
-
+import time
+import math
+import threading
+import subprocess
+import re
 import locale
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect, QScrollArea, QComboBox, QMenu, QWidgetAction, QMessageBox, QGridLayout, QDialog)
+from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QAction, QPainter, QPen, QBrush, QPolygonF
+from PyQt6.QtCore import Qt, QSize, QTimer, QPointF
 
 TRANSLATIONS = {
     "es": {
@@ -39,8 +43,9 @@ TRANSLATIONS = {
         "Linux-CachyOS kernel with scx dynamic schedulers, FalconD gaming CPU affinity, ananicy-cpp priority tuning, and pure ZRAM in RAM for zero disk swap latency.": "Kernel Linux-CachyOS con schedulers dinámicos scx, afinidad de CPU gaming con FalconD, optimización ananicy-cpp y ZRAM puro en RAM sin latencia de swap en disco.",
         "III. Multi-Environment Ecosystem": "III. Ecosistema Multi-Entorno",
         "Live environment in KDE Plasma 6 Wayland, plus 8 official installation options (KDE, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, and Server) with 16:9 previews.": "Entorno Live en KDE Plasma 6 Wayland, más 8 opciones oficiales de instalación (KDE, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland y Servidor) con capturas 16:9.",
-        "IV. Infrastructure Sovereignty": "IV. Soberanía de Infraestructura",
-        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, served with SSL from our high-speed CDN infrastructure.": "Jerarquía soberana de repositorios en cascada. [x64-lios] tiene prioridad #1 absoluta sobre Arch y CachyOS, servido con SSL desde nuestra infraestructura CDN de alta velocidad.",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// FUNDAMENTOS Y MANIFIESTO ARQUITECTÓNICO",
+        "IV. Sovereign Repositories": "IV. Repositorios Soberanos",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Jerarquía soberana de repositorios en cascada. [x64-lios] tiene prioridad #1 absoluta sobre Arch y CachyOS, entregando paquetes propios y optimizaciones de alto rendimiento sin cuellos de botella.",
         "V. Hardware Mutation": "V. Mutación de Hardware",
         "During installation, the system audits your CPU: modern processors get AVX2/AVX512 (v3/v4) repositories injected below [x64-lios]. chwd autodetects NVIDIA, AMD, and Intel GPUs.": "Durante la instalación el sistema audita tu CPU: procesadores modernos reciben repositorios AVX2/AVX512 (v3/v4) bajo [x64-lios]. chwd autodetecta GPUs NVIDIA, AMD e Intel.",
         "VI. Modular Architecture": "VI. Arquitectura Modular",
@@ -49,14 +54,14 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs & automated Snapper snapshots. Multi-bootloader support choosing Limine, GRUB, systemd-boot, or rEFInd for effortless rollback.": "Inmutabilidad temporal con Btrfs y snapshots automáticos de Snapper. Soporte multi-bootloader eligiendo Limine, GRUB, systemd-boot o rEFInd para rollback sin esfuerzo.",
         "VIII. The Death of the Terminal": "VIII. La Muerte de la Terminal",
         "GUI-First philosophy for effortless everyday use, paired with an elite hacker terminal experience in Kitty, Fish shell, and Starship pills for power users.": "Filosofía GUI-First para uso diario intuitivo, unida a una experiencia de terminal hacker de élite en Kitty, Fish shell y Starship pills para usuarios avanzados.",
-        "IX. Hybrid Rolling Release": "IX. Rolling Release Híbrido",
-        "The core flies at pure Arch rolling speed, while professional apps can be isolated via Flatpak or Distrobox containers to guarantee Debian-level rock-solid stability.": "El núcleo vuela a velocidad pura Arch rolling, mientras aplicaciones profesionales pueden aislarse vía Flatpak o contenedores Distrobox para garantizar estabilidad de roca estilo Debian.",
+        "IX. Cutting-Edge Rolling Release": "IX. Rolling Release de Vanguardia",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Evolución continua basada en Arch Linux. Tu sistema incorpora fluidamente las últimas optimizaciones de hardware, avances de kernel y software upstream sin demoras artificiales ni reinstalaciones.",
         "X. Architectural Pragmatism": "X. Pragmatismo Arquitectónico",
         "Open Source synergy. We inherit and polish battle-tested foundations, writing custom code and maintaining our own repositories only where we add sovereign value.": "Sinergia Open Source. Heredamos y pulimos cimientos probados en batalla, programando código propio y manteniendo repositorios propios solo donde aportamos valor soberano.",
         "XI. Aesthetics as Function": "XI. La Estética como Función",
         "Design is not an afterthought. Widescreen panoramic UI, Crimson & Charcoal color direction (#b31b1b / #0b0b0d), and vector iconography engineered for focus and control.": "El diseño no es una ocurrencia tardía. UI panorámica Widescreen, paleta Carmesí & Carbón (#b31b1b / #0b0b0d) e iconografía vectorial diseñada para concentración y control.",
-        "XII. Absolute Privacy": "XII. Privacidad Absoluta",
-        "In the era of covert telemetry, your PC is your private fortress. Zero tracking, zero telemetry, and zero data reporting. What you do on your machine, dies on your machine.": "En la era de la telemetría encubierta, tu PC es tu fortaleza privada. Cero rastreo, cero telemetría y cero reportes de datos. Lo que haces en tu máquina, muere en tu máquina.",
+        "XII. Privacy by Design": "XII. Privacidad por Diseño",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Cero recopilación de métricas, diagnósticos o rastreo encubierto en segundo plano. A diferencia de otros sistemas operativos, X64 LIOS jamás monitoriza tu actividad ni envía datos. Tu hardware te pertenece solo a ti.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS está diseñado meticulosamente para puristas del rendimiento. Nuestra arquitectura te garantiza:",
         "Top Gaming Performance:": "Rendimiento Top Gaming:",
         "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latencia ultra-baja y optimizaciones de kernel para exprimir cada FPS.",
@@ -84,7 +89,50 @@ TRANSLATIONS = {
         "Zero telemetry by design. Your data is exclusively yours.": "Cero telemetría por diseño. Tus datos son exclusivamente tuyos.",
         "Avant-garde Aesthetics:": "Estética Vanguardista:",
         "Ultra-fluid, minimalist environments ready to choose.": "Entornos ultra-fluidos, minimalistas y listos para elegir.",
-        "Absolute Privacy:": "Privacidad Absoluta:"
+        "Absolute Privacy:": "Privacidad Absoluta:",
+        "HIGH-PERFORMANCE ARCHITECTURE": "ARQUITECTURA DE ALTO RENDIMIENTO",
+        "Top Gaming Performance": "Rendimiento Top Gaming",
+        "Ultra-low latency CachyOS kernel base boosted with the X64 performance stack: FalconD gaming CPU affinity, dynamic scx schedulers, and real-time process tuning.": "Base de kernel CachyOS de ultra-baja latencia, potenciada con la capa de rendimiento X64: afinidad de CPU para gaming con FalconD, schedulers dinámicos scx y optimización en tiempo real.",
+        "Cutting-Edge Rolling Release": "Rolling Release de Vanguardia",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, libraries, and ecosystem tools as they release.": "Evolución constante sobre la base de Arch Linux. Tu sistema incorpora continuamente las últimas optimizaciones de hardware, librerías y herramientas del ecosistema.",
+        "Hardware Mutation (v3/v4)": "Mutación de Hardware (v3/v4)",
+        "Automatic processor audit: modern CPUs receive high-performance optimized packages (v3/v4) for maximum speed; if unsupported, it uses standard versions for total compatibility without issues.": "El instalador analiza tu procesador: si es moderno activa paquetes de alto rendimiento (v3/v4) para máxima velocidad; si no lo soporta, usa versiones estándar con compatibilidad total sin fallos.",
+        "Btrfs Snapshots & Rollback": "Snapshots y Rollback Btrfs",
+        "Automated Snapper snapshots taken before each system update. If anything fails or breaks, restore your system in seconds directly from the bootloader menu.": "Instantáneas automáticas con Snapper antes de cada actualización. Si algo falla o se desconfigura, restaura tu sistema en segundos directamente desde el menú de arranque.",
+        "Privacy by Design": "Privacidad por Diseño",
+        "Zero metrics collection, diagnostics, or background tracking. Unlike other operating systems, X64 LIOS never monitors your activity or sends your data anywhere.": "Cero recopilación de métricas, diagnósticos o rastreo en segundo plano. A diferencia de otros sistemas, X64 LIOS jamás monitorea lo que haces ni envía tus datos a nadie.",
+        "Clean & Surgical System": "Sistema Limpio y Quirúrgico",
+        "Zero bloatware and zero background idle services. An ultra-lean footprint consuming merely 600–800 MB of idle RAM, dedicating your hardware fully to gaming and maximum performance.": "Cero bloatware y sin servicios residuales en segundo plano. Un consumo mínimo de apenas 600–800 MB de RAM en reposo, liberando toda tu memoria para jugar y rendir al máximo.",
+        "UEFI x86_64 Boot": "Arranque UEFI x86_64",
+        "CachyOS Kernel + FalconD": "Kernel CachyOS + FalconD",
+        "Ready Network": "Red Preparada",
+        "Zero-Latency ZRAM": "ZRAM Latencia Cero",
+        "8 Desktops to Choose": "8 Escritorios a Elegir",
+        "Resource Monitor (btop)": "Monitor de Recursos (btop)",
+        "Audit real-time CPU, RAM, and process usage with btop.": "Audita el uso real de CPU, memoria RAM y procesos con btop.",
+        "System Cockpit & Tools": "Panel de Control y Sistema",
+        "HARDWARE DIAGNOSTICS & CONTROL": "DIAGNÓSTICO Y CONTROL DE HARDWARE",
+        "Real-time hardware audit, idle memory telemetry, and express verification tools to tune your machine.": "Auditoría en tiempo real de tu hardware, telemetría de memoria en reposo y herramientas de verificación express.",
+        "CPU & Architecture": "CPU y Arquitectura",
+        "Optimized execution pipeline": "Pipeline optimizado",
+        "Memory (RAM & ZRAM)": "Memoria (RAM y ZRAM)",
+        "Ultra-low idle footprint": "Consumo mínimo en reposo",
+        "Live session (~200MB ISO layers in RAM)": "Sesión Live (~200MB de capas en RAM)",
+        "Graphics & Display": "Gráficos y Pantalla",
+        "Hardware acceleration ready": "Aceleración por hardware activa",
+        "LIVE VERIFICATIONS": "VERIFICACIONES EN VIVO",
+        "MASTER UTILITIES": "HERRAMIENTAS MAESTRAS",
+        "Stereo Audio Test": "Test de Audio Estéreo",
+        "Verify left and right channels to ensure speakers and headphones work properly.": "Prueba los canales izquierdo y derecho para confirmar que tus altavoces o auriculares funcionan.",
+        "3D Graphics & FPS Test": "Test Gráfico 3D y FPS",
+        "Launch an interactive 3D benchmark to measure GPU fluidity and frame rates.": "Lanza una prueba 3D interactiva para medir la fluidez y FPS de tu GPU.",
+        "Display Configuration": "Configuración de Pantalla",
+        "Adjust monitor refresh rate (Hz), screen resolution, and desktop scaling.": "Ajusta la tasa de refresco (Hz), resolución y escalado de tus monitores.",
+        "Partition Manager (GParted)": "Gestor de Particiones (GParted)",
+        "Hacker Terminal (Kitty)": "Terminal Hacker (Kitty)",
+        "Close Test": "Cerrar Prueba",
+        "3D Graphics & FPS Benchmark": "Benchmark Gráfico 3D y FPS",
+        "Hardware:": "Hardware:"
     },
     "fr": {
         "Home": "Accueil",
@@ -111,8 +159,9 @@ TRANSLATIONS = {
         "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Noyaux haute performance compilés sur mesure, planificateurs BORE/EEVDF avancés, atténuations contrôlées et pré-configurations strictes pour un jeu à latence ultra-faible.",
         "III. Multi-Environment Ecosystem": "III. Écosystème Multi-Environnements",
         "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "L'utilisateur forge son destin : KDE Plasma pour le confort, GNOME pour la fluidité, ou Hyprland X64 pour le minimalisme puriste avec une utilisation microscopique de la RAM.",
-        "IV. Infrastructure Sovereignty": "IV. Souveraineté de l'Infrastructure",
-        "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modèle de dépôt hybride en cascade. Nous injectons nos patchs au-dessus d'Arch Linux pour garantir les performances, sans le coût colossal de tout recompiler.",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// FONDEMENTS ET MANIFESTE ARCHITECTURAL",
+        "IV. Sovereign Repositories": "IV. Dépôts Souverains",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Hiérarchie souveraine de dépôts en cascade. [x64-lios] détient la priorité #1 sur Arch et CachyOS, fournissant des paquets sur mesure et des optimisations directement sans goulets d'étranglement.",
         "V. Hardware Mutation": "V. Mutation Matérielle",
         "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Lors de l'installation, le système audite votre processeur : s'il est ancien, il utilise des paquets génériques infaillibles ; s'il est moderne, il active le mode Turbo en injectant des dépôts AVX2/AVX512 (v3/v4).",
         "VI. Modular Architecture": "VI. Architecture Modulaire",
@@ -121,14 +170,14 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Immutabilité temporelle avec Btrfs et Snapper. Gestionnaire de démarrage graphique rEFInd pour remonter le temps après des erreurs critiques, éliminant la peur des Rolling Releases.",
         "VIII. The Death of the Terminal": "VIII. La Mort du Terminal",
         "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Philosophie GUI-First. L'utilisateur moyen ne devrait jamais avoir besoin d'ouvrir un terminal. Toute la puissance absolue d'Arch gérable entièrement via des interfaces graphiques.",
-        "IX. Hybrid Rolling Release": "IX. Rolling Release Hybride",
-        "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Le cœur du système vole à la vitesse d'Arch, mais les applications critiques peuvent être gelées en utilisant Flatpak ou Distrobox pour garantir une stabilité de niveau Debian à la demande.",
+        "IX. Cutting-Edge Rolling Release": "IX. Rolling Release d'Avant-Garde",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Évolution continue basée sur Arch Linux. Votre système intègre harmonieusement les dernières optimisations matérielles, avancées du noyau et logiciels amont sans réinstallations.",
         "X. Architectural Pragmatism": "X. Pragmatisme Architectural",
         "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Synergie Open Source. Nous héritons et peaufinons les fondations prouvées par l'élite puriste d'Arch Linux, en écrivant du code et en injectant des dépôts personnalisés uniquement là où nous ajoutons vraiment une valeur unique.",
         "XI. Aesthetics as Function": "XI. L'Esthétique comme Fonction",
         "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Le design n'est pas un caprice. Un environnement beau et cohérent inspire la concentration et le contrôle. Chaque pixel du système obéit à notre stricte direction artistique Hacker-Minimaliste.",
-        "XII. Absolute Privacy": "XII. Confidentialité Absolue",
-        "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "À l'ère de la télémétrie d'entreprise cachée, votre PC est votre forteresse de verre. Zéro télémétrie, zéro traceur caché, zéro rapport. Ce que vous faites sur votre machine meurt sur votre machine.",
+        "XII. Privacy by Design": "XII. Confidentialité Dès la Conception",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Zéro collecte de métriques, diagnostics ou suivi secret en arrière-plan. Contrairement aux systèmes commerciaux, X64 LIOS ne surveille jamais votre activité. Votre matériel vous appartient.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS est méticuleusement conçu pour les puristes de la performance. Notre architecture vous garantit :",
         "Top Gaming Performance:": "Performances de Jeu Supérieures :",
         "Ultra-low latency and kernel optimizations to squeeze out every FPS.": "Latence ultra-faible et optimisations du noyau pour extraire chaque FPS.",
@@ -183,7 +232,9 @@ TRANSLATIONS = {
         "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Benutzerdefiniert kompilierte Hochleistungs-Kernel, fortschrittliche BORE/EEVDF-Scheduler, kontrollierte Mitigations und strenge Vorkonfigurationen für Spiele mit extrem niedriger Latenz.",
         "III. Multi-Environment Ecosystem": "III. Multi-Environment-Ökosystem",
         "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "Der Benutzer schmiedet sein Schicksal: KDE Plasma für Komfort, GNOME für Flüssigkeit oder Hyprland X64 für puristischen Minimalismus mit mikroskopischem RAM-Verbrauch.",
-        "IV. Infrastructure Sovereignty": "IV. Infrastruktur-Souveränität",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// ARCHITEKTUR-FUNDAMENTE & MANIFEST",
+        "IV. Sovereign Repositories": "IV. Souveräne Repositories",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Souveräne kaskadierende Repository-Hierarchie. [x64-lios] hat Priorität #1 über Arch und CachyOS und liefert eigene Pakete und Optimierungen ohne Engpässe.",
         "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Hybrides kaskadierendes Repository-Modell. Wir injizieren unsere Patches auf Arch Linux, um die Leistung zu gewährleisten, ohne die kolossalen Kosten, alles neu kompilieren zu müssen.",
         "V. Hardware Mutation": "V. Hardware-Mutation",
         "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Während der Installation prüft das System Ihre CPU: Wenn sie alt ist, verwendet sie kugelsichere generische Pakete; wenn sie modern ist, aktiviert sie den Turbo-Modus, indem sie AVX2/AVX512 (v3/v4) Repositories injiziert.",
@@ -193,13 +244,15 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Zeitliche Unveränderlichkeit mit Btrfs und Snapper. Der grafische Bootmanager rEFInd, um nach kritischen Fehlern in der Zeit zurückzuspringen und die Angst vor Rolling Releases zu beseitigen.",
         "VIII. The Death of the Terminal": "VIII. Der Tod des Terminals",
         "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "GUI-First-Philosophie. Der durchschnittliche Benutzer sollte niemals ein Terminal öffnen müssen. Die gesamte absolute Macht von Arch, die vollständig über grafische Benutzeroberflächen verwaltet werden kann.",
-        "IX. Hybrid Rolling Release": "IX. Hybrid Rolling Release",
+        "IX. Cutting-Edge Rolling Release": "IX. Spitzenklasse Rolling Release",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Kontinuierliche Evolution auf Basis von Arch Linux. Ihr System integriert stets die neuesten Hardware-Optimierungen, Kernel-Fortschritte und Upstream-Software ohne Neuinstallationen.",
         "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Der Kern des Systems fliegt in Arch-Geschwindigkeit, aber kritische Anwendungen können mit Flatpak oder Distrobox eingefroren werden, um bei Bedarf Debian-Level-Stabilität zu gewährleisten.",
         "X. Architectural Pragmatism": "X. Architektonischer Pragmatismus",
         "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Open Source Synergie. Wir erben und polieren Grundlagen, die sich bei der puristischen Elite von Arch Linux bewährt haben, schreiben Code und injizieren benutzerdefinierte Repositories nur dort, wo wir wirklich einen einzigartigen Wert schaffen.",
         "XI. Aesthetics as Function": "XI. Ästhetik als Funktion",
         "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Design ist keine Laune. Eine schöne und kohärente Umgebung inspiriert Konzentration und Kontrolle. Jeder Pixel des Systems gehorcht unserer strengen Hacker-Minimalismus Art Direction.",
-        "XII. Absolute Privacy": "XII. Absolute Privatsphäre",
+        "XII. Privacy by Design": "XII. Datenschutz durch Design",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Keine Erfassung von Telemetrie, Diagnosen oder verdecktem Tracking. Im Gegensatz zu kommerziellen Systemen überwacht X64 LIOS Ihre Aktivitäten nie. Ihre Hardware gehört Ihnen.",
         "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "In der Ära der verdeckten Unternehmens-Telemetrie ist Ihr PC Ihre Glasfestung. Keine Telemetrie, keine versteckten Tracker, keine Berichte. Was Sie auf Ihrer Maschine tun, stirbt auf Ihrer Maschine.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS wurde akribisch für Leistungs-Puristen entwickelt. Unsere Architektur garantiert Ihnen:",
         "Top Gaming Performance:": "Top Gaming-Leistung:",
@@ -255,7 +308,9 @@ TRANSLATIONS = {
         "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Kernel ad alte prestazioni compilati su misura, scheduler BORE/EEVDF avanzati, mitigazioni controllate e rigide pre-configurazioni per giochi a latenza ultra-bassa.",
         "III. Multi-Environment Ecosystem": "III. Ecosistema Multi-Ambiente",
         "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "L'utente forgia il proprio destino: KDE Plasma per il comfort, GNOME per la fluidità o Hyprland X64 per un minimalismo purista con uso microscopico della RAM.",
-        "IV. Infrastructure Sovereignty": "IV. Sovranità dell'Infrastruttura",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// FONDAMENTI E MANIFESTO ARCHITETTONICO",
+        "IV. Sovereign Repositories": "IV. Repository Sovrani",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Gerarchia sovrana di repository a cascata. [x64-lios] ha priorità #1 su Arch e CachyOS, fornendo pacchetti personalizzati e ottimizzazioni direttamente senza colli di bottiglia.",
         "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modello ibrido di repository a cascata. Iniettiamo le nostre patch sopra Arch Linux per garantire prestazioni, senza il costo colossale di ricompilare tutto.",
         "V. Hardware Mutation": "V. Mutazione Hardware",
         "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Durante l'installazione, il sistema controlla la tua CPU: se è vecchia, usa pacchetti generici a prova di proiettile; se è moderna, attiva la modalità Turbo iniettando repository AVX2/AVX512 (v3/v4).",
@@ -265,13 +320,15 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Immutabilità temporale con Btrfs e Snapper. Gestore di avvio grafico rEFInd per tornare indietro nel tempo dopo errori critici, eliminando la paura delle Rolling Release.",
         "VIII. The Death of the Terminal": "VIII. La Morte del Terminale",
         "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Filosofia GUI-First. L'utente medio non dovrebbe mai aver bisogno di aprire un terminale. Tutto il potere assoluto di Arch gestibile interamente attraverso interfacce grafiche.",
-        "IX. Hybrid Rolling Release": "IX. Rolling Release Ibrido",
+        "IX. Cutting-Edge Rolling Release": "IX. Rolling Release d'Avanguardia",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Evoluzione continua basata su Arch Linux. Il tuo sistema integra perfettamente le ultime ottimizzazioni hardware, progressi del kernel e software upstream senza reinstallazioni.",
         "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Il nucleo del sistema vola a velocità Arch, ma le applicazioni critiche possono essere congelate usando Flatpak o Distrobox per garantire la stabilità a livello Debian su richiesta.",
         "X. Architectural Pragmatism": "X. Pragmatismo Architettonico",
         "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Sinergia Open Source. Ereditiamo e perfezioniamo fondamenta provate dall'élite purista di Arch Linux, scrivendo codice e iniettando repository personalizzati solo dove aggiungiamo davvero un valore unico.",
         "XI. Aesthetics as Function": "XI. L'Estetica come Funzione",
         "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Il design non è un capriccio. Un ambiente bello e coerente ispira concentrazione e controllo. Ogni pixel del sistema obbedisce alla nostra rigorosa direzione artistica Hacker-Minimalista.",
-        "XII. Absolute Privacy": "XII. Privacy Assoluta",
+        "XII. Privacy by Design": "XII. Privacy fin dalla Progettazione",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Nessuna raccolta di metriche, diagnostica o tracciamento nascosto in background. A differenza dei sistemi commerciali, X64 LIOS non monitora mai le tue attività. Il tuo hardware appartiene a te.",
         "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "Nell'era della telemetria aziendale occulta, il tuo PC è la tua fortezza di vetro. Zero telemetria, zero tracker nascosti, zero rapporti. Quello che fai sulla tua macchina, muore sulla tua macchina.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS è meticolosamente progettato per i puristi delle prestazioni. La nostra architettura ti garantisce:",
         "Top Gaming Performance:": "Prestazioni di Gioco Top:",
@@ -327,7 +384,9 @@ TRANSLATIONS = {
         "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Kernels de alto desempenho compilados sob medida, agendadores BORE/EEVDF avançados, mitigações controladas e pré-configurações rigorosas para jogos de latência ultrabaixa.",
         "III. Multi-Environment Ecosystem": "III. Ecossistema Multi-Ambiente",
         "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "O usuário forja o seu destino: KDE Plasma para conforto, GNOME para fluidez, ou Hyprland X64 para minimalismo purista com uso microscópico de RAM.",
-        "IV. Infrastructure Sovereignty": "IV. Soberania da Infraestrutura",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// FUNDAMENTOS E MANIFESTO ARQUITETÔNICO",
+        "IV. Sovereign Repositories": "IV. Repositórios Soberanos",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Hierarquia soberana de repositórios em cascata. [x64-lios] tem prioridade #1 sobre Arch e CachyOS, fornecendo pacotes personalizados e otimizações diretamente sem gargalos.",
         "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Modelo híbrido de repositórios em cascata. Injetamos nossos patches em cima do Arch Linux para garantir desempenho, sem o custo colossal de recompilar tudo.",
         "V. Hardware Mutation": "V. Mutação de Hardware",
         "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "Durante a instalação, o sistema audita sua CPU: se for antiga, usa pacotes genéricos à prova de balas; se for moderna, ativa o Modo Turbo injetando repositórios AVX2/AVX512 (v3/v4).",
@@ -337,13 +396,15 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Imutabilidade temporal com Btrfs e Snapper. Gerenciador de inicialização gráfico rEFInd para voltar no tempo após erros críticos, eliminando o medo de Rolling Releases.",
         "VIII. The Death of the Terminal": "VIII. A Morte do Terminal",
         "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Filosofia GUI-First. O usuário médio nunca precisará abrir um terminal. Todo o poder absoluto do Arch gerenciável inteiramente através de interfaces gráficas.",
-        "IX. Hybrid Rolling Release": "IX. Rolling Release Híbrido",
+        "IX. Cutting-Edge Rolling Release": "IX. Rolling Release de Vanguarda",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Evolução contínua baseada no Arch Linux. Seu sistema incorpora perfeitamente as últimas otimizações de hardware, avanços de kernel e software upstream sem reinstalações.",
         "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "O núcleo do sistema voa na velocidade do Arch, mas os aplicativos críticos podem ser congelados usando Flatpak ou Distrobox para garantir estabilidade no nível do Debian sob demanda.",
         "X. Architectural Pragmatism": "X. Pragmatismo Arquitetônico",
         "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Sinergia Open Source. Herdamos e lapidamos alicerces comprovados pela elite purista do Arch Linux, escrevendo código e injetando repositórios customizados apenas onde realmente agregamos valor único.",
         "XI. Aesthetics as Function": "XI. A Estética como Função",
         "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "O design não é um capricho. Um ambiente bonito e coerente inspira foco e controle. Cada pixel do sistema obedece à nossa rígida direção de arte Hacker-Minimalista.",
-        "XII. Absolute Privacy": "XII. Privacidade Absoluta",
+        "XII. Privacy by Design": "XII. Privacidade por Design",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Zero coleta de métricas, diagnósticos ou rastreamento oculto em segundo plano. Ao contrário de sistemas comerciais, o X64 LIOS nunca monitora sua atividade. Seu hardware pertence a você.",
         "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "Na era da telemetria corporativa encoberta, seu PC é sua fortaleza de vidro. Zero telemetria, zero rastreadores ocultos, zero relatórios. O que você faz na sua máquina, morre na sua máquina.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "O X64 LIOS foi meticulosamente projetado para os puristas do desempenho. Nossa arquitetura garante:",
         "Top Gaming Performance:": "Desempenho Top em Jogos:",
@@ -399,7 +460,9 @@ TRANSLATIONS = {
         "Custom-compiled high-performance kernels, advanced BORE/EEVDF schedulers, controlled mitigations, and strict pre-configurations for ultra-low latency gaming.": "Настраиваемые высокопроизводительные ядра, продвинутые планировщики BORE/EEVDF, контролируемые смягчения и строгие предварительные конфигурации для игр со сверхнизкой задержкой.",
         "III. Multi-Environment Ecosystem": "III. Многосредовая экосистема",
         "The user forges their destiny: KDE Plasma for comfort, GNOME for fluidity, or Hyprland X64 for purist minimalism with microscopic RAM usage.": "Пользователь кует свою судьбу: KDE Plasma для комфорта, GNOME для плавности или Hyprland X64 для пуристского минимализма с микроскопическим использованием оперативной памяти.",
-        "IV. Infrastructure Sovereignty": "IV. Инфраструктурный суверенитет",
+        "// ARCHITECTURAL FOUNDATIONS & MANIFESTO": "// АРХИТЕКТУРНЫЕ ОСНОВЫ И МАНИФЕСТ",
+        "IV. Sovereign Repositories": "IV. Суверенные репозитории",
+        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.": "Суверенная каскадная иерархия репозиториев. [x64-lios] имеет абсолютный приоритет #1 над Arch и CachyOS, доставляя оптимизации напрямую без задержек.",
         "Hybrid cascading repository model. We inject our patches on top of Arch Linux to ensure performance, without the colossal cost of recompiling everything.": "Гибридная каскадная модель репозитория. Мы внедряем наши патчи поверх Arch Linux для обеспечения производительности без колоссальных затрат на перекомпиляцию всего.",
         "V. Hardware Mutation": "V. Аппаратная мутация",
         "During installation, the system audits your CPU: if it's old, it uses bulletproof generic packages; if it's modern, it activates Turbo Mode by injecting AVX2/AVX512 (v3/v4) repositories.": "При установке система проверяет процессор: если он старый, используются надежные стандартные пакеты; если современный — включает турбо-режим (AVX2/AVX512).",
@@ -409,13 +472,15 @@ TRANSLATIONS = {
         "Temporal immutability with Btrfs and Snapper. rEFInd graphical boot manager to roll back in time after critical errors, eliminating the fear of Rolling Releases.": "Временная неизменность с помощью Btrfs и Snapper. Графический менеджер загрузки rEFInd для отката во времени после критических ошибок, устраняющий страх перед Rolling Releases.",
         "VIII. The Death of the Terminal": "VIII. Смерть терминала",
         "GUI-First philosophy. The average user should never need to open a terminal. All the absolute power of Arch manageable entirely through graphical interfaces.": "Философия GUI-First. Обычному пользователю никогда не понадобится открывать терминал. Вся абсолютная мощь Arch управляется исключительно через графические интерфейсы.",
-        "IX. Hybrid Rolling Release": "IX. Гибридный Rolling Release",
+        "IX. Cutting-Edge Rolling Release": "IX. Передовой Rolling Release",
+        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.": "Непрерывная эволюция на базе Arch Linux. Ваша система безупречно интегрирует новейшие оптимизации оборудования, ядра и апстрим-пакетов без переустановок.",
         "The core of the system flies at Arch speed, but critical applications can be frozen using Flatpak or Distrobox to guarantee Debian-level stability on demand.": "Ядро системы летает на скорости Arch, но критические приложения можно заморозить с помощью Flatpak или Distrobox, чтобы гарантировать стабильность уровня Debian по запросу.",
         "X. Architectural Pragmatism": "X. Архитектурный прагматизм",
         "Open Source synergy. We inherit and polish foundations proven by the Arch Linux purist elite, writing code and injecting custom repositories only where we truly add unique value.": "Синергия Open Source. Мы наследуем и совершенствуем основы, доказанные элитой пуристов Arch Linux, пишем код и внедряем собственные репозитории только там, где мы действительно приносим уникальную пользу.",
         "XI. Aesthetics as Function": "XI. Эстетика как функция",
         "Design is not a whim. A beautiful and coherent environment inspires focus and control. Every pixel of the system obeys our strict Hacker-Minimalist art direction.": "Дизайн — это не прихоть. Красивая и согласованная среда вдохновляет на концентрацию и контроль. Каждый пиксель системы подчиняется нашему строгому хакерско-минималистическому художественному направлению.",
-        "XII. Absolute Privacy": "XII. Абсолютная конфиденциальность",
+        "XII. Privacy by Design": "XII. Конфиденциальность по умолчанию",
+        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.": "Ноль сбора метрик, диагностики или скрытого фонового слежения. В отличие от коммерческих ОС, X64 LIOS никогда не следит за вашей активностью. Ваше железо принадлежит только вам.",
         "In the era of covert corporate telemetry, your PC is your glass fortress. Zero telemetry, zero hidden trackers, zero reporting. What you do on your machine, dies on your machine.": "В эпоху скрытой корпоративной телеметрии ваш компьютер — это ваша стеклянная крепость. Никакой телеметрии, никаких скрытых трекеров, никаких отчетов. То, что вы делаете на своей машине, остается на ней.",
         "X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:": "X64 LIOS тщательно разработан для пуристов производительности. Наша архитектура гарантирует вам:",
         "Top Gaming Performance:": "Лучшая игровая производительность:",
@@ -474,13 +539,40 @@ if not os.path.exists(LOGO_PATH):
             LOGO_PATH = candidate
             break
 
+class PillarCard(QFrame):
+    def __init__(self, icon_str, title, desc):
+        super().__init__()
+        self.setStyleSheet("""
+            PillarCard {
+                background-color: rgba(255, 255, 255, 0.025);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-left: 3px solid #cc0000;
+                border-radius: 8px;
+            }
+            PillarCard:hover {
+                background-color: rgba(204, 0, 0, 0.07);
+                border-color: rgba(204, 0, 0, 0.45);
+            }
+        """)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(4)
+        lbl_t = QLabel(f"{icon_str}  {title}")
+        lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.5px; background: transparent; border: none;")
+        lbl_d = QLabel(desc)
+        lbl_d.setStyleSheet("color: #9e9ea7; font-size: 11.5px; line-height: 1.4; background: transparent; border: none;")
+        lbl_d.setWordWrap(True)
+        layout.addWidget(lbl_t)
+        layout.addWidget(lbl_d)
+        self.setLayout(layout)
+
 class PremiumButton(QPushButton):
-    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None):
+    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None, height=85):
         super().__init__()
         self.url = url
         self.cmd = cmd
         self.callback = callback
-        self.setFixedHeight(85)
+        self.setFixedHeight(height)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.setStyleSheet("""
@@ -497,32 +589,37 @@ class PremiumButton(QPushButton):
         """)
         
         hbox = QHBoxLayout()
-        hbox.setContentsMargins(20, 15, 20, 15)
-        hbox.setSpacing(20)
+        pad_v = 8 if height < 80 else 15
+        pad_h = 16 if height < 80 else 20
+        hbox.setContentsMargins(pad_h, pad_v, pad_h, pad_v)
+        hbox.setSpacing(14 if height < 80 else 20)
         
         icon_label = QLabel()
         icon = QIcon.fromTheme(icon_name)
+        icon_px = 32 if height < 80 else 42
         if not icon.isNull():
-            pixmap = icon.pixmap(42, 42)
+            pixmap = icon.pixmap(icon_px, icon_px)
             icon_label.setPixmap(pixmap)
         else:
             icon_label.setText("💠")
-            icon_label.setStyleSheet("font-size: 30px; background: transparent; border: none;")
+            icon_label.setStyleSheet(f"font-size: {icon_px - 8}px; background: transparent; border: none;")
         
-        icon_label.setFixedSize(42, 42)
+        icon_label.setFixedSize(icon_px, icon_px)
         icon_label.setStyleSheet("background: transparent; border: none;")
         hbox.addWidget(icon_label)
         
         vbox = QVBoxLayout()
         vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(3)
+        vbox.setSpacing(2)
         
         lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
+        title_size = 14 if height < 80 else 16
+        lbl_title.setStyleSheet(f"color: #ffffff; font-weight: bold; font-size: {title_size}px; border: none; background: transparent;")
         vbox.addWidget(lbl_title)
         
         lbl_desc = QLabel(desc)
-        lbl_desc.setStyleSheet("color: #aaaaaa; font-size: 13px; border: none; background: transparent;")
+        desc_size = 11 if height < 80 else 13
+        lbl_desc.setStyleSheet(f"color: #aaaaaa; font-size: {desc_size}px; border: none; background: transparent;")
         lbl_desc.setWordWrap(True)
         vbox.addWidget(lbl_desc)
         
@@ -602,6 +699,210 @@ class NavButton(QPushButton):
         self.parent_app.change_page(self.index)
 
 
+class TelemetryCard(QFrame):
+    def __init__(self, icon_str, title, value_str, badge_str=None, sub_str=None):
+        super().__init__()
+        self.setStyleSheet("""
+            TelemetryCard {
+                background-color: rgba(255, 255, 255, 0.025);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 8px;
+            }
+            TelemetryCard:hover {
+                background-color: rgba(255, 255, 255, 0.045);
+                border-color: rgba(204, 0, 0, 0.4);
+            }
+        """)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(3)
+        
+        top_hbox = QHBoxLayout()
+        top_hbox.setContentsMargins(0, 0, 0, 0)
+        lbl_title = QLabel(f"{icon_str}  {title}")
+        lbl_title.setStyleSheet("color: #8e8e93; font-size: 11px; font-weight: bold; background: transparent; border: none;")
+        top_hbox.addWidget(lbl_title)
+        top_hbox.addStretch(1)
+        
+        if badge_str:
+            lbl_badge = QLabel(f" {badge_str} ")
+            lbl_badge.setStyleSheet("""
+                background-color: rgba(0, 229, 255, 0.1);
+                color: #00e5ff;
+                border: 1px solid rgba(0, 229, 255, 0.3);
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: bold;
+                padding: 1px 5px;
+            """)
+            top_hbox.addWidget(lbl_badge)
+        layout.addLayout(top_hbox)
+        
+        self.lbl_val = QLabel(value_str)
+        self.lbl_val.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.5px; background: transparent; border: none;")
+        layout.addWidget(self.lbl_val)
+        
+        if sub_str:
+            self.lbl_sub = QLabel(sub_str)
+            self.lbl_sub.setStyleSheet("color: #71717a; font-size: 11px; background: transparent; border: none;")
+            layout.addWidget(self.lbl_sub)
+        else:
+            self.lbl_sub = None
+            
+        self.setLayout(layout)
+
+    def update_value(self, new_val):
+        self.lbl_val.setText(new_val)
+
+class CubeCanvas(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setMinimumSize(480, 260)
+        self.angle_x = 0.0
+        self.angle_y = 0.0
+        self.angle_z = 0.0
+        self.frames = []
+        self.fps = 60.0
+        self.frame_time_ms = 16.6
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_animation)
+        self.timer.start(16)
+
+    def update_animation(self):
+        now = time.perf_counter()
+        self.frames.append(now)
+        if len(self.frames) > 30:
+            self.frames.pop(0)
+            dt = self.frames[-1] - self.frames[0]
+            if dt > 0:
+                self.fps = len(self.frames) / dt
+                self.frame_time_ms = (self.frames[-1] - self.frames[-2]) * 1000
+        self.angle_x += 0.025
+        self.angle_y += 0.035
+        self.angle_z += 0.015
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.fillRect(self.rect(), QColor("#0d0d11"))
+        
+        p.setPen(QPen(QColor(255, 255, 255, 12), 1))
+        w, h = self.width(), self.height()
+        for x in range(0, w, 40):
+            p.drawLine(x, 0, x, h)
+        for y in range(0, h, 40):
+            p.drawLine(0, y, w, y)
+            
+        cx, cy = w / 2, h / 2
+        
+        vertices = [
+            [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+            [-1, -1, 1],  [1, -1, 1],  [1, 1, 1],  [-1, 1, 1]
+        ]
+        
+        rad_x, rad_y, rad_z = self.angle_x, self.angle_y, self.angle_z
+        rot_v = []
+        scale = min(w, h) * 0.22
+        
+        for vx, vy, vz in vertices:
+            x1 = vx * math.cos(rad_y) + vz * math.sin(rad_y)
+            y1 = vy
+            z1 = -vx * math.sin(rad_y) + vz * math.cos(rad_y)
+            x2 = x1
+            y2 = y1 * math.cos(rad_x) - z1 * math.sin(rad_x)
+            z2 = y1 * math.sin(rad_x) + z1 * math.cos(rad_x)
+            x3 = x2 * math.cos(rad_z) - y2 * math.sin(rad_z)
+            y3 = x2 * math.sin(rad_z) + y2 * math.cos(rad_z)
+            z3 = z2
+            
+            dist = 3.5
+            factor = dist / (dist + z3)
+            px = cx + x3 * scale * factor
+            py = cy + y3 * scale * factor
+            rot_v.append((px, py, z3))
+            
+        edges = [
+            (0,1), (1,2), (2,3), (3,0),
+            (4,5), (5,6), (6,7), (7,4),
+            (0,4), (1,5), (2,6), (3,7)
+        ]
+        
+        for i, (e1, e2) in enumerate(edges):
+            depth = (rot_v[e1][2] + rot_v[e2][2]) / 2.0
+            alpha = int(120 + (depth + 1.5) * 45)
+            alpha = max(60, min(255, alpha))
+            color = QColor(204, 0, 0, alpha) if i % 2 == 0 else QColor(0, 229, 255, alpha)
+            p.setPen(QPen(color, 2.5))
+            p.drawLine(int(rot_v[e1][0]), int(rot_v[e1][1]), int(rot_v[e2][0]), int(rot_v[e2][1]))
+
+        for px, py, z in rot_v:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor("#ffffff")))
+            p.drawEllipse(QPointF(px, py), 3.5, 3.5)
+
+        p.setPen(QPen(QColor("#00e5ff"), 1))
+        p.setFont(QFont("Monospace", 14, QFont.Weight.Bold))
+        p.drawText(20, 35, f"{self.fps:.1f} FPS")
+        p.setPen(QPen(QColor("#888888"), 1))
+        p.setFont(QFont("Sans", 10))
+        p.drawText(20, 55, f"Frame Latency: {self.frame_time_ms:.1f} ms")
+
+
+class GpuBenchmarkDialog(QDialog):
+    def __init__(self, parent=None, gpu_info="GPU Estándar", screen_info="Display"):
+        super().__init__(parent)
+        self.setWindowTitle(tr("3D Graphics & FPS Test"))
+        self.setFixedSize(540, 420)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0b0b0e;
+                border: 1px solid #cc0000;
+                border-radius: 8px;
+            }
+        """)
+        vbox = QVBoxLayout()
+        vbox.setContentsMargins(20, 20, 20, 20)
+        vbox.setSpacing(14)
+        
+        title = QLabel(f"🎮  {tr('3D Graphics & FPS Benchmark').upper()}")
+        title.setStyleSheet("color: #ffffff; font-weight: 900; font-size: 16px; background: transparent;")
+        vbox.addWidget(title)
+        
+        self.canvas = CubeCanvas()
+        vbox.addWidget(self.canvas)
+        
+        info_hbox = QHBoxLayout()
+        lbl_gpu = QLabel(f"<b>{tr('Hardware:')}</b> {gpu_info} | {screen_info}")
+        lbl_gpu.setStyleSheet("color: #aaaaaa; font-size: 11.5px; background: transparent;")
+        info_hbox.addWidget(lbl_gpu)
+        info_hbox.addStretch(1)
+        
+        btn_close = QPushButton(tr("Close Test"))
+        btn_close.setFixedHeight(32)
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: #1a1a1e;
+                color: #ffffff;
+                border: 1px solid #333333;
+                border-radius: 6px;
+                padding: 0 16px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #cc0000;
+                border-color: #ff1a1a;
+            }
+        """)
+        btn_close.clicked.connect(self.accept)
+        info_hbox.addWidget(btn_close)
+        vbox.addLayout(info_hbox)
+        
+        self.setLayout(vbox)
+
+
 class X64Welcome(QWidget):
     def __init__(self):
         super().__init__()
@@ -610,7 +911,7 @@ class X64Welcome(QWidget):
 
     def initUI(self):
         self.setWindowTitle('X64 LIOS - Welcome')
-        self.setFixedSize(1250, 720)
+        self.setFixedSize(1220, 660)
         self.setStyleSheet("background-color: #080808;")
         
         main_layout = QHBoxLayout()
@@ -619,7 +920,7 @@ class X64Welcome(QWidget):
         self.setLayout(main_layout)
 
         sidebar = QFrame()
-        sidebar.setFixedWidth(270)
+        sidebar.setFixedWidth(265)
         sidebar.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #050505, stop:1 #110000);
@@ -627,20 +928,20 @@ class X64Welcome(QWidget):
             }
         """)
         sidebar_layout = QVBoxLayout()
-        sidebar_layout.setContentsMargins(25, 40, 25, 30)
+        sidebar_layout.setContentsMargins(22, 28, 22, 24)
         sidebar.setLayout(sidebar_layout)
 
         logo_label = QLabel()
         pixmap = QPixmap(LOGO_PATH)
         if not pixmap.isNull():
-            logo_label.setPixmap(pixmap.scaled(140, 140, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            logo_label.setPixmap(pixmap.scaled(125, 125, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setStyleSheet("background: transparent; border: none;")
         sidebar_layout.addWidget(logo_label)
-        sidebar_layout.addSpacing(30)
+        sidebar_layout.addSpacing(20)
 
         nav_vbox = QVBoxLayout()
-        nav_vbox.setSpacing(20)
+        nav_vbox.setSpacing(12)
         
         tabs = [(tr("Home"), "go-home"), (tr("System"), "preferences-system"), 
                 (tr("Philosophy"), "help-about")]
@@ -653,14 +954,12 @@ class X64Welcome(QWidget):
         sidebar_layout.addLayout(nav_vbox)
         sidebar_layout.addStretch(1)
 
-        
-
         self.btn_install = QPushButton(tr("Install X64 LIOS"))
-        self.btn_install.setFixedHeight(60)
+        self.btn_install.setFixedHeight(54)
         self.btn_install.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #cc0000, stop:1 #800000);
-                color: white; font-weight: bold; font-size: 16px; border-radius: 10px; border: 1px solid #ff1a1a;
+                color: white; font-weight: bold; font-size: 15px; border-radius: 8px; border: 1px solid #ff1a1a;
                 text-align: center;
             }
             QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #a30000); }
@@ -677,11 +976,11 @@ class X64Welcome(QWidget):
         hud_text = f"X64 LIOS 2026 (Live)\n{tr('Architecture:')} {arch}\nKernel: {kernel_ver}\n{tr('Session:')} KDE Plasma (Wayland)"
         info_label = QLabel(hud_text)
         info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setStyleSheet("color: #4a4a4a; font-size: 12px; font-weight: bold; line-height: 1.5; background: transparent;")
+        info_label.setStyleSheet("color: #4a4a4a; font-size: 11px; font-weight: bold; line-height: 1.45; background: transparent;")
         sidebar_layout.addWidget(info_label)
-        sidebar_layout.addSpacing(15)
+        sidebar_layout.addSpacing(14)
         sidebar_layout.addWidget(self.btn_install)
-        sidebar_layout.addSpacing(10)
+        sidebar_layout.addSpacing(12)
 
         lang_hbox = QHBoxLayout()
         lang_hbox.addStretch(1)
@@ -762,66 +1061,340 @@ class X64Welcome(QWidget):
 
         self.change_page(0)
 
+        self.ram_timer = QTimer(self)
+        self.ram_timer.timeout.connect(self.update_live_ram)
+        self.ram_timer.start(2000)
+
+    def update_live_ram(self):
+        try:
+            with open("/proc/meminfo") as f:
+                mem = {}
+                for l in f:
+                    p = l.split(":")
+                    if len(p) == 2:
+                        mem[p[0].strip()] = int(p[1].strip().split()[0])
+                tot = mem.get("MemTotal", 0) // 1024
+                avail = mem.get("MemAvailable", 0) // 1024
+                used = tot - avail
+                if hasattr(self, 'card_ram') and self.card_ram:
+                    self.card_ram.update_value(f"{used} MB / {tot} MB")
+        except Exception:
+            pass
+
     def create_page_inicio(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(70, 40, 70, 40)
+        layout.setContentsMargins(48, 28, 48, 28)
+        layout.setSpacing(14)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
 
+        # Header section
+        header_vbox = QVBoxLayout()
+        header_vbox.setSpacing(3)
+        
+        sub_tag = QLabel(f"// {tr('HIGH-PERFORMANCE ARCHITECTURE')}")
+        sub_tag.setStyleSheet("color: #cc0000; font-size: 11px; font-weight: 800; letter-spacing: 2px; background: transparent;")
+        header_vbox.addWidget(sub_tag)
+
         title = QLabel(tr("Welcome to X64 LIOS").upper())
-        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
-        layout.addWidget(title)
+        title.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: 900; letter-spacing: 1px; background: transparent;")
+        header_vbox.addWidget(title)
 
         desc = QLabel(
-    f"<p>{tr('You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.')}</p>"
-    f"<p>{tr('X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:')}</p>"
-    "<ul style='margin-top: 0px; margin-bottom: 0px; padding-left: 20px;'>"
-    f"<li><b>{tr('Top Gaming Performance:')}</b> {tr('Ultra-low latency and kernel optimizations to squeeze out every FPS.')}</li>"
-    f"<li><b>{tr('Hybrid Rolling Release:')}</b> {tr('The freshness of Arch Linux combined with armored stability.')}</li>"
-    f"<li><b>{tr('Smart Package System:')}</b> {tr('Automatically detects your processor and installs the exact version adapted for it (whether old or next-generation).')}</li>"
-    f"<li><b>{tr('Absolute Privacy:')}</b> {tr('Zero telemetry by design. Your data is exclusively yours.')}</li>"
-    f"<li><b>{tr('Avant-garde Aesthetics:')}</b> {tr('Ultra-fluid, minimalist environments ready to choose.')}</li>"
-    f"<li><b>{tr('Pristine System:')}</b> {tr('Zero bloatware, returning total control of your machine back to you.')}</li>"
-    "</ul>"
-)
-        desc.setTextFormat(Qt.TextFormat.RichText)
-        desc.setStyleSheet("color: #a0a0a0; font-size: 15px; line-height: 1.6; background: transparent;")
+            f"{tr('You have started the Live session. Safely explore the environment without altering your hard drive, or proceed with the permanent system installation.')} "
+            f"{tr('X64 LIOS is meticulously designed for performance purists. Our architecture guarantees you:')}"
+        )
+        desc.setStyleSheet("color: #9e9ea7; font-size: 12.5px; line-height: 1.45; background: transparent;")
         desc.setWordWrap(True)
-        layout.addWidget(desc)
-        layout.addSpacing(40)
+        header_vbox.addWidget(desc)
+        layout.addLayout(header_vbox)
 
-        vlayout = QVBoxLayout()
-        vlayout.setSpacing(20)
-        vlayout.addWidget(PremiumButton(tr("Explore Live Environment"), tr("Minimize this window and test the extreme performance of the live system."), "view-fullscreen", cmd="minimize"))
-        vlayout.addWidget(PremiumButton(tr("Documentation and Notes"), tr("Check the Official Wiki to learn about modules and shortcuts."), "help-contents", url="https://x64lios.com"))
-        vlayout.addWidget(PremiumButton(tr("Install the System"), tr("Launch the Calamares installer to install X64 LIOS on your hard drive."), "drive-harddisk", callback=self.launch_calamares))
-        layout.addLayout(vlayout)
-        
+        # 2x3 Grid of Pillars - Spacious and rich
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(10)
+
+        pillars = [
+            ("🚀", tr("Top Gaming Performance"), tr("Ultra-low latency CachyOS kernel base boosted with the X64 performance stack: FalconD gaming CPU affinity, dynamic scx schedulers, and real-time process tuning.")),
+            ("🔄", tr("Cutting-Edge Rolling Release"), tr("Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, libraries, and ecosystem tools as they release.")),
+            ("⚡", tr("Hardware Mutation (v3/v4)"), tr("Automatic processor audit: modern CPUs receive high-performance optimized packages (v3/v4) for maximum speed; if unsupported, it uses standard versions for total compatibility without issues.")),
+            ("🛡️", tr("Btrfs Snapshots & Rollback"), tr("Automated Snapper snapshots taken before each system update. If anything fails or breaks, restore your system in seconds directly from the bootloader menu.")),
+            ("🔒", tr("Privacy by Design"), tr("Zero metrics collection, diagnostics, or background tracking. Unlike other operating systems, X64 LIOS never monitors your activity or sends your data anywhere.")),
+            ("✨", tr("Clean & Surgical System"), tr("Zero bloatware and zero background idle services. An ultra-lean footprint consuming merely 600–800 MB of idle RAM, dedicating your hardware fully to gaming and maximum performance."))
+        ]
+
+        for i, (icon_s, p_title, p_desc) in enumerate(pillars):
+            row = i // 2
+            col = i % 2
+            card = PillarCard(icon_s, p_title, p_desc)
+            grid.addWidget(card, row, col)
+
+        layout.addLayout(grid)
+
+        # Centered Quick Status Ribbon
+        ribbon = QFrame()
+        ribbon.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+            }
+        """)
+        r_layout = QHBoxLayout()
+        r_layout.setContentsMargins(14, 8, 14, 8)
+        r_layout.setSpacing(24)
+        r_layout.addStretch(1)
+
+        status_items = [
+            ("●", tr("UEFI x86_64 Boot")),
+            ("●", tr("CachyOS Kernel + FalconD")),
+            ("●", tr("Ready Network")),
+            ("●", tr("Zero-Latency ZRAM")),
+            ("●", tr("8 Desktops to Choose"))
+        ]
+        for dot, label_text in status_items:
+            lbl = QLabel(f"<span style='color: #00e676;'>{dot}</span> <span style='color: #cccccc; font-weight: 500; font-size: 11.5px;'>{label_text}</span>")
+            lbl.setTextFormat(Qt.TextFormat.RichText)
+            lbl.setStyleSheet("background: transparent; border: none;")
+            r_layout.addWidget(lbl)
+        r_layout.addStretch(1)
+        ribbon.setLayout(r_layout)
+        layout.addWidget(ribbon)
+
+        # Quick Actions Row (2 columns: Live exploration & btop)
+        actions_hbox = QHBoxLayout()
+        actions_hbox.setSpacing(14)
+        btn_live = PremiumButton(
+            tr("Explore Live Environment"),
+            tr("Minimize this window and test the extreme performance of the live system."),
+            "view-fullscreen",
+            cmd="minimize",
+            height=76
+        )
+        btn_btop = PremiumButton(
+            tr("Resource Monitor (btop)"),
+            tr("Audit real-time CPU, RAM, and process usage with btop."),
+            "utilities-system-monitor",
+            cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop",
+            height=76
+        )
+        actions_hbox.addWidget(btn_live)
+        actions_hbox.addWidget(btn_btop)
+        layout.addLayout(actions_hbox)
+
         return page
+
+    def get_system_telemetry(self):
+        cpu_model = "Desconocido"
+        try:
+            with open("/proc/cpuinfo") as f:
+                for line in f:
+                    if "model name" in line:
+                        cpu_model = line.split(":")[1].strip()
+                        cpu_model = re.sub(r"\(R\)|\(TM\)", "", cpu_model)
+                        cpu_model = re.sub(r"\s+", " ", cpu_model).strip()
+                        break
+        except Exception:
+            cpu_model = platform.processor()
+
+        arch_level = "x86-64"
+        try:
+            res = subprocess.run(["/lib64/ld-linux-x86-64.so.2", "--help"], capture_output=True, text=True)
+            if "x86-64-v4 (supported" in res.stdout:
+                arch_level = "x86-64-v4 (AVX-512)"
+            elif "x86-64-v3 (supported" in res.stdout:
+                arch_level = "x86-64-v3 (AVX2)"
+            elif "x86-64-v2 (supported" in res.stdout:
+                arch_level = "x86-64-v2 (SSE4.2)"
+        except Exception:
+            pass
+
+        ram_text = "N/A"
+        zram_text = "Inactivo"
+        try:
+            with open("/proc/meminfo") as f:
+                mem = {}
+                for l in f:
+                    p = l.split(":")
+                    if len(p) == 2:
+                        mem[p[0].strip()] = int(p[1].strip().split()[0])
+                tot = mem.get("MemTotal", 0) // 1024
+                avail = mem.get("MemAvailable", 0) // 1024
+                used = tot - avail
+                ram_text = f"{used} MB / {tot} MB"
+            if os.path.exists("/dev/zram0"):
+                zram_text = "ZRAM Activo"
+        except Exception:
+            pass
+
+        gpu_text = "GPU Estándar"
+        try:
+            res = subprocess.run(["lspci"], capture_output=True, text=True)
+            for line in res.stdout.splitlines():
+                if any(k in line.lower() for k in ["vga", "3d", "display"]):
+                    p = line.split(": ")[-1]
+                    gpu_text = re.sub(r"\(rev ..\)", "", p).strip()
+                    if "Virtio" in gpu_text:
+                        gpu_text = "Virtio GPU (Acelerada)"
+                    break
+        except Exception:
+            pass
+
+        screen_text = "Wayland Display"
+        try:
+            res = subprocess.run(["kscreen-doctor", "-o"], capture_output=True, text=True, env=dict(os.environ, WAYLAND_DISPLAY="wayland-1", DISPLAY=":1", XDG_RUNTIME_DIR="/run/user/1000"))
+            clean = re.sub(r"\x1b\[[0-9;]*m", "", res.stdout)
+            for token in clean.split():
+                if "*!" in token:
+                    clean_tok = token.replace("*!", "").split(":")[-1]
+                    p = clean_tok.split("@")
+                    if len(p) == 2:
+                        screen_text = f"{p[0]} @ {float(p[1]):.0f}Hz"
+                        break
+        except Exception:
+            pass
+
+        return {
+            "cpu": cpu_model,
+            "arch": arch_level,
+            "ram": ram_text,
+            "zram": zram_text,
+            "gpu": gpu_text,
+            "screen": screen_text
+        }
+
+    def run_audio_test(self):
+        def _play():
+            sounds_left = ["/usr/share/sounds/alsa/Front_Left.wav", "/usr/share/sounds/freedesktop/stereo/audio-channel-front-left.oga"]
+            sounds_right = ["/usr/share/sounds/alsa/Front_Right.wav", "/usr/share/sounds/freedesktop/stereo/audio-channel-front-right.oga"]
+            l_file = next((f for f in sounds_left if os.path.exists(f)), None)
+            r_file = next((f for f in sounds_right if os.path.exists(f)), None)
+            player = "pw-play" if os.path.exists("/usr/bin/pw-play") else "paplay"
+            if l_file and r_file:
+                subprocess.run([player, l_file])
+                time.sleep(0.12)
+                subprocess.run([player, r_file])
+            else:
+                subprocess.run(["speaker-test", "-t", "wav", "-c", "2", "-l", "1"])
+        threading.Thread(target=_play, daemon=True).start()
+
+    def run_gpu_test(self):
+        tele = getattr(self, "cached_tele", {"gpu": "GPU Estándar", "screen": "Display"})
+        dlg = GpuBenchmarkDialog(self, tele.get("gpu", "GPU"), tele.get("screen", "Display"))
+        dlg.exec()
 
     def create_page_sistema(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(70, 40, 70, 40)
+        layout.setContentsMargins(48, 24, 48, 24)
+        layout.setSpacing(12)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
 
-        title = QLabel(tr("System Tools"))
-        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
-        layout.addWidget(title)
+        header_vbox = QVBoxLayout()
+        header_vbox.setSpacing(3)
+        sub_tag = QLabel(f"// {tr('HARDWARE DIAGNOSTICS & CONTROL')}")
+        sub_tag.setStyleSheet("color: #cc0000; font-size: 11px; font-weight: 800; letter-spacing: 2px; background: transparent;")
+        header_vbox.addWidget(sub_tag)
 
-        desc = QLabel(tr("Native utilities to audit and manage your hardware during Live mode."))
-        desc.setStyleSheet("color: #a0a0a0; font-size: 15px; background: transparent;")
-        layout.addWidget(desc)
-        layout.addSpacing(40)
+        title = QLabel(tr("System Cockpit & Tools").upper())
+        title.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: 900; letter-spacing: 1px; background: transparent;")
+        header_vbox.addWidget(title)
 
-        vlayout = QVBoxLayout()
-        vlayout.setSpacing(20)
-        vlayout.addWidget(PremiumButton(tr("Hacker Terminal"), tr("Launch Kitty with your transparent profile and ASCII logo."), "utilities-terminal", cmd="kitty -o remember_window_size=no -o initial_window_width=110c -o initial_window_height=30c"))
-        vlayout.addWidget(PremiumButton(tr("Partition Manager"), tr("Open GParted to partition, format, or prepare disks."), "drive-harddisk", cmd="pkexec gparted"))
-        vlayout.addWidget(PremiumButton(tr("Resource Monitor"), tr("Check deep CPU and RAM usage with btop."), "utilities-system-monitor", cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop"))
-        layout.addLayout(vlayout)
+        desc = QLabel(tr("Real-time hardware audit, idle memory telemetry, and express verification tools to tune your machine."))
+        desc.setStyleSheet("color: #9e9ea7; font-size: 12.5px; line-height: 1.45; background: transparent;")
+        desc.setWordWrap(True)
+        header_vbox.addWidget(desc)
+        layout.addLayout(header_vbox)
+
+        tele = self.get_system_telemetry()
+        self.cached_tele = tele
+        
+        telem_hbox = QHBoxLayout()
+        telem_hbox.setSpacing(12)
+        
+        is_live = os.path.exists("/run/archiso")
+        sub_ram = tr("Live session (~200MB ISO layers in RAM)") if is_live else tr("Ultra-low idle footprint")
+        
+        c_cpu = TelemetryCard("⚡", tr("CPU & Architecture"), tele["cpu"], tele["arch"], tr("Optimized execution pipeline"))
+        self.card_ram = TelemetryCard("💾", tr("Memory (RAM & ZRAM)"), tele["ram"], tele["zram"], sub_ram)
+        c_gpu = TelemetryCard("🎮", tr("Graphics & Display"), tele["gpu"], tele["screen"], tr("Hardware acceleration ready"))
+        
+        telem_hbox.addWidget(c_cpu)
+        telem_hbox.addWidget(self.card_ram)
+        telem_hbox.addWidget(c_gpu)
+        layout.addLayout(telem_hbox)
+        layout.addSpacing(4)
+
+        cols_hbox = QHBoxLayout()
+        cols_hbox.setSpacing(14)
+
+        left_vbox = QVBoxLayout()
+        left_vbox.setSpacing(8)
+        lbl_left = QLabel(f"// {tr('LIVE VERIFICATIONS')}")
+        lbl_left.setStyleSheet("color: #888888; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; background: transparent;")
+        left_vbox.addWidget(lbl_left)
+
+        btn_sound = PremiumButton(
+            tr("Stereo Audio Test"),
+            tr("Verify left and right channels to ensure speakers and headphones work properly."),
+            "audio-speakers",
+            callback=self.run_audio_test,
+            height=72
+        )
+        btn_gpu = PremiumButton(
+            tr("3D Graphics & FPS Test"),
+            tr("Launch an interactive 3D benchmark to measure GPU fluidity and frame rates."),
+            "video-display",
+            callback=self.run_gpu_test,
+            height=72
+        )
+        btn_display = PremiumButton(
+            tr("Display Configuration"),
+            tr("Adjust monitor refresh rate (Hz), screen resolution, and desktop scaling."),
+            "preferences-desktop-display",
+            cmd="systemsettings kcm_kscreen",
+            height=72
+        )
+        left_vbox.addWidget(btn_sound)
+        left_vbox.addWidget(btn_gpu)
+        left_vbox.addWidget(btn_display)
+        cols_hbox.addLayout(left_vbox)
+
+        right_vbox = QVBoxLayout()
+        right_vbox.setSpacing(8)
+        lbl_right = QLabel(f"// {tr('MASTER UTILITIES')}")
+        lbl_right.setStyleSheet("color: #888888; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; background: transparent;")
+        right_vbox.addWidget(lbl_right)
+
+        btn_btop = PremiumButton(
+            tr("Resource Monitor (btop)"),
+            tr("Audit real-time CPU, RAM, and process usage with btop."),
+            "utilities-system-monitor",
+            cmd="kitty -o remember_window_size=no -o initial_window_width=100c -o initial_window_height=30c -e btop",
+            height=72
+        )
+        btn_gparted = PremiumButton(
+            tr("Partition Manager (GParted)"),
+            tr("Open GParted to partition, format, or prepare disks."),
+            "drive-harddisk",
+            cmd="pkexec gparted",
+            height=72
+        )
+        btn_kitty = PremiumButton(
+            tr("Hacker Terminal (Kitty)"),
+            tr("Launch Kitty with your transparent profile and ASCII logo."),
+            "utilities-terminal",
+            cmd="kitty -o remember_window_size=no -o initial_window_width=110c -o initial_window_height=30c",
+            height=72
+        )
+        right_vbox.addWidget(btn_btop)
+        right_vbox.addWidget(btn_gparted)
+        right_vbox.addWidget(btn_kitty)
+        cols_hbox.addLayout(right_vbox)
+
+        layout.addLayout(cols_hbox)
         return page
 
     def create_page_comunidad(self):
@@ -851,27 +1424,31 @@ class X64Welcome(QWidget):
     def create_page_filosofia(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(50, 40, 50, 40)
+        layout.setContentsMargins(40, 25, 40, 20)
+        layout.setSpacing(6)
         page.setLayout(layout)
 
+        category = QLabel(tr("// ARCHITECTURAL FOUNDATIONS & MANIFESTO"))
+        category.setStyleSheet("color: #ff3333; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; background: transparent;")
+        layout.addWidget(category)
+
         title = QLabel(tr("X64 Architectural Manifesto"))
-        title.setStyleSheet("color: #ffffff; font-size: 38px; font-weight: bold; background: transparent;")
+        title.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: 800; background: transparent;")
         layout.addWidget(title)
-        layout.addSpacing(10)
 
         intro = QLabel(tr("X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system."))
-        intro.setStyleSheet("color: #bbbbbb; font-size: 15px; font-style: italic; background: transparent;")
+        intro.setStyleSheet("color: #a0a0a0; font-size: 13px; font-style: italic; background: transparent;")
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        layout.addSpacing(20)
+        layout.addSpacing(10)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         # Beautiful custom dark red scrollbar
         scroll_area.setStyleSheet("""
             QScrollArea { border: none; background: transparent; }
-            QScrollBar:vertical { background: #121212; width: 8px; margin: 0px; border-radius: 4px; }
-            QScrollBar::handle:vertical { background: #333333; min-height: 30px; border-radius: 4px; }
+            QScrollBar:vertical { background: #121212; width: 6px; margin: 0px; border-radius: 3px; }
+            QScrollBar::handle:vertical { background: #333333; min-height: 25px; border-radius: 3px; }
             QScrollBar::handle:vertical:hover { background: #cc0000; }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
@@ -879,56 +1456,64 @@ class X64Welcome(QWidget):
 
         content_widget = QWidget()
         content_widget.setStyleSheet("background: transparent;")
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 15, 20)
-        content_layout.setSpacing(20)
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 10, 15)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(10)
 
         filosofia = [
             (tr("I. Absolute Freedom"), tr("Upstream purity of Arch Linux with zero PPAs, zero corporate ties, and 99% of system packages intact. Combined with the AUR and modern GUI tools for complete freedom.")),
             (tr("II. Surgical Optimization"), tr("Linux-CachyOS kernel with scx dynamic schedulers, FalconD gaming CPU affinity, ananicy-cpp priority tuning, and pure ZRAM in RAM for zero disk swap latency.")),
             (tr("III. Multi-Environment Ecosystem"), tr("Live environment in KDE Plasma 6 Wayland, plus 8 official installation options (KDE, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, and Server) with 16:9 previews.")),
-            (tr("IV. Infrastructure Sovereignty"), tr("Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, served with SSL from our high-speed CDN infrastructure.")),
+            (tr("IV. Sovereign Repositories"), tr("Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above Arch and CachyOS, delivering custom packages and optimizations directly without bottlenecks.")),
             (tr("V. Hardware Mutation"), tr("During installation, the system audits your CPU: modern processors get AVX2/AVX512 (v3/v4) repositories injected below [x64-lios]. chwd autodetects NVIDIA, AMD, and Intel GPUs.")),
             (tr("VI. Modular Architecture"), tr("Lightweight installer with zero bloat. Heavy gaming platforms and emulators are cleanly delegated to post-installation setup in X64 Hello after first boot.")),
             (tr("VII. Shield of Resilience"), tr("Temporal immutability with Btrfs & automated Snapper snapshots. Multi-bootloader support choosing Limine, GRUB, systemd-boot, or rEFInd for effortless rollback.")),
             (tr("VIII. The Death of the Terminal"), tr("GUI-First philosophy for effortless everyday use, paired with an elite hacker terminal experience in Kitty, Fish shell, and Starship pills for power users.")),
-            (tr("IX. Hybrid Rolling Release"), tr("The core flies at pure Arch rolling speed, while professional apps can be isolated via Flatpak or Distrobox containers to guarantee Debian-level rock-solid stability.")),
+            (tr("IX. Cutting-Edge Rolling Release"), tr("Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest hardware optimizations, kernel advances, and upstream software without reinstallations.")),
             (tr("X. Architectural Pragmatism"), tr("Open Source synergy. We inherit and polish battle-tested foundations, writing custom code and maintaining our own repositories only where we add sovereign value.")),
             (tr("XI. Aesthetics as Function"), tr("Design is not an afterthought. Widescreen panoramic UI, Crimson & Charcoal color direction (#b31b1b / #0b0b0d), and vector iconography engineered for focus and control.")),
-            (tr("XII. Absolute Privacy"), tr("In the era of covert telemetry, your PC is your private fortress. Zero tracking, zero telemetry, and zero data reporting. What you do on your machine, dies on your machine."))
+            (tr("XII. Privacy by Design"), tr("Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you."))
         ]
 
-        for p_title, p_desc in filosofia:
+        for idx, (p_title, p_desc) in enumerate(filosofia):
+            row = idx // 2
+            col = idx % 2
+
             frame = QFrame()
             frame.setObjectName("FiloCard")
             frame.setStyleSheet("""
                 QFrame#FiloCard {
-                    background-color: rgba(255, 255, 255, 0.03);
-                    border-radius: 10px;
-                    border-left: 4px solid #cc0000;
+                    background-color: rgba(255, 255, 255, 0.025);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 8px;
+                    border-left: 3px solid #cc0000;
                 }
-                QFrame#FiloCard:hover { background-color: rgba(204, 0, 0, 0.1); }
+                QFrame#FiloCard:hover {
+                    background-color: rgba(204, 0, 0, 0.08);
+                    border: 1px solid rgba(204, 0, 0, 0.25);
+                    border-left: 3px solid #ff3333;
+                }
             """)
             flayout = QVBoxLayout()
-            # Very spacious margins to look un-cramped and premium
-            flayout.setContentsMargins(25, 20, 25, 20)
-            flayout.setSpacing(6)
-            
+            flayout.setContentsMargins(18, 14, 18, 14)
+            flayout.setSpacing(5)
+
             lbl_t = QLabel(p_title)
-            lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
-            
+            lbl_t.setStyleSheet("color: #ffffff; font-weight: 700; font-size: 13px; border: none; background: transparent;")
+
             lbl_d = QLabel(p_desc)
-            lbl_d.setStyleSheet("color: #a0a0a0; font-size: 14px; line-height: 1.5; border: none; background: transparent;")
+            lbl_d.setStyleSheet("color: #999999; font-size: 11px; line-height: 1.4; border: none; background: transparent;")
             lbl_d.setWordWrap(True)
-            
+
             flayout.addWidget(lbl_t)
             flayout.addWidget(lbl_d)
             frame.setLayout(flayout)
-            content_layout.addWidget(frame)
+            grid.addWidget(frame, row, col)
 
-        content_widget.setLayout(content_layout)
+        content_widget.setLayout(grid)
         scroll_area.setWidget(content_widget)
-        
+
         layout.addWidget(scroll_area)
         return page
 
@@ -1005,5 +1590,7 @@ if __name__ == '__main__':
     app.setStyle("Fusion")
     welcome = X64Welcome()
     welcome.setWindowIcon(icon)
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        welcome.change_page(int(sys.argv[1]))
     welcome.show()
     sys.exit(app.exec())
