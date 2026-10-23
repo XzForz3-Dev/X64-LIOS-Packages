@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=13
+pkgrel=14
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -12,6 +12,12 @@ source=('01-monolith.jpg'
         '04-hybrid-plate.jpg'
         '05-faceted-armor.jpg'
         '06-stealth-dark.jpg'
+        'screenshot-01.png'
+        'screenshot-02.png'
+        'screenshot-03.png'
+        'screenshot-04.png'
+        'screenshot-05.png'
+        'screenshot-06.png'
         'x64-logo.png'
         'x64-layout.js'
         'plasmashellrc'
@@ -23,11 +29,9 @@ source=('01-monolith.jpg'
         'baloofilerc'
         'org.kde.discover.notifier.desktop'
         'org.kde.kdeconnect.daemon.desktop'
-        'wallpaper-metadata.json'
-        'screenshot.png'
         'plasmarc'
         'kscreenlockerrc')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar colección oficial de fondos de pantalla de X64 LIOS
@@ -43,15 +47,51 @@ package() {
     ln -sf 03-v2-shield.jpg "${pkgdir}/usr/share/backgrounds/x64-lios/x64-lios-v2.jpg"
     ln -sf 02-v3-carbon.jpg "${pkgdir}/usr/share/backgrounds/x64-lios/x64-lios-v3.jpg"
 
-    # Instalar Paquete Oficial de Wallpaper de KDE Plasma (X64-LIOS) -> 01-monolith.jpg
-    mkdir -p "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images"
-    cp "${srcdir}/wallpaper-metadata.json" "${pkgdir}/usr/share/wallpapers/X64-LIOS/metadata.json"
-    cp "${srcdir}/screenshot.png" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/screenshot.png"
-    cp "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2752x1536.jpg"
-    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/1920x1080.jpg"
-    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/2560x1440.jpg"
-    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/3840x2160.jpg"
-    ln -sf 2752x1536.jpg "${pkgdir}/usr/share/wallpapers/X64-LIOS/contents/images/5120x2880.jpg"
+    # Función auxiliar para instalar un paquete KPackage oficial de Wallpaper de KDE Plasma
+    install_wallpaper_kpackage() {
+        local pkg_id="$1"
+        local display_name="$2"
+        local image_file="$3"
+        local thumb_file="$4"
+
+        local wp_dir="${pkgdir}/usr/share/wallpapers/${pkg_id}"
+        mkdir -p "${wp_dir}/contents/images"
+
+        cat << EOF > "${wp_dir}/metadata.json"
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "info@x64lios.com",
+                "Name": "X64 Studios"
+            }
+        ],
+        "Id": "${pkg_id}",
+        "License": "GPLv3",
+        "Name": "${display_name}",
+        "Version": "2.0"
+    }
+}
+EOF
+
+        cp "${srcdir}/${thumb_file}" "${wp_dir}/contents/screenshot.png"
+        cp "${srcdir}/${image_file}" "${wp_dir}/contents/images/2752x1536.jpg"
+        ln -sf 2752x1536.jpg "${wp_dir}/contents/images/1920x1080.jpg"
+        ln -sf 2752x1536.jpg "${wp_dir}/contents/images/2560x1440.jpg"
+        ln -sf 2752x1536.jpg "${wp_dir}/contents/images/3840x2160.jpg"
+        ln -sf 2752x1536.jpg "${wp_dir}/contents/images/5120x2880.jpg"
+    }
+
+    # Instalar los 6 Fondos Soberanos de X64 LIOS como paquetes KPackage nativos de KDE Plasma
+    install_wallpaper_kpackage "X64-LIOS-01-Monolith" "X64 LIOS 01 - Stealth Monolith" "01-monolith.jpg" "screenshot-01.png"
+    install_wallpaper_kpackage "X64-LIOS-02-Carbon"   "X64 LIOS 02 - Carbon Fiber"    "02-v3-carbon.jpg" "screenshot-02.png"
+    install_wallpaper_kpackage "X64-LIOS-03-Shield"   "X64 LIOS 03 - Sovereign Shield" "03-v2-shield.jpg" "screenshot-03.png"
+    install_wallpaper_kpackage "X64-LIOS-04-Hybrid"   "X64 LIOS 04 - Hybrid Plate"    "04-hybrid-plate.jpg" "screenshot-04.png"
+    install_wallpaper_kpackage "X64-LIOS-05-Armor"    "X64 LIOS 05 - Faceted Armor"   "05-faceted-armor.jpg" "screenshot-05.png"
+    install_wallpaper_kpackage "X64-LIOS-06-Stealth"  "X64 LIOS 06 - Deep Stealth"    "06-stealth-dark.jpg" "screenshot-06.png"
+
+    # Enlace de compatibilidad absoluta: /usr/share/wallpapers/X64-LIOS -> X64-LIOS-01-Monolith
+    ln -sf X64-LIOS-01-Monolith "${pkgdir}/usr/share/wallpapers/X64-LIOS"
 
     # Instalar logo
     mkdir -p "${pkgdir}/usr/share/pixmaps"
