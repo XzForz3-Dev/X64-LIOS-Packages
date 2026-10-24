@@ -20,6 +20,13 @@ TRANSLATIONS = {
         "Home": "Inicio",
         "System": "Sistema",
         "Philosophy": "Filosofía",
+        "HARDWARE OK": "HARDWARE DETECTADO",
+        "LIVE AUDIT": "AUDITORÍA EN VIVO",
+        "Display": "Pantalla",
+        "Pantalla": "Pantalla",
+        "Memory": "Memoria",
+        "Memoria": "Memoria",
+        "CPU Arch": "CPU Arch",
         "Welcome to X64 LIOS": "Bienvenido a X64 LIOS",
         "The purist operating system designed for maximum performance, minimal latency, and absolute control.": "El sistema operativo purista diseñado para el máximo rendimiento, latencia mínima y control absoluto.",
         "Install X64 LIOS": "Instalar X64 LIOS",
@@ -903,6 +910,95 @@ class GpuBenchmarkDialog(QDialog):
         self.setLayout(vbox)
 
 
+class SystemPassport(QFrame):
+    def __init__(self, tele):
+        super().__init__()
+        self.setObjectName("SystemPassport")
+        self.setStyleSheet("""
+            QFrame#SystemPassport {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 0.03), stop:1 rgba(255, 255, 255, 0.015));
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 10px;
+            }
+            QFrame#SystemPassport:hover {
+                border-color: rgba(204, 0, 0, 0.45);
+                background-color: rgba(255, 255, 255, 0.04);
+            }
+        """)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(7)
+        
+        top_hbox = QHBoxLayout()
+        top_hbox.setContentsMargins(0, 0, 0, 0)
+        
+        lbl_status = QLabel(f"● {tr('HARDWARE OK')}")
+        lbl_status.setStyleSheet("""
+            color: #00e676;
+            font-size: 9.5px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: rgba(0, 230, 118, 0.12);
+            border: 1px solid rgba(0, 230, 118, 0.3);
+            border-radius: 4px;
+            padding: 2px 6px;
+        """)
+        top_hbox.addWidget(lbl_status)
+        top_hbox.addStretch(1)
+        
+        lbl_live = QLabel(tr("LIVE AUDIT"))
+        lbl_live.setStyleSheet("color: #71717a; font-size: 9.5px; font-weight: bold; background: transparent; letter-spacing: 0.5px;")
+        top_hbox.addWidget(lbl_live)
+        layout.addLayout(top_hbox)
+        layout.addSpacing(2)
+
+        def make_row(icon, label_text, value_text, badge_color=None):
+            hbox = QHBoxLayout()
+            hbox.setContentsMargins(0, 0, 0, 0)
+            hbox.setSpacing(6)
+            
+            lbl_key = QLabel(f"{icon} {label_text}")
+            lbl_key.setStyleSheet("color: #8e8e93; font-size: 10px; font-weight: 700; background: transparent;")
+            hbox.addWidget(lbl_key)
+            hbox.addStretch(1)
+            
+            lbl_val = QLabel(value_text)
+            color_style = f"color: {badge_color};" if badge_color else "color: #ffffff;"
+            lbl_val.setStyleSheet(f"{color_style} font-size: 10.5px; font-weight: 600; background: transparent;")
+            hbox.addWidget(lbl_val)
+            return hbox, lbl_val
+
+        gpu_clean = tele.get("gpu", "N/A")
+        gpu_clean = re.sub(r"NVIDIA Corporation\s*", "NVIDIA ", gpu_clean)
+        gpu_clean = re.sub(r"Advanced Micro Devices, Inc\.\s*\[AMD/ATI\]", "AMD ", gpu_clean)
+        gpu_clean = re.sub(r"Intel Corporation\s*", "Intel ", gpu_clean)
+        if len(gpu_clean) > 20:
+            gpu_clean = gpu_clean[:18] + "…"
+
+        screen_clean = tele.get("screen", "Wayland")
+        arch_clean = tele.get("arch", platform.machine())
+        kernel_clean = platform.release().replace('-cachyos', '')
+        zram_status = tele.get("zram", tr("ZRAM Activo"))
+
+        r1, _ = make_row("🎮", tr("GPU"), gpu_clean, "#ffffff")
+        r2, _ = make_row("🖥️", tr("Pantalla"), screen_clean, "#00e5ff")
+        r3, _ = make_row("⚡", tr("CPU Arch"), arch_clean, "#00e5ff")
+        r4, _ = make_row("🐧", tr("Kernel"), kernel_clean, "#cccccc")
+        r5, self.lbl_mem = make_row("💾", tr("Memoria"), zram_status, "#00e676")
+
+        layout.addLayout(r1)
+        layout.addLayout(r2)
+        layout.addLayout(r3)
+        layout.addLayout(r4)
+        layout.addLayout(r5)
+
+        self.setLayout(layout)
+
+    def update_ram(self, val_text):
+        if hasattr(self, 'lbl_mem') and self.lbl_mem:
+            self.lbl_mem.setText(val_text)
+
+
 class X64Welcome(QWidget):
     def __init__(self):
         super().__init__()
@@ -938,21 +1034,27 @@ class X64Welcome(QWidget):
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setStyleSheet("background: transparent; border: none;")
         sidebar_layout.addWidget(logo_label)
-        sidebar_layout.addSpacing(20)
+        sidebar_layout.addSpacing(16)
 
         nav_vbox = QVBoxLayout()
-        nav_vbox.setSpacing(12)
+        nav_vbox.setSpacing(10)
         
-        tabs = [(tr("Home"), "go-home"), (tr("System"), "preferences-system"), 
-                (tr("Philosophy"), "help-about")]
+        tabs = [(tr("Home"), "go-home"), (tr("System"), "preferences-system")]
         
         for i, (text, icon) in enumerate(tabs):
             btn = NavButton(text, icon, i, self)
+            btn.setFixedHeight(52)
             self.nav_buttons.append(btn)
             nav_vbox.addWidget(btn)
             
         sidebar_layout.addLayout(nav_vbox)
         sidebar_layout.addStretch(1)
+
+        tele = self.get_system_telemetry()
+        self.cached_tele = tele
+        self.passport = SystemPassport(tele)
+        sidebar_layout.addWidget(self.passport)
+        sidebar_layout.addSpacing(14)
 
         self.btn_install = QPushButton(tr("Install X64 LIOS"))
         self.btn_install.setFixedHeight(54)
@@ -971,14 +1073,6 @@ class X64Welcome(QWidget):
         shadow.setOffset(0, 4)
         self.btn_install.setGraphicsEffect(shadow)
         self.btn_install.clicked.connect(self.launch_calamares)
-        kernel_ver = platform.release().replace('-cachyos', '')
-        arch = platform.machine()
-        hud_text = f"X64 LIOS 2026 (Live)\n{tr('Architecture:')} {arch}\nKernel: {kernel_ver}\n{tr('Session:')} KDE Plasma (Wayland)"
-        info_label = QLabel(hud_text)
-        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setStyleSheet("color: #4a4a4a; font-size: 11px; font-weight: bold; line-height: 1.45; background: transparent;")
-        sidebar_layout.addWidget(info_label)
-        sidebar_layout.addSpacing(14)
         sidebar_layout.addWidget(self.btn_install)
         sidebar_layout.addSpacing(12)
 
@@ -1057,7 +1151,7 @@ class X64Welcome(QWidget):
         self.stacked_widget.addWidget(self.create_page_inicio())
         self.stacked_widget.addWidget(self.create_page_sistema())
         # self.stacked_widget.addWidget(self.create_page_comunidad())
-        self.stacked_widget.addWidget(self.create_page_filosofia())
+        # self.stacked_widget.addWidget(self.create_page_filosofia())
 
         self.change_page(0)
 
@@ -1078,6 +1172,8 @@ class X64Welcome(QWidget):
                 used = tot - avail
                 if hasattr(self, 'card_ram') and self.card_ram:
                     self.card_ram.update_value(f"{used} MB / {tot} MB")
+                if hasattr(self, 'passport') and self.passport:
+                    self.passport.update_ram(f"{used} MB ({tot} MB)")
         except Exception:
             pass
 
