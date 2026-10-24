@@ -973,21 +973,39 @@ class SystemPassport(QFrame):
         # Clean CPU
         raw_cpu = tele.get("cpu", "x86_64")
         raw_cpu = re.sub(r"\(R\)|\(TM\)", "", raw_cpu)
+        raw_cpu = re.sub(r"^\d+th Gen\s*", "", raw_cpu)
         raw_cpu = re.sub(r"@.*", "", raw_cpu)
-        raw_cpu = re.sub(r"CPU", "", raw_cpu)
+        raw_cpu = re.sub(r"CPU|Processor", "", raw_cpu)
+        raw_cpu = re.sub(r"\d+-Core", "", raw_cpu)
         raw_cpu = re.sub(r"\s+", " ", raw_cpu).strip()
-        arch_short = "v3" if "v3" in tele.get("arch", "") else ("v4" if "v4" in tele.get("arch", "") else "64")
+        arch_short = "v4" if "v4" in tele.get("arch", "") else ("v3" if "v3" in tele.get("arch", "") else ("v2" if "v2" in tele.get("arch", "") else "64"))
         cpu_display = f"{raw_cpu} ({arch_short})"
-        if len(cpu_display) > 22:
-            cpu_display = raw_cpu[:15] + f"… ({arch_short})"
+        if len(cpu_display) > 28:
+            cpu_display = raw_cpu[:22] + f"… ({arch_short})"
 
         # Clean GPU
         gpu_clean = tele.get("gpu", "N/A")
-        gpu_clean = re.sub(r"NVIDIA Corporation\s*", "NVIDIA ", gpu_clean)
+        gpu_clean = re.sub(r"Corporation\s*", "", gpu_clean)
         gpu_clean = re.sub(r"Advanced Micro Devices, Inc\.\s*\[AMD/ATI\]", "AMD ", gpu_clean)
         gpu_clean = re.sub(r"Intel Corporation\s*", "Intel ", gpu_clean)
-        if len(gpu_clean) > 20:
-            gpu_clean = gpu_clean[:18] + "…"
+        gpu_clean = re.sub(r"Red Hat, Inc\.\s*", "", gpu_clean)
+        gpu_clean = re.sub(r"\(Acelerada\)", "", gpu_clean)
+        gpu_clean = re.sub(r"\(rev ..\)", "", gpu_clean)
+        gpu_clean = re.sub(r"1\.0\s*", "", gpu_clean)
+        m_geforce = re.search(r"\[(GeForce [^\]]+)\]", gpu_clean)
+        if m_geforce:
+            name = re.sub(r"\s+(Lite Hash Rate|LHR)", "", m_geforce.group(1))
+            gpu_clean = f"NVIDIA {name}"
+        m_radeon = re.search(r"\[(Radeon [^\]]+)\]", gpu_clean)
+        if m_radeon:
+            name = m_radeon.group(1).split("/")[0]
+            gpu_clean = f"AMD {name}"
+        m_intel = re.search(r"\[(Iris [^\]]+|UHD [^\]]+|HD Graphics [^\]]+)\]", gpu_clean)
+        if m_intel:
+            gpu_clean = f"Intel {m_intel.group(1)}"
+        gpu_clean = re.sub(r"\s+", " ", gpu_clean).strip()
+        if len(gpu_clean) > 28:
+            gpu_clean = gpu_clean[:26] + "…"
 
         screen_clean = tele.get("screen", "Wayland")
 
@@ -1067,7 +1085,7 @@ class X64Welcome(QWidget):
         self.setLayout(main_layout)
 
         sidebar = QFrame()
-        sidebar.setFixedWidth(265)
+        sidebar.setFixedWidth(290)
         sidebar.setStyleSheet("""
             QFrame {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #050505, stop:1 #110000);
