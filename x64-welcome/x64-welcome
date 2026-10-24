@@ -11,7 +11,7 @@ import subprocess
 import re
 import locale
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect, QScrollArea, QComboBox, QMenu, QWidgetAction, QMessageBox, QGridLayout, QDialog)
+                             QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect, QScrollArea, QComboBox, QMenu, QWidgetAction, QMessageBox, QGridLayout, QDialog, QProgressBar)
 from PyQt6.QtGui import QPixmap, QFont, QIcon, QColor, QAction, QPainter, QPen, QBrush, QPolygonF
 from PyQt6.QtCore import Qt, QSize, QTimer, QPointF
 
@@ -916,38 +916,40 @@ class SystemPassport(QFrame):
         self.setObjectName("SystemPassport")
         self.setStyleSheet("""
             QFrame#SystemPassport {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 0.03), stop:1 rgba(255, 255, 255, 0.015));
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 0.035), stop:1 rgba(255, 255, 255, 0.015));
                 border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 10px;
+                border-radius: 9px;
             }
             QFrame#SystemPassport:hover {
                 border-color: rgba(204, 0, 0, 0.45);
-                background-color: rgba(255, 255, 255, 0.04);
+                background-color: rgba(255, 255, 255, 0.045);
             }
         """)
         layout = QVBoxLayout()
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(7)
+        layout.setContentsMargins(12, 9, 12, 9)
+        layout.setSpacing(4)
         
         top_hbox = QHBoxLayout()
         top_hbox.setContentsMargins(0, 0, 0, 0)
         
-        lbl_status = QLabel(f"● {tr('HARDWARE OK')}")
+        lbl_status = QLabel(f"● {tr('AUDITORÍA EN VIVO')}")
         lbl_status.setStyleSheet("""
             color: #00e676;
-            font-size: 9.5px;
+            font-size: 8.5px;
             font-weight: 800;
-            letter-spacing: 1px;
+            letter-spacing: 0.8px;
             background: rgba(0, 230, 118, 0.12);
             border: 1px solid rgba(0, 230, 118, 0.3);
             border-radius: 4px;
-            padding: 2px 6px;
+            padding: 1px 5px;
         """)
         top_hbox.addWidget(lbl_status)
         top_hbox.addStretch(1)
         
-        lbl_live = QLabel(tr("LIVE AUDIT"))
-        lbl_live.setStyleSheet("color: #71717a; font-size: 9.5px; font-weight: bold; background: transparent; letter-spacing: 0.5px;")
+        is_uefi = os.path.exists("/sys/firmware/efi")
+        boot_tag = "UEFI · LIVE" if is_uefi else "BIOS · LIVE"
+        lbl_live = QLabel(boot_tag)
+        lbl_live.setStyleSheet("color: #71717a; font-size: 8.5px; font-weight: bold; background: transparent; letter-spacing: 0.5px;")
         top_hbox.addWidget(lbl_live)
         layout.addLayout(top_hbox)
         layout.addSpacing(2)
@@ -955,19 +957,31 @@ class SystemPassport(QFrame):
         def make_row(icon, label_text, value_text, badge_color=None):
             hbox = QHBoxLayout()
             hbox.setContentsMargins(0, 0, 0, 0)
-            hbox.setSpacing(6)
+            hbox.setSpacing(4)
             
             lbl_key = QLabel(f"{icon} {label_text}")
-            lbl_key.setStyleSheet("color: #8e8e93; font-size: 10px; font-weight: 700; background: transparent;")
+            lbl_key.setStyleSheet("color: #8e8e93; font-size: 9.5px; font-weight: 700; background: transparent;")
             hbox.addWidget(lbl_key)
             hbox.addStretch(1)
             
             lbl_val = QLabel(value_text)
             color_style = f"color: {badge_color};" if badge_color else "color: #ffffff;"
-            lbl_val.setStyleSheet(f"{color_style} font-size: 10.5px; font-weight: 600; background: transparent;")
+            lbl_val.setStyleSheet(f"{color_style} font-size: 10px; font-weight: 600; background: transparent;")
             hbox.addWidget(lbl_val)
             return hbox, lbl_val
 
+        # Clean CPU
+        raw_cpu = tele.get("cpu", "x86_64")
+        raw_cpu = re.sub(r"\(R\)|\(TM\)", "", raw_cpu)
+        raw_cpu = re.sub(r"@.*", "", raw_cpu)
+        raw_cpu = re.sub(r"CPU", "", raw_cpu)
+        raw_cpu = re.sub(r"\s+", " ", raw_cpu).strip()
+        arch_short = "v3" if "v3" in tele.get("arch", "") else ("v4" if "v4" in tele.get("arch", "") else "64")
+        cpu_display = f"{raw_cpu} ({arch_short})"
+        if len(cpu_display) > 22:
+            cpu_display = raw_cpu[:15] + f"… ({arch_short})"
+
+        # Clean GPU
         gpu_clean = tele.get("gpu", "N/A")
         gpu_clean = re.sub(r"NVIDIA Corporation\s*", "NVIDIA ", gpu_clean)
         gpu_clean = re.sub(r"Advanced Micro Devices, Inc\.\s*\[AMD/ATI\]", "AMD ", gpu_clean)
@@ -976,27 +990,64 @@ class SystemPassport(QFrame):
             gpu_clean = gpu_clean[:18] + "…"
 
         screen_clean = tele.get("screen", "Wayland")
-        arch_clean = tele.get("arch", platform.machine())
-        kernel_clean = platform.release().replace('-cachyos', '')
-        zram_status = tele.get("zram", tr("ZRAM Activo"))
 
-        r1, _ = make_row("🎮", tr("GPU"), gpu_clean, "#ffffff")
-        r2, _ = make_row("🖥️", tr("Pantalla"), screen_clean, "#00e5ff")
-        r3, _ = make_row("⚡", tr("CPU Arch"), arch_clean, "#00e5ff")
-        r4, _ = make_row("🐧", tr("Kernel"), kernel_clean, "#cccccc")
-        r5, self.lbl_mem = make_row("💾", tr("Memoria"), zram_status, "#00e676")
+        # Network
+        net_text, net_color = self.get_net_status()
 
-        layout.addLayout(r1)
-        layout.addLayout(r2)
-        layout.addLayout(r3)
-        layout.addLayout(r4)
-        layout.addLayout(r5)
+        # Rows
+        r_cpu, _ = make_row("🧠", tr("CPU"), cpu_display, "#ffffff")
+        r_gpu, _ = make_row("🎮", tr("GPU"), gpu_clean, "#ffffff")
+        r_screen, _ = make_row("🖥️", tr("Panel"), screen_clean, "#00e5ff")
+        r_net, self.lbl_net = make_row("🌐", tr("Red"), net_text, net_color)
+        r_ram, self.lbl_mem = make_row("💾", tr("RAM"), tele.get("ram", "N/A"), "#00e676")
+
+        layout.addLayout(r_cpu)
+        layout.addLayout(r_gpu)
+        layout.addLayout(r_screen)
+        layout.addLayout(r_net)
+        layout.addLayout(r_ram)
+
+        # Mini Progress Bar
+        self.ram_bar = QProgressBar()
+        self.ram_bar.setFixedHeight(3)
+        self.ram_bar.setTextVisible(False)
+        self.ram_bar.setRange(0, 100)
+        self.ram_bar.setValue(25)
+        self.ram_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: rgba(255, 255, 255, 0.08);
+                border-radius: 1px;
+                border: none;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #cc0000, stop:1 #00e5ff);
+                border-radius: 1px;
+            }
+        """)
+        layout.addWidget(self.ram_bar)
 
         self.setLayout(layout)
 
-    def update_ram(self, val_text):
-        if hasattr(self, 'lbl_mem') and self.lbl_mem:
-            self.lbl_mem.setText(val_text)
+    def get_net_status(self):
+        try:
+            with open("/proc/net/route") as f:
+                for line in f:
+                    fields = line.strip().split()
+                    if len(fields) >= 2 and fields[1] == '00000000':
+                        iface = fields[0]
+                        if iface.startswith("wl") or "wifi" in iface:
+                            return tr("Wi-Fi Activo"), "#00e676"
+                        else:
+                            return tr("Ethernet Activo"), "#00e676"
+        except Exception:
+            pass
+        return tr("Sin Conexión"), "#ff5252"
+
+    def update_telemetry(self, used_mb, total_mb):
+        if total_mb > 0:
+            pct = int((used_mb / total_mb) * 100)
+            self.ram_bar.setValue(min(100, max(0, pct)))
+            self.lbl_mem.setText(f"{used_mb} / {total_mb} MB")
 
 
 class X64Welcome(QWidget):
@@ -1173,7 +1224,7 @@ class X64Welcome(QWidget):
                 if hasattr(self, 'card_ram') and self.card_ram:
                     self.card_ram.update_value(f"{used} MB / {tot} MB")
                 if hasattr(self, 'passport') and self.passport:
-                    self.passport.update_ram(f"{used} MB ({tot} MB)")
+                    self.passport.update_telemetry(used, tot)
         except Exception:
             pass
 
