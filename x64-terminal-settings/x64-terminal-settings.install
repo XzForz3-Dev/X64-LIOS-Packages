@@ -1,4 +1,9 @@
 post_install() {
+    # Neutralizar auto-activacion de systemd-oomd por slices de cachyos-settings
+    mkdir -p /etc/systemd/system/system.slice.d /etc/systemd/system/user-.slice.d
+    ln -sf /dev/null /etc/systemd/system/system.slice.d/10-oomd-per-slice-defaults.conf
+    ln -sf /dev/null /etc/systemd/system/user-.slice.d/10-oomd-per-slice-defaults.conf
+
     # Eliminar cualquier rastro de systemd-oomd generado por cachyos-settings
     rm -f /etc/systemd/system/multi-user.target.wants/systemd-oomd.service 2>/dev/null || true
     rm -f /etc/systemd/system/sockets.target.wants/systemd-oomd.socket 2>/dev/null || true
