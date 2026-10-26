@@ -1,9 +1,7 @@
 name: X64 LIOS Packages CI/CD
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub
+  workflow_dispatch: # Manual trigger only (local deploys use ./scripts/deploy-pkg.sh)
 
 jobs:
   build-and-sync:
