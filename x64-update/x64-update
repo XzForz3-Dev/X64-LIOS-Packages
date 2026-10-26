@@ -534,7 +534,7 @@ def run_gui():
         QProgressBar, QTextEdit, QStackedWidget, QDialog
     )
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
-    from PyQt6.QtGui import QColor, QFont, QIcon, QTextCursor
+    from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor
 
     class CheckWorker(QThread):
         finished = pyqtSignal(dict)
@@ -657,101 +657,187 @@ def run_gui():
             self.transaction_done.emit(success, ret, self.kernel_updated)
 
     class ConfirmDialog(QDialog):
-        def __init__(self, items_count, crit_count, cached_sudo, parent=None):
+        def __init__(self, items_count, crit_count, cached_sudo, parent=None, breakdown=None):
             super().__init__(parent)
-            self.setWindowTitle("Confirmar Actualización del Sistema")
-            self.setFixedSize(500, 310 if not cached_sudo else 240)
+            self.setWindowTitle("Autorización del Sistema")
+            self.setFixedWidth(480)
             self.setModal(True)
             self.cached_sudo = cached_sudo
+            self.breakdown = breakdown or {}
             self.setStyleSheet("""
                 QDialog {
-                    background-color: #0d0d13;
-                    border: 1px solid #ff1a1a;
-                    border-radius: 12px;
+                    background-color: #0b0b10;
+                }
+                QLabel {
+                    border: none;
+                    background: transparent;
                 }
             """)
 
             vbox = QVBoxLayout(self)
-            vbox.setContentsMargins(24, 20, 24, 20)
-            vbox.setSpacing(12)
+            vbox.setContentsMargins(24, 22, 24, 22)
+            vbox.setSpacing(16)
 
-            # Header
+            # Header Row (Official Icon + Title & Subtitle)
             hdr = QHBoxLayout()
-            lbl_badge = QLabel("⚡")
-            lbl_badge.setStyleSheet("font-size: 24px;")
-            lbl_title = QLabel("Confirmar Actualización del Sistema")
-            lbl_title.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;")
-            hdr.addWidget(lbl_badge)
-            hdr.addWidget(lbl_title)
+            hdr.setSpacing(14)
+
+            icon_box = QFrame()
+            icon_box.setObjectName("iconBox")
+            icon_box.setFixedSize(44, 44)
+            icon_box.setStyleSheet("""
+                QFrame#iconBox {
+                    background-color: #13131d;
+                    border: 1px solid #232334;
+                    border-radius: 10px;
+                }
+            """)
+            ib_layout = QVBoxLayout(icon_box)
+            ib_layout.setContentsMargins(0, 0, 0, 0)
+            ib_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl_icon = QLabel()
+            for icon_path in [
+                "/usr/share/pixmaps/x64-update.png",
+                "/usr/share/icons/hicolor/128x128/apps/x64-update.png",
+                os.path.expanduser("~/Proyectos/X64-LIOS-Packages/x64-update/icons/128x128/apps/x64-update.png")
+            ]:
+                if os.path.exists(icon_path):
+                    pix = QPixmap(icon_path).scaled(
+                        30, 30,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    lbl_icon.setPixmap(pix)
+                    break
+            ib_layout.addWidget(lbl_icon)
+            hdr.addWidget(icon_box)
+
+            title_col = QVBoxLayout()
+            title_col.setSpacing(2)
+            lbl_title = QLabel("Autorización de Actualización")
+            lbl_title.setStyleSheet("color: #f4f4f6; font-size: 15px; font-weight: 800;")
+            lbl_sub = QLabel("Confirma la operación para iniciar la transacción del sistema")
+            lbl_sub.setStyleSheet("color: #7c7c90; font-size: 12px;")
+            title_col.addWidget(lbl_title)
+            title_col.addWidget(lbl_sub)
+            hdr.addLayout(title_col)
             hdr.addStretch()
             vbox.addLayout(hdr)
 
-            # Summary Card
+            # Flat Summary Card (strictly scoped by #summaryCard so QLabels never inherit borders)
             summary_frame = QFrame()
+            summary_frame.setObjectName("summaryCard")
             summary_frame.setStyleSheet("""
-                QFrame {
-                    background: #14141e;
-                    border: 1px solid #28283a;
-                    border-radius: 8px;
-                    padding: 8px 12px;
+                QFrame#summaryCard {
+                    background-color: #12121b;
+                    border: 1px solid #222232;
+                    border-radius: 9px;
                 }
             """)
             sbox = QVBoxLayout(summary_frame)
-            sbox.setContentsMargins(10, 8, 10, 8)
-            sbox.setSpacing(5)
+            sbox.setContentsMargins(14, 12, 14, 12)
+            sbox.setSpacing(6)
 
-            lbl_pkgs = QLabel(f"📦 Se actualizarán <b>{items_count}</b> paquete(s) detectado(s).")
-            lbl_pkgs.setStyleSheet("color: #e4e4e7; font-size: 12px;")
-            sbox.addWidget(lbl_pkgs)
+            top_row = QHBoxLayout()
+            top_row.setSpacing(8)
+            pkg_word = "paquete listo" if items_count == 1 else "paquetes listos"
+            lbl_pkgs = QLabel(f"{items_count} {pkg_word} para actualizar")
+            lbl_pkgs.setStyleSheet("color: #f4f4f6; font-size: 13px; font-weight: 700;")
+            top_row.addWidget(lbl_pkgs)
+            top_row.addStretch()
+
+            # Breakdown pills
+            repo_n = self.breakdown.get("repo", 0)
+            aur_n = self.breakdown.get("aur", 0)
+            fp_n = self.breakdown.get("fp", 0)
+
+            def make_pill(text, fg, bg, border):
+                p = QLabel(text)
+                p.setStyleSheet(
+                    f"background-color: {bg}; color: {fg}; border: 1px solid {border}; "
+                    f"border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700;"
+                )
+                return p
+
+            if repo_n > 0:
+                top_row.addWidget(make_pill(f"Oficiales: {repo_n}", "#38bdf8", "#092030", "#123b56"))
+            if aur_n > 0:
+                top_row.addWidget(make_pill(f"AUR: {aur_n}", "#e879f9", "#26092e", "#481456"))
+            if fp_n > 0:
+                top_row.addWidget(make_pill(f"Flatpak: {fp_n}", "#818cf8", "#101036", "#232368"))
+            if crit_count > 0:
+                top_row.addWidget(make_pill(f"Críticos: {crit_count}", "#fbbf24", "#2b1d06", "#573b0c"))
+
+            sbox.addLayout(top_row)
 
             if crit_count > 0:
-                lbl_crit = QLabel(f"⚠️ Incluye <b>{crit_count}</b> componente(s) crítico(s) (Kernel / Drivers).")
-                lbl_crit.setStyleSheet("color: #f59e0b; font-size: 11px; font-weight: bold;")
-                sbox.addWidget(lbl_crit)
-
-            lbl_desc = QLabel("¿Deseas autorizar y comenzar la transacción del sistema ahora?")
-            lbl_desc.setStyleSheet("color: #9292a4; font-size: 11px;")
-            sbox.addWidget(lbl_desc)
+                crit_word = "componente crítico" if crit_count == 1 else "componentes críticos"
+                lbl_note = QLabel(f"Incluye {crit_count} {crit_word} del sistema (Kernel / Controladores).")
+                lbl_note.setStyleSheet("color: #f59e0b; font-size: 11px; font-weight: 600;")
+            else:
+                lbl_note = QLabel("Los paquetes se descargarán e instalarán mediante verificación criptográfica.")
+                lbl_note.setStyleSheet("color: #717184; font-size: 11px;")
+            sbox.addWidget(lbl_note)
 
             vbox.addWidget(summary_frame)
 
+            # Authentication Section
             if not self.cached_sudo:
-                lbl_auth = QLabel("🔒 Introduce tu contraseña de administrador para autorizar:")
-                lbl_auth.setStyleSheet("color: #9292a4; font-size: 12px;")
-                vbox.addWidget(lbl_auth)
+                auth_col = QVBoxLayout()
+                auth_col.setSpacing(6)
+
+                lbl_auth = QLabel("Contraseña de administrador")
+                lbl_auth.setStyleSheet("color: #a1a1b5; font-size: 12px; font-weight: 600;")
+                auth_col.addWidget(lbl_auth)
 
                 self.pwd_input = QLineEdit()
                 self.pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
-                self.pwd_input.setPlaceholderText("Contraseña de administrador...")
+                self.pwd_input.setPlaceholderText("Ingresa tu contraseña de sudo...")
                 self.pwd_input.setStyleSheet("""
                     QLineEdit {
-                        background: #14141e;
+                        background-color: #12121b;
                         color: #ffffff;
-                        border: 1px solid #28283a;
+                        border: 1px solid #262638;
                         border-radius: 8px;
-                        padding: 8px 12px;
+                        padding: 9px 12px;
                         font-size: 13px;
                     }
                     QLineEdit:focus {
-                        border: 1px solid #ff1a1a;
-                        background: #181826;
+                        border: 1px solid #dc2626;
+                        background-color: #151520;
                     }
                 """)
-                vbox.addWidget(self.pwd_input)
+                auth_col.addWidget(self.pwd_input)
 
                 self.lbl_error = QLabel("")
-                self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold;")
+                self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: 600;")
                 self.lbl_error.setVisible(False)
-                vbox.addWidget(self.lbl_error)
+                auth_col.addWidget(self.lbl_error)
+
+                vbox.addLayout(auth_col)
                 self.pwd_input.returnPressed.connect(self.verify_and_confirm)
                 self.pwd_input.setFocus()
             else:
                 self.pwd_input = None
-                lbl_auth_ok = QLabel("✓ Privilegios de administrador activos en la sesión actual.")
-                lbl_auth_ok.setStyleSheet("color: #22c55e; font-size: 11px; font-weight: bold;")
-                vbox.addWidget(lbl_auth_ok)
+                auth_ok_frame = QFrame()
+                auth_ok_frame.setObjectName("authOkFrame")
+                auth_ok_frame.setStyleSheet("""
+                    QFrame#authOkFrame {
+                        background-color: #091e14;
+                        border: 1px solid #14462c;
+                        border-radius: 8px;
+                    }
+                """)
+                ok_box = QHBoxLayout(auth_ok_frame)
+                ok_box.setContentsMargins(12, 8, 12, 8)
+                lbl_auth_ok = QLabel("Sesión de administrador activa — no se requiere contraseña adicional.")
+                lbl_auth_ok.setStyleSheet("color: #4ade80; font-size: 11px; font-weight: 600;")
+                ok_box.addWidget(lbl_auth_ok)
+                vbox.addWidget(auth_ok_frame)
 
-            # Buttons
+            vbox.addSpacing(2)
+
+            # Action Buttons
             btn_row = QHBoxLayout()
             btn_row.setSpacing(10)
 
@@ -759,35 +845,36 @@ def run_gui():
             btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_cancel.setStyleSheet("""
                 QPushButton {
-                    background: #1a1a26;
-                    color: #9292a4;
-                    border: 1px solid #2a2a3a;
-                    border-radius: 7px;
-                    padding: 8px 18px;
+                    background-color: #161622;
+                    color: #a1a1b5;
+                    border: 1px solid #262638;
+                    border-radius: 8px;
+                    padding: 9px 18px;
                     font-weight: 600;
                     font-size: 12px;
                 }
                 QPushButton:hover {
-                    background: #252536;
+                    background-color: #202030;
                     color: #ffffff;
+                    border: 1px solid #34344a;
                 }
             """)
             btn_cancel.clicked.connect(self.reject)
 
-            btn_confirm = QPushButton("⚡ Iniciar Actualización")
+            btn_confirm = QPushButton("Autorizar y Actualizar")
             btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_confirm.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #dc2626, stop:1 #991b1b);
                     color: #ffffff;
-                    border: 1px solid #ff3b3b;
-                    border-radius: 7px;
-                    padding: 8px 22px;
-                    font-weight: bold;
+                    border: 1px solid #ef4444;
+                    border-radius: 8px;
+                    padding: 9px 22px;
+                    font-weight: 700;
                     font-size: 12px;
                 }
                 QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #b91c1c);
                 }
             """)
             btn_confirm.clicked.connect(self.verify_and_confirm)
@@ -796,6 +883,8 @@ def run_gui():
             btn_row.addWidget(btn_cancel)
             btn_row.addWidget(btn_confirm)
             vbox.addLayout(btn_row)
+            self.adjustSize()
+            self.setFixedSize(480, self.sizeHint().height())
 
         def verify_and_confirm(self):
             if not self.cached_sudo:
@@ -1579,11 +1668,16 @@ def run_gui():
             # Check if sudo credentials are required
             cached_sudo = (subprocess.run(["sudo", "-n", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)
 
-            # Count total items and critical components
+            # Count total items and breakdown by category
             items_count = len(self.all_items)
             crit_count = sum(1 for item in self.all_items if item.get("crit", False))
+            breakdown = {
+                "repo": sum(1 for item in self.all_items if item.get("type") == "Oficial"),
+                "aur": sum(1 for item in self.all_items if item.get("type") == "AUR"),
+                "fp": sum(1 for item in self.all_items if item.get("type") == "Flatpak"),
+            }
 
-            dlg = ConfirmDialog(items_count, crit_count, cached_sudo, self)
+            dlg = ConfirmDialog(items_count, crit_count, cached_sudo, self, breakdown=breakdown)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return # User canceled
             password = dlg.get_password()
