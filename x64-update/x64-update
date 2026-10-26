@@ -238,41 +238,288 @@ def run_background_check_and_save():
     }
 
 ANSI_MAP = {
-    '30': '#71717a', '31': '#ef4444', '32': '#22c55e', '33': '#f59e0b',
-    '34': '#3b82f6', '35': '#d946ef', '36': '#06b6d4', '37': '#f4f4f5',
-    '90': '#71717a', '91': '#f87171', '92': '#4ade80', '93': '#fbbf24',
+    '30': '#52525b', '31': '#ef4444', '32': '#22c55e', '33': '#facc15',
+    '34': '#3b82f6', '35': '#d946ef', '36': '#06b6d4', '37': '#e4e4e7',
+    '90': '#71717a', '91': '#f87171', '92': '#4ade80', '93': '#fde047',
     '94': '#60a5fa', '95': '#e879f9', '96': '#22d3ee', '97': '#ffffff',
 }
 
-def ansi_to_html(text):
-    # 1. Strip OSC sequences (e.g. terminal notifications, systemd / shell integration)
-    text = re.sub(r'\x1b\].*?(?:\x07|\x1b\\|$)', '', text, flags=re.DOTALL)
-    # 2. Strip leftover literal shell notifications like []3008;end=...
-    text = re.sub(r'\[\]\d+;[^\r\n]*', '', text)
-    # 3. Strip non-color CSI sequences (cursor moves, line clears, title changes, etc.)
-    text = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', lambda m: m.group(0) if m.group(0).endswith('m') else '', text)
-    # 4. Strip other stray escape sequences
-    text = re.sub(r'\x1b[PX^_][^\x1b]*\x1b\\', '', text)
-    text = re.sub(r'\x1b[0-9A-Za-z]', '', text)
+# Bold + standard ANSI 30-37 maps to bright palette in modern terminals (like Kitty)
+ANSI_BOLD_MAP = {
+    '30': '#71717a', '31': '#f87171', '32': '#4ade80', '33': '#fde047',
+    '34': '#60a5fa', '35': '#e879f9', '36': '#22d3ee', '37': '#ffffff',
+}
 
-    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-    def repl(m):
-        code = m.group(1)
-        if code in ('0', ''):
-            return '</span>'
-        parts = code.split(';')
-        color = '#ffffff'
-        bold = False
-        for p in parts:
-            if p == '1':
-                bold = True
+def _xterm_256_to_hex(n):
+    if n < 0 or n > 255:
+        return '#d4d4d8'
+    if n < 8:
+        return ANSI_MAP.get(str(30 + n), '#d4d4d8')
+    if n < 16:
+        return ANSI_MAP.get(str(90 + (n - 8)), '#ffffff')
+    if n < 232:
+        n -= 16
+        r_idx = n // 36
+        g_idx = (n % 36) // 6
+        b_idx = n % 6
+        r = 0 if r_idx == 0 else 55 + r_idx * 40
+        g = 0 if g_idx == 0 else 55 + g_idx * 40
+        b = 0 if b_idx == 0 else 55 + b_idx * 40
+        return f'#{r:02x}{g:02x}{b:02x}'
+    # Grayscale ramp 232..255 (slightly lifted for dark background legibility, e.g. pacman 243)
+    level = min(255, 18 + (n - 232) * 10)
+    return f'#{level:02x}{level:02x}{min(255, level + 8):02x}'
+
+
+class Vt100Screen:
+    """True 2D VT100/ANSI Virtual Terminal Buffer for pixel-accurate pacman/paru/flatpak rendering."""
+
+    def __init__(self, header_html=""):
+        self.header_html = header_html
+        self.lines = [[]]
+        self.row = 0
+        self.col = 0
+        self.fg = None
+        self.bold = False
+        self.dim = False
+        self.pending = ""
+        self.cr_overwrite = False
+
+    def feed(self, text):
+        data = self.pending + text
+        self.pending = ""
+
+        # Hold back incomplete trailing CSI or OSC sequence across PTY read chunks
+        m = re.search(r"(\x1b(?:\[[0-9;?]*|\][^\x07\x1b]{0,512}(?:\x1b)?)?)$", data, flags=re.DOTALL)
+        if m:
+            self.pending = m.group(1)
+            data = data[:-len(self.pending)]
+
+        if not data:
+            return
+
+        # 1. Strip complete OSC sequences (e.g. \x1b]3008;...\x1b\ or \x1b]0;...\x07)
+        data = re.sub(r"\x1b\].*?(?:\x07|\x1b\\)", "", data, flags=re.DOTALL)
+        # 2. Strip leftover literal shell notifications like []3008;end=...
+        data = re.sub(r"\[\]\d+;[^\r\n]*", "", data)
+        # 3. Strip DCS/PM/APC sequences
+        data = re.sub(r"\x1b[PX^_].*?\x1b\\", "", data, flags=re.DOTALL)
+
+        i = 0
+        n = len(data)
+        while i < n:
+            ch = data[i]
+            if ch == "\x1b":
+                m_csi = re.match(r"\x1b\[([0-9;?]*)([A-Za-z@`])", data[i:])
+                if m_csi:
+                    self._handle_csi(m_csi.group(1), m_csi.group(2))
+                    i += m_csi.end()
+                    continue
+                m_esc = re.match(r"\x1b(?:[\(\)][0-9A-Za-z]|[0-9A-Za-z=><\\])", data[i:])
+                if m_esc:
+                    i += m_esc.end()
+                    continue
+                i += 1
+            elif ch == "\r":
+                self.col = 0
+                self.cr_overwrite = True
+                i += 1
+            elif ch == "\n":
+                self.row += 1
+                self.col = 0
+                self.cr_overwrite = False
+                while len(self.lines) <= self.row:
+                    self.lines.append([])
+                i += 1
+            elif ch == "\b":
+                self.col = max(0, self.col - 1)
+                self.cr_overwrite = False
+                i += 1
+            elif ch == "\t":
+                spaces = 8 - (self.col % 8)
+                for _ in range(spaces):
+                    self._put_char(" ")
+                i += 1
+            elif ord(ch) >= 32:
+                self._put_char(ch)
+                i += 1
+            else:
+                i += 1
+
+    def _resolve_color(self):
+        if self.fg is None:
+            if self.bold:
+                return "#ffffff"
+            if self.dim:
+                return "#71717a"
+            return None
+        if self.bold and self.fg in ANSI_BOLD_MAP:
+            return ANSI_BOLD_MAP[self.fg]
+        if self.fg in ANSI_MAP:
+            return ANSI_MAP[self.fg]
+        if self.fg.startswith("#"):
+            return self.fg
+        return None
+
+    def _put_char(self, ch):
+        while len(self.lines) <= self.row:
+            self.lines.append([])
+        line = self.lines[self.row]
+        if self.cr_overwrite:
+            line.clear()
+            self.cr_overwrite = False
+        while len(line) <= self.col:
+            line.append((" ", None, False))
+        line[self.col] = (ch, self._resolve_color(), self.bold)
+        self.col += 1
+
+    def _handle_csi(self, params, cmd):
+        arg = params.lstrip("?")
+        first_num = arg.split(";")[0] if arg else ""
+        count = int(first_num) if first_num.isdigit() and int(first_num) > 0 else 1
+
+        if cmd == "A":  # Cursor Up
+            self.row = max(0, self.row - count)
+            self.cr_overwrite = (self.col == 0)
+        elif cmd == "B":  # Cursor Down
+            self.row += count
+            while len(self.lines) <= self.row:
+                self.lines.append([])
+            self.cr_overwrite = (self.col == 0)
+        elif cmd == "C":  # Cursor Forward
+            self.col += count
+            self.cr_overwrite = False
+        elif cmd == "D":  # Cursor Back
+            self.col = max(0, self.col - count)
+            self.cr_overwrite = False
+        elif cmd == "E":  # Cursor Next Line (col 0)
+            self.row += count
+            self.col = 0
+            self.cr_overwrite = True
+            while len(self.lines) <= self.row:
+                self.lines.append([])
+        elif cmd == "F":  # Cursor Preceding Line (col 0)
+            self.row = max(0, self.row - count)
+            self.col = 0
+            self.cr_overwrite = True
+        elif cmd in ("G", "`"):  # Cursor Horizontal Absolute (1-based)
+            self.col = max(0, count - 1)
+            self.cr_overwrite = (self.col == 0)
+        elif cmd == "K":  # Erase in Line
+            while len(self.lines) <= self.row:
+                self.lines.append([])
+            line = self.lines[self.row]
+            mode = int(first_num) if first_num.isdigit() else 0
+            if mode == 0:
+                if self.cr_overwrite and self.col == 0:
+                    line.clear()
+                    self.cr_overwrite = False
+                else:
+                    del line[self.col:]
+            elif mode == 1:
+                for c_idx in range(min(self.col + 1, len(line))):
+                    line[c_idx] = (" ", None, False)
+            elif mode == 2:
+                line.clear()
+                self.cr_overwrite = False
+        elif cmd == "J":  # Erase in Display
+            mode = int(first_num) if first_num.isdigit() else 0
+            if mode in (2, 3):
+                self.lines = [[]]
+                self.row = 0
+                self.col = 0
+                self.cr_overwrite = False
+        elif cmd == "m":  # SGR (Select Graphic Rendition)
+            self._handle_sgr(params)
+
+    def _handle_sgr(self, params):
+        if not params or params == "0":
+            self.fg = None
+            self.bold = False
+            self.dim = False
+            return
+        parts = params.split(";")
+        idx = 0
+        while idx < len(parts):
+            p = parts[idx]
+            if p in ("", "0"):
+                self.fg = None
+                self.bold = False
+                self.dim = False
+            elif p == "1":
+                self.bold = True
+            elif p == "2":
+                self.dim = True
+            elif p == "22":
+                self.bold = False
+                self.dim = False
+            elif p == "39":
+                self.fg = None
+            elif p == "38" and idx + 2 < len(parts) and parts[idx + 1] == "5":
+                if parts[idx + 2].isdigit():
+                    self.fg = _xterm_256_to_hex(int(parts[idx + 2]))
+                idx += 2
+            elif p == "38" and idx + 4 < len(parts) and parts[idx + 1] == "2":
+                try:
+                    r = max(0, min(255, int(parts[idx + 2])))
+                    g = max(0, min(255, int(parts[idx + 3])))
+                    b = max(0, min(255, int(parts[idx + 4])))
+                    self.fg = f"#{r:02x}{g:02x}{b:02x}"
+                except ValueError:
+                    pass
+                idx += 4
             elif p in ANSI_MAP:
-                color = ANSI_MAP[p]
-        b_style = 'font-weight: bold;' if bold else ''
-        return f'<span style="color: {color}; {b_style}">'
-    
-    html = re.sub(r'\x1b\[([0-9;]*)m', repl, text)
-    return html
+                self.fg = p
+            idx += 1
+
+    def to_html(self):
+        out_lines = []
+        for line in self.lines:
+            if not line:
+                out_lines.append("")
+                continue
+            row_parts = []
+            cur_fg = None
+            cur_bold = False
+            buf = []
+
+            def flush_run():
+                if not buf:
+                    return
+                txt = "".join(buf).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                if cur_fg or cur_bold:
+                    styles = []
+                    if cur_fg:
+                        styles.append(f"color:{cur_fg}")
+                    if cur_bold:
+                        styles.append("font-weight:bold")
+                    row_parts.append(f'<span style="{";".join(styles)}">{txt}</span>')
+                else:
+                    row_parts.append(txt)
+
+            for ch, fg, bold in line:
+                if fg != cur_fg or bold != cur_bold:
+                    flush_run()
+                    buf = [ch]
+                    cur_fg = fg
+                    cur_bold = bold
+                else:
+                    buf.append(ch)
+            flush_run()
+            out_lines.append("".join(row_parts))
+
+        body = "\n".join(out_lines)
+        return (
+            f"{self.header_html}"
+            f'<pre style="margin: 0; font-family: \'JetBrainsMono Nerd Font\', \'Noto Sans Mono\', monospace; '
+            f'font-size: 12px; line-height: 1.38; color: #d4d4d8; white-space: pre;">{body}</pre>'
+        )
+
+
+def ansi_to_html(text):
+    vt = Vt100Screen()
+    vt.feed(text)
+    return vt.to_html()
 
 
 # ==============================================================================
@@ -338,16 +585,16 @@ def run_gui():
             master, slave = pty.openpty()
             self.master_fd = master
 
-            # Set PTY window size (32 rows, 110 columns) so pacman/ncurses format progress bars properly
+            # Set PTY window size (32 rows, 104 columns) so pacman/ncurses format progress bars cleanly inside log_view
             try:
-                winsize = struct.pack("HHHH", 32, 110, 0, 0)
+                winsize = struct.pack("HHHH", 32, 104, 0, 0)
                 fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
             except Exception:
                 pass
 
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
-            env["COLUMNS"] = "110"
+            env["COLUMNS"] = "104"
             env["LINES"] = "32"
             env["LC_ALL"] = "C.UTF-8"
 
@@ -1362,14 +1609,22 @@ def run_gui():
 
             # Switch to In-App Transaction View
             self.stacked_widget.setCurrentIndex(1)
-            self.tx_overwrite_mode = False
-            self.tx_active_block_offset = 0
-            self.tx_pending_escape = ""
-            self.log_view.clear()
-            self.log_view.append(
-                f"<div style='color: #ef4444; font-weight: bold;'>[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
-                f"<div style='color: #71717a;'>Comandos: {' && '.join(commands)}</div><hr style='border: 1px solid #222230;'><br>"
+            cmd_display = " && ".join(commands).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            header_html = (
+                f"<div style=\"color: #ef4444; font-weight: bold; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
+                f"[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
+                f"<div style=\"color: #71717a; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
+                f"Comandos: {cmd_display}</div>"
+                f"<div style=\"color: #222230; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px; margin-bottom: 6px;\">"
+                f"{'─' * 104}</div>"
             )
+            self.vt_screen = Vt100Screen(header_html=header_html)
+            self.vt_last_render = 0.0
+            if not hasattr(self, "vt_render_timer"):
+                self.vt_render_timer = QTimer(self)
+                self.vt_render_timer.setSingleShot(True)
+                self.vt_render_timer.timeout.connect(self.flush_vt_render)
+            self.log_view.setHtml(self.vt_screen.to_html())
 
             # Reset header and transaction state
             self.lbl_live.setText("EN VIVO")
@@ -1416,85 +1671,37 @@ def run_gui():
             self.tx_worker.transaction_done.connect(self.on_tx_finished)
             self.tx_worker.start()
 
-        def on_tx_output(self, raw_text):
-            data = getattr(self, "tx_pending_escape", "") + raw_text
-            self.tx_pending_escape = ""
-
-            # Retain incomplete trailing escape sequences across chunk boundaries
-            m = re.search(r"(\x1b(?:\[[0-9;?]*)?)$", data)
-            if m:
-                self.tx_pending_escape = m.group(1)
-                data = data[:-len(self.tx_pending_escape)]
-
-            if not data:
+        def flush_vt_render(self):
+            if not hasattr(self, "vt_screen"):
                 return
+            self.vt_last_render = time.time()
+            self.log_view.setHtml(self.vt_screen.to_html())
+            vbar = self.log_view.verticalScrollBar()
+            vbar.setValue(vbar.maximum())
+            hbar = self.log_view.horizontalScrollBar()
+            hbar.setValue(0)
 
-            doc = self.log_view.document()
-            data = data.replace("\r\n", "\n")
-            tokens = re.split(r"(\x1b\[\d*[A-Za-z]|\n|\r)", data)
-
-            for t in tokens:
-                if not t:
-                    continue
-
-                if t == "\n":
-                    if getattr(self, "tx_active_block_offset", 0) < 0:
-                        self.tx_active_block_offset += 1
-                    else:
-                        cursor = QTextCursor(doc)
-                        cursor.movePosition(QTextCursor.MoveOperation.End)
-                        cursor.insertBlock()
-                        self.tx_active_block_offset = 0
-                    self.tx_overwrite_mode = False
-
-                elif t == "\r":
-                    self.tx_overwrite_mode = True
-
-                elif t.startswith("\x1b["):
-                    cmd = t[-1]
-                    arg = t[2:-1]
-                    count = int(arg) if arg.isdigit() else 1
-
-                    if cmd in ("F", "A"):
-                        self.tx_active_block_offset = getattr(self, "tx_active_block_offset", 0) - count
-                        self.tx_overwrite_mode = True
-                    elif cmd in ("E", "B"):
-                        self.tx_active_block_offset = min(0, getattr(self, "tx_active_block_offset", 0) + count)
-                        self.tx_overwrite_mode = False
-                    elif cmd == "K":
-                        pass
-
-                else:
-                    total_blocks = doc.blockCount()
-                    if total_blocks == 0:
-                        c = QTextCursor(doc)
-                        c.insertBlock()
-                        total_blocks = 1
-
-                    offset = getattr(self, "tx_active_block_offset", 0)
-                    target_block_idx = max(0, min(total_blocks - 1, total_blocks - 1 + offset))
-                    target_block = doc.findBlockByNumber(target_block_idx)
-                    cursor = QTextCursor(target_block)
-
-                    if getattr(self, "tx_overwrite_mode", False):
-                        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
-                        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
-                        cursor.removeSelectedText()
-                        self.tx_overwrite_mode = False
-                    else:
-                        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
-
-                    html = ansi_to_html(t)
-                    if html:
-                        cursor.insertHtml(html)
-
-            self.log_view.ensureCursorVisible()
+        def on_tx_output(self, raw_text):
+            if not hasattr(self, "vt_screen"):
+                self.vt_screen = Vt100Screen()
+            self.vt_screen.feed(raw_text)
+            now = time.time()
+            if now - getattr(self, "vt_last_render", 0.0) >= 0.025:
+                if hasattr(self, "vt_render_timer") and self.vt_render_timer.isActive():
+                    self.vt_render_timer.stop()
+                self.flush_vt_render()
+            else:
+                if hasattr(self, "vt_render_timer") and not self.vt_render_timer.isActive():
+                    self.vt_render_timer.start(25)
 
         def on_tx_stage(self, stage_text, percent):
             self.lbl_tx_stage.setText(stage_text)
             self.tx_progress.setValue(percent)
 
         def on_tx_finished(self, success, exit_code, kernel_updated):
+            if hasattr(self, "vt_render_timer") and self.vt_render_timer.isActive():
+                self.vt_render_timer.stop()
+            self.flush_vt_render()
             self.timer_elapsed.stop()
             self.btn_tx_done.setEnabled(True)
 
