@@ -3151,6 +3151,726 @@ def tr(text):
     return text
 
 
+TOOLTIP_LABELS = {
+    'es': ('¿Qué es?', '¿Para qué sirve?', '¿Cuándo activarlo / usarlo?'),
+    'en': ('What is it?', 'What is it for?', 'When to enable / use it?'),
+    'fr': ("Qu'est-ce que c'est ?", 'À quoi ça sert ?', "Quand l'activer / l'utiliser ?"),
+    'de': ('Was ist das?', 'Wofür wird es genutzt?', 'Wann aktivieren / nutzen?'),
+    'it': ("Cos'è?", 'A cosa serve?', 'Quando attivarlo / usarlo?'),
+    'pt': ('O que é?', 'Para que serve?', 'Quando ativar / usar?'),
+    'ru': ('Что это?', 'Для чего нужно?', 'Когда включать / использовать?'),
+}
+
+TOOLTIP_GUIDES = {
+    'es': {
+        'falcond.service': (
+            'Demonio inteligente de detección automática de videojuegos (Steam, Proton, Wine y binarios nativos).',
+            'Conmuta dinámicamente el perfil de energía de la CPU a máximo rendimiento, ajusta la afinidad de núcleos y frena tareas secundarias para eliminar micro-tirones (stuttering).',
+            'Mantenlo ACTIVADO siempre si juegas en este equipo. Solo desactívalo en portátiles usando batería cuando busques ahorro energético extremo.'
+        ),
+        'ananicy-cpp.service': (
+            'Gestor automático de prioridades de procesos (nice / ionice) escrito en C++ con reglas optimizadas para gaming y escritorio.',
+            'Asigna prioridad de CPU y entrada/salida de disco a tu aplicación activa (juego, navegador o editor) y reduce el impacto de procesos en segundo plano.',
+            'Mantenlo ACTIVADO permanentemente en cualquier PC de escritorio o laptop para una respuesta instantánea de la interfaz.'
+        ),
+        'bpftune.service': (
+            'Optimizador autónomo desarrollado por Oracle basado en programas eBPF dentro del kernel Linux.',
+            'Analiza el tráfico de red y uso de memoria en tiempo real para auto-ajustar buffers TCP y parámetros sysctl dinámicamente.',
+            'Viene INACTIVO porque el kernel X64 ya incluye TCP BBR + FQ precalibrados. Actívalo si realizas transferencias masivas en redes 2.5G/10G o servidores locales.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: servicio que monta el perfil completo de tu navegador web (Chromium, Firefox, Brave, Zen) en memoria RAM (tmpfs).',
+            'Acelera drásticamente la apertura de pestañas, caché e historial y reduce hasta un 90% las escrituras constantes que desgastan tu SSD/NVMe.',
+            'Actívalo si tienes 16 GB de RAM o más. Déjalo INACTIVO en equipos con 8 GB de RAM o menos para reservar toda la memoria a tus juegos.'
+        ),
+        'systemd-oomd.service': (
+            'Vigía de agotamiento de memoria (Out-Of-Memory Daemon) de systemd.',
+            'Monitorea la presión de memoria y cierra forzosamente procesos pesados si la RAM física y el ZRAM llegan al 100% de saturación.',
+            'Recomendado INACTIVO para Gaming: evita que cierre bruscamente tus juegos durante picos de compilación de shaders Vulkan (ZRAM ya amortigua la memoria). Actívalo solo en equipos con poca RAM (4-8 GB) si sufres congelamientos por exceso de pestañas.'
+        ),
+        'fstrim.timer': (
+            'Temporizador semanal del sistema para el mantenimiento de bloques en unidades de estado sólido (NVMe y SSD SATA).',
+            'Informa al controlador del SSD qué bloques ya no contienen datos válidos, evitando la degradación de velocidad de escritura y prolongando su vida útil.',
+            'Mantenlo ACTIVADO siempre que tu sistema operativo resida en un disco SSD o NVMe.'
+        ),
+        'mitigations': (
+            'Parches de seguridad del kernel Linux contra vulnerabilidades de ejecución especulativa del procesador (Spectre, Meltdown, MDS, TAA).',
+            'Protegen tu CPU contra lecturas no autorizadas de memoria entre procesos. Desactivarlos (mitigations=off) elimina los controles de salto del kernel, ganando entre +3% y +7% de FPS y menor latencia.',
+            'Mantenlo en SEGURO (ACTIVO) para uso general o trabajo. Desactívalo únicamente si buscas el máximo rendimiento competitivo en juegos y ejecutas software de confianza.'
+        ),
+        'scx_bore': (
+            'Planificador nativo en C integrado directamente en el núcleo Linux-CachyOS (Burst-Oriented Response Enhancer).',
+            'Prioriza los hilos interactivos frente a cargas pesadas sin coste adicional de CPU y trabaja en sinergia directa con FalconD.',
+            'Ideal como opción predeterminada todo-terreno: máxima estabilidad, cero sobrecarga y excelente rendimiento general.'
+        ),
+        'scx_lavd': (
+            'Planificador eBPF (Latency-critical Virtual Deadline) desarrollado por Valve e Igalia específicamente para gaming y SteamOS.',
+            'Calcula plazos virtuales para los hilos de renderizado y audio del juego, maximizando la estabilidad de los FPS mínimos (1% Low FPS).',
+            'Actívalo cuando juegues títulos competitivos (CS2, Valorant/Overwatch, Apex) o juegos AAA exigentes en CPU.'
+        ),
+        'scx_bpfland': (
+            'Planificador eBPF interactivo diseñado para mantener la fluidez absoluta del escritorio bajo cargas extremas.',
+            'Detecta qué ventanas e hilos interactúan con el usuario y les garantiza tiempo de CPU inmediato incluso si el procesador está al 100%.',
+            'Úsalo si haces streaming con OBS, compilas código o renderizas vídeo al mismo tiempo que juegas o usas el escritorio.'
+        ),
+        'scx_cosmos': (
+            'Planificador eBPF ultraligero de propósito general enfocado en localidad de caché de CPU.',
+            'Minimiza la migración innecesaria de hilos entre núcleos, reduciendo la latencia de despertar y el consumo energético.',
+            'Recomendado para uso diario equilibrado, ofimática avanzada y portátiles donde buscas fluidez con buena eficiencia.'
+        ),
+        'scx_flash': (
+            'Planificador eBPF basado en el algoritmo Earliest Deadline First (EDF) para cargas multimedia.',
+            'Garantiza tiempos de respuesta deterministas y estrictos para buffers de audio y vídeo en tiempo real.',
+            'Actívalo para producción musical (DAW / PipeWire baja latencia), edición de vídeo o transmisión sin cortes de audio.'
+        ),
+        'scx_rusty': (
+            'Planificador eBPF multidominio escrito en Rust para arquitecturas con múltiples complejos de caché (Multi-CCD / muchos núcleos).',
+            'Balancea inteligentemente la carga entre chiplets (ej. AMD Ryzen 9 con 12/16 núcleos o Threadripper) evitando cuellos de botella entre cachés L3.',
+            'Úsalo en estaciones de trabajo de alto conteo de núcleos para renderizado 3D, virtualización o compilación pesada.'
+        ),
+        'ufw.service': (
+            'Cortafuegos de red perimetral (Uncomplicated Firewall) gestionado sobre tablas netfilter/iptables del kernel.',
+            'Bloquea automáticamente cualquier intento de conexión entrante no autorizada hacia tu PC mientras permite todo tu tráfico saliente normal.',
+            'Mantenlo ACTIVADO siempre, especialmente si conectas tu equipo a redes Wi-Fi públicas, routers compartidos o LAN.'
+        ),
+        'bluetooth.service': (
+            'Pila oficial de protocolos inalámbricos BlueZ de Linux.',
+            'Permite emparejar y utilizar mandos de consola (DualSense PS5, Xbox Wireless, Switch Pro), auriculares Bluetooth, teclados y ratones.',
+            'Mantenlo ACTIVADO si usas mandos o audio inalámbrico. Puedes desactivarlo en PCs de escritorio sin antena Bluetooth.'
+        ),
+        'tcp_bbr': (
+            'Algoritmo moderno de control de congestión de red desarrollado por Google junto con el planificador de paquetes Fair Queueing (FQ).',
+            'Maximiza el ancho de banda real y evita el "Bufferbloat" (subidas bruscas de ping cuando alguien más descarga archivos en tu red).',
+            'Viene preconfigurado y ACTIVO de fábrica en el kernel de X64 LIOS; no requiere intervención manual.'
+        ),
+        'wifi_lowjitter': (
+            'Regla de baja latencia inalámbrica (wifi.powersave = 2) aplicada a NetworkManager.',
+            'Impide que el chip Wi-Fi entre en micro-estados de suspensión entre paquetes, erradicando los picos de lag (jitter) en partidas online.',
+            'Viene ACTIVO de fábrica en X64 LIOS para garantizar estabilidad de nivel cableado jugando por Wi-Fi.'
+        ),
+        'secureboot': (
+            'Asistente criptográfico gráfico basado en sbctl para firmar el kernel y gestores de arranque UEFI.',
+            'Te permite tener Secure Boot ACTIVADO en tu placa base con tus propias claves sin borrar los certificados oficiales de Microsoft.',
+            'Úsalo si tienes Dual-Boot con Windows 11 y juegas títulos que exigen Secure Boot obligatorio en BIOS (Valorant, EA FC, FaceIT).'
+        ),
+        'maint_update': (
+            'Lanzador directo del Centro Oficial de Actualizaciones de X64 LIOS (x64-update).',
+            'Sincroniza los repositorios oficiales [x64-lios], CachyOS, Arch, paquetes AUR y aplicaciones Flatpak en una interfaz gráfica segura.',
+            'Ejecútalo 1 o 2 veces por semana para mantener tus drivers, kernel y parches de seguridad al día.'
+        ),
+        'maint_mirrors': (
+            'Herramienta de benchmark de servidores de descarga (cachyos-rate-mirrors).',
+            'Mide la velocidad y latencia real desde tu ubicación hacia todos los servidores mundiales y ordena los más rápidos primero.',
+            'Úsalo si notas que las descargas o instalaciones de paquetes van más lentas de lo habitual.'
+        ),
+        'maint_cache': (
+            'Rutina de limpieza del almacén local de paquetes descargados (/var/cache/pacman/pkg/).',
+            'Elimina los instaladores comprimidos (.pkg.tar.zst) de versiones antiguas que Pacman guarda por respaldo, recuperando varios GB de disco.',
+            'Úsalo cada par de meses o cuando quieras liberar espacio rápido en tu unidad SSD/NVMe.'
+        ),
+        'maint_orphans': (
+            'Escáner y limpiador de dependencias huérfanas (pacman -Qtdq).',
+            'Detecta y desinstala librerías auxiliares que fueron instaladas para algún programa que ya borraste y que hoy no usa nadie.',
+            'Ejecútalo periódicamente tras desinstalar aplicaciones para mantener el sistema limpio.'
+        ),
+        'maint_winboat': (
+            'Entorno contenedorizado ligero basado en Docker para ejecutar aplicaciones de productividad de Windows.',
+            'Configura automáticamente Docker y Winboat para integrar programas de oficina o utilidades de Windows dentro de tu escritorio Linux.',
+            'Instálalo solo si necesitas alguna herramienta específica de Windows que no tenga versión nativa ni alternativa en Linux.'
+        ),
+        'x64-update.timer': (
+            'Demonio centinela y temporizador de bandeja del sistema (x64-update-tray).',
+            'Verifica silenciosamente en segundo plano si existen nuevas actualizaciones disponibles y muestra el icono de estado junto al reloj.',
+            'Mantenlo ACTIVADO si quieres enterarte al instante de nuevas actualizaciones; desactívalo si prefieres comprobarlas manualmente.'
+        ),
+        'rescue_keyrings': (
+            'Reparador automático del llavero criptográfico GPG de Pacman (/etc/pacman.d/gnupg).',
+            'Reinicializa y vuelve a firmar los certificados oficiales de Arch, CachyOS y X64 LIOS.',
+            'Úsalo únicamente si al actualizar o instalar un paquete recibes errores de "firma inválida o corrupta (PGP signature)".'
+        ),
+        'rescue_unlock': (
+            'Desbloqueador de emergencia de la base de datos de paquetes (/var/lib/pacman/db.lck).',
+            'Elimina el archivo cerrojo que queda huérfano cuando una actualización previa se interrumpió por un apagón o cierre forzoso.',
+            'Úsalo solo cuando Pacman o X64 Update te indiquen "no se pudo bloquear la base de datos (unable to lock database)".'
+        ),
+        'rescue_reinstall': (
+            'Rutina de reconstrucción integral de todos los paquetes nativos instalados (pacman -Sy $(pacman -Qnq)).',
+            'Descarga y sobreescribe todos los binarios y librerías del sistema sin borrar tus archivos personales ni configuraciones de usuario.',
+            'Úsalo como herramienta de rescate mayor si borraste por accidente archivos del sistema en /usr o tras un corte eléctrico grave.'
+        ),
+        'rescue_journal': (
+            'Inspector forense de registros críticos del arranque actual (journalctl -p 3 -xb).',
+            'Filtra y muestra exclusivamente los errores de severidad alta del kernel, drivers y servicios de systemd ocurridos al encender el PC.',
+            'Úsalo para diagnosticar fallos de hardware, errores de montaje de discos o servicios que no levantan.'
+        ),
+        'rescue_kwin': (
+            'Consola oficial de diagnóstico interno del compositor KWin Wayland de KDE Plasma.',
+            'Muestra en tiempo real qué ventanas corren en Wayland nativo o XWayland, estado de FreeSync/VRR (Adaptive Sync), monitores y buffers DRM.',
+            'Úsala para verificar si el refresco variable (VRR) está activo en tu monitor gamer o depurar problemas gráficos.'
+        ),
+        'rescue_btop': (
+            'Monitor interactivo de recursos del sistema en alta definición (btop++).',
+            'Visualiza en tiempo real la carga y frecuencia de cada núcleo de CPU, temperatura, consumo de RAM/ZRAM, tráfico de red y procesos.',
+            'Ábrelo en cualquier momento para vigilar el rendimiento o cerrar algún proceso que consuma demasiados recursos.'
+        ),
+        'dns_1.1.1.1': (
+            'Resolvedor DNS global de ultra-baja latencia operado por Cloudflare (1.1.1.1 / 1.0.0.1).',
+            'Resuelve dominios web y servidores de juego en pocos milisegundos con soporte completo de cifrado DNS-over-TLS (DoT) y cero registro de tu IP.',
+            'Elígelo como primera opción para Gaming Competitivo y navegación general a máxima velocidad.'
+        ),
+        'dns_1.1.1.2': (
+            'Variante de seguridad de Cloudflare 1.1.1.1 for Families con filtro activo contra malware y phishing.',
+            'Bloquea automáticamente a nivel de red dominios conocidos por distribuir troyanos, ransomware, spyware y páginas de estafa antes de que carguen.',
+            'Actívalo si buscas la misma velocidad de Cloudflare pero con una capa extra de protección preventiva al navegar.'
+        ),
+        'dns_94.140.14.14': (
+            'Resolvedor DNS público de AdGuard con bloqueo integrado de publicidad y rastreadores.',
+            'Filtra dominios de anuncios invasivos, telemetría corporativa y trackers analíticos directamente en la red para todo el sistema operativo.',
+            'Úsalo si quieres bloquear publicidad en navegadores y aplicaciones sin instalar extensiones adicionales.'
+        ),
+        'dns_9.9.9.9': (
+            'Servicio DNS sin ánimo de lucro con sede en Suiza (Quad9 Foundation) protegido por leyes suizas de privacidad.',
+            'Combina inteligencia de amenazas de más de 20 proveedores de ciberseguridad para bloquear dominios maliciosos con privacidad estricta.',
+            'Ideal para usuarios enfocados en privacidad extrema, banca online y seguridad corporativa.'
+        ),
+        'dns_8.8.8.8': (
+            'Infraestructura DNS mundial de alta disponibilidad operada por Google (8.8.8.8 / 8.8.4.4).',
+            'Ofrece enrutamiento Anycast masivo y compatibilidad universal con cualquier CDN o servidor de descarga internacional.',
+            'Úsalo si algún servidor regional presenta problemas de resolución con otros proveedores o obtiene el menor ping en tu benchmark.'
+        ),
+        'dns_208.67.222.222': (
+            'Uno de los servidores DNS más veteranos y estables de Internet, mantenido por Cisco Umbrella (OpenDNS).',
+            'Proporciona resolución clásica de altísima fiabilidad y protección contra suplantación de identidad (phishing).',
+            'Úsalo como alternativa sólida si tu proveedor de Internet (ISP) tiene mejor enrutamiento hacia nodos de Cisco.'
+        ),
+        'cachyos-gaming-meta cachyos-gaming-applications protonup-qt lact|lact-git': (
+            'Meta-paquete maestro Todo-en-Uno que instala el ecosistema Gaming completo de X64 LIOS en un solo clic.',
+            'Instala Steam, Lutris, Heroic, Faugus, Wine/Proton-SLR, UMU, MangoHud, Gamescope, LACT, ProtonUp-Qt y todas las librerías Vulkan/OpenGL de 32 y 64 bits.',
+            'Usa este botón si quieres dejar tu PC 100% lista para jugar cualquier título de cualquier tienda sin instalar piezas por separado.'
+        ),
+        'cachyos-gaming-meta umu-launcher protontricks': (
+            'Núcleo base de compatibilidad para juegos de Windows en Linux (Wine X64, Proton-SLR, UMU Launcher, Winetricks y librerías 32-bit).',
+            'Proporciona los traductores DirectX a Vulkan (DXVK / VKD3D-Proton), códecs de audio/vídeo y librerías necesarias para que los juegos arranquen.',
+            'Imprescindible como base si prefieres instalar solo un lanzador específico (como Lutris o Heroic) en lugar de la Suite Completa.'
+        ),
+        'steam': (
+            'Plataforma oficial de videojuegos de Valve con integración nativa de Steam Play (Proton).',
+            'Permite descargar y ejecutar miles de juegos de Windows y Linux con soporte de mandos, guardado en la nube y pre-caché de shaders Vulkan.',
+            'Instálalo si tienes biblioteca de juegos en Steam.'
+        ),
+        'lutris': (
+            'Gestor universal de videojuegos de código abierto para Linux.',
+            'Unifica en una sola biblioteca juegos de EA App, Battle.net, Ubisoft Connect, GOG, emuladores e instaladores clásicos de Windows mediante scripts automáticos.',
+            'Instálalo si juegas títulos fuera de Steam o clásicos de PC con instalador propio.'
+        ),
+        'heroic-games-launcher': (
+            'Lanzador gráfico moderno y ligero alternativo a Epic Games Launcher, GOG Galaxy y Amazon Games.',
+            'Permite iniciar sesión, descargar y jugar tu catálogo de Epic, GOG y Prime Gaming gestionando versiones de Wine/Proton y sincronización en la nube.',
+            'Instálalo si tienes juegos gratuitos o comprados en Epic Games Store, GOG o Amazon.'
+        ),
+        'faugus-launcher': (
+            'Lanzador minimalista ultrarrápido basado en UMU-Launcher (el motor oficial de Proton fuera de Steam).',
+            'Ejecuta clientes como Battle.net (World of Warcraft, Diablo IV, Overwatch 2), EA App o ejecutables .exe sueltos usando el mismo contenedor Proton de Steam.',
+            'Ideal si buscas la forma más rápida, limpia y ligera de abrir Battle.net o juegos portables sin configuraciones complejas.'
+        ),
+        'mangohud goverlay': (
+            'Capa de telemetría en pantalla (MangoHud) junto con su panel de diseño gráfico (GOverlay).',
+            'Muestra dentro de tus juegos los FPS, gráfica de frametime, temperaturas de CPU/GPU, consumo en vatios (W) y uso de VRAM en tiempo real.',
+            'Instálalo para monitorizar el rendimiento de tu hardware mientras juegas (se activa/oculta con Shift_R + F12).'
+        ),
+        'lact|lact-git': (
+            'Linux GPU Control Application: centro de control avanzado de tarjetas gráficas AMD, NVIDIA e Intel.',
+            'Permite personalizar curvas de ventiladores, ajustar límites de potencia (TDP/Watts), hacer overclock o undervolt y vigilar temperaturas en vivo.',
+            'Instálalo si quieres controlar el ruido de los ventiladores de tu GPU o ajustar sus frecuencias y voltajes.'
+        ),
+        'gamescope': (
+            'Micro-compositor Wayland desarrollado por Valve para SteamOS y Steam Deck.',
+            'Aísla la resolución del juego respecto a tu escritorio, permite reescalado espacial AMD FSR / NIS en cualquier juego y limita los FPS con precisión.',
+            'Úsalo como parámetro de lanzamiento (ej. gamescope -W 1920 -H 1080 -f -- %command%) en juegos que dan problemas al minimizar con Alt+Tab.'
+        ),
+        'protonup-qt': (
+            'Gestor gráfico para descargar y actualizar motores de compatibilidad personalizados (GE-Proton, Luxtorpeda, Wine-GE).',
+            'Instala automáticamente las últimas versiones de GloriousEggroll (GE-Proton) directamente en Steam, Lutris y Heroic con un par de clics.',
+            'Instálalo si algún juego reciente requiere parches de vídeo (cinemáticas MediaFoundation) aún no incluidos en el Proton oficial de Valve.'
+        ),
+        'obs-studio obs-vkcapture': (
+            'Estudio profesional de grabación y transmisión en directo (OBS Studio) preconfigurado con captura directa Vulkan/OpenGL.',
+            'Permite grabar partidas a 60/120 FPS o transmitir en Twitch/YouTube usando codificación por hardware (NVENC / VAAPI) sin pérdida de rendimiento.',
+            'Instálalo si creas contenido, grabas clips de tus partidas o haces streaming.'
+        ),
+        'waydroid': (
+            'Contenedor LXC de alto rendimiento que ejecuta un sistema Android completo sobre el mismo kernel Linux.',
+            'Permite instalar y jugar títulos móviles de Android con aceleración gráfica directa por GPU y soporte de pantalla completa.',
+            'Instálalo si quieres usar apps o juegos de Android directamente en tu PC sin la lentitud de un emulador tradicional.'
+        ),
+        'sunshine': (
+            'Servidor de streaming de videojuegos auto-alojado de ultra-baja latencia compatible con clientes Moonlight.',
+            'Codifica tu escritorio y juegos en tiempo real por hardware para que puedas jugarlos desde tu TV del salón, tablet, móvil o consola portátil.',
+            'Instálalo si quieres convertir tu PC en tu propio servidor de juego en la nube privado dentro de tu red local.'
+        ),
+    },
+    'en': {
+        'falcond.service': (
+            'Intelligent daemon that automatically detects running video games (Steam, Proton, Wine, and native binaries).',
+            'Dynamically switches CPU power profiles to maximum performance, tunes core affinity, and throttles background tasks to eliminate micro-stuttering.',
+            'Keep it ACTIVE at all times if you game on this PC. Only disable it on laptops running on battery when seeking maximum battery life.'
+        ),
+        'ananicy-cpp.service': (
+            'Automatic process priority manager (nice / ionice) written in C++ with curated rules for gaming and desktop responsiveness.',
+            'Prioritizes CPU and disk I/O for your active foreground app (game, browser, editor) while restraining heavy background tasks.',
+            'Keep it ACTIVE permanently on any desktop or laptop for a snappy, stutter-free user interface.'
+        ),
+        'bpftune.service': (
+            'Autonomous kernel tuner developed by Oracle powered by eBPF programs inside the Linux kernel.',
+            'Monitors live network traffic and memory pressure to dynamically auto-tune TCP buffers and sysctl kernel parameters.',
+            'INACTIVE by default because the X64 kernel already ships pre-tuned with TCP BBR + FQ. Enable it for high-speed 2.5G/10G LAN transfers or local servers.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: mounts your web browser profile (Chromium, Firefox, Brave, Zen) directly into system RAM (tmpfs).',
+            'Dramatically speeds up tab loading, history, and cache while reducing constant SSD/NVMe write wear by up to 90%, syncing safely on shutdown.',
+            'Enable it if you have 16 GB+ of RAM. Leave it INACTIVE on systems with 8 GB RAM or less to save all memory for your games.'
+        ),
+        'systemd-oomd.service': (
+            'Systemd Out-Of-Memory (OOM) watchdog daemon.',
+            'Monitors memory pressure and forcibly terminates heavy processes before the entire system freezes under 100% RAM + ZRAM exhaustion.',
+            'Recommended INACTIVE for Gaming: prevents false-positive kills of games during heavy Vulkan shader compilation spikes (ZRAM already cushions RAM). Enable only on low-RAM PCs (4-8 GB) if you experience hard freezes.'
+        ),
+        'fstrim.timer': (
+            'Weekly scheduled system timer for block maintenance on solid-state drives (NVMe and SATA SSDs).',
+            'Informs the SSD controller which blocks are no longer in use, preventing write-speed degradation over time and extending drive lifespan.',
+            'Keep it ACTIVE whenever your operating system is installed on an SSD or NVMe drive.'
+        ),
+        'mitigations': (
+            'Linux kernel security patches against speculative execution CPU hardware vulnerabilities (Spectre, Meltdown, MDS, TAA).',
+            'Protects your CPU against side-channel memory leaks. Disabling them (mitigations=off) removes kernel boundary checks, gaining +3% to +7% CPU FPS and lower frame latency.',
+            'Keep SECURE (ACTIVE) for general use. Disable only if you want maximum competitive gaming FPS and run trusted software.'
+        ),
+        'scx_bore': (
+            'Native C scheduler built directly into the Linux-CachyOS kernel (Burst-Oriented Response Enhancer).',
+            'Prioritizes interactive bursts over heavy background loads with zero eBPF overhead and works seamlessly with FalconD.',
+            'Ideal all-round default choice: rock-solid stability, zero overhead, and great responsiveness.'
+        ),
+        'scx_lavd': (
+            'Latency-critical Virtual Deadline eBPF scheduler developed by Valve & Igalia specifically for gaming and SteamOS.',
+            'Computes virtual deadlines for game rendering and audio threads, maximizing 1% Low FPS stability and frame pacing.',
+            'Enable it when playing competitive esports titles (CS2, Overwatch, Apex) or CPU-bound AAA games.'
+        ),
+        'scx_bpfland': (
+            'Interactive eBPF scheduler designed to keep desktop and gaming responsiveness silky smooth under extreme load.',
+            'Detects interactive user threads and guarantees immediate CPU time even when background compilation hits 100% CPU.',
+            'Use it if you livestream with OBS, compile code, or render video while gaming or multitasking.'
+        ),
+        'scx_cosmos': (
+            'Ultra-lightweight general-purpose eBPF scheduler focused on CPU cache locality.',
+            'Minimizes unnecessary thread migrations across cores, reducing wakeup latency and power consumption.',
+            'Recommended for balanced daily computing, productivity, and laptops seeking smooth efficiency.'
+        ),
+        'scx_flash': (
+            'Earliest Deadline First (EDF) eBPF scheduler engineered for real-time multimedia workloads.',
+            'Guarantees strict, deterministic latency consistency for real-time audio and video processing buffers.',
+            'Enable it for professional audio production (DAW / low-latency PipeWire), video editing, or glitch-free broadcasting.'
+        ),
+        'scx_rusty': (
+            'Multi-domain eBPF load balancer written in Rust for multi-CCD / high-core-count processor architectures.',
+            'Intelligently balances threads across CPU chiplets (e.g. 12/16-core AMD Ryzen 9 or Threadripper) to avoid L3 cache cross-talk bottlenecks.',
+            'Use it on high-core-count workstations for 3D rendering, virtualization, or heavy parallel compilation.'
+        ),
+        'ufw.service': (
+            'Perimeter network firewall (Uncomplicated Firewall) powered by Linux kernel netfilter rules.',
+            'Automatically blocks unauthorized incoming connection attempts to your PC while allowing all normal outgoing traffic.',
+            'Keep it ACTIVE at all times, especially when connecting to public Wi-Fi, shared routers, or local networks.'
+        ),
+        'bluetooth.service': (
+            'Official Linux BlueZ wireless protocol stack.',
+            'Enables pairing and communication with wireless gamepads (PS5 DualSense, Xbox, Switch Pro), Bluetooth headsets, keyboards, and mice.',
+            'Keep it ACTIVE if you use wireless controllers or audio. You can disable it on desktop PCs without Bluetooth hardware.'
+        ),
+        'tcp_bbr': (
+            'Modern network congestion control algorithm developed by Google paired with Fair Queueing (FQ) packet scheduling.',
+            'Maximizes throughput and prevents "Bufferbloat" (massive ping spikes when other devices download files on your network).',
+            'Pre-configured and ACTIVE out of the box in the X64 LIOS kernel; no manual action required.'
+        ),
+        'wifi_lowjitter': (
+            'Wireless low-latency rule (wifi.powersave = 2) applied to NetworkManager.',
+            'Prevents the Wi-Fi radio from entering micro-sleep states between packets, eliminating lag spikes (jitter) in online multiplayer games.',
+            'ACTIVE out of the box in X64 LIOS to ensure wired-grade ping stability over Wi-Fi.'
+        ),
+        'secureboot': (
+            'Graphical cryptographic assistant powered by sbctl to sign your Linux kernels and UEFI bootloaders.',
+            'Allows you to keep Secure Boot ENABLED in BIOS using your own custom keys while preserving official Microsoft certificates.',
+            'Use it if you dual-boot Windows 11 and play games that strictly require Secure Boot in BIOS (Valorant, EA FC, FaceIT).'
+        ),
+        'maint_update': (
+            'Direct launcher for the official X64 LIOS Update Center (x64-update).',
+            'Synchronizes [x64-lios], CachyOS, Arch repositories, AUR packages, and Flatpak apps in a safe native graphical interface.',
+            'Run it once or twice a week to keep your GPU drivers, kernel, and security patches up to date.'
+        ),
+        'maint_mirrors': (
+            'Download server speed and latency benchmark tool (cachyos-rate-mirrors).',
+            'Tests connection latency from your location to global mirror servers and sorts the fastest ones to the top of your list.',
+            'Run it if package downloads or system updates feel slower than usual.'
+        ),
+        'maint_cache': (
+            'Cleanup utility for the local downloaded package store (/var/cache/pacman/pkg/).',
+            'Removes old compressed package archives (.pkg.tar.zst) kept by Pacman, freeing up several gigabytes of disk space.',
+            'Use it every couple of months or whenever you want to reclaim space on your SSD/NVMe.'
+        ),
+        'maint_orphans': (
+            'Orphaned dependency scanner and cleaner (pacman -Qtdq).',
+            'Finds and removes leftover helper libraries that were installed for applications you have since uninstalled.',
+            'Run it periodically after removing software to keep your installation lean.'
+        ),
+        'maint_winboat': (
+            'Lightweight Docker-based containerized environment for running Windows productivity applications.',
+            'Automatically sets up Docker and Winboat to integrate Windows office or utility programs seamlessly into your Linux desktop.',
+            'Install it only if you need a specific Windows desktop application that has no native Linux version.'
+        ),
+        'x64-update.timer': (
+            'Background sentinel timer and system tray notifier applet (x64-update-tray).',
+            'Silently checks for available system updates in the background and displays a status icon next to your panel clock.',
+            'Keep it ACTIVE for automatic update alerts, or disable it if you prefer checking for updates manually.'
+        ),
+        'rescue_keyrings': (
+            'Automated repair tool for the Pacman GPG cryptographic keyring (/etc/pacman.d/gnupg).',
+            'Reinitializes and refreshes official digital signatures for Arch, CachyOS, and X64 LIOS repositories.',
+            'Use it only if package installation fails with "invalid or corrupted package (PGP signature)" errors.'
+        ),
+        'rescue_unlock': (
+            'Emergency unlocker for the Pacman package database (/var/lib/pacman/db.lck).',
+            'Deletes the stale lock file left behind when a previous package transaction was interrupted by a power loss or forced close.',
+            'Use it only when Pacman or X64 Update reports "unable to lock database".'
+        ),
+        'rescue_reinstall': (
+            'Full reinstallation routine for all native system packages (pacman -Sy $(pacman -Qnq)).',
+            'Re-downloads and overwrites all system binaries and libraries in /usr without touching your personal files or user configs.',
+            'Use as a major rescue tool if system files were accidentally deleted or corrupted after a sudden power outage.'
+        ),
+        'rescue_journal': (
+            'Forensic inspector for critical boot errors (journalctl -p 3 -xb).',
+            'Filters and displays only high-severity kernel, driver, and systemd service errors from the current boot session.',
+            'Use it to diagnose hardware initialization issues, disk mount errors, or failing services.'
+        ),
+        'rescue_kwin': (
+            'Official built-in diagnostic inspector for the KDE Plasma KWin Wayland compositor.',
+            'Shows live details on native Wayland vs XWayland windows, FreeSync/VRR (Adaptive Sync) state, displays, and DRM buffers.',
+            'Use it to verify if Variable Refresh Rate (VRR) is active on your gaming monitor or debug window rendering.'
+        ),
+        'rescue_btop': (
+            'High-definition interactive terminal resource monitor (btop++).',
+            'Displays real-time per-core CPU load and clock speeds, temperatures, RAM/ZRAM usage, disk I/O, network traffic, and processes.',
+            'Open it anytime to monitor system thermals or terminate a runaway process.'
+        ),
+        'dns_1.1.1.1': (
+            'Ultra-low-latency global DNS resolver operated by Cloudflare (1.1.1.1 / 1.0.0.1).',
+            'Resolves web domains and game servers in milliseconds with full DNS-over-TLS (DoT) encryption and a strict zero-IP-logging policy.',
+            'Choose it as your primary option for Competitive Gaming and fastest everyday browsing.'
+        ),
+        'dns_1.1.1.2': (
+            'Security-hardened variant of Cloudflare 1.1.1.1 with built-in anti-malware and anti-phishing filtering.',
+            'Automatically blocks known trojan, ransomware, spyware, and phishing domains at the DNS layer before they can load.',
+            'Enable it if you want Cloudflare speed combined with proactive network-level malware protection.'
+        ),
+        'dns_94.140.14.14': (
+            'Public DNS resolver by AdGuard with integrated ad and tracker blocking.',
+            'Filters intrusive advertisements, corporate telemetry, and analytics trackers system-wide across all browsers and apps.',
+            'Use it if you want network-level ad blocking without installing extra browser extensions.'
+        ),
+        'dns_9.9.9.9': (
+            'Swiss non-profit DNS service (Quad9 Foundation) protected by strict Swiss privacy laws.',
+            'Combines threat intelligence from 20+ cybersecurity providers to block malicious domains while never logging personal data.',
+            'Ideal for privacy-focused users, online banking, and high-security environments.'
+        ),
+        'dns_8.8.8.8': (
+            'High-availability global DNS infrastructure operated by Google (8.8.8.8 / 8.8.4.4).',
+            'Delivers massive Anycast routing reliability and universal compatibility with international CDNs and game download servers.',
+            'Use it if a regional service has resolution issues elsewhere or if it achieves the lowest latency in your benchmark.'
+        ),
+        'dns_208.67.222.222': (
+            'One of the longest-running and most stable DNS resolvers on the Internet, maintained by Cisco Umbrella (OpenDNS).',
+            'Provides rock-solid enterprise domain resolution and built-in phishing protection.',
+            'Use it as a dependable alternative if your ISP routes preferentially to Cisco peering nodes.'
+        ),
+        'cachyos-gaming-meta cachyos-gaming-applications protonup-qt lact|lact-git': (
+            'Master All-in-One meta-package that installs the complete X64 LIOS Gaming ecosystem in a single click.',
+            'Installs Steam, Lutris, Heroic, Faugus, Wine/Proton-SLR, UMU, MangoHud, Gamescope, LACT, ProtonUp-Qt, and all 32/64-bit Vulkan/OpenGL libraries.',
+            'Use this button to make your PC 100% ready for any game across all storefronts without installing tools individually.'
+        ),
+        'cachyos-gaming-meta umu-launcher protontricks': (
+            'Core compatibility foundation for running Windows games on Linux (Wine X64, Proton-SLR, UMU Launcher, Winetricks & 32-bit libs).',
+            'Provides DirectX-to-Vulkan translators (DXVK / VKD3D-Proton), media codecs, and runtime libraries required by modern games.',
+            'Essential base package if you prefer installing only one specific launcher instead of the Full Gaming Suite.'
+        ),
+        'steam': (
+            'Official Valve gaming platform with native Steam Play (Proton) integration.',
+            'Downloads and runs thousands of Windows and Linux titles with controller support, cloud saves, and Vulkan shader pre-caching.',
+            'Install it if you own games on Steam.'
+        ),
+        'lutris': (
+            'Unified open-source gaming library manager for Linux.',
+            'Brings together games from EA App, Battle.net, Ubisoft Connect, GOG, emulators, and standalone Windows installers via automated scripts.',
+            'Install it if you play non-Steam PC games or classic standalone installers.'
+        ),
+        'heroic-games-launcher': (
+            'Modern, lightweight native graphical launcher for Epic Games Store, GOG Galaxy, and Amazon Prime Gaming.',
+            'Lets you log in, download, and launch your Epic, GOG, and Amazon libraries with per-game Wine/Proton management and cloud saves.',
+            'Install it if you claim free games or own titles on Epic Games, GOG, or Amazon.'
+        ),
+        'faugus-launcher': (
+            'Ultra-fast minimalist launcher powered by UMU-Launcher (the official Proton runtime outside Steam).',
+            'Runs Battle.net (World of Warcraft, Diablo IV, Overwatch 2), EA App, or standalone .exe games inside Steam’s Proton container.',
+            'Ideal when you want the cleanest, fastest way to run Battle.net or portable Windows games with zero bloat.'
+        ),
+        'mangohud goverlay': (
+            'In-game performance telemetry overlay (MangoHud) paired with its graphical configurator (GOverlay).',
+            'Displays live FPS, frametime graphs, CPU/GPU temperatures, wattage draw (W), and VRAM usage directly inside your games.',
+            'Install it to monitor hardware performance while gaming (toggle overlay in-game with Right Shift + F12).'
+        ),
+        'lact|lact-git': (
+            'Linux GPU Control Application: advanced control center for AMD, NVIDIA, and Intel graphics cards.',
+            'Lets you customize fan curves, adjust power limits (TDP/Watts), apply overclocking or undervolting, and monitor live thermals.',
+            'Install it if you want to tune GPU fan acoustics, thermals, or clock speeds.'
+        ),
+        'gamescope': (
+            'Wayland micro-compositor engineered by Valve for SteamOS and Steam Deck.',
+            'Isolates game resolution from your desktop, enables spatial upscaling (AMD FSR / NIS) in any game, and enforces frame rate caps.',
+            'Use it as a launch option (e.g. gamescope -W 1920 -H 1080 -f -- %command%) for games that dislike Alt+Tab or need upscaling.'
+        ),
+        'protonup-qt': (
+            'Graphical manager to download and update custom compatibility engines (GE-Proton, Luxtorpeda, Wine-GE).',
+            'Automatically installs the latest GloriousEggroll (GE-Proton) builds directly into Steam, Lutris, and Heroic in two clicks.',
+            'Install it if a game needs community video codec patches (MediaFoundation cutscenes) or bleeding-edge Proton fixes.'
+        ),
+        'obs-studio obs-vkcapture': (
+            'Professional livestreaming and screen recording suite (OBS Studio) bundled with native Vulkan/OpenGL game capture.',
+            'Records gameplay at 60/120 FPS or streams to Twitch/YouTube using hardware encoding (NVENC / VAAPI) with minimal FPS impact.',
+            'Install it if you record gameplay clips, create videos, or livestream.'
+        ),
+        'waydroid': (
+            'High-performance LXC container that runs a full Android system directly on the host Linux kernel.',
+            'Lets you install and play mobile Android games and apps with direct hardware GPU acceleration and multi-touch/mouse support.',
+            'Install it if you want to run Android games or mobile apps natively on your PC without heavy emulation.'
+        ),
+        'sunshine': (
+            'Self-hosted, ultra-low-latency game streaming server compatible with Moonlight clients.',
+            'Hardware-encodes your PC games in real time so you can play them remotely on your living-room TV, phone, tablet, or handheld.',
+            'Install it to turn your gaming PC into your own private cloud gaming host across your home network.'
+        ),
+    },
+    'fr': {
+        'falcond.service': (
+            'Démon intelligent qui détecte automatiquement le lancement de vos jeux vidéo (Steam, Proton, Wine et natifs).',
+            'Bascule le profil CPU sur performance maximale, ajuste l’affinité des cœurs et réduit les tâches de fond pour éliminer les micro-saccades.',
+            'Gardez-le ACTIVÉ en permanence si vous jouez. Désactivez-le uniquement sur PC portable sur batterie pour économiser de l’énergie.'
+        ),
+        'ananicy-cpp.service': (
+            'Gestionnaire automatique de priorités de processus (nice / ionice) en C++ avec règles optimisées pour le jeu et le bureau.',
+            'Donne la priorité CPU et disque à votre application au premier plan tout en limitant les processus lourds en arrière-plan.',
+            'Gardez-le ACTIVÉ en permanence pour une fluidité maximale du bureau et des jeux.'
+        ),
+        'bpftune.service': (
+            'Optimiseur autonome développé par Oracle basé sur des programmes eBPF dans le noyau Linux.',
+            'Analyse le trafic réseau et la mémoire en temps réel pour ajuster dynamiquement les tampons TCP et paramètres sysctl.',
+            'INACTIF par défaut car le noyau X64 intègre déjà TCP BBR + FQ. Activez-le pour les réseaux 2.5G/10G ou serveurs locaux.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon : monte le profil complet de votre navigateur web (Chromium, Firefox, Brave, Zen) directement en RAM (tmpfs).',
+            'Accélère l’ouverture des onglets et réduit jusqu’à 90 % les écritures sur votre SSD/NVMe, avec synchronisation sûre à l’arrêt.',
+            'Activez-le si vous avez 16 Go de RAM ou plus. Laissez-le INACTIF avec 8 Go de RAM ou moins pour réserver la mémoire aux jeux.'
+        ),
+        'systemd-oomd.service': (
+            'Service de surveillance de saturation mémoire (Out-Of-Memory Daemon) de systemd.',
+            'Ferme de force les applications lourdes avant que le système ne gèle si la RAM et le ZRAM atteignent 100 %.',
+            'Recommandé INACTIF pour le Gaming : évite la fermeture brutale d’un jeu lors de la compilation de shaders Vulkan. Activez-le uniquement sur les PC ayant peu de RAM (4-8 Go).'
+        ),
+        'fstrim.timer': (
+            'Minuteur hebdomadaire d’entretien des blocs pour disques SSD NVMe et SATA.',
+            'Nettoie les cellules mémoire inutilisées pour maintenir la vitesse d’écriture et prolonger la durée de vie du SSD.',
+            'Gardez-le ACTIVÉ tant que votre système est installé sur un SSD ou NVMe.'
+        ),
+        'mitigations': (
+            'Correctifs de sécurité du noyau Linux contre les failles matérielles CPU (Spectre, Meltdown, MDS, TAA).',
+            'Protège la mémoire CPU. Les désactiver (mitigations=off) offre +3 % à +7 % de FPS et réduit la latence en jeu.',
+            'Gardez SÉCURISÉ (ACTIF) pour un usage général. Désactivez uniquement pour maximiser les FPS en jeu compétitif.'
+        ),
+    },
+    'de': {
+        'falcond.service': (
+            'Intelligenter Daemon zur automatischen Erkennung laufender Spiele (Steam, Proton, Wine und native Spiele).',
+            'Schaltet das CPU-Energieprofil dynamisch auf Höchstleistung, optimiert die Kern-Affinität und drosselt Hintergrundaufgaben gegen Mikroruckler.',
+            'Für Gamer immer AKTIV lassen. Nur auf Laptops im Akkubetrieb deaktivieren, um maximale Akkulaufzeit zu erzielen.'
+        ),
+        'ananicy-cpp.service': (
+            'Automatischer Prozessprioritäts-Manager (nice / ionice) in C++ mit Regelwerk für Gaming und Desktop.',
+            'Priorisiert CPU- und Festplatten-I/O für Ihre aktive Anwendung (Spiel, Browser) und bremst Hintergrundlasten.',
+            'Dauerhaft AKTIV lassen für eine verzögerungsfreie Reaktionsfähigkeit des Systems.'
+        ),
+        'bpftune.service': (
+            'Autonomer Kernel-Optimierer von Oracle auf Basis von eBPF-Programmen im Linux-Kernel.',
+            'Überwacht Netzwerkverkehr und Speicherlast in Echtzeit, um TCP-Puffer und sysctl-Werte dynamisch anzupassen.',
+            'Standardmäßig INAKTIV, da der X64-Kernel bereits TCP BBR + FQ nutzt. Ideal für 2.5G/10G-Netzwerke oder lokale Server.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: lädt Ihr gesamtes Webbrowser-Profil (Chromium, Firefox, Brave, Zen) direkt in den Arbeitsspeicher (tmpfs).',
+            'Beschleunigt das Öffnen von Tabs enorm und schont Ihre SSD/NVMe durch bis zu 90 % weniger Schreibzugriffe.',
+            'Aktivieren ab 16 GB RAM. Bei 8 GB RAM oder weniger INAKTIV lassen, damit Spielen der volle Speicher bleibt.'
+        ),
+        'systemd-oomd.service': (
+            'Systemd Out-Of-Memory (OOM) Schutz-Daemon.',
+            'Beendet speicherintensive Prozesse, bevor das System bei 100 % RAM- und ZRAM-Auslastung komplett einfriert.',
+            'Für Gaming INAKTIV empfohlen: verhindert, dass Spiele beim Kompilieren von Vulkan-Shadern fälschlich beendet werden. Nur bei wenig RAM (4-8 GB) aktivieren.'
+        ),
+        'fstrim.timer': (
+            'Wöchentlicher System-Timer zur Blockwartung von NVMe- und SATA-SSDs.',
+            'Teilt dem SSD-Controller freie Datenblöcke mit, erhält die Schreibgeschwindigkeit und verlängert die Lebensdauer.',
+            'Immer AKTIV lassen, wenn das System auf einer SSD oder NVMe installiert ist.'
+        ),
+        'mitigations': (
+            'Linux-Kernel-Sicherheitsfilter gegen spekulative CPU-Hardwarelücken (Spectre, Meltdown, MDS, TAA).',
+            'Schützt den Prozessor vor Seitenkanalangriffen. Deaktivieren (mitigations=off) bringt +3 % bis +7 % mehr FPS.',
+            'Für den Alltag SICHER (AKTIV) lassen. Nur für maximale FPS im kompetitiven Gaming deaktivieren.'
+        ),
+    },
+    'it': {
+        'falcond.service': (
+            'Demone intelligente che rileva automaticamente l’avvio dei videogiochi (Steam, Proton, Wine e nativi).',
+            'Imposta dinamicamente la CPU alle massime prestazioni, ottimizza l’affinità dei core e riduce i processi in background per eliminare lo stuttering.',
+            'Mantienilo sempre ATTIVO se giochi sul PC. Disattivalo solo su laptop a batteria per risparmiare energia.'
+        ),
+        'ananicy-cpp.service': (
+            'Gestore automatico delle priorità dei processi (nice / ionice) in C++ con profili per gaming e desktop.',
+            'Assegna priorità CPU e disco all’applicazione in primo piano limitando i rallentamenti causati dai processi in background.',
+            'Mantienilo sempre ATTIVO per garantire massima reattività del desktop.'
+        ),
+        'bpftune.service': (
+            'Ottimizzatore autonomo sviluppato da Oracle basato su programmi eBPF nel kernel Linux.',
+            'Analizza il traffico di rete e la memoria in tempo reale per regolare dinamicamente i buffer TCP e i parametri sysctl.',
+            'INATTIVO di default poiché il kernel X64 include già TCP BBR + FQ. Attivalo per reti 2.5G/10G o server locali.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: monta il profilo del browser web (Chromium, Firefox, Brave, Zen) direttamente nella memoria RAM (tmpfs).',
+            'Rende istantanea l’apertura delle schede e riduce fino al 90% le scritture su SSD/NVMe, sincronizzando i dati allo spegnimento.',
+            'Attivalo se hai 16 GB di RAM o più. Lascialo INATTIVO con 8 GB o meno per riservare la RAM ai giochi.'
+        ),
+        'systemd-oomd.service': (
+            'Demone di protezione da esaurimento memoria (Out-Of-Memory) di systemd.',
+            'Termina forzatamente i processi pesanti prima che il sistema si blocchi quando RAM e ZRAM raggiungono il 100%.',
+            'Consigliato INATTIVO per il Gaming: evita chiusure improvvise dei giochi durante la compilazione degli shader Vulkan. Attivalo solo su PC con poca RAM (4-8 GB).'
+        ),
+        'fstrim.timer': (
+            'Timer settimanale di sistema per la manutenzione dei blocchi su unità SSD NVMe e SATA.',
+            'Pulisce i blocchi dati inutilizzati preservando le prestazioni di scrittura e la durata dell’SSD.',
+            'Mantienilo sempre ATTIVO su qualsiasi disco SSD o NVMe.'
+        ),
+        'mitigations': (
+            'Patch di sicurezza del kernel Linux contro le vulnerabilità hardware della CPU (Spectre, Meltdown, MDS, TAA).',
+            'Protegge la CPU da attacchi side-channel. Disattivarle (mitigations=off) garantisce da +3% a +7% di FPS nei giochi.',
+            'Mantieni SICURO (ATTIVO) per uso generale. Disattiva solo per massimizzare gli FPS nel gaming competitivo.'
+        ),
+    },
+    'pt': {
+        'falcond.service': (
+            'Daemon inteligente que detecta automaticamente quando você abre um jogo (Steam, Proton, Wine e nativos).',
+            'Altera dinamicamente o perfil da CPU para desempenho máximo, ajusta a afinidade de núcleos e reduz tarefas de fundo para eliminar engasgos (stuttering).',
+            'Mantenha sempre ATIVADO para jogar. Desative apenas em notebooks fora da tomada quando quiser economizar bateria.'
+        ),
+        'ananicy-cpp.service': (
+            'Gerenciador automático de prioridades de processos (nice / ionice) em C++ com regras para jogos e desktop.',
+            'Dá prioridade de CPU e disco para a janela em uso (jogo, navegador) e freia processos pesados em segundo plano.',
+            'Mantenha sempre ATIVADO para máxima fluidez do sistema.'
+        ),
+        'bpftune.service': (
+            'Otimizador autônomo desenvolvido pela Oracle baseado em programas eBPF no kernel Linux.',
+            'Monitora o tráfego de rede e memória em tempo real para auto-ajustar buffers TCP e parâmetros sysctl.',
+            'Vem INATIVO pois o kernel X64 já traz TCP BBR + FQ ativos. Ative para transferências em redes 2.5G/10G ou servidores locais.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: monta o perfil do seu navegador (Chromium, Firefox, Brave, Zen) diretamente na memória RAM (tmpfs).',
+            'Deixa o navegador instantâneo e reduz em até 90% as gravações que desgastam seu SSD/NVMe, salvando tudo ao desligar.',
+            'Ative se tiver 16 GB de RAM ou mais. Deixe INATIVO em PCs com 8 GB ou menos para reservar toda a RAM aos jogos.'
+        ),
+        'systemd-oomd.service': (
+            'Vigia de esgotamento de memória (Out-Of-Memory Daemon) do systemd.',
+            'Fecha aplicativos pesados antes que o sistema congele caso a RAM e o ZRAM cheguem a 100% de uso.',
+            'Recomendado INATIVO para Jogos: evita que seus jogos sejam fechados abruptamente durante picos de compilação de shaders Vulkan. Ative apenas em PCs com pouca RAM (4-8 GB).'
+        ),
+        'fstrim.timer': (
+            'Temporizador semanal do sistema para manutenção de blocos em unidades SSD NVMe e SATA.',
+            'Informa ao SSD quais blocos foram apagados, mantendo a velocidade de gravação máxima e prolongando a vida útil.',
+            'Mantenha sempre ATIVADO em qualquer computador com SSD ou NVMe.'
+        ),
+        'mitigations': (
+            'Proteções do kernel Linux contra vulnerabilidades de execução especulativa da CPU (Spectre, Meltdown, MDS, TAA).',
+            'Protegem a memória da CPU. Desativá-las (mitigations=off) recupera de +3% a +7% de FPS e reduz a latência em jogos.',
+            'Mantenha SEGURO (ATIVO) para uso diário. Desative apenas se buscar o máximo de FPS em jogos competitivos.'
+        ),
+    },
+    'ru': {
+        'falcond.service': (
+            'Интеллектуальная служба автоматического обнаружения запущенных игр (Steam, Proton, Wine и нативных).',
+            'Динамически переключает процессор в режим максимальной производительности, настраивает привязку ядер и снижает фоновую нагрузку для устранения фризов.',
+            'Держите ВКЛЮЧЕННЫМ, если вы играете на ПК. Отключайте только на ноутбуках при работе от батареи для экономии заряда.'
+        ),
+        'ananicy-cpp.service': (
+            'Автоматический менеджер приоритетов процессов (nice / ionice) на C++ с базой правил для игр и рабочего стола.',
+            'Отдает приоритет процессора и диска активному окну (игре, браузеру) и ограничивает фоновые задачи.',
+            'Держите постоянно ВКЛЮЧЕННЫМ для мгновенного отклика системы.'
+        ),
+        'bpftune.service': (
+            'Автономный оптимизатор ядра от Oracle на базе программ eBPF внутри ядра Linux.',
+            'Анализирует сетевой трафик и память в реальном времени для автоматической подстройки буферов TCP и параметров sysctl.',
+            'По умолчанию ОТКЛЮЧЕН, так как ядро X64 уже настроено с TCP BBR + FQ. Включайте для скоростных сетей 2.5G/10G или серверов.'
+        ),
+        'psd.service': (
+            'Profile-Sync-Daemon: переносит профиль вашего браузера (Chromium, Firefox, Brave, Zen) напрямую в оперативную память (tmpfs).',
+            'Многократно ускоряет работу вкладок и кэша, а также снижает износ SSD/NVMe-накопителя до 90%.',
+            'Включайте при наличии 16 ГБ ОЗУ и более. Оставьте ОТКЛЮЧЕННЫМ при 8 ГБ ОЗУ и менее, чтобы сохранить память для игр.'
+        ),
+        'systemd-oomd.service': (
+            'Служба защиты от исчерпания оперативной памяти (Out-Of-Memory Daemon).',
+            'Принудительно закрывает тяжелые процессы до полного зависания ПК при заполнении ОЗУ и ZRAM на 100%.',
+            'Для игр рекомендуется ОТКЛЮЧИТЬ: предотвращает внезапное закрытие игр во время компиляции шейдеров Vulkan (ZRAM уже защищает память). Включайте только на ПК с 4–8 ГБ ОЗУ.'
+        ),
+        'fstrim.timer': (
+            'Еженедельный системный таймер обслуживания блоков твердотельных накопителей (NVMe и SATA SSD).',
+            'Очищает неиспользуемые ячейки памяти SSD, предотвращая падение скорости записи и продлевая срок службы диска.',
+            'Всегда держите ВКЛЮЧЕННЫМ, если система установлена на SSD или NVMe.'
+        ),
+        'mitigations': (
+            'Защитные патчи ядра Linux от аппаратных уязвимостей процессора (Spectre, Meltdown, MDS, TAA).',
+            'Защищают процессор от утечек памяти. Их отключение (mitigations=off) дает прирост от +3% до +7% FPS и снижает задержку кадров.',
+            'Держите АКТИВНЫМИ для обычной работы. Отключайте только ради максимального FPS в киберспортивных играх.'
+        ),
+    }
+}
+
+
+def format_rich_tooltip(title, badge="", guide_key=None, fallback_desc=""):
+    lang_dict = TOOLTIP_GUIDES.get(_lang_code) or TOOLTIP_GUIDES.get("en", {})
+    guide = lang_dict.get(guide_key) or TOOLTIP_GUIDES.get("en", {}).get(guide_key)
+    lbl_what, lbl_for, lbl_when = TOOLTIP_LABELS.get(_lang_code, TOOLTIP_LABELS["en"])
+    badge_html = f" <span style='color:#9292a0; font-size:11px; font-weight:normal;'>({badge})</span>" if badge else ""
+    if not guide:
+        return (
+            f"<table width='390' cellspacing='0' cellpadding='2'><tr><td>"
+            f"<b style='color:#ffffff; font-size:12.5px;'>{title}</b>{badge_html}<br>"
+            f"<span style='color:#d4d4dc; font-size:11.5px;'>{fallback_desc}</span>"
+            f"</td></tr></table>"
+        )
+    what_txt, for_txt, when_txt = guide
+    return (
+        f"<table width='430' cellspacing='0' cellpadding='2'><tr><td>"
+        f"<b style='color:#ffffff; font-size:13px;'>{title}</b>{badge_html}"
+        f"<hr style='border:none; background-color:#2e2e3a; height:1px; margin:5px 0;'>"
+        f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+        f"<b style='color:#ff4d4d;'>• {lbl_what}</b> {what_txt}</p>"
+        f"<p style='margin:4px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+        f"<b style='color:#38bdf8;'>• {lbl_for}</b> {for_txt}</p>"
+        f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+        f"<b style='color:#2ecc71;'>• {lbl_when}</b> {when_txt}</p>"
+        f"</td></tr></table>"
+    )
+
+
 class FitLabel(QLabel):
     """Single-line QLabel that shrinks its font (down to min_ratio) and finally
     elides with '…' so text never gets hard-clipped in narrow grid cards."""
@@ -3469,6 +4189,13 @@ class DnsOptimizerPanel(QFrame):
             btn.setMinimumWidth(0)
             btn.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            ipv4_pretty = p["ipv4"].split(",")[0]
+            btn.setToolTip(format_rich_tooltip(
+                p["name"],
+                ipv4_pretty,
+                guide_key=f"dns_{p['ping_ip']}",
+                fallback_desc=f"{tr(p['tag'])} • TLS (DoT): {p['dot']}"
+            ))
             btn.clicked.connect(lambda checked=False, idx=i: self.select_provider(idx))
 
             b_lay = QVBoxLayout(btn)
@@ -3923,6 +4650,12 @@ class ScxSchedulerPanel(QFrame):
 
             top_h = QHBoxLayout()
             disp_name = tr(s["name"]) if s["id"] == "bore" else s["name"]
+            btn.setToolTip(format_rich_tooltip(
+                disp_name,
+                s["badge"],
+                guide_key=f"scx_{s['id']}",
+                fallback_desc=tr(s["desc"])
+            ))
             lbl_n = FitLabel(disp_name)
             lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
@@ -4234,7 +4967,7 @@ class ScxSchedulerPanel(QFrame):
 
 
 class KernelStatusCard(QFrame):
-    def __init__(self, title, desc, badge_text, icon_name, height=78):
+    def __init__(self, title, desc, badge_text, icon_name, height=78, guide_key=None):
         super().__init__()
         self.setObjectName("KernelStatusCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
@@ -4242,7 +4975,7 @@ class KernelStatusCard(QFrame):
         self.setFixedHeight(height)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setToolTip(f"<b>{title}</b><br>{desc}")
+        self.setToolTip(format_rich_tooltip(title, badge_text, guide_key=guide_key, fallback_desc=desc))
         self.setStyleSheet("""
             QFrame#KernelStatusCard {
                 background-color: rgba(255, 255, 255, 0.03);
@@ -4378,7 +5111,8 @@ class SecureBootCard(QFrame):
 
         title = tr("Secure Boot & UEFI Key Manager (sbctl)")
         desc = tr("Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.")
-        self.setToolTip(f"<b>{title}</b><br>{desc}")
+        self._rich_tip = format_rich_tooltip(title, "sbctl", guide_key="secureboot", fallback_desc=desc)
+        self.setToolTip(self._rich_tip)
 
         lbl_title = FitLabel(title)
         lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -4411,6 +5145,7 @@ class SecureBootCard(QFrame):
 
         self.btn_open = QPushButton(tr("OPEN ASSISTANT ↗"))
         self.btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open.setToolTip(self._rich_tip)
         self.btn_open.setStyleSheet("""
             QPushButton {
                 background: rgba(16, 185, 129, 0.15);
@@ -4473,7 +5208,7 @@ class SecureBootCard(QFrame):
 
 
 class PremiumButton(QPushButton):
-    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None, height=82):
+    def __init__(self, title, desc, icon_name, url=None, cmd=None, callback=None, height=82, guide_key=None):
         super().__init__()
         self.url = url
         self.cmd = cmd
@@ -4484,7 +5219,7 @@ class PremiumButton(QPushButton):
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip(f"<b>{title}</b><br>{desc}")
+        self.setToolTip(format_rich_tooltip(title, "", guide_key=guide_key, fallback_desc=desc))
 
         self.setStyleSheet("""
             PremiumButton {
@@ -4747,6 +5482,15 @@ class MitigationsSwitchCard(QFrame):
         self.toggle_btn.clicked.connect(self.toggle_action)
         hbox.addWidget(self.toggle_btn)
 
+        mit_tip = format_rich_tooltip(
+            tr("CPU Security Mitigations (Spectre/Meltdown)"),
+            "mitigations=off",
+            guide_key="mitigations",
+            fallback_desc=self.lbl_desc.text()
+        )
+        self.setToolTip(mit_tip)
+        self.toggle_btn.setToolTip(mit_tip)
+
         self._disabled_state = False
         self.refresh_state()
 
@@ -4871,7 +5615,8 @@ class ServiceSwitchCard(QFrame):
         self.setFixedHeight(height)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setToolTip(f"<b>{title}</b> ({unit_name})<br>{desc}")
+        rich_tip = format_rich_tooltip(title, unit_name, guide_key=unit_name, fallback_desc=desc)
+        self.setToolTip(rich_tip)
         self.setStyleSheet("""
             QFrame#ServiceCard {
                 background-color: rgba(255, 255, 255, 0.03);
@@ -4944,7 +5689,7 @@ class ServiceSwitchCard(QFrame):
         self.toggle_btn.setFixedHeight(28)
         self.toggle_btn.setMinimumWidth(82)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.toggle_btn.setToolTip(f"<b>{title}</b> ({unit_name})<br>{desc}")
+        self.toggle_btn.setToolTip(rich_tip)
         self.toggle_btn.clicked.connect(self.toggle_service)
         hbox.addWidget(self.toggle_btn)
 
@@ -5040,6 +5785,18 @@ class ServiceSwitchCard(QFrame):
                 if self._active else "if systemctl is-active --quiet sshd; then ufw allow 22/tcp >/dev/null 2>&1 || true; fi && ufw --force enable && systemctl enable --now ufw.service"
             )
             proc.start("pkexec", ["sh", "-c", ufw_cmd])
+        elif self.unit_name == "systemd-oomd.service":
+            oomd_cmd = (
+                "mkdir -p /etc/systemd/system/system.slice.d /etc/systemd/system/user-.slice.d && "
+                "ln -sf /dev/null /etc/systemd/system/system.slice.d/10-oomd-per-slice-defaults.conf && "
+                "ln -sf /dev/null /etc/systemd/system/user-.slice.d/10-oomd-per-slice-defaults.conf && "
+                "systemctl daemon-reload && systemctl disable --now systemd-oomd.service systemd-oomd.socket"
+                if self._active else
+                "rm -f /etc/systemd/system/system.slice.d/10-oomd-per-slice-defaults.conf "
+                "/etc/systemd/system/user-.slice.d/10-oomd-per-slice-defaults.conf && "
+                "systemctl daemon-reload && systemctl enable --now systemd-oomd.service"
+            )
+            proc.start("pkexec", ["sh", "-c", oomd_cmd])
         else:
             proc.start("pkexec", ["systemctl", *action.split(), self.unit_name])
 
@@ -5090,7 +5847,9 @@ class GamingInstallCard(QFrame):
         self.setFixedHeight(80 if is_suite else 74)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setToolTip(f"<b>{title}</b><br>{desc}")
+        pkg_badge = " Gaming Suite " if is_suite else check_pkg.split()[0].split("|")[0]
+        self._rich_tip = format_rich_tooltip(title, pkg_badge, guide_key=check_pkg, fallback_desc=desc)
+        self.setToolTip(self._rich_tip)
 
         border_color = "rgba(204, 0, 0, 0.55)" if is_suite else "rgba(255, 255, 255, 0.06)"
         bg_color = "rgba(204, 0, 0, 0.09)" if is_suite else "rgba(255, 255, 255, 0.03)"
@@ -5169,7 +5928,7 @@ class GamingInstallCard(QFrame):
         self.btn_action.setFixedHeight(32 if is_suite else 27)
         self.btn_action.setMinimumWidth(126 if is_suite else 98)
         self.btn_action.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_action.setToolTip(f"<b>{title}</b><br>{desc}")
+        self.btn_action.setToolTip(self._rich_tip)
         self.btn_action.clicked.connect(self.install_action)
         hbox.addWidget(self.btn_action)
 
@@ -5194,10 +5953,9 @@ class GamingInstallCard(QFrame):
         if self.is_installed():
             if self.launch_cmd:
                 self.btn_action.setText(tr("OPEN ↗"))
-                self.btn_action.setToolTip(tr("Installed. Click to open application."))
             else:
                 self.btn_action.setText(tr("INSTALLED ✓"))
-                self.btn_action.setToolTip(tr("Component is installed."))
+            self.btn_action.setToolTip(self._rich_tip)
             self.btn_action.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(0, 180, 90, 0.16);
@@ -6326,7 +7084,8 @@ class X64Hello(QWidget):
             tr("Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel."),
             f"{tcp_cc} + FQ",
             "bolt",
-            height=78
+            height=78,
+            guide_key="tcp_bbr"
         )
 
         card_wifi = KernelStatusCard(
@@ -6334,7 +7093,8 @@ class X64Hello(QWidget):
             tr("Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming."),
             tr("ACTIVE"),
             "wifi",
-            height=78
+            height=78,
+            guide_key="wifi_lowjitter"
         )
 
         net_grid.addWidget(card_ufw, 0, 0)
@@ -6387,7 +7147,8 @@ class X64Hello(QWidget):
             tr("Synchronize repositories and upgrade all system packages (pacman -Syu)."),
             "refresh",
             cmd=get_system_update_cmd(),
-            height=100
+            height=100,
+            guide_key="maint_update"
         )
         btn_mirrors = PremiumButton(
             tr("Rank Fastest Mirrors"),
@@ -6398,7 +7159,8 @@ class X64Hello(QWidget):
                 "CLASIFICACIÓN DE ESPEJOS (MIRRORS)",
                 "printf '\033[1;31m==> [X64 MIRRORS]\033[0m \033[1;37mAnalizando latencia y velocidad de servidores de descarga...\033[0m\n\n'; sudo cachyos-rate-mirrors"
             ),
-            height=100
+            height=100,
+            guide_key="maint_mirrors"
         )
         btn_cache = PremiumButton(
             tr("Clean Package Cache"),
@@ -6409,7 +7171,8 @@ class X64Hello(QWidget):
                 "LIMPIEZA DE CACHÉ DE PAQUETES",
                 "printf '\033[1;31m==> [X64 CACHE]\033[0m \033[1;37mLiberando espacio en disco de paquetes antiguos (pacman -Sc)...\033[0m\n\n'; sudo pacman -Sc"
             ),
-            height=100
+            height=100,
+            guide_key="maint_cache"
         )
         btn_orphans = PremiumButton(
             tr("Remove Orphan Packages"),
@@ -6420,7 +7183,8 @@ class X64Hello(QWidget):
                 "PURGA DE PAQUETES HUÉRFANOS",
                 "printf '\033[1;31m==> [X64 CLEANER]\033[0m \033[1;37mBuscando dependencias huérfanas sin uso...\033[0m\n\n'; orphans=$(pacman -Qtdq); if [ -n \"$orphans\" ]; then sudo pacman -Rns $orphans; else printf '\033[1;32m✓ No hay paquetes huérfanos en el sistema.\033[0m\n'; fi"
             ),
-            height=100
+            height=100,
+            guide_key="maint_orphans"
         )
         btn_winboat = PremiumButton(
             tr("Install Winboat (Windows Apps)"),
@@ -6431,7 +7195,8 @@ class X64Hello(QWidget):
                 "INSTALADOR DE WINBOAT Y CONTENEDORES",
                 "printf '\033[1;31m==> [X64 WINBOAT]\033[0m \033[1;37mInstalando Winboat y motor de contenedores Docker...\033[0m\n\n'; sudo pacman -Sy --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
             ),
-            height=100
+            height=100,
+            guide_key="maint_winboat"
         )
         card_upd_tray = ServiceSwitchCard(
             tr("LIOS Update Notifier"),
@@ -6469,7 +7234,8 @@ class X64Hello(QWidget):
                 "RESTABLECIMIENTO DE LLAVES CRIPTOGRÁFICAS (KEYRINGS)",
                 "printf '\033[1;31m==> [X64 KEYRINGS]\033[0m \033[1;37mRegenerando depósito de firmas GPG de Pacman...\033[0m\n\n'; sudo rm -rf /etc/pacman.d/gnupg/ && sudo pacman-key --init && sudo pacman-key --populate && sudo pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && sudo pacman-key --lsign-key F3B607488DB35A47"
             ),
-            height=100
+            height=100,
+            guide_key="rescue_keyrings"
         )
         btn_unlock = PremiumButton(
             tr("Unlock Pacman Database"),
@@ -6480,7 +7246,8 @@ class X64Hello(QWidget):
                 "DESBLOQUEO DE BASE DE DATOS PACMAN",
                 "printf '\033[1;31m==> [X64 RESCUE]\033[0m \033[1;37mVerificando estado de /var/lib/pacman/db.lck...\033[0m\n\n'; if [ -f /var/lib/pacman/db.lck ]; then sudo rm -f /var/lib/pacman/db.lck && printf '\033[1;32m✓ Archivo db.lck eliminado. Base de datos desbloqueada.\033[0m\n'; else printf '\033[1;32m✓ La base de datos no está bloqueada (no existe db.lck).\033[0m\n'; fi"
             ),
-            height=100
+            height=100,
+            guide_key="rescue_unlock"
         )
         btn_reinstall = PremiumButton(
             tr("Reinstall All Native Packages"),
@@ -6491,7 +7258,8 @@ class X64Hello(QWidget):
                 "REINSTALACIÓN COMPLETA DE PAQUETES NATIVOS",
                 "printf '\033[1;31m==> [X64 RESCUE]\033[0m \033[1;37mReinstalando todos los paquetes nativos del sistema...\033[0m\n\n'; sudo pacman -Sy $(pacman -Qnq)"
             ),
-            height=100
+            height=100,
+            guide_key="rescue_reinstall"
         )
         btn_journal = PremiumButton(
             tr("System Boot Error Log"),
@@ -6502,21 +7270,24 @@ class X64Hello(QWidget):
                 "REGISTRO DE ERRORES CRÍTICOS DEL SISTEMA",
                 "printf '\033[1;31m==> [X64 DIAGNOSTICS]\033[0m \033[1;37mAnalizando eventos críticos del kernel y systemd (journalctl -p 3 -xb)...\033[0m\n\n'; out=$(journalctl -p 3 -xb --no-pager); if [ -n \"$out\" ]; then echo \"$out\"; else printf '\033[1;32m✓ Cero errores críticos registrados en este arranque.\033[0m\n'; fi"
             ),
-            height=100
+            height=100,
+            guide_key="rescue_journal"
         )
         btn_kwin = PremiumButton(
             tr("KWin (Wayland) Debug Console"),
             tr("Open the native KWin Wayland diagnostic inspector for windows and VRR."),
             "bug",
             cmd="/usr/lib/qt6/bin/qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || dbus-send --session --dest=org.kde.KWin --type=method_call /KWin org.kde.KWin.showDebugConsole",
-            height=100
+            height=100,
+            guide_key="rescue_kwin"
         )
         btn_btop = PremiumButton(
             tr("Live Resource Monitor (btop)"),
             tr("Interactive terminal dashboard for CPU frequencies, temperatures, processes, and disk I/O."),
             "gauge",
             cmd="kitty -o remember_window_size=no -o background_opacity=1.0 -o initial_window_width=105c -o initial_window_height=30c --title 'X64 LIOS Resource Monitor' -e btop",
-            height=100
+            height=100,
+            guide_key="rescue_btop"
         )
 
         rescue_grid.addWidget(btn_keyrings, 0, 0)
@@ -6823,6 +7594,16 @@ if __name__ == '__main__':
     app.setWindowIcon(icon)
     QIcon.setThemeName("breeze-dark")
     app.setStyle("Fusion")
+    app.setStyleSheet("""
+        QToolTip {
+            background-color: #121217;
+            color: #f2f2f2;
+            border: 1px solid #cc0000;
+            border-radius: 7px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+    """)
     hello = X64Hello()
     hello.setWindowIcon(icon)
     hello.show()
