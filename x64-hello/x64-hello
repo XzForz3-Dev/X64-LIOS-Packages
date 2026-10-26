@@ -3200,33 +3200,43 @@ TOOLTIP_GUIDES = {
         ),
         'scx_bore': (
             'Planificador nativo en C integrado directamente en el núcleo Linux-CachyOS (Burst-Oriented Response Enhancer).',
-            'Prioriza los hilos interactivos frente a cargas pesadas sin coste adicional de CPU y trabaja en sinergia directa con FalconD.',
-            'Ideal como opción predeterminada todo-terreno: máxima estabilidad, cero sobrecarga y excelente rendimiento general.'
+            'Prioriza los hilos interactivos frente a cargas pesadas sin coste adicional de CPU y trabaja en sinergia automática con FalconD.',
+            'Ideal como opción predeterminada todo-terreno: máxima estabilidad, cero sobrecarga eBPF y excelente rendimiento general.'
         ),
         'scx_lavd': (
-            'Planificador eBPF (Latency-critical Virtual Deadline) desarrollado por Valve e Igalia específicamente para gaming y SteamOS.',
+            'Planificador eBPF (Latency-critical Virtual Deadline) desarrollado por Valve e Igalia para gaming competitivo (perfil automático: Gaming --performance).',
             'Calcula plazos virtuales para los hilos de renderizado y audio del juego, maximizando la estabilidad de los FPS mínimos (1% Low FPS).',
             'Actívalo cuando juegues títulos competitivos (CS2, Valorant/Overwatch, Apex) o juegos AAA exigentes en CPU.'
         ),
         'scx_bpfland': (
-            'Planificador eBPF interactivo diseñado para mantener la fluidez absoluta del escritorio bajo cargas extremas.',
+            'Planificador eBPF interactivo precalibrado en perfil de Baja Latencia (rodaja mínima de 500 µs).',
             'Detecta qué ventanas e hilos interactúan con el usuario y les garantiza tiempo de CPU inmediato incluso si el procesador está al 100%.',
             'Úsalo si haces streaming con OBS, compilas código o renderizas vídeo al mismo tiempo que juegas o usas el escritorio.'
         ),
         'scx_cosmos': (
-            'Planificador eBPF ultraligero de propósito general enfocado en localidad de caché de CPU.',
+            'Planificador eBPF ultraligero de propósito general precalibrado en modo Automático con afinidad de caché L2/L3.',
             'Minimiza la migración innecesaria de hilos entre núcleos, reduciendo la latencia de despertar y el consumo energético.',
             'Recomendado para uso diario equilibrado, ofimática avanzada y portátiles donde buscas fluidez con buena eficiencia.'
         ),
         'scx_flash': (
-            'Planificador eBPF basado en el algoritmo Earliest Deadline First (EDF) para cargas multimedia.',
-            'Garantiza tiempos de respuesta deterministas y estrictos para buffers de audio y vídeo en tiempo real.',
+            'Planificador eBPF basado en el algoritmo Earliest Deadline First (EDF) precalibrado en perfil de Baja Latencia Multimedia.',
+            'Garantiza tiempos de respuesta deterministas y estrictos (sin cortes ni xruns) para buffers de audio y vídeo en tiempo real.',
             'Actívalo para producción musical (DAW / PipeWire baja latencia), edición de vídeo o transmisión sin cortes de audio.'
         ),
         'scx_rusty': (
-            'Planificador eBPF multidominio escrito en Rust para arquitecturas con múltiples complejos de caché (Multi-CCD / muchos núcleos).',
+            'Planificador eBPF multidominio escrito en Rust precalibrado para procesadores de múltiples complejos de caché (Multi-CCD).',
             'Balancea inteligentemente la carga entre chiplets (ej. AMD Ryzen 9 con 12/16 núcleos o Threadripper) evitando cuellos de botella entre cachés L3.',
             'Úsalo en estaciones de trabajo de alto conteo de núcleos para renderizado 3D, virtualización o compilación pesada.'
+        ),
+        'scx_persist': (
+            'Opción de persistencia de arranque que guarda tu planificador elegido en /etc/scx_loader/config.toml.',
+            'Permite decidir si quieres probar un planificador solo durante la sesión actual (sin marcar) o dejarlo fijo cada vez que enciendas el PC (marcado).',
+            'Márcalo únicamente cuando hayas probado un planificador en tus juegos o trabajo y quieras que cargue siempre al iniciar.'
+        ),
+        'scx_apply': (
+            'Conmutador en caliente del planificador de tareas del kernel Linux mediante scxctl.',
+            'Aplica instantáneamente el planificador seleccionado junto con su perfil óptimo precalibrado sin necesidad de reiniciar el ordenador.',
+            'Haz clic en cualquiera de las 6 tarjetas superiores y pulsa este botón para activar el cambio al instante.'
         ),
         'ufw.service': (
             'Cortafuegos de red perimetral (Uncomplicated Firewall) gestionado sobre tablas netfilter/iptables del kernel.',
@@ -3451,29 +3461,39 @@ TOOLTIP_GUIDES = {
             'Ideal all-round default choice: rock-solid stability, zero overhead, and great responsiveness.'
         ),
         'scx_lavd': (
-            'Latency-critical Virtual Deadline eBPF scheduler developed by Valve & Igalia specifically for gaming and SteamOS.',
+            'Latency-critical Virtual Deadline eBPF scheduler by Valve & Igalia for competitive gaming (auto-profile: Gaming --performance).',
             'Computes virtual deadlines for game rendering and audio threads, maximizing 1% Low FPS stability and frame pacing.',
             'Enable it when playing competitive esports titles (CS2, Overwatch, Apex) or CPU-bound AAA games.'
         ),
         'scx_bpfland': (
-            'Interactive eBPF scheduler designed to keep desktop and gaming responsiveness silky smooth under extreme load.',
+            'Interactive eBPF scheduler pre-tuned with the Low Latency (500 µs slice) profile for smooth multitasking.',
             'Detects interactive user threads and guarantees immediate CPU time even when background compilation hits 100% CPU.',
             'Use it if you livestream with OBS, compile code, or render video while gaming or multitasking.'
         ),
         'scx_cosmos': (
-            'Ultra-lightweight general-purpose eBPF scheduler focused on CPU cache locality.',
+            'Ultra-lightweight general-purpose eBPF scheduler pre-tuned in Auto mode with L2/L3 CPU cache locality.',
             'Minimizes unnecessary thread migrations across cores, reducing wakeup latency and power consumption.',
             'Recommended for balanced daily computing, productivity, and laptops seeking smooth efficiency.'
         ),
         'scx_flash': (
-            'Earliest Deadline First (EDF) eBPF scheduler engineered for real-time multimedia workloads.',
+            'Earliest Deadline First (EDF) eBPF scheduler pre-tuned with the strict Multimedia Low-Latency profile.',
             'Guarantees strict, deterministic latency consistency for real-time audio and video processing buffers.',
             'Enable it for professional audio production (DAW / low-latency PipeWire), video editing, or glitch-free broadcasting.'
         ),
         'scx_rusty': (
-            'Multi-domain eBPF load balancer written in Rust for multi-CCD / high-core-count processor architectures.',
+            'Multi-domain eBPF load balancer written in Rust pre-tuned for multi-CCD / high-core-count processor architectures.',
             'Intelligently balances threads across CPU chiplets (e.g. 12/16-core AMD Ryzen 9 or Threadripper) to avoid L3 cache cross-talk bottlenecks.',
             'Use it on high-core-count workstations for 3D rendering, virtualization, or heavy parallel compilation.'
+        ),
+        'scx_persist': (
+            'Boot persistence toggle that writes your selected scheduler into /etc/scx_loader/config.toml.',
+            'Lets you choose between testing a scheduler for the current session only (unchecked) or keeping it active on every boot (checked).',
+            'Check this box once you have tested a scheduler in your games or workflow and want it loaded permanently.'
+        ),
+        'scx_apply': (
+            'Live hot-switcher for the Linux kernel CPU task scheduler powered by scxctl.',
+            'Applies the selected scheduler and its optimal pre-calibrated profile immediately with zero reboot required.',
+            'Click any of the 6 scheduler cards above and press this button to switch schedulers on the fly.'
         ),
         'ufw.service': (
             'Perimeter network firewall (Uncomplicated Firewall) powered by Linux kernel netfilter rules.',
@@ -4595,13 +4615,12 @@ class ScxSchedulerPanel(QFrame):
         self.active_sched_id = "bore"
         self.active_mode_id = "auto"
         self.sched_buttons = []
-        self.mode_buttons = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(10)
 
-        # Top Status + Workload Mode Row
+        # Top Status + Pre-Calibrated Automatic Profile Indicator
         top_bar = QHBoxLayout()
         top_bar.setSpacing(8)
 
@@ -4613,17 +4632,17 @@ class ScxSchedulerPanel(QFrame):
         top_bar.addWidget(self.lbl_active_pill)
         top_bar.addStretch(1)
 
-        lbl_mode = QLabel(tr("Workload Profile:"))
-        lbl_mode.setStyleSheet("color: #bbbbbb; font-size: 12px; font-weight: bold; border: none;")
-        top_bar.addWidget(lbl_mode)
-
-        for m_id, m_label, _m_toml in SCX_MODES:
-            m_btn = QPushButton(tr(m_label))
-            m_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            m_btn.setFixedHeight(30)
-            m_btn.clicked.connect(lambda checked=False, mid=m_id: self.select_mode(mid))
-            self.mode_buttons[m_id] = m_btn
-            top_bar.addWidget(m_btn)
+        self.lbl_auto_profile_pill = QLabel("")
+        self.lbl_auto_profile_pill.setStyleSheet("""
+            color: #e2e2ec;
+            background-color: rgba(204, 0, 0, 0.14);
+            border: 1px solid rgba(255, 77, 77, 0.45);
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-weight: bold;
+            font-size: 11px;
+        """)
+        top_bar.addWidget(self.lbl_auto_profile_pill)
 
         layout.addLayout(top_bar)
 
@@ -4693,6 +4712,11 @@ class ScxSchedulerPanel(QFrame):
         self.chk_persist = QCheckBox(tr("Persist at boot (/etc/scx_loader/config.toml)"))
         self.chk_persist.setChecked(False)
         self.chk_persist.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_persist.setToolTip(format_rich_tooltip(
+            tr("Persist at boot (/etc/scx_loader/config.toml)"),
+            "scx_loader",
+            guide_key="scx_persist"
+        ))
         btm_row.addWidget(self.chk_persist)
 
         self.status_lbl = FitLabel("", min_ratio=0.85)
@@ -4703,6 +4727,11 @@ class ScxSchedulerPanel(QFrame):
         btn_reset = QPushButton(tr("Reset to BORE Default"))
         btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_reset.setFixedHeight(34)
+        btn_reset.setToolTip(format_rich_tooltip(
+            tr("Reset to BORE Default"),
+            "Native C",
+            guide_key="scx_bore"
+        ))
         btn_reset.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.06);
@@ -4723,6 +4752,11 @@ class ScxSchedulerPanel(QFrame):
         btn_apply = QPushButton(tr("Apply Selected Scheduler"))
         btn_apply.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_apply.setFixedHeight(34)
+        btn_apply.setToolTip(format_rich_tooltip(
+            tr("Apply Selected Scheduler"),
+            "scxctl",
+            guide_key="scx_apply"
+        ))
         btn_apply.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #d60000, stop:1 #850000);
@@ -4751,6 +4785,11 @@ class ScxSchedulerPanel(QFrame):
         self.active_sched_id = s_id
         self.active_mode_id = m_id
         self.lbl_active_pill.setText(f" ●  {pretty} ")
+        self.lbl_active_pill.setToolTip(format_rich_tooltip(
+            pretty,
+            tr("ACTIVE"),
+            guide_key=f"scx_{s_id}"
+        ))
         if s_id == "bore":
             self.lbl_active_pill.setStyleSheet("""
                 color: #38bdf8; background-color: rgba(56, 189, 248, 0.14);
@@ -4790,13 +4829,9 @@ class ScxSchedulerPanel(QFrame):
                 """)
 
         if select_active:
-            self.select_scheduler(found_idx, auto_mode=False)
-            if m_id in self.mode_buttons:
-                self.select_mode(m_id)
-            else:
-                self.select_mode(SCX_SCHEDULERS[found_idx]["default_mode"])
+            self.select_scheduler(found_idx, auto_mode=True)
         else:
-            self.select_scheduler(self.selected_idx, auto_mode=False)
+            self.select_scheduler(self.selected_idx, auto_mode=True)
 
         if self.parent_app and hasattr(self.parent_app, "update_hardware_telemetry"):
             self.parent_app.update_hardware_telemetry(force=True)
@@ -4827,56 +4862,30 @@ class ScxSchedulerPanel(QFrame):
                     }
                 """)
         chosen = SCX_SCHEDULERS[idx]
-        if auto_mode:
-            self.select_mode(chosen["default_mode"])
-        else:
-            self.select_mode(self.selected_mode)
+        self.select_mode(chosen["default_mode"])
 
     def select_mode(self, mode_id):
         self.selected_mode = mode_id
-        is_bore = (SCX_SCHEDULERS[self.selected_idx]["id"] == "bore")
-        for m_id, m_btn in self.mode_buttons.items():
-            m_btn.setEnabled(not is_bore)
-            if is_bore:
-                m_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(255, 255, 255, 0.02);
-                        color: #55555e;
-                        border: 1px solid #22222a;
-                        border-radius: 7px;
-                        padding: 0 10px;
-                        font-weight: bold;
-                        font-size: 11px;
-                    }
-                """)
-            elif m_id == mode_id:
-                m_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(204, 0, 0, 0.22);
-                        color: #ffffff;
-                        border: 1px solid #ff3333;
-                        border-radius: 7px;
-                        padding: 0 10px;
-                        font-weight: bold;
-                        font-size: 11px;
-                    }
-                """)
-            else:
-                m_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(255, 255, 255, 0.05);
-                        color: #aaaaaa;
-                        border: 1px solid #33333c;
-                        border-radius: 7px;
-                        padding: 0 10px;
-                        font-weight: bold;
-                        font-size: 11px;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(255, 255, 255, 0.10);
-                        color: #ffffff;
-                    }
-                """)
+        chosen = SCX_SCHEDULERS[self.selected_idx]
+        mode_labels = {
+            "bore": f"⚡ {tr('Native Kernel + FalconD Auto')}",
+            "gaming": f"{tr('Workload Profile:')} {tr('⚡ Gaming')}",
+            "lowlatency": f"{tr('Workload Profile:')} {tr('🎯 Low Latency')}",
+            "auto": f"{tr('Workload Profile:')} {tr('⚙️ Auto')}",
+            "powersave": f"{tr('Workload Profile:')} {tr('🔋 Power Save')}",
+        }
+        if chosen["id"] == "bore":
+            pill_txt = mode_labels["bore"]
+        else:
+            pill_txt = mode_labels.get(mode_id, mode_labels["auto"])
+        self.lbl_auto_profile_pill.setText(f" {pill_txt} ")
+        disp_name = tr(chosen["name"]) if chosen["id"] == "bore" else chosen["name"]
+        self.lbl_auto_profile_pill.setToolTip(format_rich_tooltip(
+            disp_name,
+            chosen["badge"],
+            guide_key=f"scx_{chosen['id']}",
+            fallback_desc=tr(chosen["desc"])
+        ))
 
     def _build_persist_cmd(self, sched_id, mode_id):
         mode_toml = "Auto"

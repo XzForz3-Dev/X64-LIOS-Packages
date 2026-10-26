@@ -1,6 +1,6 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=19
+pkgrel=20
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
