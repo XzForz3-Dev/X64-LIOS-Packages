@@ -7467,19 +7467,594 @@ class X64Hello(QWidget):
     def create_page_philosophy(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(55, 35, 55, 30)
+        layout.setContentsMargins(36, 20, 36, 16)
+        layout.setSpacing(4)
         page.setLayout(layout)
 
-        title = QLabel(tr("X64 Architectural Manifesto"))
-        title.setStyleSheet("color: #ffffff; font-size: 34px; font-weight: bold; background: transparent;")
-        layout.addWidget(title)
-        layout.addSpacing(8)
+        philo_i18n = {
+            "es": {
+                "cat": "// FUNDAMENTOS ARQUITECTÓNICOS Y MANIFIESTO",
+                "title": "Manifiesto Arquitectónico X64",
+                "intro": "X64 LIOS nace como la respuesta definitiva a la fragmentación de Linux. Extraemos la fuerza bruta de los kernels de alto rendimiento, la precisión del ecosistema gaming y la pureza de Arch para forjar el sistema operativo definitivo.",
+                "pillars": [
+                    (
+                        "I. La Libertad Absoluta",
+                        "Pureza Upstream de Arch Linux con cero PPAs, cero ataduras corporativas y el 99% de los paquetes del sistema intactos. Combinado con AUR y herramientas gráficas modernas para una libertad total.",
+                        (
+                            "Base pura Arch Linux Rolling Release sin parches invasivos que rompan la compatibilidad upstream.",
+                            "Garantiza acceso inmediato a todo el catálogo oficial de Arch, AUR y Flatpak sin bloqueos artificiales ni dependencias rotas.",
+                            "Activo permanentemente como cimiento base de tu sistema operativo."
+                        )
+                    ),
+                    (
+                        "II. Optimización Quirúrgica",
+                        "Kernel Linux-CachyOS con schedulers dinámicos sched_ext (scx_lavd / BORE), afinidad gaming FalconD, ananicy-cpp y ZRAM puro en RAM sin falsos cierres de systemd-oomd.",
+                        (
+                            "Pila de rendimiento de ultra-baja latencia en espacio de kernel (eBPF / BORE) y espacio de usuario.",
+                            "Maximiza los FPS mínimos (1% Low), prioriza procesos interactivos y protege tus juegos durante compilaciones masivas de shaders Vulkan mediante ZRAM zstd.",
+                            "Activo de fábrica y personalizable en tiempo real desde la pestaña CPU y Rendimiento."
+                        )
+                    ),
+                    (
+                        "III. Ecosistema Multi-Entorno & Silent Boot",
+                        "Arranque limpio Silent Handover (Plymouth → SDDM sin parpadeos) y 8 entornos oficiales (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland y Servidor).",
+                        (
+                            "Arquitectura gráfica Wayland/X11 con transición continua de framebuffer KMS y soporte oficial para 8 escritorios.",
+                            "Elimina textos de consola y parpadeos visuales al encender el PC, entregando tu entorno favorito preconfigurado con identidad X64.",
+                            "Elegible durante la instalación en Calamares y activo en cada arranque."
+                        )
+                    ),
+                    (
+                        "IV. Repositorios Soberanos",
+                        "Jerarquía soberana de repositorios en cascada. [x64-lios] ostenta la prioridad #1 absoluta sobre CachyOS y Arch, entregando paquetes propios y optimizaciones vía SSL sin cuellos de botella.",
+                        (
+                            "Infraestructura propia de distribución de paquetes (repo.x64lios.com) auditada con paridad estricta.",
+                            "Entrega actualizaciones instantáneas de nuestras herramientas (x64-hello, x64-update, x64-secureboot, temas y perfiles) con prioridad máxima.",
+                            "Se aplica automáticamente en cada actualización mediante X64 Update o pacman."
+                        )
+                    ),
+                    (
+                        "V. Mutación de Hardware (v3 / v4)",
+                        "Durante la instalación el sistema audita tu silicio: CPUs modernas reciben repositorios AVX2/AVX-512 (x86-64-v3/v4) bajo [x64-lios] y chwd autodetecta GPUs NVIDIA, AMD e Intel.",
+                        (
+                            "Motor inteligente de detección de instrucciones microarquitectónicas de CPU y perfiles de drivers gráficos.",
+                            "Exprime las instrucciones vectoriales modernas de tu procesador para ganar hasta un 15% de rendimiento extra, manteniendo compatibilidad total en CPUs clásicas.",
+                            "Configurado automáticamente a medida de tu hardware durante la instalación."
+                        )
+                    ),
+                    (
+                        "VI. Arquitectura Modular Sin Bloatware",
+                        "Sistema base quirúrgico con solo ~600–800 MB de RAM en reposo. Las suites pesadas de juegos, launchers y utilidades se delegan a instalación modular de 1 clic en X64 Hello.",
+                        (
+                            "Diseño minimalista libre de programas preinstalados innecesarios o servicios basura en segundo plano.",
+                            "Reserva el 100% de tu memoria RAM y ciclos de CPU para tus videojuegos y flujo de trabajo, permitiéndote instalar solo lo que realmente utilizas.",
+                            "Gestionable a la carta desde la pestaña Gaming Center."
+                        )
+                    ),
+                    (
+                        "VII. Escudo Btrfs, 4 Bootloaders y Secure Boot",
+                        "Inmutabilidad temporal con Btrfs + Snapper en Limine, GRUB, systemd-boot o rEFInd, unido al asistente x64-secureboot (sbctl) para firma UEFI y Dual-Boot con Windows 11.",
+                        (
+                            "Sistema de respaldo por instantáneas fotográficas en el arranque y firmado criptográfico de kernels UEFI.",
+                            "Permite restaurar el sistema en segundos desde el menú de encendido si algo falla y jugar títulos con anti-cheat que exigen Secure Boot activo.",
+                            "Snapshots automáticos antes de actualizar; Secure Boot configurable en Red y Seguridad."
+                        )
+                    ),
+                    (
+                        "VIII. Filosofía GUI-First y Terminal Hacker",
+                        "Control diario intuitivo mediante aplicaciones gráficas nativas en PyQt6, unido a una experiencia de terminal hacker de élite en Kitty, Fish shell, Fastfetch y Starship pills.",
+                        (
+                            "Convergencia entre paneles de control visuales de 1 clic y una consola de comandos preconfigurada al detalle.",
+                            "Permite administrar el kernel, red, drivers y mantenimiento sin tocar comandos, brindando a la vez la mejor terminal para usuarios avanzados.",
+                            "Disponible en todo momento en las apps nativas X64 y en la terminal Kitty."
+                        )
+                    ),
+                    (
+                        "IX. Rolling Release de Vanguardia",
+                        "Evolución continua basada en Arch Linux. Tu sistema incorpora fluidamente los últimos kernels, drivers Mesa/NVIDIA y mejoras de Proton sin reinstalaciones, guiado por X64 Update.",
+                        (
+                            "Modelo de actualización continua donde tu sistema operativo siempre se mantiene en la última versión.",
+                            "Recibe soporte inmediato para nuevo hardware y mejoras de FPS en Vulkan/Proton apenas se publican, bajo la supervisión segura de X64 Update.",
+                            "Al sincronizar paquetes semanalmente desde el botón Actualizar Sistema."
+                        )
+                    ),
+                    (
+                        "X. Pila de Red Competitiva",
+                        "Control de congestión Google TCP BBR + Fair Queueing (FQ) contra bufferbloat, Wi-Fi sin ahorro energético (Low-Jitter), benchmark DNS en vivo con DNS-over-TLS y cortafuegos UFW.",
+                        (
+                            "Optimización profunda del stack TCP/IP del kernel Linux y cifrado de resolución de nombres.",
+                            "Elimina los picos de lag (jitter) jugando por Wi-Fi, evita subidas de ping cuando otros descargan en tu red y protege tus conexiones entrantes.",
+                            "TCP BBR y Wi-Fi Low-Jitter activos de fábrica; DNS y Firewall ajustables en Red y Seguridad."
+                        )
+                    ),
+                    (
+                        "XI. La Estética como Función",
+                        "El diseño no es secundario. Interfaz panorámica Widescreen, dirección de arte Carmesí & Carbón (#b31b1b / #0b0b0d), tooltips educativos y vectores diseñados para foco y control.",
+                        (
+                            "Identidad visual cohesiva de alto contraste y cero distracciones en todo el ecosistema X64 LIOS.",
+                            "Reduce la fatiga visual en sesiones prolongadas y expone telemetría y controles técnicos con claridad inmediata.",
+                            "Presente desde el gestor de arranque y SDDM hasta el escritorio y las herramientas X64."
+                        )
+                    ),
+                    (
+                        "XII. Privacidad por Diseño",
+                        "Cero recopilación de métricas, diagnósticos o rastreo encubierto en segundo plano. A diferencia de los sistemas comerciales, X64 LIOS jamás monitoriza tu actividad: tu hardware es tuyo.",
+                        (
+                            "Compromiso arquitectónico inquebrantable de cero telemetría y cero servicios espía.",
+                            "Garantiza soberanía digital absoluta sobre tus archivos, procesos y red, sin telemetría corporativa consumiendo recursos en segundo plano.",
+                            "Garantizado por diseño en el 100% de los paquetes de X64 LIOS."
+                        )
+                    ),
+                ]
+            },
+            "en": {
+                "cat": "// ARCHITECTURAL FOUNDATIONS & MANIFESTO",
+                "title": "X64 Architectural Manifesto",
+                "intro": "X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system.",
+                "pillars": [
+                    (
+                        "I. Absolute Freedom",
+                        "Upstream purity of Arch Linux with zero PPAs, zero corporate ties, and 99% of system packages intact. Combined with the AUR and modern GUI tools for complete freedom.",
+                        (
+                            "Pure Arch Linux Rolling Release foundation without invasive patches that break upstream compatibility.",
+                            "Guarantees instant access to the entire official Arch, AUR, and Flatpak catalog without artificial locks or broken dependencies.",
+                            "Permanently active as the core foundation of your operating system."
+                        )
+                    ),
+                    (
+                        "II. Surgical Optimization",
+                        "Linux-CachyOS kernel with live sched_ext (scx_lavd / BORE) schedulers, FalconD gaming CPU affinity, ananicy-cpp priority tuning, and pure ZRAM in RAM with zero false systemd-oomd kills.",
+                        (
+                            "Ultra-low-latency performance stack across both kernel space (eBPF / BORE) and user space.",
+                            "Maximizes 1% Low FPS stability, prioritizes interactive tasks, and protects games during heavy Vulkan shader compilation via zstd ZRAM.",
+                            "Active out of the box and customizable in real time from the CPU & Performance tab."
+                        )
+                    ),
+                    (
+                        "III. Multi-Environment & Silent Boot",
+                        "Flicker-free Silent Handover boot (Plymouth → SDDM) and 8 official desktop environments (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, and Server).",
+                        (
+                            "Wayland/X11 graphics architecture with seamless KMS framebuffer handover and native support for 8 desktops.",
+                            "Eliminates boot console text and screen flicker at startup while delivering your favorite desktop pre-tuned with X64 identity.",
+                            "Selectable during Calamares installation and active on every boot."
+                        )
+                    ),
+                    (
+                        "IV. Sovereign Repositories",
+                        "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above CachyOS and Arch, delivering custom packages and optimizations over SSL without bottlenecks.",
+                        (
+                            "Dedicated package distribution infrastructure (repo.x64lios.com) audited with strict 21/21 parity.",
+                            "Delivers instant updates for X64 tools (x64-hello, x64-update, x64-secureboot, themes, and profiles) with top priority.",
+                            "Automatically applied on every system sync via X64 Update or pacman."
+                        )
+                    ),
+                    (
+                        "V. Hardware Mutation (v3 / v4)",
+                        "During installation, the system audits your silicon: modern CPUs receive AVX2/AVX-512 (x86-64-v3/v4) repositories below [x64-lios], and chwd autodetects NVIDIA, AMD, and Intel GPUs.",
+                        (
+                            "Intelligent CPU microarchitecture instruction detector and automated GPU driver profiler.",
+                            "Unlocks modern vector instructions on your processor for up to 15% extra performance while keeping 100% compatibility on older CPUs.",
+                            "Automatically configured for your hardware during system installation."
+                        )
+                    ),
+                    (
+                        "VI. Zero-Bloat Modular Architecture",
+                        "Surgical base system consuming only ~600–800 MB idle RAM. Heavy gaming suites, launchers, and utilities are delegated to 1-click modular installation in X64 Hello.",
+                        (
+                            "Lean system design free from unnecessary preinstalled bloatware or idle background daemons.",
+                            "Dedicates 100% of your RAM and CPU cycles to your games and workflows, letting you install only the launchers you actually use.",
+                            "Manageable anytime on demand from the Gaming Center tab."
+                        )
+                    ),
+                    (
+                        "VII. Btrfs Shield, 4 Bootloaders & Secure Boot",
+                        "Temporal immutability with Btrfs + Snapper across Limine, GRUB, systemd-boot, or rEFInd, paired with x64-secureboot (sbctl) for UEFI key signing and Windows 11 dual-boot.",
+                        (
+                            "Automated bootable snapshot recovery system combined with custom UEFI cryptographic kernel signing.",
+                            "Lets you roll back any faulty update in seconds from the boot menu and play anti-cheat games that require Secure Boot enabled.",
+                            "Snapshots run automatically before updates; Secure Boot is managed in Network & Security."
+                        )
+                    ),
+                    (
+                        "VIII. GUI-First & Hacker Terminal",
+                        "Effortless everyday control via native PyQt6 graphical apps, paired with an elite hacker terminal experience in Kitty, Fish shell, Fastfetch, and Starship pills.",
+                        (
+                            "Synergy between 1-click visual control panels and a meticulously pre-configured command-line environment.",
+                            "Lets any user manage kernels, networking, drivers, and maintenance without touching the CLI, while giving power users an elite terminal.",
+                            "Available anytime across X64 native apps and the Kitty terminal."
+                        )
+                    ),
+                    (
+                        "IX. Cutting-Edge Rolling Release",
+                        "Continuous evolution based on Arch Linux. Your system seamlessly incorporates the latest kernels, Mesa/NVIDIA drivers, and Proton advances without reinstallations via X64 Update.",
+                        (
+                            "Continuous delivery model where your operating system never becomes obsolete.",
+                            "Brings immediate support for new hardware and Vulkan/Proton FPS improvements as soon as they release, backed by Snapper snapshots.",
+                            "Applied whenever you update your system via X64 Update."
+                        )
+                    ),
+                    (
+                        "X. Competitive Network Stack",
+                        "Google TCP BBR + Fair Queueing (FQ) anti-bufferbloat congestion control, Wi-Fi Low-Jitter (powersave off), live DNS ping benchmarking with DNS-over-TLS, and UFW firewall.",
+                        (
+                            "Deep Linux kernel TCP/IP stack optimization paired with encrypted DNS resolution.",
+                            "Eliminates Wi-Fi ping spikes (jitter) in online games, prevents latency jumps during background downloads, and blocks unauthorized incoming traffic.",
+                            "TCP BBR and Wi-Fi Low-Jitter are active by default; DNS and Firewall are tuned in Network & Security."
+                        )
+                    ),
+                    (
+                        "XI. Aesthetics as Function",
+                        "Design is not an afterthought. Widescreen panoramic UI, Crimson & Charcoal color direction (#b31b1b / #0b0b0d), educational hover tooltips, and vector iconography.",
+                        (
+                            "Cohesive, high-contrast, distraction-free visual identity across the entire X64 LIOS ecosystem.",
+                            "Reduces eye strain during long sessions and presents live telemetry and technical controls with instant clarity.",
+                            "Present from the bootloader and SDDM login screen to the desktop and X64 apps."
+                        )
+                    ),
+                    (
+                        "XII. Privacy by Design",
+                        "Zero metrics collection, diagnostics, or covert background tracking. Unlike commercial operating systems, X64 LIOS never monitors your activity or phones home. Your hardware belongs to you.",
+                        (
+                            "Uncompromising architectural commitment to zero telemetry and zero background spyware.",
+                            "Guarantees complete digital sovereignty over your files, processes, and network without corporate trackers wasting bandwidth.",
+                            "Guaranteed by design across 100% of X64 LIOS packages."
+                        )
+                    ),
+                ]
+            },
+            "fr": {
+                "cat": "// FONDEMENTS ET MANIFESTE ARCHITECTURAL",
+                "title": "Manifeste Architectural X64",
+                "intro": "X64 LIOS est né comme la réponse ultime à la fragmentation de Linux. Nous extrayons la puissance brute des noyaux haute performance, la précision de l'écosystème gaming et la pureté d'Arch pour forger le système définitif.",
+                "pillars": [
+                    ("I. Liberté Absolue", "Pureté d'Arch Linux sans aucun PPA ni lien d'entreprise, avec 99 % des paquets système intacts. Combiné à l'AUR et à des outils graphiques modernes pour une liberté totale.", (
+                        "Base Arch Linux Rolling Release pure sans correctifs intrusifs.",
+                        "Garantit un accès immédiat aux dépôts Arch, à l'AUR et à Flatpak sans blocages artificiels.",
+                        "Actif en permanence comme fondation de votre système."
+                    )),
+                    ("II. Optimisation Chirurgicale", "Noyau Linux-CachyOS avec ordonnanceurs dynamiques sched_ext (scx_lavd / BORE), affinité CPU FalconD, ananicy-cpp et ZRAM pure sans fermetures forcées de systemd-oomd.", (
+                        "Pile de performance à ultra-basse latence dans l'espace noyau (eBPF / BORE) et utilisateur.",
+                        "Maximise les FPS minimums (1% Low) et protège vos jeux lors de la compilation des shaders Vulkan grâce à ZRAM zstd.",
+                        "Actif par défaut et réglable en direct dans l'onglet CPU & Performance."
+                    )),
+                    ("III. Écosystème Multi-Environnements & Silent Boot", "Démarrage fluide Silent Handover (Plymouth → SDDM sans scintillement) et 8 environnements officiels (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, Serveur).", (
+                        "Architecture graphique Wayland/X11 avec transition KMS continue et 8 bureaux officiels.",
+                        "Supprime les textes de console au démarrage et livre votre bureau préconfiguré aux couleurs X64.",
+                        "Sélectionnable lors de l'installation Calamares et actif à chaque démarrage."
+                    )),
+                    ("IV. Dépôts Souverains", "Hiérarchie souveraine de dépôts en cascade. [x64-lios] détient la priorité #1 sur CachyOS et Arch, livrant des paquets sur mesure et des optimisations via SSL.", (
+                        "Infrastructure dédiée (repo.x64lios.com) placée au sommet de /etc/pacman.conf.",
+                        "Distribue instantanément les mises à jour des outils X64 LIOS et thèmes officiels.",
+                        "Consulté automatiquement à chaque exécution de X64 Update ou pacman."
+                    )),
+                    ("V. Mutation Matérielle (v3 / v4)", "Pendant l'installation, le système audite votre CPU : les processeurs modernes reçoivent les dépôts AVX2/AVX-512 (v3/v4) et chwd détecte automatiquement les GPU NVIDIA, AMD et Intel.", (
+                        "Détection matérielle intelligente qui adapte les binaires aux instructions exactes de votre CPU et GPU.",
+                        "Exploite les instructions AVX2 et AVX-512 et configure les pilotes graphiques optimaux sans intervention manuelle.",
+                        "Configuré automatiquement à l'installation et vérifiable dans l'onglet Accueil."
+                    )),
+                    ("VI. Architecture Modulaire Sans Bloatware", "Système de base chirurgical ne consommant que ~600–800 Mo de RAM au repos. Les plateformes de jeu lourdes s'installent en 1 clic dans X64 Gaming Center.", (
+                        "Séparation stricte entre le cœur du système d'exploitation et les applications lourdes optionnelles.",
+                        "Garde le système ultra-léger au démarrage tout en permettant d'installer Steam ou Lutris en 1 clic.",
+                        "Disponible à la demande dans l'onglet Gaming Center."
+                    )),
+                    ("VII. Bouclier Btrfs, 4 Bootloaders & Secure Boot", "Immutabilité temporelle avec Btrfs + Snapper sur Limine, GRUB, systemd-boot ou rEFInd, avec l'assistant x64-secureboot (sbctl) pour Windows 11 Dual-Boot.", (
+                        "Système de snapshots automatiques amorçables combiné à la signature cryptographique UEFI (sbctl).",
+                        "Permet d'annuler une mise à jour défaillante depuis le menu de boot et de jouer aux titres exigeant Secure Boot.",
+                        "Les snapshots sont automatiques ; Secure Boot se gère dans Réseau & Sécurité."
+                    )),
+                    ("VIII. Philosophie GUI-First & Terminal Hacker", "Contrôle quotidien intuitif via des outils graphiques natifs PyQt6, couplé au terminal d'élite Kitty avec Fish, Fastfetch et Starship.", (
+                        "Synergie entre panneaux de contrôle graphiques en 1 clic et terminal préconfiguré de haut vol.",
+                        "Permet de tout gérer visuellement sans ligne de commande tout en offrant un terminal d'élite aux experts.",
+                        "Disponible à tout moment dans les applications X64 et le terminal Kitty."
+                    )),
+                    ("IX. Rolling Release d'Avant-Garde", "Évolution continue basée sur Arch Linux. Votre système intègre les derniers noyaux, pilotes Mesa/NVIDIA et avancées Proton sans réinstallation via X64 Update.", (
+                        "Modèle de mise à jour continue où votre système d'exploitation ne devient jamais obsolète.",
+                        "Apporte immédiatement le support du nouveau matériel et les gains de FPS Vulkan/Proton.",
+                        "Appliqué à chaque mise à jour via X64 Update."
+                    )),
+                    ("X. Pile Réseau Compétitive", "Contrôle de congestion Google TCP BBR + FQ anti-bufferbloat, Wi-Fi Low-Jitter sans économie d'énergie, benchmark DNS chiffré (DoT) et pare-feu UFW.", (
+                        "Optimisation profonde de la pile TCP/IP du noyau Linux associée au chiffrement DNS-over-TLS.",
+                        "Élimine les pics de ping Wi-Fi en jeu et protège votre réseau contre les connexions entrantes non autorisées.",
+                        "TCP BBR et Wi-Fi Low-Jitter sont actifs par défaut ; DNS et UFW se règlent dans Réseau & Sécurité."
+                    )),
+                    ("XI. L'Esthétique comme Fonction", "Interface panoramique Widescreen, charte Carmin & Anthracite (#b31b1b / #0b0b0d), info-bulles éducatives et iconographie vectorielle.", (
+                        "Identité visuelle cohérente à fort contraste et sans distraction sur tout l'écosystème X64 LIOS.",
+                        "Réduit la fatigue visuelle et présente la télémétrie matérielle avec une clarté immédiate.",
+                        "Présente du bootloader et de l'écran SDDM jusqu'au bureau et aux outils X64."
+                    )),
+                    ("XII. Confidentialité Dès la Conception", "Zéro collecte de métriques, diagnostic ou suivi caché. X64 LIOS ne surveille jamais votre activité : votre matériel vous appartient exclusivement.", (
+                        "Engagement architectural absolu envers zéro télémétrie et zéro espionnage en arrière-plan.",
+                        "Garantit une souveraineté numérique totale sur vos fichiers, processus et connexions réseau.",
+                        "Garanti par conception sur 100 % des paquets X64 LIOS."
+                    )),
+                ]
+            },
+            "de": {
+                "cat": "// ARCHITEKTUR-FUNDAMENTE & MANIFEST",
+                "title": "X64 Architektur-Manifest",
+                "intro": "X64 LIOS wurde als ultimative Antwort auf die Linux-Fragmentierung entwickelt. Wir vereinen Hochleistungs-Kernel, präzises Gaming-Tuning und die Reinheit von Arch Linux zum definitiven Betriebssystem.",
+                "pillars": [
+                    ("I. Absolute Freiheit", "Reines Arch Linux ohne PPAs oder Konzernbindung mit 99 % unveränderten Systempaketen, kombiniert mit dem AUR und modernen GUI-Werkzeugen.", (
+                        "Reine Arch Linux Rolling-Release-Basis ohne invasive Patches.",
+                        "Garantiert sofortigen Zugriff auf alle offiziellen Arch-Pakete, das AUR und Flatpak ohne künstliche Sperren.",
+                        "Dauerhaft aktiv als Fundament Ihres Betriebssystems."
+                    )),
+                    ("II. Chirurgische Optimierung", "Linux-CachyOS-Kernel mit Live-sched_ext-Schedulern (scx_lavd / BORE), FalconD-Gaming-Affinität, ananicy-cpp und reinem ZRAM ohne falsche systemd-oomd-Abbrüche.", (
+                        "Ultra-niedriglatenter Performance-Stack im Kernel- (eBPF / BORE) und Userspace.",
+                        "Maximiert die 1%-Low-FPS und schützt Spiele während massiver Vulkan-Shader-Kompilierungen durch ZRAM.",
+                        "Standardmäßig aktiv und im Tab CPU & Leistung in Echtzeit anpassbar."
+                    )),
+                    ("III. Multi-Desktop & Silent Boot", "Flackerfreier Silent Handover (Plymouth → SDDM) sowie 8 offizielle Desktop-Umgebungen (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland und Server).", (
+                        "Wayland/X11-Grafikarchitektur mit nahtlosem KMS-Framebuffer-Übergang und 8 offiziellen Desktops.",
+                        "Beseitigt Konsolentext und Flackern beim Systemstart und liefert Ihren Wunsch-Desktop im X64-Design.",
+                        "Bei der Calamares-Installation wählbar und bei jedem Start aktiv."
+                    )),
+                    ("IV. Souveräne Paketquellen", "Souveräne Repository-Hierarchie: [x64-lios] steht auf Priorität #1 über CachyOS und Arch und liefert eigene Pakete und Optimierungen direkt per SSL.", (
+                        "Eigene Paket-Infrastruktur (repo.x64lios.com) an oberster Stelle in /etc/pacman.conf.",
+                        "Liefert sofortige Updates für native X64-Tools, Bootloader-Themes und System-Skripte.",
+                        "Wird bei jedem Aufruf von X64 Update oder pacman automatisch genutzt."
+                    )),
+                    ("V. Hardware-Mutation (v3 / v4)", "Automatische CPU-Prüfung bei der Installation: Moderne CPUs erhalten AVX2/AVX-512-Pakete (v3/v4), während chwd NVIDIA-, AMD- und Intel-GPUs automatisch einrichtet.", (
+                        "Intelligente Hardware-Erkennung, die Binärpakete exakt auf Ihre CPU-Mikroarchitektur abstimmt.",
+                        "Nutzt AVX2- und AVX-512-Befehlssätze und installiert automatisch die optimalen GPU-Treiber.",
+                        "Wird bei der Installation konfiguriert und im Start-Tab angezeigt."
+                    )),
+                    ("VI. Modulare Zero-Bloat-Architektur", "Ultraschlankes Basissystem mit nur ~600–800 MB RAM-Verbrauch im Leerlauf. Große Gaming-Suiten werden modular per 1-Klick im X64 Gaming Center installiert.", (
+                        "Strikte Trennung zwischen schlankem Betriebssystemkern und optionalen Großanwendungen.",
+                        "Hält das System extrem ressourcenschonend und erlaubt die 1-Klick-Installation von Steam, Heroic oder Lutris.",
+                        "Jederzeit bei Bedarf im Tab Gaming Center verfügbar."
+                    )),
+                    ("VII. Btrfs-Schutzschild, 4 Bootloader & Secure Boot", "Zeitsichere Btrfs-Snapshots mit Snapper für Limine, GRUB, systemd-boot oder rEFInd, inklusive x64-secureboot (sbctl) für Windows 11 Dual-Boot.", (
+                        "Automatisiertes, bootfähiges Snapshot-System kombiniert mit eigener UEFI-Kernelsignierung (sbctl).",
+                        "Ermöglicht das Zurückrollen fehlerhafter Updates direkt im Bootmenü und unterstützt Anti-Cheat mit Secure Boot.",
+                        "Snapshots laufen automatisch vor Updates; Secure Boot wird unter Netzwerk & Sicherheit verwaltet."
+                    )),
+                    ("VIII. GUI-First & Hacker-Terminal", "Mühelose Steuerung über native PyQt6-Apps, kombiniert mit einem erstklassigen Hacker-Terminal in Kitty, Fish-Shell, Fastfetch und Starship-Pills.", (
+                        "Synergie aus visuellen 1-Klick-Kontrollzentren und einer vorkonfigurierten Profi-Kommandozeile.",
+                        "Erlaubt komfortable Systemverwaltung ohne Terminalzwang und bietet Power-Usern zugleich eine Elite-Shell.",
+                        "Jederzeit in den X64-Apps und im Kitty-Terminal verfügbar."
+                    )),
+                    ("IX. Spitzenklasse Rolling Release", "Kontinuierliche Evolution auf Arch-Basis: Neueste Kernel, Mesa/NVIDIA-Treiber und Proton-Updates ohne Neuinstallation über X64 Update.", (
+                        "Kontinuierliches Update-Modell, bei dem Ihr Betriebssystem niemals veraltet.",
+                        "Liefert sofortige Unterstützung für neue Hardware sowie Vulkan/Proton-Verbesserungen, abgesichert durch Snapper.",
+                        "Wird bei jeder Aktualisierung über X64 Update angewendet."
+                    )),
+                    ("X. Kompetitiver Netzwerk-Stack", "Google TCP BBR + FQ gegen Bufferbloat, Wi-Fi Low-Jitter (ohne Energiespar-Lags), Live-DNS-Benchmark mit DNS-over-TLS und UFW-Firewall.", (
+                        "Tiefgreifende Optimierung des Linux-TCP/IP-Stacks gepaart mit verschlüsselter DNS-Auflösung.",
+                        "Verhindert WLAN-Ping-Spitzen in Online-Spielen und blockiert unautorisierte eingehende Verbindungen.",
+                        "TCP BBR und Wi-Fi Low-Jitter sind ab Werk aktiv; DNS und Firewall werden unter Netzwerk & Sicherheit gesteuert."
+                    )),
+                    ("XI. Ästhetik als Funktion", "Breitbild-Panorama-UI, Farbgebung in Karminrot & Anthrazit (#b31b1b / #0b0b0d), erklärende Tooltips und gestochen scharfe Vektor-Icons.", (
+                        "Durchgängige, kontrastreiche und ablenkungsfreie visuelle Identität im gesamten X64 LIOS.",
+                        "Schont die Augen bei langen Sitzungen und stellt Live-Telemetrie übersichtlich dar.",
+                        "Präsent vom Bootloader und SDDM bis zum Desktop und allen X64-Werkzeugen."
+                    )),
+                    ("XII. Privacy by Design", "Null Telemetrie, null Diagnosedaten und kein verstecktes Tracking im Hintergrund. X64 LIOS überwacht Sie niemals – Ihre Hardware gehört allein Ihnen.", (
+                        "Kompromisslose Architektur ohne Telemetrie, Datensammlung oder Hintergrund-Tracker.",
+                        "Garantiert volle digitale Souveränität über Ihre Dateien, Prozesse und Netzwerkverbindungen.",
+                        "Konstruktionsbedingt in 100 % aller X64-LIOS-Pakete garantiert."
+                    )),
+                ]
+            },
+            "it": {
+                "cat": "// FONDAMENTA ARCHITETTONICHE E MANIFESTO",
+                "title": "Manifesto Architettonico X64",
+                "intro": "X64 LIOS nasce come risposta definitiva alla frammentazione di Linux. Estraiamo la potenza bruta dei kernel ad alte prestazioni, la precisione del gaming e la purezza di Arch per forgiare il sistema definitivo.",
+                "pillars": [
+                    ("I. Libertà Assoluta", "Purezza di Arch Linux con zero PPA, zero vincoli aziendali e il 99% dei pacchetti intatti, unito ad AUR e strumenti grafici moderni.", (
+                        "Base Arch Linux Rolling Release pura senza patch invasive.",
+                        "Garantisce accesso immediato al catalogo ufficiale Arch, AUR e Flatpak senza blocchi artificiali.",
+                        "Attivo permanentemente come fondamento del sistema operativo."
+                    )),
+                    ("II. Ottimizzazione Chirurgica", "Kernel Linux-CachyOS con scheduler dinamici sched_ext (scx_lavd / BORE), affinità gaming FalconD, ananicy-cpp e ZRAM pura senza chiusure anomale di systemd-oomd.", (
+                        "Stack ad altissime prestazioni e bassa latenza nello spazio kernel (eBPF / BORE) e utente.",
+                        "Massimizza gli FPS minimi (1% Low) e protegge i giochi durante la compilazione shader Vulkan tramite ZRAM.",
+                        "Attivo di serie e personalizzabile in tempo reale nella scheda CPU e Prestazioni."
+                    )),
+                    ("III. Ecosistema Multi-Ambiente & Silent Boot", "Avvio fluido Silent Handover (Plymouth → SDDM senza sfarfallio) e 8 ambienti desktop ufficiali (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland e Server).", (
+                        "Architettura grafica Wayland/X11 con transizione framebuffer KMS continua e 8 desktop ufficiali.",
+                        "Elimina scritte di console e sfarfallii all'avvio, offrendo il tuo desktop preferito già rifinito in stile X64.",
+                        "Selezionabile durante l'installazione Calamares e attivo a ogni avvio."
+                    )),
+                    ("IV. Repository Sovrani", "Gerarchia sovrana di repository a cascata: [x64-lios] detiene la priorità #1 su CachyOS e Arch, distribuendo pacchetti e ottimizzazioni via SSL.", (
+                        "Infrastruttura dedicata (repo.x64lios.com) posizionata al primo posto in /etc/pacman.conf.",
+                        "Fornisce aggiornamenti istantanei per le app native X64 LIOS, i temi e gli script di sistema.",
+                        "Interrogato automaticamente a ogni esecuzione di X64 Update o pacman."
+                    )),
+                    ("V. Mutazione Hardware (v3 / v4)", "Durante l'installazione il sistema analizza la CPU: i processori moderni ricevono i repository AVX2/AVX-512 (v3/v4) e chwd configura le GPU NVIDIA, AMD e Intel.", (
+                        "Rilevamento hardware intelligente che adatta i binari alle istruzioni esatte della tua CPU e GPU.",
+                        "Sfrutta le istruzioni AVX2 e AVX-512 e installa automaticamente i driver grafici ottimali.",
+                        "Configurato automaticamente durante l'installazione e visibile nella scheda Home."
+                    )),
+                    ("VI. Architettura Modulare Zero-Bloat", "Sistema base ultraleggero (~600–800 MB di RAM a riposo). Le piattaforme di gioco pesanti si installano con 1 clic in X64 Gaming Center.", (
+                        "Separazione netta tra il cuore del sistema operativo e le suite pesanti opzionali.",
+                        "Mantiene il sistema scattante e leggero, consentendo di installare Steam, Heroic o Lutris con 1 clic.",
+                        "Disponibile su richiesta nella scheda Gaming Center."
+                    )),
+                    ("VII. Scudo Btrfs, 4 Bootloader & Secure Boot", "Immutabilità temporale con Btrfs + Snapper su Limine, GRUB, systemd-boot o rEFInd, più assistente x64-secureboot (sbctl) per Windows 11 Dual-Boot.", (
+                        "Sistema automatico di snapshot avviabili unito alla firma crittografica UEFI del kernel (sbctl).",
+                        "Permette di annullare qualsiasi aggiornamento difettoso dal menu di avvio e usare giochi con Secure Boot.",
+                        "Gli snapshot sono automatici; Secure Boot si gestisce in Rete e Sicurezza."
+                    )),
+                    ("VIII. Filosofia GUI-First & Terminale Hacker", "Controllo quotidiano intuitivo tramite app grafiche native PyQt6, affiancato dal terminale d'élite Kitty con Fish, Fastfetch e Starship.", (
+                        "Sinergia tra pannelli di controllo grafici a 1 clic e un terminale preconfigurato d'élite.",
+                        "Consente a chiunque di gestire kernel, rete e driver senza usare la CLI, offrendo al contempo una shell avanzata.",
+                        "Disponibile in qualsiasi momento nelle app X64 e nel terminale Kitty."
+                    )),
+                    ("IX. Rolling Release d'Avanguardia", "Evoluzione continua basata su Arch Linux: ultimi kernel, driver Mesa/NVIDIA e ottimizzazioni Proton senza reinstallazioni tramite X64 Update.", (
+                        "Modello a rilascio continuo in cui il sistema operativo non diventa mai obsoleto.",
+                        "Porta supporto immediato per nuovo hardware e miglioramenti FPS Vulkan/Proton in totale sicurezza.",
+                        "Applicato a ogni aggiornamento tramite X64 Update."
+                    )),
+                    ("X. Stack di Rete Competitivo", "Controllo congestione Google TCP BBR + FQ anti-bufferbloat, Wi-Fi Low-Jitter, benchmark DNS in tempo reale con DNS-over-TLS e firewall UFW.", (
+                        "Ottimizzazione profonda dello stack TCP/IP del kernel Linux abbinata a DNS crittografato.",
+                        "Elimina i picchi di ping Wi-Fi nei giochi online e blocca il traffico in entrata non autorizzato.",
+                        "TCP BBR e Wi-Fi Low-Jitter sono attivi di default; DNS e Firewall si regolano in Rete e Sicurezza."
+                    )),
+                    ("XI. L'Estetica come Funzione", "Interfaccia panoramica Widescreen, palette Cremisi & Carbone (#b31b1b / #0b0b0d), tooltip educativi a 3 punti e iconografia vettoriale.", (
+                        "Identità visiva coerente, ad alto contrasto e priva di distrazioni in tutto l'ecosistema X64 LIOS.",
+                        "Riduce l'affaticamento visivo e presenta telemetria e controlli tecnici con chiarezza immediata.",
+                        "Presente dal bootloader e SDDM fino al desktop e alle applicazioni X64."
+                    )),
+                    ("XII. Privacy fin dalla Progettazione", "Zero raccolta di metriche, diagnostica o tracciamento nascosto. X64 LIOS non monitora mai la tua attività: il tuo hardware appartiene solo a te.", (
+                        "Impegno architetturale assoluto per zero telemetria e zero tracciamento in background.",
+                        "Garantisce totale sovranità digitale sui tuoi file, processi e connessioni di rete.",
+                        "Garantito fin dalla progettazione sul 100% dei pacchetti X64 LIOS."
+                    )),
+                ]
+            },
+            "pt": {
+                "cat": "// FUNDAMENTOS E MANIFESTO ARQUITETÔNICO",
+                "title": "Manifesto Arquitetônico X64",
+                "intro": "O X64 LIOS nasceu como a resposta definitiva para a fragmentação do Linux. Extraímos a potência bruta dos kernels de alto desempenho, a precisão do ecossistema gamer e a pureza do Arch para forjar o sistema definitivo.",
+                "pillars": [
+                    ("I. Liberdade Absoluta", "Pureza do Arch Linux sem PPAs e sem amarras corporativas, com 99% dos pacotes intactos, aliado ao AUR e ferramentas gráficas modernas.", (
+                        "Base pura Arch Linux Rolling Release sem patches invasivos.",
+                        "Garante acesso imediato a todo o catálogo oficial do Arch, AUR e Flatpak sem bloqueios artificiais.",
+                        "Ativo permanentemente como alicerce do seu sistema operacional."
+                    )),
+                    ("II. Otimização Cirúrgica", "Kernel Linux-CachyOS com schedulers dinâmicos sched_ext (scx_lavd / BORE), afinidade FalconD para jogos, ananicy-cpp e ZRAM pura sem fechamentos falsos do systemd-oomd.", (
+                        "Pilha de desempenho de ultrabaixa latência no espaço do kernel (eBPF / BORE) e do usuário.",
+                        "Maximiza os FPS mínimos (1% Low) e protege seus jogos durante compilações de shaders Vulkan via ZRAM.",
+                        "Ativo de fábrica e ajustável em tempo real na aba CPU e Desempenho."
+                    )),
+                    ("III. Ecossistema Multi-Ambiente & Silent Boot", "Inicialização contínua Silent Handover (Plymouth → SDDM sem piscar) e 8 ambientes oficiais (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland e Servidor).", (
+                        "Arquitetura gráfica Wayland/X11 com transição contínua de framebuffer KMS e 8 desktops oficiais.",
+                        "Elimina textos de console e piscadas ao ligar o PC, entregando seu ambiente favorito com identidade X64.",
+                        "Escolhido durante a instalação no Calamares e ativo em cada inicialização."
+                    )),
+                    ("IV. Repositórios Soberanos", "Hierarquia soberana de repositórios em cascata: [x64-lios] tem prioridade #1 sobre CachyOS e Arch, entregando pacotes próprios e otimizações via SSL.", (
+                        "Infraestrutura própria de pacotes (repo.x64lios.com) posicionada no topo do /etc/pacman.conf.",
+                        "Entrega atualizações imediatas dos utilitários X64 LIOS, temas e scripts de sistema sem atrasos.",
+                        "Consultado automaticamente sempre que você usa o X64 Update ou pacman."
+                    )),
+                    ("V. Mutação de Hardware (v3 / v4)", "Na instalação o sistema analisa sua CPU: processadores modernos ativam repositórios AVX2/AVX-512 (v3/v4) e o chwd detecta GPUs NVIDIA, AMD e Intel.", (
+                        "Detecção inteligente de silício que adapta os binários às instruções exatas da sua CPU e GPU.",
+                        "Aproveita instruções AVX2 e AVX-512 e instala automaticamente os drivers gráficos ideais.",
+                        "Configurado automaticamente na instalação e visível na aba Início."
+                    )),
+                    ("VI. Arquitetura Modular Sem Bloatware", "Sistema base cirúrgico consumindo apenas ~600–800 MB de RAM em repouso. Plataformas pesadas de jogos são instaladas em 1 clique no X64 Gaming Center.", (
+                        "Separação estrita entre o núcleo enxuto do sistema e suítes pesadas opcionais.",
+                        "Mantém o sistema ultraleve na inicialização e permite instalar Steam, Heroic ou Lutris em 1 clique.",
+                        "Disponível sob demanda na aba Centro Gaming."
+                    )),
+                    ("VII. Escudo Btrfs, 4 Bootloaders & Secure Boot", "Imutabilidade temporal com Btrfs + Snapper no Limine, GRUB, systemd-boot ou rEFInd, junto ao assistente x64-secureboot (sbctl) para Dual-Boot com Windows 11.", (
+                        "Sistema automático de snapshots inicializáveis aliado à assinatura criptográfica UEFI (sbctl).",
+                        "Permite reverter qualquer atualização problemática no menu de boot e jogar títulos que exigem Secure Boot.",
+                        "Snapshots rodam automaticamente antes de atualizar; Secure Boot é gerido em Rede e Segurança."
+                    )),
+                    ("VIII. Filosofia GUI-First & Terminal Hacker", "Controle diário intuitivo via aplicativos nativos PyQt6, combinado com o terminal hacker de elite no Kitty com Fish, Fastfetch e Starship.", (
+                        "Sinergia entre painéis visuais de 1 clique e um ambiente de linha de comando pré-configurado de elite.",
+                        "Permite gerenciar kernels, rede e drivers sem tocar no terminal, oferecendo ao mesmo tempo uma shell avançada.",
+                        "Disponível a qualquer momento nos apps X64 e no terminal Kitty."
+                    )),
+                    ("IX. Rolling Release de Vanguarda", "Evolução contínua baseada no Arch Linux: receba os últimos kernels, drivers Mesa/NVIDIA e avanços do Proton sem reinstalações pelo X64 Update.", (
+                        "Modelo de entrega contínua em que seu sistema operacional nunca fica obsoleto.",
+                        "Traz suporte imediato a novos hardwares e ganhos de FPS no Vulkan/Proton com segurança.",
+                        "Aplicado sempre que você atualiza o sistema pelo X64 Update."
+                    )),
+                    ("X. Pilha de Rede Competitiva", "Controle de congestionamento Google TCP BBR + FQ anti-bufferbloat, Wi-Fi Low-Jitter, benchmark DNS em tempo real com DNS-over-TLS e firewall UFW.", (
+                        "Otimização profunda da pilha TCP/IP do kernel Linux combinada com resolução DNS criptografada.",
+                        "Elimina picos de ping no Wi-Fi em jogos online e bloqueia conexões de entrada não autorizadas.",
+                        "TCP BBR e Wi-Fi Low-Jitter vêm ativos por padrão; DNS e Firewall são ajustados em Rede e Segurança."
+                    )),
+                    ("XI. A Estética como Função", "Interface panorâmica Widescreen, direção de arte Carmim & Carvão (#b31b1b / #0b0b0d), tooltips educativos e iconografia vetorial refinada.", (
+                        "Identidade visual coesa, de alto contraste e livre de distrações em todo o ecossistema X64 LIOS.",
+                        "Reduz o cansaço visual e apresenta telemetria em vivo e controles técnicos com clareza imediata.",
+                        "Presente desde o bootloader e tela SDDM até a área de trabalho e aplicativos X64."
+                    )),
+                    ("XII. Privacidade por Design", "Zero coleta de métricas, diagnósticos ou rastreamento oculto. O X64 LIOS jamais monitora sua atividade: seu hardware pertence exclusivamente a você.", (
+                        "Compromisso arquitetônico absoluto com zero telemetria e zero rastreamento em segundo plano.",
+                        "Garante soberania digital total sobre seus arquivos, processos e rede.",
+                        "Garantido por design em 100% dos pacotes do X64 LIOS."
+                    )),
+                ]
+            },
+            "ru": {
+                "cat": "// АРХИТЕКТУРНЫЕ ОСНОВЫ И МАНИФЕСТ",
+                "title": "Архитектурный Манифест X64",
+                "intro": "X64 LIOS создан как окончательный ответ на фрагментацию Linux. Мы объединили мощь высокопроизводительных ядер, точность игровой экосистемы и чистоту Arch для создания идеальной ОС.",
+                "pillars": [
+                    ("I. Абсолютная Свобода", "Чистота Arch Linux без PPA и корпоративных ограничений, 99% системных пакетов нетронуты, плюс доступ к AUR и современным графическим утилитам.", (
+                        "Чистая база Arch Linux Rolling Release без инвазивных патчей.",
+                        "Гарантирует мгновенный доступ ко всем пакетам Arch, AUR и Flatpak без искусственных ограничений.",
+                        "Постоянно активно как фундамент вашей операционной системы."
+                    )),
+                    ("II. Хирургическая Оптимизация", "Ядро Linux-CachyOS с динамическими планировщиками sched_ext (scx_lavd / BORE), игровым демоном FalconD, ananicy-cpp и чистым ZRAM без ложных срабатываний systemd-oomd.", (
+                        "Стек сверхнизкой задержки на уровне ядра (eBPF / BORE) и пространства пользователя.",
+                        "Максимизирует минимальный FPS (1% Low) и защищает игры при компиляции шейдеров Vulkan через ZRAM.",
+                        "Активно по умолчанию и настраивается в реальном времени во вкладке Процессор и Производительность."
+                    )),
+                    ("III. Мульти-Среда и Бесшовная Загрузка", "Плавный переход Silent Handover (Plymouth → SDDM без мерцания) и 8 официальных окружений (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland и Сервер).", (
+                        "Графическая архитектура Wayland/X11 с бесшовной передачей кадрового буфера KMS и 8 окружениями.",
+                        "Убирает консольный текст и мерцание при включении ПК, предоставляя готовый рабочий стол в стиле X64.",
+                        "Выбирается при установке в Calamares и работает при каждом запуске."
+                    )),
+                    ("IV. Суверенные Репозитории", "Каскадная иерархия репозиториев: [x64-lios] имеет приоритет №1 над CachyOS и Arch, доставляя фирменные пакеты и оптимизации по SSL.", (
+                        "Собственная инфраструктура репозиториев (repo.x64lios.com) с наивысшим приоритетом в /etc/pacman.conf.",
+                        "Мгновенно доставляет обновления фирменных утилит X64 LIOS, тем загрузчиков и системных скриптов.",
+                        "Автоматически используется при каждом запуске X64 Update или pacman."
+                    )),
+                    ("V. Адаптация Оборудования (v3 / v4)", "При установке система проверяет процессор: современные CPU получают репозитории AVX2/AVX-512 (v3/v4), а chwd автоматически настраивает GPU NVIDIA, AMD и Intel.", (
+                        "Интеллектуальное определение оборудования, подбирающее бинарные пакеты под инструкции вашего CPU и GPU.",
+                        "Раскрывает потенциал инструкций AVX2 и AVX-512 и автоматически устанавливает оптимальные видеодрайверы.",
+                        "Настраивается автоматически при установке и отображается во вкладке Главная."
+                    )),
+                    ("VI. Модульная Архитектура Без Мусора", "Чистая базовая система потребляет всего ~600–800 МБ ОЗУ в простое. Игровые лаунчеры устанавливаются в 1 клик через X64 Gaming Center.", (
+                        "Строгое разделение между легким базовым ядром ОС и дополнительными тяжелыми приложениями.",
+                        "Сохраняет минимальное потребление ОЗУ и позволяет установить Steam, Heroic или Lutris в 1 клик.",
+                        "Доступно по запросу во вкладке Игровой Центр."
+                    )),
+                    ("VII. Защита Btrfs, 4 Загрузчика и Secure Boot", "Мгновенные снимки Btrfs + Snapper для Limine, GRUB, systemd-boot и rEFInd, а также мастер x64-secureboot (sbctl) для Dual-Boot с Windows 11.", (
+                        "Система автоматических загружаемых снимков в сочетании с криптографической подписью UEFI (sbctl).",
+                        "Позволяет откатить любое обновление прямо из меню загрузчика и запускать игры с требованием Secure Boot.",
+                        "Снимки создаются автоматически перед обновлениями; Secure Boot управляется в разделе Сеть и Безопасность."
+                    )),
+                    ("VIII. Принцип GUI-First и Терминал Хакера", "Удобное управление через нативные приложения PyQt6 в сочетании с терминалом Kitty, оболочкой Fish, Fastfetch и приглашением Starship.", (
+                        "Синергия удобных графических панелей управления в 1 клик и преднастроенного терминала.",
+                        "Позволяет управлять ядрами, сетью и драйверами без командной строки, сохраняя мощный терминал для профи.",
+                        "Доступно в любое время в приложениях X64 и терминале Kitty."
+                    )),
+                    ("IX. Передовой Rolling Release", "Непрерывное обновление на базе Arch Linux: свежие ядра, драйверы Mesa/NVIDIA и улучшения Proton без переустановки системы через X64 Update.", (
+                        "Модель непрерывных обновлений, при которой ваша ОС никогда не устаревает.",
+                        "Обеспечивает мгновенную поддержку нового оборудования и прирост FPS в Vulkan/Proton под защитой Snapper.",
+                        "Применяется при каждом обновлении системы через X64 Update."
+                    )),
+                    ("X. Игровой Сетевой Стек", "Алгоритм Google TCP BBR + FQ против буферблоата, отключение энергосбережения Wi-Fi (Low-Jitter), тест пинга DNS с шифрованием DoT и межсетевой экран UFW.", (
+                        "Глубокая оптимизация стека TCP/IP ядра Linux в сочетании с зашифрованным DNS-over-TLS.",
+                        "Устраняет скачки пинга по Wi-Fi в онлайн-играх и блокирует несанкционированные входящие подключения.",
+                        "TCP BBR и Wi-Fi Low-Jitter активны по умолчанию; DNS и UFW настраиваются в разделе Сеть и Безопасность."
+                    )),
+                    ("XI. Эстетика как Функция", "Широкоформатный интерфейс, палитра Багровый и Угольный (#b31b1b / #0b0b0d), подробные всплывающие подсказки и векторная иконографика.", (
+                        "Единый высококонтрастный визуальный стиль без отвлекающих элементов во всей экосистеме X64 LIOS.",
+                        "Снижает нагрузку на зрение и наглядно отображает телеметрию оборудования и переключатели.",
+                        "Присутствует от загрузчика и экрана SDDM до рабочего стола и утилит X64."
+                    )),
+                    ("XII. Приватность по Умолчанию", "Ноль телеметрии, скрытых отчетов и фоновой слежки. В отличие от коммерческих ОС, X64 LIOS никогда не следит за вами — ваш ПК принадлежит только вам.", (
+                        "Бескомпромиссный архитектурный принцип полного отсутствия телеметрии и фоновой слежки.",
+                        "Гарантирует полный цифровой суверенитет над вашими файлами, процессами и сетевым трафиком.",
+                        "Гарантировано архитектурой в 100% пакетов X64 LIOS."
+                    )),
+                ]
+            }
+        }
 
-        intro = QLabel(tr("X64 LIOS was born as the ultimate answer to Linux fragmentation. We extract the raw power of high-performance kernels, the precision of the gaming ecosystem, and the purity of Arch to forge the definitive operating system."))
-        intro.setStyleSheet("color: #bbbbbb; font-size: 14px; font-style: italic; background: transparent;")
+        cur_data = philo_i18n.get(_lang_code, philo_i18n["en"])
+        en_pillars = philo_i18n["en"]["pillars"]
+
+        cat_lbl = QLabel(cur_data["cat"])
+        cat_lbl.setStyleSheet("color: #cc0000; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; background: transparent;")
+        layout.addWidget(cat_lbl)
+
+        title = QLabel(cur_data["title"])
+        title.setStyleSheet("color: #ffffff; font-size: 24px; font-weight: bold; background: transparent;")
+        layout.addWidget(title)
+
+        intro = QLabel(cur_data["intro"])
+        intro.setStyleSheet("color: #a8a8b2; font-size: 12px; font-style: italic; background: transparent;")
         intro.setWordWrap(True)
         layout.addWidget(intro)
-        layout.addSpacing(16)
+        layout.addSpacing(4)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -7487,57 +8062,77 @@ class X64Hello(QWidget):
 
         content_widget = QWidget()
         content_widget.setStyleSheet("background: transparent;")
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 15, 20)
-        content_layout.setSpacing(16)
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 8, 6)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
 
-        filosofia = [
-            (tr("I. Absolute Freedom"), tr("Upstream purity of Arch Linux with zero PPAs, zero corporate ties, and 99% of system packages intact. Combined with the AUR and modern GUI tools for complete freedom.")),
-            (tr("II. Surgical Optimization"), tr("X64 low-latency kernel with scx dynamic schedulers, FalconD gaming CPU affinity, ananicy-cpp priority tuning, and pure ZRAM in RAM for zero disk swap latency.")),
-            (tr("III. Multi-Environment Ecosystem"), tr("Live environment in KDE Plasma 6 Wayland, plus 8 official installation options (KDE, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, and Server) with 16:9 previews.")),
-            (tr("IV. Infrastructure Independence"), tr("Cascading repository hierarchy. [x64-lios] holds priority #1 at the top of the system, served with SSL from our high-speed CDN infrastructure.")),
-            (tr("V. Hardware Mutation"), tr("During installation, the system audits your CPU: modern processors get AVX2/AVX512 (v3/v4) repositories injected below [x64-lios]. chwd autodetects NVIDIA, AMD, and Intel GPUs.")),
-            (tr("VI. Modular Architecture"), tr("Lightweight installer with zero bloat. Heavy gaming platforms and emulators are cleanly delegated to post-installation setup in X64 Hello after first boot.")),
-            (tr("VII. Shield of Resilience"), tr("Temporal immutability with Btrfs & automated Snapper snapshots. Multi-bootloader support choosing Limine, GRUB, systemd-boot, or rEFInd for effortless rollback.")),
-            (tr("VIII. The Death of the Terminal"), tr("GUI-First philosophy for effortless everyday use, paired with an elite hacker terminal experience in Kitty, Fish shell, and Starship pills for power users.")),
-            (tr("IX. Hybrid Rolling Release"), tr("The core flies at pure Arch rolling speed, while professional apps can be isolated via Flatpak or Distrobox containers to guarantee Debian-level rock-solid stability.")),
-            (tr("X. Architectural Pragmatism"), tr("Open Source synergy. We inherit and polish battle-tested foundations, writing custom code and maintaining our own repositories only where we add unique value.")),
-            (tr("XI. Aesthetics as Function"), tr("Design is not an afterthought. Widescreen panoramic UI, Crimson & Charcoal color direction (#b31b1b / #0b0b0d), and vector iconography engineered for focus and control.")),
-            (tr("XII. Absolute Privacy"), tr("In the era of covert telemetry, your PC is your private fortress. Zero tracking, zero telemetry, and zero data reporting. What you do on your machine, dies on your machine."))
-        ]
+        lbl_what, lbl_for, lbl_when = TOOLTIP_LABELS.get(_lang_code, TOOLTIP_LABELS["en"])
 
-        for p_title, p_desc in filosofia:
+        for idx, (p_title, p_desc, p_guide) in enumerate(cur_data["pillars"]):
+            row = idx // 2
+            col = idx % 2
+            guide_tuple = p_guide if p_guide is not None else en_pillars[idx][2]
+            what_t, for_t, when_t = guide_tuple
+
+            tip_html = (
+                f"<table width='430' cellspacing='0' cellpadding='2'><tr><td>"
+                f"<b style='color:#ffffff; font-size:13px;'>{p_title}</b> "
+                f"<span style='color:#9292a0; font-size:11px;'>(#{idx + 1}/12)</span>"
+                f"<hr style='border:none; background-color:#2e2e3a; height:1px; margin:5px 0;'>"
+                f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+                f"<b style='color:#ff4d4d;'>• {lbl_what}</b> {what_t}</p>"
+                f"<p style='margin:4px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+                f"<b style='color:#38bdf8;'>• {lbl_for}</b> {for_t}</p>"
+                f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
+                f"<b style='color:#2ecc71;'>• {lbl_when}</b> {when_t}</p>"
+                f"</td></tr></table>"
+            )
+
             frame = QFrame()
             frame.setObjectName("FiloCard")
             frame.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
             frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+            frame.setMinimumWidth(0)
+            frame.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            frame.setToolTip(tip_html)
             frame.setStyleSheet("""
                 QFrame#FiloCard {
                     background-color: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
                     border-radius: 10px;
-                    border-left: 4px solid #cc0000;
+                    border-left: 3px solid #cc0000;
                 }
-                QFrame#FiloCard:hover { background-color: rgba(204, 0, 0, 0.1); }
+                QFrame#FiloCard:hover {
+                    background-color: rgba(204, 0, 0, 0.09);
+                    border: 1px solid rgba(204, 0, 0, 0.4);
+                    border-left: 3px solid #ff3333;
+                }
             """)
             flayout = QVBoxLayout()
-            flayout.setContentsMargins(22, 16, 22, 16)
-            flayout.setSpacing(5)
+            flayout.setContentsMargins(15, 9, 15, 9)
+            flayout.setSpacing(3)
 
-            lbl_t = QLabel(p_title)
+            lbl_t = FitLabel(p_title)
             lbl_t.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 16px; border: none; background: transparent;")
+            lbl_t.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13.2px; border: none; background: transparent;")
 
             lbl_d = QLabel(p_desc)
             lbl_d.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_d.setStyleSheet("color: #a0a0a0; font-size: 14px; line-height: 1.5; border: none; background: transparent;")
+            lbl_d.setStyleSheet("color: #a4a4ae; font-size: 11.2px; line-height: 1.32; border: none; background: transparent;")
             lbl_d.setWordWrap(True)
+            _hfw = lbl_d.sizePolicy()
+            _hfw.setHeightForWidth(True)
+            lbl_d.setSizePolicy(_hfw)
 
             flayout.addWidget(lbl_t)
             flayout.addWidget(lbl_d)
             frame.setLayout(flayout)
-            content_layout.addWidget(frame)
+            grid.addWidget(frame, row, col)
 
-        content_widget.setLayout(content_layout)
+        content_widget.setLayout(grid)
         scroll_area.setWidget(content_widget)
 
         layout.addWidget(scroll_area)
