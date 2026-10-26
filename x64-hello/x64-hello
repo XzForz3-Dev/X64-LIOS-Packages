@@ -8069,27 +8069,9 @@ class X64Hello(QWidget):
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
-        lbl_what, lbl_for, lbl_when = TOOLTIP_LABELS.get(_lang_code, TOOLTIP_LABELS["en"])
-
-        for idx, (p_title, p_desc, p_guide) in enumerate(cur_data["pillars"]):
+        for idx, (p_title, p_desc, *_) in enumerate(cur_data["pillars"]):
             row = idx // 2
             col = idx % 2
-            guide_tuple = p_guide if p_guide is not None else en_pillars[idx][2]
-            what_t, for_t, when_t = guide_tuple
-
-            tip_html = (
-                f"<table width='430' cellspacing='0' cellpadding='2'><tr><td>"
-                f"<b style='color:#ffffff; font-size:13px;'>{p_title}</b> "
-                f"<span style='color:#9292a0; font-size:11px;'>(#{idx + 1}/12)</span>"
-                f"<hr style='border:none; background-color:#2e2e3a; height:1px; margin:5px 0;'>"
-                f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-                f"<b style='color:#ff4d4d;'>• {lbl_what}</b> {what_t}</p>"
-                f"<p style='margin:4px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-                f"<b style='color:#38bdf8;'>• {lbl_for}</b> {for_t}</p>"
-                f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-                f"<b style='color:#2ecc71;'>• {lbl_when}</b> {when_t}</p>"
-                f"</td></tr></table>"
-            )
 
             frame = QFrame()
             frame.setObjectName("FiloCard")
@@ -8097,7 +8079,6 @@ class X64Hello(QWidget):
             frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
             frame.setMinimumWidth(0)
             frame.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            frame.setToolTip(tip_html)
             frame.setStyleSheet("""
                 QFrame#FiloCard {
                     background-color: rgba(255, 255, 255, 0.03);
