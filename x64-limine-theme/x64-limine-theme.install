@@ -1,0 +1,9 @@
+post_install() {
+    if [ -d /boot/efi ] && [ -f /usr/share/limine/x64-limine-splash.png ]; then
+        cp -f /usr/share/limine/x64-limine-splash.png /boot/efi/x64-limine-splash.png 2>/dev/null || true
+    fi
+}
+
+post_upgrade() {
+    post_install
+}
