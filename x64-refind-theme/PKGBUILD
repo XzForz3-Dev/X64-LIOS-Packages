@@ -1,6 +1,6 @@
 pkgname=x64-refind-theme
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Official X64 LIOS rEFInd Bootloader Theme (Dark Carbon Gaming Edition)"
 arch=('any')
 license=('GPL')
