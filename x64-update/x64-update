@@ -1365,67 +1365,16 @@ def run_gui():
             footer_layout.setSpacing(16)
 
             opts_vbox = QVBoxLayout()
-            opts_vbox.setSpacing(6)
+            opts_vbox.setSpacing(3)
 
             self.lbl_summary = QLabel("Analizando estado de los paquetes...")
             self.lbl_summary.setStyleSheet("color: #f4f4f6; font-weight: 700; font-size: 13px;")
             opts_vbox.addWidget(self.lbl_summary)
 
-            chk_row = QHBoxLayout()
-            chk_row.setSpacing(18)
+            self.lbl_sub_summary = QLabel("Limpieza automática de paquetes residuales y caché segura activada")
+            self.lbl_sub_summary.setStyleSheet("color: #6e6e82; font-size: 11px;")
+            opts_vbox.addWidget(self.lbl_sub_summary)
 
-            chk_style = """
-                QCheckBox {
-                    color: #8c8ca2;
-                    font-size: 12px;
-                    spacing: 7px;
-                }
-                QCheckBox:hover {
-                    color: #d4d4e4;
-                }
-                QCheckBox::indicator {
-                    width: 15px;
-                    height: 15px;
-                    border-radius: 4px;
-                    border: 1px solid #323246;
-                    background-color: #171723;
-                }
-                QCheckBox::indicator:hover {
-                    border: 1px solid #dc2626;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #dc2626;
-                    border: 1px solid #ef4444;
-                }
-            """
-
-            self.chk_aur = QCheckBox("Incluir AUR (Paru / Yay)")
-            self.chk_aur.setChecked(True)
-            self.chk_aur.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.chk_aur.setStyleSheet(chk_style)
-
-            self.chk_flatpak = QCheckBox("Incluir Flatpak")
-            self.chk_flatpak.setChecked(True)
-            self.chk_flatpak.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.chk_flatpak.setStyleSheet(chk_style)
-
-            self.chk_orphans = QCheckBox("Eliminar paquetes huérfanos")
-            self.chk_orphans.setChecked(True)
-            self.chk_orphans.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.chk_orphans.setStyleSheet(chk_style)
-
-            self.chk_clean = QCheckBox("Limpiar caché antigua (paccache -rk2)")
-            self.chk_clean.setChecked(False)
-            self.chk_clean.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.chk_clean.setStyleSheet(chk_style)
-
-            chk_row.addWidget(self.chk_aur)
-            chk_row.addWidget(self.chk_flatpak)
-            chk_row.addWidget(self.chk_orphans)
-            chk_row.addWidget(self.chk_clean)
-            chk_row.addStretch()
-
-            opts_vbox.addLayout(chk_row)
             footer_layout.addLayout(opts_vbox, stretch=2)
 
             btn_box = QHBoxLayout()
@@ -1775,9 +1724,6 @@ def run_gui():
             self.f_fp.setText(f"Flatpak ({fp_cnt})")
             self._update_chip_styles(tot, crit_cnt, repo_cnt, aur_cnt, fp_cnt)
 
-            self.chk_aur.setVisible(aur_cnt > 0)
-            self.chk_flatpak.setVisible(fp_cnt > 0)
-
             if tot == 0:
                 self.lbl_summary.setText("No hay actualizaciones pendientes.")
                 self.btn_update.setEnabled(False)
@@ -1899,54 +1845,44 @@ def run_gui():
                 return # User canceled
             password = dlg.get_password()
 
-            # Assemble transaction commands (CachyOS-grade separated pipeline)
-            aur_enabled = self.chk_aur.isChecked() and self.chk_aur.isVisible()
-            fp_enabled = self.chk_flatpak.isChecked() and self.chk_flatpak.isVisible()
-            clean_orphans = self.chk_orphans.isChecked()
-            clean_cache = self.chk_clean.isChecked()
-
+            # Assemble transaction commands (CachyOS-grade separated & automated pipeline)
             aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
             has_repo_updates = any(item.get("type") == "Sistema" for item in self.all_items)
+            has_aur_updates = any(item.get("type") == "AUR" for item in self.all_items)
+            has_fp_updates = any(item.get("type") == "Flatpak" for item in self.all_items)
 
             commands = []
             display_cmds = []
 
             # 3. Separate Pacman (-Syu) and AUR (-Sua) execution
-            if has_repo_updates or (not aur_enabled and not fp_enabled):
+            if has_repo_updates or (not has_aur_updates and not has_fp_updates):
                 commands.append("sudo pacman -Syu --noconfirm")
                 display_cmds.append("sudo pacman -Syu --noconfirm")
 
-            if aur_enabled and aur_helper:
+            if has_aur_updates and aur_helper:
                 commands.append(f"{aur_helper} -Sua --noconfirm")
                 display_cmds.append(f"{aur_helper} -Sua --noconfirm")
 
             # 4. Flatpak update + unused runtime cleanup
-            if fp_enabled and shutil.which("flatpak"):
+            if has_fp_updates and shutil.which("flatpak"):
                 commands.append("flatpak update -y && flatpak uninstall --unused -y")
                 display_cmds.append("flatpak update -y && flatpak uninstall --unused -y")
 
-            # 5. Orphan packages cleanup (pacman -Qtdq -> pacman -Rns)
-            if clean_orphans:
-                commands.append(
-                    "orphans=$(pacman -Qtdq 2>/dev/null || true); "
-                    "if [ -n \"$orphans\" ]; then "
-                    "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
-                    "sudo pacman -Rns --noconfirm $orphans; "
-                    "fi"
-                )
-                display_cmds.append("pacman -Rns $(pacman -Qtdq)")
+            # 5. Automatic orphan packages cleanup (pacman -Qtdq -> pacman -Rns)
+            commands.append(
+                "orphans=$(pacman -Qtdq 2>/dev/null || true); "
+                "if [ -n \"$orphans\" ]; then "
+                "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
+                "sudo pacman -Rns --noconfirm $orphans; "
+                "fi"
+            )
 
-            # 6. Smart Pacman cache cleanup (paccache -rk2 -ruk0, keeping 2 rollback versions)
-            if clean_cache:
-                if shutil.which("paccache"):
-                    commands.append(
-                        "printf '\\033[1;34m::\\033[0;1m Limpiando caché antigua (conservando últimas 2 versiones)...\\033[0m\\n' && "
-                        "sudo paccache -rk2 && sudo paccache -ruk0"
-                    )
-                    display_cmds.append("sudo paccache -rk2 && sudo paccache -ruk0")
-                else:
-                    commands.append("sudo pacman -Sc --noconfirm")
-                    display_cmds.append("sudo pacman -Sc --noconfirm")
+            # 6. Automatic smart Pacman cache cleanup (paccache -rk2 -ruk0, keeping 2 rollback versions)
+            if shutil.which("paccache"):
+                commands.append(
+                    "printf '\\033[1;34m::\\033[0;1m Optimizando caché de paquetes (conservando últimas 2 versiones)...\\033[0m\\n' && "
+                    "sudo paccache -rk2 -q && sudo paccache -ruk0 -q"
+                )
 
             # 7b. Safe post-upgrade daemon restart (checkservices excluding display/session managers)
             if shutil.which("checkservices"):
