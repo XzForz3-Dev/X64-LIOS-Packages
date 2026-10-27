@@ -1,13 +1,13 @@
 pkgname=x64-refind-theme
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS rEFInd Bootloader Theme (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Official X64 LIOS rEFInd Bootloader Theme (Dark Carbon Gaming Edition)"
 arch=('any')
 license=('GPL')
 depends=()
+install=x64-refind-theme.install
 
 package() {
-    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS rEFInd Theme - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+    mkdir -p "${pkgdir}/usr/share/refind/themes/x64-lios/icons"
+    cp -r "${startdir}/theme/"* "${pkgdir}/usr/share/refind/themes/x64-lios/"
 }
-
