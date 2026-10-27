@@ -615,7 +615,7 @@ def run_gui():
                 f"{sudo_bin} rm -f /var/lib/pacman/db.lck; "
                 f"fi"
             )
-            cmd_str = f"set -e; {preamble}; " + " && ".join(self.commands)
+            cmd_str = f"set -e; {preamble}; " + " && ".join(self.commands) + "; sync"
 
             def _setup_pty_session():
                 os.setsid()
