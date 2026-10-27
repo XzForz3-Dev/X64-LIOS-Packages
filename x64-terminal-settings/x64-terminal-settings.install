@@ -9,9 +9,37 @@ post_install() {
     rm -f /etc/systemd/system/sockets.target.wants/systemd-oomd.socket 2>/dev/null || true
     rm -f /etc/systemd/system/dbus-org.freedesktop.oom1.service 2>/dev/null || true
     rm -f /etc/systemd/system/timers.target.wants/fwupd-refresh.timer 2>/dev/null || true
+
+    # Neutralizar hooks de branding de cachyos-hooks y blindar identidad X64 LIOS
+    mkdir -p /etc/pacman.d/hooks
+    ln -sf /dev/null /etc/pacman.d/hooks/cachyos-branding.hook
+    ln -sf /dev/null /etc/pacman.d/hooks/os-release.hook
+    ln -sf /dev/null /etc/pacman.d/hooks/lsb-release.hook
+
+    cat << 'EOF' > /usr/lib/os-release
+NAME="X64 LIOS Linux"
+PRETTY_NAME="X64 LIOS Linux"
+ID=x64lios
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;255;0;0"
+HOME_URL="https://x64lios.com/"
+DOCUMENTATION_URL="https://x64lios.com/"
+SUPPORT_URL="https://x64lios.com/"
+BUG_REPORT_URL="https://x64lios.com/"
+LOGO=x64-logo
+EOF
+    cp -f /usr/lib/os-release /etc/os-release
+
+    cat << 'EOF' > /etc/lsb-release
+DISTRIB_ID="X64 LIOS"
+DISTRIB_RELEASE="rolling"
+DISTRIB_DESCRIPTION="X64 LIOS Linux"
+EOF
 }
 
 post_upgrade() {
     post_install
 }
+
 

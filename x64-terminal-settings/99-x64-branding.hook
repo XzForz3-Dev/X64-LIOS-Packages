@@ -1,0 +1,13 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = lsb-release
+Target = cachyos-hooks
+Target = x64-terminal-settings
+
+[Action]
+Description = Blindando identidad oficial de X64 LIOS Linux (os-release / lsb-release)...
+When = PostTransaction
+Exec = /usr/bin/sh -c "printf 'NAME=\"X64 LIOS Linux\"\nPRETTY_NAME=\"X64 LIOS Linux\"\nID=x64lios\nID_LIKE=arch\nBUILD_ID=rolling\nANSI_COLOR=\"38;2;255;0;0\"\nHOME_URL=\"https://x64lios.com/\"\nDOCUMENTATION_URL=\"https://x64lios.com/\"\nSUPPORT_URL=\"https://x64lios.com/\"\nBUG_REPORT_URL=\"https://x64lios.com/\"\nLOGO=x64-logo\n' > /usr/lib/os-release && cp -f /usr/lib/os-release /etc/os-release && printf 'DISTRIB_ID=\"X64 LIOS\"\nDISTRIB_RELEASE=\"rolling\"\nDISTRIB_DESCRIPTION=\"X64 LIOS Linux\"\n' > /etc/lsb-release"
