@@ -588,6 +588,25 @@ def run_gui():
                 except Exception:
                     pass
 
+            # 1. Auto-unlock stale /var/lib/pacman/db.lck if no pacman process is running
+            if os.path.exists("/var/lib/pacman/db.lck"):
+                pac_running = (
+                    subprocess.run(
+                        ["pgrep", "-x", "pacman"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    ).returncode == 0
+                )
+                if not pac_running:
+                    self.output_received.emit(
+                        "\x1b[1;33m::\x1b[0;1m Detectado candado huérfano /var/lib/pacman/db.lck (sin procesos activos). Desbloqueando...\x1b[0m\r\n"
+                    )
+                    subprocess.run(
+                        ["sudo", "rm", "-f", "/var/lib/pacman/db.lck"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+
             master, slave = pty.openpty()
             self.master_fd = master
 
@@ -653,8 +672,25 @@ def run_gui():
                 self.output_received.emit(f"\nError interno ejecutando transacción: {e}\n")
                 ret = 1
 
+            # 7. Exact CachyOS kernel reboot check: verify if running kernel's vmlinuz was replaced
+            try:
+                running_kernel_vmlinuz = f"/usr/lib/modules/{os.uname().release}/vmlinuz"
+                if not os.path.isfile(running_kernel_vmlinuz):
+                    self.kernel_updated = True
+            except Exception:
+                pass
+
             success = (ret == 0)
             if success:
+                # Immediately clear state files so tray icon updates to "up to date" without delay
+                try:
+                    ensure_state_dir()
+                    with open(COUNT_FILE, "w", encoding="utf-8") as f:
+                        f.write("0\n")
+                    with open(PACKAGES_FILE, "w", encoding="utf-8") as f:
+                        f.write("")
+                except Exception:
+                    pass
                 self.stage_changed.emit("¡Transacción finalizada con éxito!", 100)
                 run_background_check_and_save()
             else:
@@ -1373,13 +1409,19 @@ def run_gui():
             self.chk_flatpak.setCursor(Qt.CursorShape.PointingHandCursor)
             self.chk_flatpak.setStyleSheet(chk_style)
 
-            self.chk_clean = QCheckBox("Limpiar caché tras actualizar (pacman -Sc)")
+            self.chk_orphans = QCheckBox("Eliminar paquetes huérfanos")
+            self.chk_orphans.setChecked(True)
+            self.chk_orphans.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.chk_orphans.setStyleSheet(chk_style)
+
+            self.chk_clean = QCheckBox("Limpiar caché antigua (paccache -rk2)")
             self.chk_clean.setChecked(False)
             self.chk_clean.setCursor(Qt.CursorShape.PointingHandCursor)
             self.chk_clean.setStyleSheet(chk_style)
 
             chk_row.addWidget(self.chk_aur)
             chk_row.addWidget(self.chk_flatpak)
+            chk_row.addWidget(self.chk_orphans)
             chk_row.addWidget(self.chk_clean)
             chk_row.addStretch()
 
@@ -1857,28 +1899,73 @@ def run_gui():
                 return # User canceled
             password = dlg.get_password()
 
-            # Assemble transaction commands
+            # Assemble transaction commands (CachyOS-grade separated pipeline)
             aur_enabled = self.chk_aur.isChecked() and self.chk_aur.isVisible()
             fp_enabled = self.chk_flatpak.isChecked() and self.chk_flatpak.isVisible()
+            clean_orphans = self.chk_orphans.isChecked()
             clean_cache = self.chk_clean.isChecked()
 
             aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
+            has_repo_updates = any(item.get("type") == "Sistema" for item in self.all_items)
 
             commands = []
-            if aur_enabled and aur_helper:
-                commands.append(f"{aur_helper} -Syu --noconfirm")
-            else:
+            display_cmds = []
+
+            # 3. Separate Pacman (-Syu) and AUR (-Sua) execution
+            if has_repo_updates or (not aur_enabled and not fp_enabled):
                 commands.append("sudo pacman -Syu --noconfirm")
+                display_cmds.append("sudo pacman -Syu --noconfirm")
 
+            if aur_enabled and aur_helper:
+                commands.append(f"{aur_helper} -Sua --noconfirm")
+                display_cmds.append(f"{aur_helper} -Sua --noconfirm")
+
+            # 4. Flatpak update + unused runtime cleanup
             if fp_enabled and shutil.which("flatpak"):
-                commands.append("flatpak update -y")
+                commands.append("flatpak update -y && flatpak uninstall --unused -y")
+                display_cmds.append("flatpak update -y && flatpak uninstall --unused -y")
 
+            # 5. Orphan packages cleanup (pacman -Qtdq -> pacman -Rns)
+            if clean_orphans:
+                commands.append(
+                    "orphans=$(pacman -Qtdq 2>/dev/null || true); "
+                    "if [ -n \"$orphans\" ]; then "
+                    "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
+                    "sudo pacman -Rns --noconfirm $orphans; "
+                    "fi"
+                )
+                display_cmds.append("pacman -Rns $(pacman -Qtdq)")
+
+            # 6. Smart Pacman cache cleanup (paccache -rk2 -ruk0, keeping 2 rollback versions)
             if clean_cache:
-                commands.append("sudo pacman -Sc --noconfirm")
+                if shutil.which("paccache"):
+                    commands.append(
+                        "printf '\\033[1;34m::\\033[0;1m Limpiando caché antigua (conservando últimas 2 versiones)...\\033[0m\\n' && "
+                        "sudo paccache -rk2 && sudo paccache -ruk0"
+                    )
+                    display_cmds.append("sudo paccache -rk2 && sudo paccache -ruk0")
+                else:
+                    commands.append("sudo pacman -Sc --noconfirm")
+                    display_cmds.append("sudo pacman -Sc --noconfirm")
+
+            # 7b. Safe post-upgrade daemon restart (checkservices excluding display/session managers)
+            if shutil.which("checkservices"):
+                commands.append(
+                    "svcs=$(sudo checkservices -F -P -R "
+                    "-i gdm.service -i plasmalogin.service -i sddm.service -i lightdm.service "
+                    "-i lxdm.service -i slim.service -i xdm.service -i greetd.service "
+                    "-i nodm.service -i ly.service -i lemurs.service -i dbus.service "
+                    "-i systemd-logind.service -i NetworkManager.service 2>/dev/null "
+                    "| grep '.service' | cut -f2 -d \"'\" || true); "
+                    "if [ -n \"$svcs\" ]; then "
+                    "printf '\\033[1;34m::\\033[0;1m Reiniciando servicios de segundo plano actualizados...\\033[0m\\n'; "
+                    "sudo systemctl restart $svcs || true; "
+                    "fi"
+                )
 
             # Switch to In-App Transaction View
             self.stacked_widget.setCurrentIndex(1)
-            cmd_display = " && ".join(commands).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            cmd_display = " && ".join(display_cmds).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             header_html = (
                 f"<div style=\"color: #ef4444; font-weight: bold; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
                 f"[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
@@ -2058,6 +2145,13 @@ def run_gui():
                 self.trigger_refresh()
             else:
                 self.close()
+
+    # 2. Single-instance lock (prevent opening two concurrent x64-update windows)
+    lock_file = open("/tmp/x64-update-gui.lock", "w")
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit(0)
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
