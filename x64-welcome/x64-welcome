@@ -2104,9 +2104,8 @@ class X64Welcome(QWidget):
         os.system(
             "kitty --title 'X64 LIOS Installer Log' bash -c '"
             "echo \":: Sincronizando X64-LIOS-Installer desde GitHub...\"; "
-            "rm -rf /tmp/x64-installer-sync; "
-            "if git clone --depth 1 https://github.com/XzForz3-Dev/X64-LIOS-Installer.git /tmp/x64-installer-sync 2>/dev/null; then "
-            "sudo rm -rf /tmp/x64-installer-sync/.git && sudo cp -rf /tmp/x64-installer-sync/. /etc/calamares/ && rm -rf /tmp/x64-installer-sync; "
+            "if curl -sL https://github.com/XzForz3-Dev/X64-LIOS-Installer/archive/refs/heads/main.tar.gz | tar -xz -C /tmp/; then "
+            "sudo cp -rf /tmp/X64-LIOS-Installer-main/. /etc/calamares/ && rm -rf /tmp/X64-LIOS-Installer-main; "
             "fi; "
             "sudo calamares -d' &"
         )
