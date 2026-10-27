@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-limine-theme
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Official X64 LIOS Limine Bootloader Theme"
 arch=('any')
 url="https://x64lios.com"
