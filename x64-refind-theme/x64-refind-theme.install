@@ -6,7 +6,7 @@ post_install() {
         fi
     done
     if [ -d /boot ] && [ -f /usr/share/refind/themes/x64-lios/icons/os_linux.png ]; then
-        cp -f /usr/share/refind/themes/x64-lios/icons/os_linux.png /boot/.VolumeIcon.png 2>/dev/null || true
+        rm -f /boot/.VolumeIcon.png /.VolumeIcon.png /boot/efi/.VolumeIcon.png 2>/dev/null || true
         for k in /boot/vmlinuz-*; do
             [ -f "$k" ] && cp -f /usr/share/refind/themes/x64-lios/icons/os_linux.png "${k}.png" 2>/dev/null || true
         done
