@@ -1,18 +1,20 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
 install='x64-gnome-settings.install'
-depends=('glib2' 'glib2-devel' 'python')
+depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme')
 source=('gdm-stealth-chassis.jpg'
         'x64-lios-cube-160.png'
         'zzz_x64.org.gnome.login-screen.gschema.override'
+        'zzz_x64.org.gnome.desktop.interface.gschema.override'
         '00-x64-logo'
         'apply-gdm-theme.py'
         '90-x64-gdm-theme.hook')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -28,10 +30,12 @@ package() {
     mkdir -p "${pkgdir}/usr/share/pixmaps"
     install -m644 "${srcdir}/x64-lios-cube-160.png" "${pkgdir}/usr/share/pixmaps/x64-lios-cube-160.png"
 
-    # 3. GSettings Override para GDM (Prevalencia zzz_ sobre zz_cachyos)
+    # 3. GSettings Override para GDM y GNOME Desktop (Modo Oscuro Puro por defecto)
     mkdir -p "${pkgdir}/usr/share/glib-2.0/schemas"
     install -m644 "${srcdir}/zzz_x64.org.gnome.login-screen.gschema.override" \
         "${pkgdir}/usr/share/glib-2.0/schemas/zzz_x64.org.gnome.login-screen.gschema.override"
+    install -m644 "${srcdir}/zzz_x64.org.gnome.desktop.interface.gschema.override" \
+        "${pkgdir}/usr/share/glib-2.0/schemas/zzz_x64.org.gnome.desktop.interface.gschema.override"
 
     # 4. dconf override de respaldo para GDM
     mkdir -p "${pkgdir}/etc/dconf/db/gdm.d"

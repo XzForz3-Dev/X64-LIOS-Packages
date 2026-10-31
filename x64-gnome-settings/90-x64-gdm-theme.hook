@@ -9,3 +9,4 @@ Target = usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg
 Description = Applying X64 LIOS GDM & Lock Screen Theme...
 When = PostTransaction
 Exec = /usr/lib/x64-lios/apply-gdm-theme.py
+

@@ -540,7 +540,7 @@ def run_gui():
         QProgressBar, QTextEdit, QStackedWidget, QDialog, QStyledItemDelegate, QStyle
     )
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF
-    from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor, QPainter, QPen, QBrush
+    from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor, QPainter, QPen, QBrush, QPalette
 
     class CheckWorker(QThread):
         finished = pyqtSignal(dict)
@@ -2108,6 +2108,17 @@ def run_gui():
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    _pal = app.palette()
+    _pal.setColor(QPalette.ColorRole.Window, QColor("#121217"))
+    _pal.setColor(QPalette.ColorRole.WindowText, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Base, QColor("#0d0d11"))
+    _pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#16161c"))
+    _pal.setColor(QPalette.ColorRole.Text, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Button, QColor("#18181f"))
+    _pal.setColor(QPalette.ColorRole.ButtonText, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Highlight, QColor("#cc0000"))
+    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    app.setPalette(_pal)
     win = X64UpdateWindow()
     win.show()
     sys.exit(app.exec())

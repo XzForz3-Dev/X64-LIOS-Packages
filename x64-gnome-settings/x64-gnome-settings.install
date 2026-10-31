@@ -16,3 +16,4 @@ post_remove() {
         mv -f /usr/share/gnome-shell/gnome-shell-theme.gresource.stock /usr/share/gnome-shell/gnome-shell-theme.gresource 2>/dev/null || true
     fi
 }
+

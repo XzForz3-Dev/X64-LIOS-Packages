@@ -8179,6 +8179,17 @@ if __name__ == '__main__':
     app.setWindowIcon(icon)
     QIcon.setThemeName("breeze-dark")
     app.setStyle("Fusion")
+    _pal = app.palette()
+    _pal.setColor(QPalette.ColorRole.Window, QColor("#121217"))
+    _pal.setColor(QPalette.ColorRole.WindowText, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Base, QColor("#0d0d11"))
+    _pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#16161c"))
+    _pal.setColor(QPalette.ColorRole.Text, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Button, QColor("#18181f"))
+    _pal.setColor(QPalette.ColorRole.ButtonText, QColor("#f2f2f2"))
+    _pal.setColor(QPalette.ColorRole.Highlight, QColor("#cc0000"))
+    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    app.setPalette(_pal)
     app.setStyleSheet("""
         QToolTip {
             background-color: #121217;
