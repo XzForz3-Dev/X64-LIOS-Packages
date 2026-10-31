@@ -1,0 +1,18 @@
+post_install() {
+    echo ":: Aplicando tema y configuración de X64 LIOS para GDM..."
+    glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+    if [ -x /usr/lib/x64-lios/apply-gdm-theme.py ]; then
+        /usr/lib/x64-lios/apply-gdm-theme.py 2>/dev/null || true
+    fi
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+    if [ -f /usr/share/gnome-shell/gnome-shell-theme.gresource.stock ]; then
+        mv -f /usr/share/gnome-shell/gnome-shell-theme.gresource.stock /usr/share/gnome-shell/gnome-shell-theme.gresource 2>/dev/null || true
+    fi
+}

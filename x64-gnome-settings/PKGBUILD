@@ -1,13 +1,47 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS GNOME Desktop Settings (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
-depends=()
+install='x64-gnome-settings.install'
+depends=('glib2' 'glib2-devel' 'python')
+source=('gdm-stealth-chassis.jpg'
+        'x64-lios-cube-160.png'
+        'zzz_x64.org.gnome.login-screen.gschema.override'
+        '00-x64-logo'
+        'apply-gdm-theme.py'
+        '90-x64-gdm-theme.hook')
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
 
 package() {
-    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS GNOME Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
-}
+    # 1. Fondo oficial de GDM / Pantalla de Bloqueo
+    mkdir -p "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/gdm-stealth-chassis.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg"
 
+    # 2. Logotipo oficial del Cubo 3D de X64 LIOS (160px)
+    mkdir -p "${pkgdir}/usr/share/pixmaps"
+    install -m644 "${srcdir}/x64-lios-cube-160.png" "${pkgdir}/usr/share/pixmaps/x64-lios-cube-160.png"
+
+    # 3. GSettings Override para GDM (Prevalencia zzz_ sobre zz_cachyos)
+    mkdir -p "${pkgdir}/usr/share/glib-2.0/schemas"
+    install -m644 "${srcdir}/zzz_x64.org.gnome.login-screen.gschema.override" \
+        "${pkgdir}/usr/share/glib-2.0/schemas/zzz_x64.org.gnome.login-screen.gschema.override"
+
+    # 4. dconf override de respaldo para GDM
+    mkdir -p "${pkgdir}/etc/dconf/db/gdm.d"
+    install -m644 "${srcdir}/00-x64-logo" "${pkgdir}/etc/dconf/db/gdm.d/00-x64-logo"
+
+    # 5. Script aplicador dinámico de gresource para GDM
+    mkdir -p "${pkgdir}/usr/lib/x64-lios"
+    install -m755 "${srcdir}/apply-gdm-theme.py" "${pkgdir}/usr/lib/x64-lios/apply-gdm-theme.py"
+
+    # 6. Hook ALPM para persistencia en actualizaciones de gnome-shell
+    mkdir -p "${pkgdir}/usr/share/libalpm/hooks"
+    install -m644 "${srcdir}/90-x64-gdm-theme.hook" "${pkgdir}/usr/share/libalpm/hooks/90-x64-gdm-theme.hook"
+}
