@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -12,7 +12,9 @@ optdepends=('kitty: GPU-accelerated terminal emulator')
 source=(
     'config.fish'
     'starship.toml'
+    'starship-tty.toml'
     'fastfetch.jsonc'
+    'fastfetch-tty.jsonc'
     'x64_logo.txt'
     'kitty.conf'
     '99-x64-lios-performance.conf'
@@ -28,24 +30,30 @@ source=(
     '00-x64-lios.preset'
     '99-x64-branding.hook'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration
     install -d "${pkgdir}/etc/skel/.config/fish"
     install -m644 "${srcdir}/config.fish" "${pkgdir}/etc/skel/.config/fish/config.fish"
 
-    # Starship prompt skel configuration
+    # Starship prompt skel and system-wide configurations (standard and TTY)
     install -d "${pkgdir}/etc/skel/.config"
     install -m644 "${srcdir}/starship.toml" "${pkgdir}/etc/skel/.config/starship.toml"
+    install -m644 "${srcdir}/starship-tty.toml" "${pkgdir}/etc/skel/.config/starship-tty.toml"
 
-    # Fastfetch skel and system-wide configurations
+    install -d "${pkgdir}/etc"
+    install -m644 "${srcdir}/starship-tty.toml" "${pkgdir}/etc/starship-tty.toml"
+
+    # Fastfetch skel and system-wide configurations (standard and TTY)
     install -d "${pkgdir}/etc/skel/.config/fastfetch"
     install -m644 "${srcdir}/fastfetch.jsonc" "${pkgdir}/etc/skel/.config/fastfetch/config.jsonc"
+    install -m644 "${srcdir}/fastfetch-tty.jsonc" "${pkgdir}/etc/skel/.config/fastfetch/config-tty.jsonc"
     install -m644 "${srcdir}/x64_logo.txt" "${pkgdir}/etc/skel/.config/fastfetch/x64_logo.txt"
 
     install -d "${pkgdir}/etc/fastfetch"
     install -m644 "${srcdir}/fastfetch.jsonc" "${pkgdir}/etc/fastfetch/config.jsonc"
+    install -m644 "${srcdir}/fastfetch-tty.jsonc" "${pkgdir}/etc/fastfetch/config-tty.jsonc"
 
     install -d "${pkgdir}/usr/share/fastfetch"
     install -m644 "${srcdir}/x64_logo.txt" "${pkgdir}/usr/share/fastfetch/x64_logo.txt"

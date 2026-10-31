@@ -1,0 +1,17 @@
+format = """
+[ [X64 LIOS] ](bold bg:red fg:white) \
+[ $directory ](bold bg:bright-black fg:white) \
+$character"""
+
+[username]
+show_always = false
+
+[directory]
+style = "bold bg:bright-black fg:white"
+format = "[$path]($style)"
+truncation_length = 3
+truncation_symbol = ".../"
+
+[character]
+success_symbol = "[>](bold red)"
+error_symbol = "[x](bold red)"
