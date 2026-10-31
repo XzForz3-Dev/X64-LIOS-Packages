@@ -29,7 +29,7 @@ SUPPORT_URL="https://x64lios.com/"
 BUG_REPORT_URL="https://x64lios.com/"
 LOGO=x64-logo
 EOF
-    cp -f /usr/lib/os-release /etc/os-release
+    ln -sf ../usr/lib/os-release /etc/os-release
 
     cat << 'EOF' > /etc/lsb-release
 DISTRIB_ID="X64 LIOS"

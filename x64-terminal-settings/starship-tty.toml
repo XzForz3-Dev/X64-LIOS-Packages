@@ -1,17 +1,20 @@
 format = """
-[ [X64 LIOS] ](bold bg:red fg:white) \
-[ $directory ](bold bg:bright-black fg:white) \
+$username \
+$directory \
 $character"""
 
 [username]
-show_always = false
+show_always = true
+style_user = "bg:red fg:white bold"
+style_root = "bg:red fg:white bold"
+format = "[\\[X64 LIOS\\]]($style)"
 
 [directory]
-style = "bold bg:bright-black fg:white"
-format = "[$path]($style)"
+style = "bg:bright-black fg:white bold"
+format = "[ $path ]($style)"
 truncation_length = 3
 truncation_symbol = ".../"
 
 [character]
-success_symbol = "[>](bold red)"
-error_symbol = "[x](bold red)"
+success_symbol = "[> ](bold red)"
+error_symbol = "[x ](bold red)"
