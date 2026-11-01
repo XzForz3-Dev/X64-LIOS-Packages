@@ -227,7 +227,7 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "7"; and type -q xfce4-session
         echo -e "  \e[0;37m-> Desinstalando suite completa de Xfce4...\e[0m"
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel thunar ristretto file-roller lightdm-gtk-greeter 2>/dev/null | sort -u)
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel thunar ristretto file-roller lightdm-slick-greeter lightdm-gtk-greeter labwc 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
         end
@@ -420,7 +420,7 @@ function install_desktop_menu
             end
         case 7
             echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
-            sudo pacman -S --needed --noconfirm --overwrite "*" xfce4 xfce4-goodies lightdm lightdm-gtk-greeter thunar file-roller ristretto network-manager-applet x64-xfce4-settings
+            sudo pacman -S --needed --noconfirm --overwrite "*" xfce4 xfce4-goodies labwc xorg-xwayland lightdm lightdm-slick-greeter thunar file-roller ristretto network-manager-applet x64-xfce4-settings
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"

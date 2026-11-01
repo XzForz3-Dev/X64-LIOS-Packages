@@ -1,13 +1,62 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS Xfce4 Desktop Settings (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland) y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
-depends=()
+install='x64-xfce4-settings.install'
+depends=(
+    'xfce4-session'
+    'labwc'
+    'xorg-xwayland'
+    'lightdm'
+    'lightdm-slick-greeter'
+    'papirus-icon-theme'
+)
+source=(
+    '07-slick-greeter-dock.jpg'
+    '60-slick-greeter.conf'
+    'slick-greeter.conf'
+    '10-wlroots.conf'
+    'xsettings.xml'
+    'screenshot.png'
+)
+sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+)
 
 package() {
-    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS Xfce4 Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
-}
+    # 1. Fondo oficial X64 LIOS para Login Slick Greeter
+    install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/07-slick-greeter-dock.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/07-slick-greeter-dock.jpg"
 
+    # 2. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
+    install -d "${pkgdir}/etc/lightdm/lightdm.conf.d"
+    install -m644 "${srcdir}/60-slick-greeter.conf" "${pkgdir}/etc/lightdm/lightdm.conf.d/60-slick-greeter.conf"
+
+    # 3. Configuracion de Slick Greeter (fondo docking pad y tema oscuro)
+    install -d "${pkgdir}/etc/lightdm"
+    install -m644 "${srcdir}/slick-greeter.conf" "${pkgdir}/etc/lightdm/slick-greeter.conf"
+
+    # 4. Forzar cursor por software en compositores wlroots/labwc (evita cursor invertido)
+    install -d "${pkgdir}/etc/environment.d"
+    install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
+
+    # 5. Configuracion global de Xfce por defecto (tema oscuro Adwaita-dark y Papirus-Dark)
+    install -d "${pkgdir}/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
+    install -m644 "${srcdir}/xsettings.xml" "${pkgdir}/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
+
+    # 6. Entorno inicial para labwc en skeleton de nuevos usuarios
+    install -d "${pkgdir}/etc/skel/.config/xfce4/labwc"
+    echo "WLR_NO_HARDWARE_CURSORS=1" > "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
+    chmod 644 "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
+
+    # 7. Screenshot oficial de referencia
+    install -d "${pkgdir}/usr/share/x64-xfce4-settings"
+    install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-xfce4-settings/screenshot.png"
+}

@@ -1,0 +1,21 @@
+post_install() {
+    # 1. Hide bare labwc session so only official Xfce sessions are presented
+    if [ -f /usr/share/wayland-sessions/labwc.desktop ]; then
+        if ! grep -q "NoDisplay=" /usr/share/wayland-sessions/labwc.desktop; then
+            echo "NoDisplay=true" >> /usr/share/wayland-sessions/labwc.desktop
+        else
+            sed -i "s/NoDisplay=.*/NoDisplay=true/" /usr/share/wayland-sessions/labwc.desktop
+        fi
+    fi
+
+    # 2. Patch labwc upstream environment template if present
+    if [ -f /usr/share/xfce4/labwc/labwc-environment ]; then
+        if ! grep -q "WLR_NO_HARDWARE_CURSORS" /usr/share/xfce4/labwc/labwc-environment; then
+            echo "WLR_NO_HARDWARE_CURSORS=1" >> /usr/share/xfce4/labwc/labwc-environment
+        fi
+    fi
+}
+
+post_upgrade() {
+    post_install
+}
