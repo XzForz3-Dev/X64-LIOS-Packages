@@ -1,6 +1,6 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
