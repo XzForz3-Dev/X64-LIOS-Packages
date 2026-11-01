@@ -261,6 +261,7 @@ function install_desktop_menu
     set -l niri_tag ""
     set -l cinnamon_tag ""
     set -l xfce_tag ""
+    set -l nodesktop_tag ""
 
     type -q Hyprland; and set hypr_tag " \e[1;32m[ACTIVO]\e[0m"
     type -q gnome-shell; and set gnome_tag " \e[1;32m[ACTIVO]\e[0m"
@@ -269,6 +270,7 @@ function install_desktop_menu
     type -q niri-session; and set niri_tag " \e[1;32m[ACTIVO]\e[0m"
     type -q cinnamon-session; and set cinnamon_tag " \e[1;32m[ACTIVO]\e[0m"
     type -q xfce4-session; and set xfce_tag " \e[1;32m[ACTIVO]\e[0m"
+    test $has_desktop -eq 0; and set nodesktop_tag " \e[1;32m[ACTIVO]\e[0m"
 
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
     echo -e "   $title X64 LIOS - GESTIÓN Y MUTACIÓN DE ENTORNOS DE ESCRITORIO$reset"
@@ -281,7 +283,7 @@ function install_desktop_menu
     echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
     echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
     echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
-    echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset\n"
+    echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset$nodesktop_tag\n"
     echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
