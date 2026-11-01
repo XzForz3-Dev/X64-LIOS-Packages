@@ -120,7 +120,7 @@ class X64UpdateTray(QSystemTrayIcon):
             if QSystemTrayIcon.isSystemTrayAvailable():
                 if not self.isVisible():
                     self.show()
-                    self.update_ui()
+                self.update_ui()
         except Exception:
             pass
 
@@ -308,6 +308,16 @@ def main():
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("x64-update-tray")
     app.setApplicationDisplayName("X64 LIOS Update")
+
+    # Esperar activamente a que el System Tray (StatusNotifierWatcher en D-Bus) esté disponible
+    # Esto elimina la condición de carrera durante el arranque en frío de KDE Plasma 6, XFCE, GNOME, etc.
+    max_wait_seconds = 30
+    start_time = time.time()
+    while time.time() - start_time < max_wait_seconds:
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            break
+        app.processEvents()
+        time.sleep(0.3)
 
     tray = X64UpdateTray(app)
     tray.show()
