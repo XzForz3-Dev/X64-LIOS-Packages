@@ -17,7 +17,13 @@ if test "$TERM" = "linux"
         end
     end
 else
-    # Terminal gráfica (Kitty, Alacritty, GNOME Console, Konsole, etc.): Diseño completo con Nerd Fonts
+    # Terminal gráfica (Kitty, Alacritty, GNOME Console, Konsole, COSMIC Term, etc.): Diseño completo con Nerd Fonts
+    if test -f $HOME/.config/starship.toml
+        set -gx STARSHIP_CONFIG $HOME/.config/starship.toml
+    else
+        set -e STARSHIP_CONFIG
+    end
+
     if status is-interactive
         fastfetch
     end
