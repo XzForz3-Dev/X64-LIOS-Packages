@@ -171,43 +171,44 @@ end
 function clean_previous_desktops -a target_id
     echo -e "\n  \e[1;33m[*] Retirando entorno anterior para mantener la pureza del sistema...\e[0m"
 
-    # Desactivar display managers anteriores
+    # Detener y desactivar display managers anteriores
+    sudo systemctl stop sddm gdm lightdm cosmic-greeter 2>/dev/null
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
-    # Retirar paquetes del entorno previo
+    # Retirar paquetes del entorno previo con cascada recursiva segura (-Rc)
     if test "$target_id" != "1"; and type -q Hyprland
         echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes Waybar/Rofi/Dunst...\e[0m"
-        sudo pacman -Rns --noconfirm x64-hyprland-settings hyprland waybar rofi rofi-wayland dunst xdg-desktop-portal-hyprland 2>/dev/null; or sudo pacman -R --noconfirm x64-hyprland-settings hyprland 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-hyprland-settings hyprland waybar rofi rofi-wayland dunst xdg-desktop-portal-hyprland 2>/dev/null; or sudo pacman -R --noconfirm x64-hyprland-settings hyprland 2>/dev/null
     end
 
     if test "$target_id" != "2"; and type -q gnome-shell
         echo -e "  \e[0;37m-> Desinstalando GNOME Shell y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-gnome-settings gnome-shell gdm gnome-control-center gnome-tweaks nautilus adw-gtk-theme 2>/dev/null; or sudo pacman -R --noconfirm x64-gnome-settings gnome-shell 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks 2>/dev/null; or sudo pacman -R --noconfirm x64-gnome-settings gnome-shell 2>/dev/null
     end
 
     if test "$target_id" != "3"; and type -q startplasma-wayland
         echo -e "  \e[0;37m-> Desinstalando KDE Plasma 6 y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-kde-settings plasma-desktop plasma-meta konsole dolphin 2>/dev/null; or sudo pacman -R --noconfirm x64-kde-settings plasma-desktop 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-kde-settings plasma-desktop plasma-workspace sddm-kcm 2>/dev/null; or sudo pacman -R --noconfirm x64-kde-settings plasma-desktop 2>/dev/null
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
         echo -e "  \e[0;37m-> Desinstalando COSMIC Desktop y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel 2>/dev/null; or sudo pacman -R --noconfirm x64-cosmic-settings cosmic-session 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel 2>/dev/null; or sudo pacman -R --noconfirm x64-cosmic-settings cosmic-session 2>/dev/null
     end
 
     if test "$target_id" != "5"; and type -q niri-session
         echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-niri-settings niri 2>/dev/null; or sudo pacman -R --noconfirm x64-niri-settings niri 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-niri-settings niri fuzzel 2>/dev/null; or sudo pacman -R --noconfirm x64-niri-settings niri 2>/dev/null
     end
 
     if test "$target_id" != "6"; and type -q cinnamon-session
         echo -e "  \e[0;37m-> Desinstalando Cinnamon y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-cinnamon-settings cinnamon lightdm lightdm-slick-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-cinnamon-settings cinnamon 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-cinnamon-settings cinnamon lightdm-slick-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-cinnamon-settings cinnamon 2>/dev/null
     end
 
     if test "$target_id" != "7"; and type -q xfce4-session
         echo -e "  \e[0;37m-> Desinstalando Xfce4 y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-xfce4-settings xfce4 xfce4-goodies lightdm lightdm-gtk-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-xfce4-settings xfce4 2>/dev/null
+        sudo pacman -Rc --noconfirm x64-xfce4-settings xfce4-session xfce4-panel lightdm-gtk-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-xfce4-settings xfce4-session 2>/dev/null
     end
 
     echo -e "  \e[1;32m[OK] Limpieza de entorno anterior completada con éxito.\e[0m"
