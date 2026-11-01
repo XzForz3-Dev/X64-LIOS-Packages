@@ -1,11 +1,11 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
 install='x64-gnome-settings.install'
-depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme')
+depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme' 'gnome-backgrounds')
 source=('gdm-stealth-chassis.jpg'
         'x64-lios-cube-160.png'
         'zzz_x64.org.gnome.login-screen.gschema.override'
