@@ -171,7 +171,7 @@ function clean_previous_desktops -a target_id
     # Retirar paquetes del entorno previo
     if test "$target_id" != "1"; and type -q Hyprland
         echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes Waybar/Rofi/Dunst...\e[0m"
-        sudo pacman -Rns --noconfirm x64-hyprland-settings hyprland waybar rofi-wayland dunst xdg-desktop-portal-hyprland 2>/dev/null; or sudo pacman -R --noconfirm x64-hyprland-settings hyprland 2>/dev/null
+        sudo pacman -Rns --noconfirm x64-hyprland-settings hyprland waybar rofi rofi-wayland dunst xdg-desktop-portal-hyprland 2>/dev/null; or sudo pacman -R --noconfirm x64-hyprland-settings hyprland 2>/dev/null
     end
 
     if test "$target_id" != "2"; and type -q gnome-shell
@@ -376,6 +376,11 @@ function install_desktop_menu
             configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
         case '*'
             return
+    end
+
+    # Sincronizar configuraciones oficiales de /etc/skel al directorio del usuario activo
+    if test -d /etc/skel/.config
+        cp -rn /etc/skel/.config/* $HOME/.config/ 2>/dev/null
     end
 end
 
