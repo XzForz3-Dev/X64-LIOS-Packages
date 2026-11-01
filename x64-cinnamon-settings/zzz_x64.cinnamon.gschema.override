@@ -1,3 +1,7 @@
+[org.cinnamon]
+app-menu-icon-name='x64-logo'
+app-menu-label=''
+
 [org.cinnamon.desktop.background]
 picture-uri='file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'
 picture-options='zoom'

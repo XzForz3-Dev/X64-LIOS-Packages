@@ -1,5 +1,20 @@
 post_install() {
     glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+
+    # Propagar configuracion del boton de inicio oficial a los usuarios existentes
+    for user_dir in /home/*; do
+        if [ -d "$user_dir" ]; then
+            u=$(basename "$user_dir")
+            g=$(id -gn "$u" 2>/dev/null || echo "$u")
+            target_dir="$user_dir/.config/cinnamon/spices/menu@cinnamon.org"
+            mkdir -p "$target_dir"
+            if [ -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json ]; then
+                cp -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json "$target_dir/0.json"
+                chown -R "$u:$g" "$user_dir/.config/cinnamon" 2>/dev/null || true
+            fi
+        fi
+    done
 }
 
 post_upgrade() {
@@ -8,5 +23,5 @@ post_upgrade() {
 
 post_remove() {
     glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
 }
-
