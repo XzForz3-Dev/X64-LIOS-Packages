@@ -2,3 +2,16 @@
 color-scheme='prefer-dark'
 gtk-theme='adw-gtk3-dark'
 
+[org.gnome.desktop.background]
+picture-uri='file:///usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg'
+picture-options='zoom'
+primary-color='#0d0d11'
+secondary-color='#0d0d11'
+
+[org.gnome.desktop.screensaver]
+picture-uri='file:///usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg'
+picture-options='zoom'
+primary-color='#0d0d11'
+secondary-color='#0d0d11'
+

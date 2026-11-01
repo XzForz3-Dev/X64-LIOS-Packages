@@ -182,17 +182,17 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "2"; and type -q gnome-shell
         echo -e "  \e[0;37m-> Desinstalando GNOME Shell y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-gnome-settings gnome-shell gdm nautilus adw-gtk-theme 2>/dev/null; or sudo pacman -R --noconfirm x64-gnome-settings gnome-shell 2>/dev/null
+        sudo pacman -Rns --noconfirm x64-gnome-settings gnome-shell gdm gnome-control-center gnome-tweaks nautilus adw-gtk-theme 2>/dev/null; or sudo pacman -R --noconfirm x64-gnome-settings gnome-shell 2>/dev/null
     end
 
     if test "$target_id" != "3"; and type -q startplasma-wayland
         echo -e "  \e[0;37m-> Desinstalando KDE Plasma 6 y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-kde-settings plasma-meta konsole 2>/dev/null; or sudo pacman -R --noconfirm x64-kde-settings plasma-meta 2>/dev/null
+        sudo pacman -Rns --noconfirm x64-kde-settings plasma-desktop plasma-meta konsole dolphin 2>/dev/null; or sudo pacman -R --noconfirm x64-kde-settings plasma-desktop 2>/dev/null
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
         echo -e "  \e[0;37m-> Desinstalando COSMIC Desktop y componentes...\e[0m"
-        sudo pacman -Rns --noconfirm x64-cosmic-settings cosmic-session cosmic-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-cosmic-settings cosmic-session 2>/dev/null
+        sudo pacman -Rns --noconfirm x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel 2>/dev/null; or sudo pacman -R --noconfirm x64-cosmic-settings cosmic-session 2>/dev/null
     end
 
     if test "$target_id" != "5"; and type -q niri-session
@@ -350,35 +350,35 @@ function install_desktop_menu
         end
     end
 
-    # Instalación del entorno seleccionado
+    # Instalación del entorno seleccionado (Paridad 1:1 con Suites Maestras de Calamares)
     switch $d_choice
         case 1
-            echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
             sudo pacman -S --needed --noconfirm hyprland sddm x64-sddm-theme dolphin kitty waybar rofi-wayland dunst xdg-desktop-portal-hyprland x64-hyprland-settings
             configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"
         case 2
-            echo -e "\n  \e[1;32m[*] Instalando GNOME Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm gnome-shell gdm nautilus kitty x64-gnome-settings adw-gtk-theme
+            echo -e "\n  \e[1;32m[*] Instalando GNOME Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm baobab decibels file-roller gdm gnome-backgrounds gnome-bluetooth-3.0 gnome-calculator gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell gnome-shell-extensions gnome-text-editor gnome-tweaks gnome-user-docs gnome-user-share gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb loupe mutter nautilus papers resources showtime simple-scan snapshot sushi xdg-user-dirs-gtk x64-gnome-settings adw-gtk-theme kitty
             configure_desktop_boot_mode gdm "GNOME (X64 Stealth Edition)"
         case 3
-            echo -e "\n  \e[1;32m[*] Instalando KDE Plasma 6 Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm plasma-meta sddm x64-sddm-theme dolphin konsole x64-kde-settings
+            echo -e "\n  \e[1;32m[*] Instalando KDE Plasma 6 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm ark bluedevil breeze-gtk discover dolphin ffmpegthumbs filelight flatpak fwupd gwenview haruna kate kcalc kde-gtk-config kdeconnect kdegraphics-thumbnailers kdeplasma-addons kdialog kinfocenter kio-admin kio-fuse konsole kscreen kwallet-pam kwalletmanager okular partitionmanager phonon-qt6-vlc plasma-browser-integration plasma-desktop plasma-disks plasma-firewall plasma-nm plasma-pa plasma-systemmonitor plasma-thunderbolt plasma-vault plasma-workspace-wallpapers powerdevil print-manager sddm sddm-kcm x64-sddm-theme skanpage spectacle tesseract-data-eng xsettingsd x64-kde-settings
             configure_desktop_boot_mode sddm "KDE Plasma 6 (X64 Gaming Edition)"
         case 4
-            echo -e "\n  \e[1;32m[*] Instalando COSMIC Desktop Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm cosmic-session cosmic-greeter x64-cosmic-settings
+            echo -e "\n  \e[1;32m[*] Instalando COSMIC Desktop Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers gnome-keyring xdg-desktop-portal-cosmic xdg-desktop-portal-gtk xorg-xwayland x64-cosmic-settings
             configure_desktop_boot_mode cosmic-greeter "COSMIC Desktop (System76 Rust Edition)"
         case 5
-            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm niri sddm x64-sddm-theme dolphin kitty waybar x64-niri-settings
+            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm niri sddm x64-sddm-theme kitty dolphin fuzzel waybar xdg-desktop-portal-gnome x64-niri-settings
             configure_desktop_boot_mode sddm "Niri (X64 Scroll-Infinito Edition)"
         case 6
-            echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm cinnamon lightdm lightdm-slick-greeter x64-cinnamon-settings
+            echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-keyring gnome-terminal x64-cinnamon-settings
             configure_desktop_boot_mode lightdm "Cinnamon (X64 Classic Edition)"
         case 7
-            echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter x64-xfce4-settings
+            echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            sudo pacman -S --needed --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter thunar file-roller ristretto network-manager-applet x64-xfce4-settings
             configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
         case '*'
             return
