@@ -1,10 +1,10 @@
 pkgname=x64-niri-settings
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Official X64 LIOS Niri Desktop Settings and Integration with Noctalia Shell"
 arch=('any')
 license=('GPL')
-depends=('niri' 'noctalia' 'kitty' 'dolphin' 'xwayland-satellite' 'wl-clipboard' 'xdg-desktop-portal-gnome')
+depends=('niri' 'noctalia' 'kitty' 'nautilus' 'xwayland-satellite' 'wl-clipboard' 'xdg-desktop-portal-gnome')
 source=('config.kdl'
         'config.toml')
 sha256sums=('SKIP'
