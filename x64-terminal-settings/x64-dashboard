@@ -162,6 +162,51 @@ function configure_desktop_boot_mode -a dm_service desktop_name
     read -l -P "  Presiona Enter para volver..." dummy
 end
 
+function clean_previous_desktops -a target_id
+    echo -e "\n  \e[1;33m[*] Retirando entorno anterior para mantener la pureza del sistema...\e[0m"
+
+    # Desactivar display managers anteriores
+    sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
+
+    # Retirar paquetes del entorno previo
+    if test "$target_id" != "1"; and type -q Hyprland
+        echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes Waybar/Rofi/Dunst...\e[0m"
+        sudo pacman -Rns --noconfirm x64-hyprland-settings hyprland waybar rofi-wayland dunst xdg-desktop-portal-hyprland 2>/dev/null; or sudo pacman -R --noconfirm x64-hyprland-settings hyprland 2>/dev/null
+    end
+
+    if test "$target_id" != "2"; and type -q gnome-shell
+        echo -e "  \e[0;37m-> Desinstalando GNOME Shell y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-gnome-settings gnome-shell gdm nautilus adw-gtk-theme 2>/dev/null; or sudo pacman -R --noconfirm x64-gnome-settings gnome-shell 2>/dev/null
+    end
+
+    if test "$target_id" != "3"; and type -q startplasma-wayland
+        echo -e "  \e[0;37m-> Desinstalando KDE Plasma 6 y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-kde-settings plasma-meta konsole 2>/dev/null; or sudo pacman -R --noconfirm x64-kde-settings plasma-meta 2>/dev/null
+    end
+
+    if test "$target_id" != "4"; and type -q cosmic-session
+        echo -e "  \e[0;37m-> Desinstalando COSMIC Desktop y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-cosmic-settings cosmic-session cosmic-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-cosmic-settings cosmic-session 2>/dev/null
+    end
+
+    if test "$target_id" != "5"; and type -q niri-session
+        echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-niri-settings niri 2>/dev/null; or sudo pacman -R --noconfirm x64-niri-settings niri 2>/dev/null
+    end
+
+    if test "$target_id" != "6"; and type -q cinnamon-session
+        echo -e "  \e[0;37m-> Desinstalando Cinnamon y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-cinnamon-settings cinnamon lightdm lightdm-slick-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-cinnamon-settings cinnamon 2>/dev/null
+    end
+
+    if test "$target_id" != "7"; and type -q xfce4-session
+        echo -e "  \e[0;37m-> Desinstalando Xfce4 y componentes...\e[0m"
+        sudo pacman -Rns --noconfirm x64-xfce4-settings xfce4 xfce4-goodies lightdm lightdm-gtk-greeter 2>/dev/null; or sudo pacman -R --noconfirm x64-xfce4-settings xfce4 2>/dev/null
+    end
+
+    echo -e "  \e[1;32m[OK] Limpieza de entorno anterior completada con éxito.\e[0m"
+end
+
 function install_desktop_menu
     clear
     echo ""
@@ -172,51 +217,161 @@ function install_desktop_menu
     set -l title "\e[1;37m"
     set -l val "\e[0;37m"
 
+    set -l hypr_tag ""
+    set -l gnome_tag ""
+    set -l kde_tag ""
+    set -l cosmic_tag ""
+    set -l niri_tag ""
+    set -l cinnamon_tag ""
+    set -l xfce_tag ""
+
+    type -q Hyprland; and set hypr_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q gnome-shell; and set gnome_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q startplasma-wayland; and set kde_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q cosmic-session; and set cosmic_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q niri-session; and set niri_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q cinnamon-session; and set cinnamon_tag " \e[1;32m[ACTIVO]\e[0m"
+    type -q xfce4-session; and set xfce_tag " \e[1;32m[ACTIVO]\e[0m"
+
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title X64 LIOS - INSTALADOR DE ENTORNOS DE ESCRITORIO OFICIALES$reset"
+    echo -e "   $title X64 LIOS - GESTIÓN Y MUTACIÓN DE ENTORNOS DE ESCRITORIO$reset"
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
-    echo -e "  Selecciona el escritorio que deseas descargar e instalar en este equipo:\n"
-    echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset       $val(X64 Cyberpunk Edition - Wayland, animaciones fluidas)$reset"
-    echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset"
-    echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Máximo rendimiento y control)$reset"
-    echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset"
-    echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset"
-    echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset"
-    echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset\n"
+    echo -e "  Selecciona el escritorio oficial que deseas configurar en este equipo:\n"
+    echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset       $val(X64 Cyberpunk Edition - Wayland, animaciones fluidas)$reset$hypr_tag"
+    echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset$gnome_tag"
+    echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Máximo rendimiento y control)$reset$kde_tag"
+    echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
+    echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
+    echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
+    echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag\n"
     echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
-    echo -e -n "\n  \e[1;31m> Selecciona un entorno para instalar [1-7, 0]: \e[0m"
+    echo -e -n "\n  \e[1;31m> Selecciona un entorno [1-7, 0]: \e[0m"
     read -l -P "" d_choice
     test $status -ne 0; and return
 
+    if test "$d_choice" = "0"; or test -z "$d_choice"
+        return
+    end
+
+    # Nombres de entornos
+    set -l target_name ""
+    set -l target_dm ""
     switch $d_choice
         case 1
-            echo -e "\n  \e[1;32mInstalando Hyprland Oficial de X64 LIOS...\e[0m"
+            set target_name "Hyprland (X64 Cyberpunk Edition)"
+            set target_dm "sddm"
+        case 2
+            set target_name "GNOME (X64 Stealth Edition)"
+            set target_dm "gdm"
+        case 3
+            set target_name "KDE Plasma 6 (X64 Gaming Edition)"
+            set target_dm "sddm"
+        case 4
+            set target_name "COSMIC Desktop (System76 Rust Edition)"
+            set target_dm "cosmic-greeter"
+        case 5
+            set target_name "Niri (X64 Scroll-Infinito Edition)"
+            set target_dm "sddm"
+        case 6
+            set target_name "Cinnamon (X64 Classic Edition)"
+            set target_dm "lightdm"
+        case 7
+            set target_name "Xfce4 (X64 Ultra-Lightweight Edition)"
+            set target_dm "lightdm"
+        case '*'
+            return
+    end
+
+    # Comprobar si el usuario seleccionó el mismo escritorio que ya tiene
+    set -l is_current 0
+    if test "$d_choice" = "1"; and type -q Hyprland; set is_current 1; end
+    if test "$d_choice" = "2"; and type -q gnome-shell; set is_current 1; end
+    if test "$d_choice" = "3"; and type -q startplasma-wayland; set is_current 1; end
+    if test "$d_choice" = "4"; and type -q cosmic-session; set is_current 1; end
+    if test "$d_choice" = "5"; and type -q niri-session; set is_current 1; end
+    if test "$d_choice" = "6"; and type -q cinnamon-session; set is_current 1; end
+    if test "$d_choice" = "7"; and type -q xfce4-session; set is_current 1; end
+
+    if test $is_current -eq 1
+        clear
+        echo ""
+        echo ""
+        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
+        echo -e "   $title AVISO: ENTORNO YA ACTIVO EN EL SISTEMA$reset"
+        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+        echo -e "    \e[1;32m¡$target_name ya es tu escritorio activo actual!\e[0m\n"
+        echo -e "    ¿Deseas reinstalar o reparar sus componentes oficiales?\n"
+        echo -e "    \e[1;33m[1]\e[0m Reinstalar / Reparar paquetes de $target_name"
+        echo -e "    \e[1;36m[2]\e[0m Reconfigurar modo de arranque (Consola TTY vs Inicio Gráfico)"
+        echo -e "    \e[1;31m[0]\e[0m Cancelar y volver al Dashboard\n"
+        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
+        echo -e -n "\n  \e[1;31m> Opción [1, 2, 0]: \e[0m"
+        read -l -P "" same_choice
+        if test "$same_choice" = "2"
+            configure_desktop_boot_mode $target_dm "$target_name"
+            return
+        else if test "$same_choice" != "1"
+            return
+        end
+    else
+        # Si tiene otro escritorio instalado, ejecutar protocolo de Transición Limpia (Opción 1)
+        if test $has_desktop -gt 0
+            clear
+            echo ""
+            echo ""
+            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
+            echo -e "   $title TRANSICIÓN LIMPIA DE ESCRITORIO (MODO PUREZA X64)$reset"
+            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+            echo -e "    \e[1;33m[!] Entorno actual detectado:\e[0m \e[1;37m$desktop_names[1]\e[0m\n"
+            echo -e "    Para evitar duplicación de aplicaciones (múltiples exploradores de archivos,"
+            echo -e "    centros de control y reproductores) y colisiones de demonios en segundo plano:\n"
+            echo -e "    \e[1;31m1.\e[0m Se desinstalará limpiamente \e[1;33m$desktop_names[1]\e[0m y sus dependencias."
+            echo -e "    \e[1;32m2.\e[0m Se instalará y configurará \e[1;37m$target_name\e[0m."
+            echo -e "    \e[1;36m3.\e[0m Podrás configurar el modo de arranque (Consola TTY o Gráfico).\n"
+            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
+            echo -e -n "\n  \e[1;31m> ¿Proceder con la transición limpia a $target_name? [S/n]: \e[0m"
+            read -l -P "" trans_choice
+            if test -n "$trans_choice"; and test "$trans_choice" != "s"; and test "$trans_choice" != "S"
+                echo -e "\n  \e[1;33m[INFO] Transición cancelada. Tu escritorio actual no ha sido modificado.\e[0m"
+                sleep 2
+                return
+            end
+
+            # Ejecutar limpieza del entorno previo
+            clean_previous_desktops $d_choice
+        end
+    end
+
+    # Instalación del entorno seleccionado
+    switch $d_choice
+        case 1
+            echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm hyprland sddm x64-sddm-theme dolphin kitty waybar rofi-wayland dunst xdg-desktop-portal-hyprland x64-hyprland-settings
             configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"
         case 2
-            echo -e "\n  \e[1;32mInstalando GNOME Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando GNOME Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm gnome-shell gdm nautilus kitty x64-gnome-settings adw-gtk-theme
             configure_desktop_boot_mode gdm "GNOME (X64 Stealth Edition)"
         case 3
-            echo -e "\n  \e[1;32mInstalando KDE Plasma 6 Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando KDE Plasma 6 Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm plasma-meta sddm x64-sddm-theme dolphin konsole x64-kde-settings
             configure_desktop_boot_mode sddm "KDE Plasma 6 (X64 Gaming Edition)"
         case 4
-            echo -e "\n  \e[1;32mInstalando COSMIC Desktop Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando COSMIC Desktop Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm cosmic-session cosmic-greeter x64-cosmic-settings
             configure_desktop_boot_mode cosmic-greeter "COSMIC Desktop (System76 Rust Edition)"
         case 5
-            echo -e "\n  \e[1;32mInstalando Niri Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm niri sddm x64-sddm-theme dolphin kitty waybar x64-niri-settings
             configure_desktop_boot_mode sddm "Niri (X64 Scroll-Infinito Edition)"
         case 6
-            echo -e "\n  \e[1;32mInstalando Cinnamon Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm cinnamon lightdm lightdm-slick-greeter x64-cinnamon-settings
             configure_desktop_boot_mode lightdm "Cinnamon (X64 Classic Edition)"
         case 7
-            echo -e "\n  \e[1;32mInstalando Xfce4 Oficial de X64 LIOS...\e[0m"
+            echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter x64-xfce4-settings
             configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
         case '*'
