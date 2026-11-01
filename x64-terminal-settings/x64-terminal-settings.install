@@ -36,6 +36,11 @@ DISTRIB_ID="X64 LIOS"
 DISTRIB_RELEASE="rolling"
 DISTRIB_DESCRIPTION="X64 LIOS Linux"
 EOF
+
+    # Restaurar pre-login banner oficial X64 LIOS en /etc/issue
+    if [ -f /usr/share/x64-lios/issue ]; then
+        cp -f /usr/share/x64-lios/issue /etc/issue
+    fi
 }
 
 post_upgrade() {
