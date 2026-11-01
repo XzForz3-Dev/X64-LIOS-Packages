@@ -1,19 +1,25 @@
 pkgname=x64-niri-settings
 pkgver=1.0.0
-pkgrel=2
-pkgdesc="Official X64 LIOS Niri Desktop Settings and Integration"
+pkgrel=3
+pkgdesc="Official X64 LIOS Niri Desktop Settings and Integration with Noctalia Shell"
 arch=('any')
 license=('GPL')
-depends=('niri' 'kitty' 'waybar' 'dolphin' 'fuzzel')
-source=('config.kdl')
-sha256sums=('SKIP')
+depends=('niri' 'noctalia' 'kitty' 'dolphin' 'xwayland-satellite' 'wl-clipboard' 'xdg-desktop-portal-gnome')
+source=('config.kdl'
+        'config.toml')
+sha256sums=('SKIP'
+            'SKIP')
 
 package() {
     # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS Niri Desktop Settings" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+    echo "X64 LIOS Niri Desktop Settings with Noctalia Shell" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 
-    # Install skeleton and system-wide default configuration
+    # Install skeleton and system-wide default configuration for Niri
     install -Dm644 "${srcdir}/config.kdl" "${pkgdir}/etc/skel/.config/niri/config.kdl"
     install -Dm644 "${srcdir}/config.kdl" "${pkgdir}/etc/xdg/niri/config.kdl"
+
+    # Install skeleton and system-wide default configuration for Noctalia
+    install -Dm644 "${srcdir}/config.toml" "${pkgdir}/etc/skel/.config/noctalia/config.toml"
+    install -Dm644 "${srcdir}/config.toml" "${pkgdir}/etc/xdg/noctalia/config.toml"
 }

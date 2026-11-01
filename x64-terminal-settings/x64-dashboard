@@ -211,7 +211,7 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "5"; and type -q niri-session
         echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
-        set -l niri_pkgs (pacman -Qq x64-niri-settings niri fuzzel waybar dolphin 2>/dev/null | sort -u)
+        set -l niri_pkgs (pacman -Qq x64-niri-settings niri noctalia dolphin fuzzel waybar 2>/dev/null | sort -u)
         if test (count $niri_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $niri_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $niri_pkgs 2>/dev/null
         end
@@ -405,11 +405,11 @@ function install_desktop_menu
                 configure_desktop_boot_mode cosmic-greeter "COSMIC Desktop (System76 Rust Edition)"
             end
         case 5
-            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
-            sudo pacman -S --needed --noconfirm --overwrite "*" niri sddm x64-sddm-theme kitty dolphin fuzzel waybar xdg-desktop-portal-gnome x64-niri-settings
+            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS (Suite Completa Noctalia Shell)...\e[0m"
+            sudo pacman -S --needed --noconfirm --overwrite "*" niri sddm x64-sddm-theme kitty dolphin noctalia xdg-desktop-portal-gnome x64-niri-settings
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
-                configure_desktop_boot_mode sddm "Niri (X64 Scroll-Infinito Edition)"
+                configure_desktop_boot_mode sddm "Niri (X64 Noctalia Shell Edition)"
             end
         case 6
             echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"

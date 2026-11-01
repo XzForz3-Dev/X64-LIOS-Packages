@@ -1,0 +1,7 @@
+[shell]
+polkit_agent = true
+
+[wallpaper]
+directory = "/usr/share/noctalia/assets"
+enabled = true
+fill_mode = "crop"
