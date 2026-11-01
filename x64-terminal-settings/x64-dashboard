@@ -178,7 +178,7 @@ function clean_previous_desktops -a target_id
     # Retirar paquetes del entorno previo con cascada recursiva segura (-Rcs)
     if test "$target_id" != "1"; and type -q Hyprland
         echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes (Waybar, Rofi, Dolphin)...\e[0m"
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland waybar rofi rofi-wayland dunst xdg-desktop-portal-hyprland dolphin 2>/dev/null | sort -u)
+        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland waybar rofi rofi-wayland dunst xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
         end
@@ -186,7 +186,7 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "2"; and type -q gnome-shell
         echo -e "  \e[0;37m-> Desinstalando suite completa de GNOME...\e[0m"
-        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus 2>/dev/null | sort -u)
+        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme 2>/dev/null | sort -u)
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
