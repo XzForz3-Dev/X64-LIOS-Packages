@@ -8,6 +8,25 @@ post_install() {
     if [ -x /usr/share/x64-lios/set-default-wallpaper.sh ]; then
         /usr/share/x64-lios/set-default-wallpaper.sh
     fi
+
+    echo "=> [X64 Theme] Asegurando arranque de sesión limpio (cero ventanas previas restauradas)..."
+    for udir in /home/*; do
+        if [ -d "$udir/.config" ]; then
+            rm -rf "$udir/.config/session"
+            if [ -f "$udir/.config/ksmserverrc" ]; then
+                sed -i '/loginMode=/d' "$udir/.config/ksmserverrc"
+                if grep -q "^\[General\]" "$udir/.config/ksmserverrc"; then
+                    sed -i '/^\[General\]/a loginMode=emptySession' "$udir/.config/ksmserverrc"
+                else
+                    echo -e "\n[General]\nloginMode=emptySession" >> "$udir/.config/ksmserverrc"
+                fi
+            else
+                mkdir -p "$udir/.config"
+                echo -e "[General]\nloginMode=emptySession" > "$udir/.config/ksmserverrc"
+            fi
+            chown -R $(stat -c "%u:%g" "$udir") "$udir/.config/ksmserverrc" 2>/dev/null || true
+        fi
+    done
 }
 
 post_upgrade() {

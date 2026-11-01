@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=16
+pkgrel=17
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -27,6 +27,7 @@ source=('01-monolith.jpg'
         'gtk3-settings.ini'
         'gtk4-settings.ini'
         'baloofilerc'
+        'ksmserverrc'
         'org.kde.discover.notifier.desktop'
         'org.kde.kdeconnect.daemon.desktop'
         'plasmarc'
@@ -34,7 +35,7 @@ source=('01-monolith.jpg'
         'x64-theme-init.sh'
         'set-default-wallpaper.sh'
         'x64-kde-wallpaper-defaults.hook')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Instalar colección oficial de fondos de pantalla de X64 LIOS
@@ -141,6 +142,11 @@ EOF
     # Desactivar indexador Baloo (cero sobrecarga de disco/CPU para gaming)
     cp "${srcdir}/baloofilerc" "${pkgdir}/etc/skel/.config/baloofilerc"
     cp "${srcdir}/baloofilerc" "${pkgdir}/etc/xdg/baloofilerc"
+
+    # Configuración de sesión limpia (cero ventanas previas restauradas, arranque impoluto)
+    cp "${srcdir}/ksmserverrc" "${pkgdir}/etc/xdg/ksmserverrc"
+    cp "${srcdir}/ksmserverrc" "${pkgdir}/etc/skel/.config/ksmserverrc"
+    cp "${srcdir}/ksmserverrc" "${pkgdir}/etc/skel/.config/kdedefaults/ksmserverrc"
 
     # Desactivar demonios de fondo redundantes en autostart (DiscoverNotifier y KDE Connect)
     mkdir -p "${pkgdir}/etc/skel/.config/autostart"
