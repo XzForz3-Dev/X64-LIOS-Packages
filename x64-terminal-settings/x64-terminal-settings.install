@@ -41,10 +41,34 @@ EOF
     if [ -f /usr/share/x64-lios/issue ]; then
         cp -f /usr/share/x64-lios/issue /etc/issue
     fi
+
+    # Wrapper inteligente de Kitty para compatibilidad en maquinas virtuales (QEMU/KVM/VirtualBox/VMware/virtio-gpu)
+    mkdir -p /usr/local/bin
+    cat << 'EOF' > /usr/local/bin/kitty
+#!/bin/bash
+# X64 LIOS - Smart Kitty GPU/VM Wrapper
+# On virtual machines with virtio-gpu/QEMU, virgl lacks 32-bit RGBA EGL configs for GLFW.
+# Fallback to software rendering automatically on VMs while preserving 100% native GPU on bare-metal.
+
+if [ -z "$LIBGL_ALWAYS_SOFTWARE" ]; then
+    if grep -q -E "QEMU|VirtualBox|KVM|VMware" /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null; then
+        export LIBGL_ALWAYS_SOFTWARE=1
+    elif lspci 2>/dev/null | grep -qi "virtio.*gpu"; then
+        export LIBGL_ALWAYS_SOFTWARE=1
+    fi
+fi
+
+exec /usr/bin/kitty "$@"
+EOF
+    chmod 755 /usr/local/bin/kitty
 }
 
 post_upgrade() {
     post_install
+}
+
+post_remove() {
+    rm -f /usr/local/bin/kitty 2>/dev/null || true
 }
 
 
