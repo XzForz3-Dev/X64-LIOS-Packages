@@ -233,6 +233,14 @@ function clean_previous_desktops -a target_id
         end
     end
 
+    if test "$target_id" = "8"
+        echo -e "  \e[0;37m-> Desinstalando gestores de pantalla y componentes gráficos residuales...\e[0m"
+        set -l dm_pkgs (pacman -Qq sddm lightdm gdm cosmic-greeter x64-sddm-theme 2>/dev/null | sort -u)
+        if test (count $dm_pkgs) -gt 0
+            sudo pacman -Rcs --noconfirm $dm_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $dm_pkgs 2>/dev/null
+        end
+    end
+
     echo -e "  \e[1;32m[OK] Limpieza de entorno anterior completada con éxito.\e[0m"
 end
 
