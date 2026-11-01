@@ -4,8 +4,9 @@ if test "$TERM" = "linux"
         set -gx STARSHIP_CONFIG /etc/starship-tty.toml
     end
 
-    # Lanzar Centro de Mando interactivo al iniciar sesión en tty1 (Modo Server / CLI o Rescate)
-    if status is-login; and test (tty 2>/dev/null) = "/dev/tty1"; and test -x /usr/bin/x64-dashboard; and test -z "$DISPLAY"; and test -z "$WAYLAND_DISPLAY"
+    # Lanzar Centro de Mando interactivo al iniciar sesión interactiva en tty1 (Modo Server / CLI o Rescate)
+    # Exige status is-interactive para no interceptar comandos de login de Display Managers (ej. greetd / cosmic-greeter)
+    if status is-login; and status is-interactive; and test (tty 2>/dev/null) = "/dev/tty1"; and test -x /usr/bin/x64-dashboard; and test -z "$DISPLAY"; and test -z "$WAYLAND_DISPLAY"
         /usr/bin/x64-dashboard
     end
 end
