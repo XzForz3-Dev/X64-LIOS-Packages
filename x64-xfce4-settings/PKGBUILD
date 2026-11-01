@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland) y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -47,9 +47,9 @@ package() {
     install -d "${pkgdir}/etc/environment.d"
     install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
 
-    # 5. Configuracion global de Xfce por defecto (tema oscuro Adwaita-dark y Papirus-Dark)
-    install -d "${pkgdir}/etc/xdg/xfce4/xfconf/xfce-perchannel-xml"
-    install -m644 "${srcdir}/xsettings.xml" "${pkgdir}/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
+    # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark y Papirus-Dark)
+    install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
+    install -m644 "${srcdir}/xsettings.xml" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
 
     # 6. Entorno inicial para labwc en skeleton de nuevos usuarios
     install -d "${pkgdir}/etc/skel/.config/xfce4/labwc"
