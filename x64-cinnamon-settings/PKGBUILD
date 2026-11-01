@@ -1,13 +1,35 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS Cinnamon Desktop Settings (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
-depends=()
+install='x64-cinnamon-settings.install'
+depends=('cinnamon' 'lightdm' 'lightdm-slick-greeter' 'papirus-icon-theme' 'glib2')
+source=('cinnamon-wallpaper.jpg'
+        '60-slick-greeter.conf'
+        'slick-greeter.conf'
+        'zzz_x64.cinnamon.gschema.override')
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
 
 package() {
-    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS Cinnamon Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
-}
+    # 1. Fondo de pantalla oficial Cinnamon & Slick Greeter
+    install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/cinnamon-wallpaper.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/cinnamon-wallpaper.jpg"
 
+    # 2. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
+    install -d "${pkgdir}/etc/lightdm/lightdm.conf.d"
+    install -m644 "${srcdir}/60-slick-greeter.conf" "${pkgdir}/etc/lightdm/lightdm.conf.d/60-slick-greeter.conf"
+
+    # 3. Configuracion de Slick Greeter (tema oscuro y fondo oficial)
+    install -d "${pkgdir}/etc/lightdm"
+    install -m644 "${srcdir}/slick-greeter.conf" "${pkgdir}/etc/lightdm/slick-greeter.conf"
+
+    # 4. GSettings Overrides para Cinnamon (tema oscuro, iconos y fondo por defecto)
+    install -d "${pkgdir}/usr/share/glib-2.0/schemas"
+    install -m644 "${srcdir}/zzz_x64.cinnamon.gschema.override" \
+        "${pkgdir}/usr/share/glib-2.0/schemas/zzz_x64.cinnamon.gschema.override"
+}
