@@ -272,11 +272,12 @@ function install_desktop_menu
     echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
     echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
     echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
-    echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag\n"
+    echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
+    echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset\n"
     echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
-    echo -e -n "\n  \e[1;31m> Selecciona un entorno [1-7, 0]: \e[0m"
+    echo -e -n "\n  \e[1;31m> Selecciona una opción [1-8, 0]: \e[0m"
     read -l -P "" d_choice
     test $status -ne 0; and return
 
@@ -309,6 +310,9 @@ function install_desktop_menu
         case 7
             set target_name "Xfce4 (X64 Ultra-Lightweight Edition)"
             set target_dm "lightdm"
+        case 8
+            set target_name "No Desktop (Modo Servidor / Consola TTY Pura)"
+            set target_dm "none"
         case '*'
             return
     end
@@ -322,6 +326,7 @@ function install_desktop_menu
     if test "$d_choice" = "5"; and type -q niri-session; set is_current 1; end
     if test "$d_choice" = "6"; and type -q cinnamon-session; set is_current 1; end
     if test "$d_choice" = "7"; and type -q xfce4-session; set is_current 1; end
+    if test "$d_choice" = "8"; and test $has_desktop -eq 0; set is_current 1; end
 
     if test $is_current -eq 1
         clear
@@ -424,6 +429,18 @@ function install_desktop_menu
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
+            end
+        case 8
+            echo -e "\n  \e[1;32m[*] Configurando Sistema en Modo No Desktop (Consola TTY Pura)...\e[0m"
+            sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
+            sudo systemctl set-default multi-user.target 2>/dev/null
+            set install_ok 1
+            echo -e "  \e[1;32m[OK] Todos los gestores gráficos han sido deshabilitados.\e[0m"
+            echo -e "  \e[1;32m[OK] Target configurado en multi-user.target (Consola TTY).\e[0m\n"
+            echo -e -n "  \e[1;31m¿Deseas reiniciar ahora para entrar en consola TTY? [s/N]: \e[0m"
+            read -l -P "" r_ans
+            if test "$r_ans" = "s"; or test "$r_ans" = "S"
+                sudo reboot
             end
         case '*'
             return
