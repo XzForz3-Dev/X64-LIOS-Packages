@@ -179,43 +179,43 @@ function install_desktop_menu
             sudo pacman -S --needed --noconfirm hyprland sddm x64-sddm-theme dolphin kitty waybar rofi-wayland dunst xdg-desktop-portal-hyprland x64-hyprland-settings
             sudo systemctl enable sddm
             echo -e "\n  \e[1;32m¡Hyprland instalado con éxito! SDDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 2
             echo -e "\n  \e[1;32mInstalando GNOME Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm gnome-shell gdm x64-gdm-theme nautilus kitty x64-gnome-settings adw-gtk-theme
+            sudo pacman -S --needed --noconfirm gnome-shell gdm nautilus kitty x64-gnome-settings adw-gtk-theme
             sudo systemctl enable gdm
             echo -e "\n  \e[1;32m¡GNOME instalado con éxito! GDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 3
             echo -e "\n  \e[1;32mInstalando KDE Plasma 6 Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm plasma-meta sddm x64-sddm-theme dolphin konsole x64-plasma-settings
+            sudo pacman -S --needed --noconfirm plasma-meta sddm x64-sddm-theme dolphin konsole x64-kde-settings
             sudo systemctl enable sddm
             echo -e "\n  \e[1;32m¡KDE Plasma instalado con éxito! SDDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 4
             echo -e "\n  \e[1;32mInstalando COSMIC Desktop Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm cosmic-session cosmic-greeter x64-cosmic-settings
             sudo systemctl enable cosmic-greeter
             echo -e "\n  \e[1;32m¡COSMIC instalado con éxito! Cosmic-greeter activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 5
             echo -e "\n  \e[1;32mInstalando Niri Oficial de X64 LIOS...\e[0m"
             sudo pacman -S --needed --noconfirm niri sddm x64-sddm-theme dolphin kitty waybar x64-niri-settings
             sudo systemctl enable sddm
             echo -e "\n  \e[1;32m¡Niri instalado con éxito! SDDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 6
             echo -e "\n  \e[1;32mInstalando Cinnamon Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm cinnamon lightdm x64-cinnamon-settings
+            sudo pacman -S --needed --noconfirm cinnamon lightdm lightdm-slick-greeter x64-cinnamon-settings
             sudo systemctl enable lightdm
             echo -e "\n  \e[1;32m¡Cinnamon instalado con éxito! LightDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case 7
             echo -e "\n  \e[1;32mInstalando Xfce4 Oficial de X64 LIOS...\e[0m"
-            sudo pacman -S --needed --noconfirm xfce4 xfce4-goodies lightdm x64-xfce4-settings
+            sudo pacman -S --needed --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter x64-xfce4-settings
             sudo systemctl enable lightdm
             echo -e "\n  \e[1;32m¡Xfce4 instalado con éxito! LightDM activado.\e[0m"
-            read -l -P "  Presiona Enter para continuar..." dummy
+            read -l -P "  Presiona Enter para volver..." dummy
         case '*'
             return
     end
