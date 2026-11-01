@@ -418,7 +418,7 @@ binds {
     XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
 
     // Some laptops have a key for toggling the touchpad.
-    XF86TouchpadToggle repeat=false { toggle-touchpad; }
+    // XF86TouchpadToggle repeat=false { toggle-touchpad; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,

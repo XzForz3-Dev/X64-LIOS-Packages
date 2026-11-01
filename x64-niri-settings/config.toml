@@ -5,3 +5,4 @@ polkit_agent = true
 directory = "/usr/share/noctalia/assets"
 enabled = true
 fill_mode = "crop"
+

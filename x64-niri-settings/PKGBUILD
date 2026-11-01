@@ -1,6 +1,6 @@
 pkgname=x64-niri-settings
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Official X64 LIOS Niri Desktop Settings and Integration with Noctalia Shell"
 arch=('any')
 license=('GPL')
