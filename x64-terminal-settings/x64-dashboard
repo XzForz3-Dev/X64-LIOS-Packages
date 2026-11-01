@@ -428,7 +428,7 @@ function install_desktop_menu
             end
         case 6
             echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
-            sudo pacman -S --needed --noconfirm --overwrite "*" cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-keyring gnome-terminal x64-cinnamon-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-keyring gnome-terminal kitty x64-cinnamon-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Cinnamon (X64 Classic Edition)"

@@ -2,6 +2,10 @@
 app-menu-icon-name='x64-logo'
 app-menu-label=''
 
+[org.cinnamon.desktop.default-applications.terminal]
+exec='kitty'
+exec-arg='-e'
+
 [org.cinnamon.desktop.background]
 picture-uri='file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'
 picture-options='zoom'
@@ -15,3 +19,21 @@ theme='Adwaita-dark'
 
 [org.cinnamon.theme]
 name='cinnamon'
+
+[org.gnome.Terminal.Legacy.Settings]
+default-show-menubar=false
+theme-variant='dark'
+
+[org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/]
+use-system-font=false
+font='JetBrainsMono Nerd Font 11'
+use-theme-colors=false
+background-color='#08080a'
+foreground-color='#c0c0c0'
+bold-color-same-as-fg=true
+cursor-colors-set=true
+cursor-background-color='#ff2b2b'
+cursor-foreground-color='#ffffff'
+default-size-columns=105
+default-size-rows=28
+palette=['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']

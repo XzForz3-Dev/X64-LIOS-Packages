@@ -2,16 +2,51 @@ post_install() {
     glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
     gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
 
-    # Propagar configuracion del boton de inicio oficial a los usuarios existentes
+    # Propagar configuracion del boton de inicio y panel a los usuarios existentes
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
             u=$(basename "$user_dir")
             g=$(id -gn "$u" 2>/dev/null || echo "$u")
-            target_dir="$user_dir/.config/cinnamon/spices/menu@cinnamon.org"
-            mkdir -p "$target_dir"
+
+            # 1. Menu oficial con boton X
+            target_menu="$user_dir/.config/cinnamon/spices/menu@cinnamon.org"
+            mkdir -p "$target_menu"
             if [ -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json ]; then
-                cp -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json "$target_dir/0.json"
-                chown -R "$u:$g" "$user_dir/.config/cinnamon" 2>/dev/null || true
+                cp -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json "$target_menu/0.json"
+            fi
+
+            # 2. Panel con lanzadores oficiales (Nemo, Chromium, Kitty)
+            target_panel="$user_dir/.config/cinnamon/spices/grouped-window-list@cinnamon.org"
+            mkdir -p "$target_panel"
+            if [ -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json ]; then
+                cp -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json "$target_panel/2.json"
+            fi
+
+            chown -R "$u:$g" "$user_dir/.config/cinnamon" 2>/dev/null || true
+
+            # 3. Inyectar dconf para sesiones activas si el usuario tiene bus de sesión
+            uid=$(id -u "$u" 2>/dev/null || true)
+            if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                su - "$u" -c "
+                    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus 2>/dev/null || true
+                    dconf write /org/cinnamon/desktop/default-applications/terminal/exec \"'kitty'\" 2>/dev/null || true
+                    dconf write /org/cinnamon/desktop/default-applications/terminal/exec-arg \"'-e'\" 2>/dev/null || true
+                    dconf write /org/gnome/terminal/legacy/default-show-menubar false 2>/dev/null || true
+                    dconf write /org/gnome/terminal/legacy/theme-variant \"'dark'\" 2>/dev/null || true
+                    P='/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/'
+                    dconf write \${P}use-system-font false 2>/dev/null || true
+                    dconf write \${P}font \"'JetBrainsMono Nerd Font 11'\" 2>/dev/null || true
+                    dconf write \${P}use-theme-colors false 2>/dev/null || true
+                    dconf write \${P}background-color \"'#08080a'\" 2>/dev/null || true
+                    dconf write \${P}foreground-color \"'#c0c0c0'\" 2>/dev/null || true
+                    dconf write \${P}bold-color-same-as-fg true 2>/dev/null || true
+                    dconf write \${P}cursor-colors-set true 2>/dev/null || true
+                    dconf write \${P}cursor-background-color \"'#ff2b2b'\" 2>/dev/null || true
+                    dconf write \${P}cursor-foreground-color \"'#ffffff'\" 2>/dev/null || true
+                    dconf write \${P}default-size-columns 105 2>/dev/null || true
+                    dconf write \${P}default-size-rows 28 2>/dev/null || true
+                    dconf write \${P}palette \"['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']\" 2>/dev/null || true
+                " 2>/dev/null || true
             fi
         fi
     done
