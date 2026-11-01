@@ -231,8 +231,13 @@ while true
     switch $choice
         case 8 'c' 'C'
             clear
-            echo -e "\e[1;32mSaliendo a la consola de comandos de X64 LIOS (Fish)...\e[0m"
-            echo -e "\e[0;37mPara volver a abrir el Centro de Mando en cualquier momento, escribe: \e[1;33mx64-dashboard\e[0m\n"
+            if test -f /etc/fastfetch/config-tty.jsonc
+                fastfetch --config /etc/fastfetch/config-tty.jsonc
+            else
+                fastfetch 2>/dev/null
+            end
+            echo ""
+            echo -e "  \e[0;37m(Escribe \e[1;33mx64-dashboard\e[0m \e[0;37men cualquier momento para volver al Centro de Mando)\e[0m\n"
             break
         case 9 'r' 'R'
             clear
