@@ -185,8 +185,8 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "2"; and type -q gnome-shell
-        echo -e "  \e[0;37m-> Desinstalando GNOME Shell y componentes...\e[0m"
-        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks 2>/dev/null | sort -u)
+        echo -e "  \e[0;37m-> Desinstalando suite completa de GNOME...\e[0m"
+        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus 2>/dev/null | sort -u)
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
@@ -194,16 +194,16 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "3"; and type -q startplasma-wayland
-        echo -e "  \e[0;37m-> Desinstalando KDE Plasma 6 y componentes...\e[0m"
-        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace sddm-kcm dolphin konsole 2>/dev/null | sort -u)
+        echo -e "  \e[0;37m-> Desinstalando suite completa de KDE Plasma 6...\e[0m"
+        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons 2>/dev/null | sort -u)
         if test (count $kde_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $kde_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $kde_pkgs 2>/dev/null
         end
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
-        echo -e "  \e[0;37m-> Desinstalando COSMIC Desktop y componentes...\e[0m"
-        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel 2>/dev/null | sort -u)
+        echo -e "  \e[0;37m-> Desinstalando suite completa de COSMIC Desktop...\e[0m"
+        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
         if test (count $cosmic_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
         end
@@ -211,23 +211,23 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "5"; and type -q niri-session
         echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
-        set -l niri_pkgs (pacman -Qq x64-niri-settings niri fuzzel dolphin 2>/dev/null | sort -u)
+        set -l niri_pkgs (pacman -Qq x64-niri-settings niri fuzzel waybar dolphin 2>/dev/null | sort -u)
         if test (count $niri_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $niri_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $niri_pkgs 2>/dev/null
         end
     end
 
     if test "$target_id" != "6"; and type -q cinnamon-session
-        echo -e "  \e[0;37m-> Desinstalando Cinnamon y componentes...\e[0m"
-        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon nemo lightdm-slick-greeter 2>/dev/null | sort -u)
+        echo -e "  \e[0;37m-> Desinstalando suite completa de Cinnamon...\e[0m"
+        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
         if test (count $cin_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cin_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cin_pkgs 2>/dev/null
         end
     end
 
     if test "$target_id" != "7"; and type -q xfce4-session
-        echo -e "  \e[0;37m-> Desinstalando Xfce4 y componentes...\e[0m"
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4-session xfce4-panel thunar ristretto lightdm-gtk-greeter 2>/dev/null | sort -u)
+        echo -e "  \e[0;37m-> Desinstalando suite completa de Xfce4...\e[0m"
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel thunar ristretto file-roller lightdm-gtk-greeter 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
         end
