@@ -1,13 +1,13 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=28
+pkgrel=29
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
 license=('GPL3')
 install='x64-terminal-settings.install'
-depends=('fish' 'starship' 'fastfetch')
+depends=('fish' 'starship' 'fastfetch' 'ttf-jetbrains-mono-nerd')
 optdepends=('kitty: GPU-accelerated terminal emulator'
             'btop: Resource monitor for x64-dashboard')
 source=(
@@ -18,6 +18,7 @@ source=(
     'fastfetch-tty.jsonc'
     'x64_logo.txt'
     'kitty.conf'
+    '99-x64-monospace.conf'
     '99-x64-terminal.fish'
     '99-x64-lios-performance.conf'
     '90-x64-gaming-shaders.conf'
@@ -34,7 +35,7 @@ source=(
     'x64-dashboard'
     'issue'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
@@ -71,6 +72,14 @@ package() {
 
     install -d "${pkgdir}/etc/xdg/kitty"
     install -m644 "${srcdir}/kitty.conf" "${pkgdir}/etc/xdg/kitty/kitty.conf"
+
+    # Fontconfig System-Wide Monospace Override to JetBrainsMono Nerd Font
+    install -d "${pkgdir}/etc/fonts/conf.d"
+    install -m644 "${srcdir}/99-x64-monospace.conf" "${pkgdir}/etc/fonts/conf.d/99-x64-monospace.conf"
+
+    # COSMIC Terminal Skel Configuration
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1"
+    echo '"JetBrainsMono Nerd Font"' > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/font_name"
 
     # Kernel & Network Low-Latency Tuning Profile
     install -d "${pkgdir}/etc/sysctl.d"
