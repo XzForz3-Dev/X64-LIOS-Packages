@@ -195,7 +195,7 @@ function clean_previous_desktops -a target_id
 
     if test "$target_id" != "3"; and type -q startplasma-wayland
         echo -e "  \e[0;37m-> Desinstalando suite completa de KDE Plasma 6...\e[0m"
-        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons 2>/dev/null | sort -u)
+        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons ffmpegthumbs kdegraphics-thumbnailers kdegraphics-mobipocket kdialog kio-admin kio-fuse kwallet kwallet-pam phonon-qt6-vlc phonon-qt6 breeze-gtk xsettingsd 2>/dev/null | sort -u)
         if test (count $kde_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $kde_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $kde_pkgs 2>/dev/null
         end
