@@ -1,5 +1,5 @@
 [org.cinnamon.desktop.background]
-picture-uri='file:///usr/share/backgrounds/x64-lios/cinnamon-wallpaper.jpg'
+picture-uri='file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'
 picture-options='zoom'
 
 [org.cinnamon.desktop.interface]

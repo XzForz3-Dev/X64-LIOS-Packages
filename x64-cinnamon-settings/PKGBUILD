@@ -1,34 +1,37 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
 install='x64-cinnamon-settings.install'
 depends=('cinnamon' 'lightdm' 'lightdm-slick-greeter' 'papirus-icon-theme' 'glib2')
-source=('cinnamon-wallpaper.jpg'
+source=('cinnamon-login.jpg'
+        'cinnamon-desktop.jpg'
         '60-slick-greeter.conf'
         'slick-greeter.conf'
         'zzz_x64.cinnamon.gschema.override')
 sha256sums=('SKIP'
             'SKIP'
             'SKIP'
+            'SKIP'
             'SKIP')
 
 package() {
-    # 1. Fondo de pantalla oficial Cinnamon & Slick Greeter
+    # 1. Fondos oficiales X64 LIOS para Login Slick Greeter y Escritorio Cinnamon
     install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
-    install -m644 "${srcdir}/cinnamon-wallpaper.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/cinnamon-wallpaper.jpg"
+    install -m644 "${srcdir}/cinnamon-login.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/cinnamon-login.jpg"
+    install -m644 "${srcdir}/cinnamon-desktop.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg"
 
     # 2. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
     install -d "${pkgdir}/etc/lightdm/lightdm.conf.d"
     install -m644 "${srcdir}/60-slick-greeter.conf" "${pkgdir}/etc/lightdm/lightdm.conf.d/60-slick-greeter.conf"
 
-    # 3. Configuracion de Slick Greeter (tema oscuro y fondo oficial)
+    # 3. Configuracion de Slick Greeter (fondo a medida y tema oscuro)
     install -d "${pkgdir}/etc/lightdm"
     install -m644 "${srcdir}/slick-greeter.conf" "${pkgdir}/etc/lightdm/slick-greeter.conf"
 
-    # 4. GSettings Overrides para Cinnamon (tema oscuro, iconos y fondo por defecto)
+    # 4. GSettings Overrides para Cinnamon (tema oscuro, iconos y fondo Monolith por defecto)
     install -d "${pkgdir}/usr/share/glib-2.0/schemas"
     install -m644 "${srcdir}/zzz_x64.cinnamon.gschema.override" \
         "${pkgdir}/usr/share/glib-2.0/schemas/zzz_x64.cinnamon.gschema.override"
