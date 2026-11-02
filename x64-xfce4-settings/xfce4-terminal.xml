@@ -14,3 +14,4 @@
   <property name="misc-toolbar-default" type="bool" value="false"/>
   <property name="scrolling-bar" type="string" value="TERMINAL_SCROLLBAR_NONE"/>
 </channel>
+

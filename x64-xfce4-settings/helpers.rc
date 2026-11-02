@@ -6,3 +6,4 @@ WebBrowser=chromium
 MailReader=thunderbird
 TerminalEmulator=kitty
 FileManager=thunar
+
