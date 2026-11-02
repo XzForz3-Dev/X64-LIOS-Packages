@@ -1,0 +1,37 @@
+post_install() {
+    # Asegurar font_name en /etc/skel sin conflicto de paquetes
+    mkdir -p /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1
+    echo '"JetBrainsMono Nerd Font"' > /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/font_name
+
+    # Propagar configuraciones soberanas de COSMIC a usuarios existentes en /home/*
+    for user_dir in /home/*; do
+        if [ -d "$user_dir" ]; then
+            u=$(basename "$user_dir")
+            g=$(id -gn "$u" 2>/dev/null || echo "$u")
+
+            target_cosmic="$user_dir/.config/cosmic"
+            mkdir -p "$target_cosmic/com.system76.CosmicTheme.Dark/v2"
+            mkdir -p "$target_cosmic/com.system76.CosmicTheme.Dark/v1"
+            mkdir -p "$target_cosmic/com.system76.CosmicAppList/v1"
+            mkdir -p "$target_cosmic/com.system76.CosmicTerm/v1"
+
+            # Copiar configs de skeleton
+            if [ -d /etc/skel/.config/cosmic ]; then
+                cp -rn /etc/skel/.config/cosmic/* "$target_cosmic/" 2>/dev/null || true
+                # Forzar sobreescritura de temas y terminales clave para alineación soberana
+                cp -f /etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/* "$target_cosmic/com.system76.CosmicTheme.Dark/v2/" 2>/dev/null || true
+                cp -f /etc/skel/.config/cosmic/com.system76.CosmicAppList/v1/* "$target_cosmic/com.system76.CosmicAppList/v1/" 2>/dev/null || true
+                cp -f /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/* "$target_cosmic/com.system76.CosmicTerm/v1/" 2>/dev/null || true
+            fi
+
+            # Asegurar tipografía JetBrainsMono Nerd Font en el usuario
+            echo '"JetBrainsMono Nerd Font"' > "$target_cosmic/com.system76.CosmicTerm/v1/font_name"
+
+            chown -R "$u:$g" "$target_cosmic" 2>/dev/null || true
+        fi
+    done
+}
+
+post_upgrade() {
+    post_install
+}

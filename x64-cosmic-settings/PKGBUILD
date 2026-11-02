@@ -1,13 +1,63 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=1
-pkgdesc="Official X64 LIOS COSMIC Desktop Settings (Vanilla Skeleton)"
+pkgrel=2
+pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
-depends=()
+install='x64-cosmic-settings.install'
+depends=(
+    'cosmic-session'
+    'cosmic-terminal'
+    'kitty'
+    'ttf-jetbrains-mono-nerd'
+)
+source=(
+    'theme_v2_accent'
+    'theme_v2_background'
+    'app_list_favorites'
+    'cosmic_term_color_schemes_dark'
+    'cosmic_term_font_size'
+    'cosmic_term_show_headerbar'
+    'screenshot.png'
+)
+sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+)
 
 package() {
-    mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS COSMIC Settings - Vanilla default configuration placeholder" > "${pkgdir}/usr/share/doc/${pkgname}/README"
-}
+    # 1. Configuracion en /etc/skel/.config/cosmic (Nuevos usuarios)
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2"
+    install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
+    install -m644 "${srcdir}/theme_v2_background" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/background"
 
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicAppList/v1"
+    install -m644 "${srcdir}/app_list_favorites" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicAppList/v1/favorites"
+
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1"
+    install -m644 "${srcdir}/cosmic_term_color_schemes_dark" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/color_schemes_dark"
+    install -m644 "${srcdir}/cosmic_term_font_size" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/font_size"
+    install -m644 "${srcdir}/cosmic_term_show_headerbar" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/show_headerbar"
+
+    # 2. Configuracion global de respaldo en /etc/xdg/cosmic
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2"
+    install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
+    install -m644 "${srcdir}/theme_v2_background" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/background"
+
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicAppList/v1"
+    install -m644 "${srcdir}/app_list_favorites" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicAppList/v1/favorites"
+
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1"
+    install -m644 "${srcdir}/cosmic_term_color_schemes_dark" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1/color_schemes_dark"
+    install -m644 "${srcdir}/cosmic_term_font_size" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1/font_size"
+    install -m644 "${srcdir}/cosmic_term_show_headerbar" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1/show_headerbar"
+
+    # 3. Screenshot oficial de referencia
+    install -d "${pkgdir}/usr/share/x64-cosmic-settings"
+    install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-cosmic-settings/screenshot.png"
+}
