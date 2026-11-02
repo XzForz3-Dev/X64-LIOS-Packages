@@ -11,10 +11,16 @@ ShellRoot {
 
         function toggle() {
             launcher.visible = !launcher.visible;
+            if (launcher.visible) {
+                controlCenter.visible = false;
+                calendarPopup.visible = false;
+            }
         }
 
         function open() {
             launcher.visible = true;
+            controlCenter.visible = false;
+            calendarPopup.visible = false;
         }
 
         function close() {
@@ -23,14 +29,42 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "calendar"
+
+        function toggle() {
+            calendarPopup.visible = !calendarPopup.visible;
+            if (calendarPopup.visible) {
+                launcher.visible = false;
+                controlCenter.visible = false;
+            }
+        }
+
+        function open() {
+            calendarPopup.visible = true;
+            launcher.visible = false;
+            controlCenter.visible = false;
+        }
+
+        function close() {
+            calendarPopup.visible = false;
+        }
+    }
+
+    IpcHandler {
         target: "control"
 
         function toggle() {
             controlCenter.visible = !controlCenter.visible;
+            if (controlCenter.visible) {
+                launcher.visible = false;
+                calendarPopup.visible = false;
+            }
         }
 
         function open() {
             controlCenter.visible = true;
+            launcher.visible = false;
+            calendarPopup.visible = false;
         }
 
         function close() {
@@ -44,17 +78,34 @@ ShellRoot {
 
         onToggleLauncher: {
             launcher.visible = !launcher.visible;
-            if (launcher.visible) controlCenter.visible = false;
+            if (launcher.visible) {
+                controlCenter.visible = false;
+                calendarPopup.visible = false;
+            }
+        }
+
+        onToggleCalendar: {
+            calendarPopup.visible = !calendarPopup.visible;
+            if (calendarPopup.visible) {
+                launcher.visible = false;
+                controlCenter.visible = false;
+            }
         }
 
         onToggleControl: {
             controlCenter.visible = !controlCenter.visible;
-            if (controlCenter.visible) launcher.visible = false;
+            if (controlCenter.visible) {
+                launcher.visible = false;
+                calendarPopup.visible = false;
+            }
         }
 
         onTogglePower: {
             controlCenter.visible = !controlCenter.visible;
-            if (controlCenter.visible) launcher.visible = false;
+            if (controlCenter.visible) {
+                launcher.visible = false;
+                calendarPopup.visible = false;
+            }
         }
     }
 
@@ -63,6 +114,13 @@ ShellRoot {
         id: launcher
         visible: false
         onCloseRequested: launcher.visible = false
+    }
+
+    // Cyberpunk Calendar & Date Dropdown Popup
+    CalendarPopup {
+        id: calendarPopup
+        visible: false
+        onCloseRequested: calendarPopup.visible = false
     }
 
     // Control Center Sliding Panel

@@ -18,15 +18,25 @@ PanelWindow {
     }
 
     margins {
-        top: 54
-        right: 12
+        top: 32
+        right: 4
     }
 
     implicitWidth: 360
     implicitHeight: 460
     color: "transparent"
 
-    WlrLayershell.layer: WlrLayer.Top
+    exclusionMode: ExclusionMode.Ignore
+    WlrLayershell.layer: WlrLayer.Overlay
+
+    PwObjectTracker {
+        objects: {
+            var list = [];
+            if (Pipewire.defaultAudioSink) list.push(Pipewire.defaultAudioSink);
+            if (Pipewire.defaultAudioSource) list.push(Pipewire.defaultAudioSource);
+            return list;
+        }
+    }
 
     Rectangle {
         anchors.fill: parent

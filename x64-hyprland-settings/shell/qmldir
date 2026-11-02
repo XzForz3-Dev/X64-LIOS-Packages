@@ -3,3 +3,4 @@ Bar 1.0 Bar.qml
 AppLauncher 1.0 AppLauncher.qml
 ControlCenter 1.0 ControlCenter.qml
 VolumeOsd 1.0 VolumeOsd.qml
+CalendarPopup 1.0 CalendarPopup.qml

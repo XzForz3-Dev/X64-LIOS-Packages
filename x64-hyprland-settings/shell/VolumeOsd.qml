@@ -24,6 +24,14 @@ PanelWindow {
 
     visible: false
 
+    PwObjectTracker {
+        objects: {
+            var list = [];
+            if (Pipewire.defaultAudioSink) list.push(Pipewire.defaultAudioSink);
+            return list;
+        }
+    }
+
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property real currentVol: sink && sink.audio ? sink.audio.volume : 0
     readonly property bool currentMuted: sink && sink.audio ? sink.audio.muted : false
@@ -82,3 +90,4 @@ PanelWindow {
         }
     }
 }
+
