@@ -1,0 +1,29 @@
+post_install() {
+    # Propagar configuraciones soberanas de Hyprland y Quickshell a usuarios existentes en /home/*
+    for user_dir in /home/*; do
+        if [ -d "$user_dir" ]; then
+            u=$(basename "$user_dir")
+            g=$(id -gn "$u" 2>/dev/null || echo "$u")
+
+            target_hypr="$user_dir/.config/hypr"
+            target_qs="$user_dir/.config/quickshell"
+            mkdir -p "$target_hypr"
+            mkdir -p "$target_qs"
+
+            # Copiar configs de skeleton
+            if [ -d /etc/skel/.config/hypr ]; then
+                cp -f /etc/skel/.config/hypr/* "$target_hypr/" 2>/dev/null || true
+            fi
+
+            if [ -d /etc/skel/.config/quickshell ]; then
+                cp -rf /etc/skel/.config/quickshell/* "$target_qs/" 2>/dev/null || true
+            fi
+
+            chown -R "$u:$g" "$target_hypr" "$target_qs" 2>/dev/null || true
+        fi
+    done
+}
+
+post_upgrade() {
+    post_install
+}

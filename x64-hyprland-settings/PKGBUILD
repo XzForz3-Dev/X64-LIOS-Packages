@@ -1,19 +1,38 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=2
-pkgdesc="Official X64 LIOS Hyprland Desktop Settings and Integration"
+pkgrel=3
+pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'kitty' 'waybar' 'dunst' 'rofi-wayland' 'dolphin')
-source=('hyprland.conf')
-sha256sums=('SKIP')
+depends=('hyprland' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd')
+install=x64-hyprland-settings.install
+source=(
+    'hyprland.lua'
+    'hyprland.conf'
+    '01-monolith.jpg'
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
-    echo "X64 LIOS Hyprland Desktop Settings" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+    echo "X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua)" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 
     # Install skeleton and system-wide default configuration
+    install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/skel/.config/hypr/hyprland.lua"
+    install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/xdg/hypr/hyprland.lua"
     install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/skel/.config/hypr/hyprland.conf"
     install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/xdg/hypr/hyprland.conf"
+
+    # Install 4K Monolith Wallpaper
+    install -Dm644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
+
+    # Install Quickshell Desktop Shell to /usr/share and /etc/skel
+    local qs_dir="${pkgdir}/usr/share/x64-hyprland/shell"
+    mkdir -p "${qs_dir}"
+    cp -r "${startdir}/shell/"* "${qs_dir}/"
+
+    local skel_qs="${pkgdir}/etc/skel/.config/quickshell"
+    mkdir -p "${skel_qs}"
+    cp -r "${startdir}/shell/"* "${skel_qs}/"
 }

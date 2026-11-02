@@ -1,0 +1,344 @@
+import QtQuick
+import QtQuick.Layouts
+import QtQuick.Controls
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Hyprland
+import Quickshell.Services.Pipewire
+import Quickshell.Io
+
+PanelWindow {
+    id: controlWindow
+
+    signal closeRequested()
+
+    anchors {
+        top: true
+        right: true
+    }
+
+    margins {
+        top: 54
+        right: 12
+    }
+
+    implicitWidth: 360
+    implicitHeight: 460
+    color: "transparent"
+
+    WlrLayershell.layer: WlrLayer.Top
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Theme.radiusLg
+        color: Theme.bgGlass
+        border.color: Theme.borderGlass
+        border.width: 1
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 14
+
+            // Header
+            RowLayout {
+                Layout.fillWidth: true
+
+                Text {
+                    text: "CENTRO DE CONTROL"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 13
+                    font.bold: true
+                    color: Theme.accent
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: "󰅖"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 15
+                    color: Theme.textMuted
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: controlWindow.closeRequested()
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: Theme.borderSubtle
+            }
+
+            // Quick App Actions
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: 10
+                rowSpacing: 10
+
+                // Kitty Terminal
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 44
+                    radius: Theme.radiusSm
+                    color: termArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: termArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+                        Text { text: "󰄛"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
+                        Text { text: "Terminal Kitty"; font.family: Theme.fontSans; font.pixelSize: 12; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: termArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec kitty");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                // Dolphin File Manager
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 44
+                    radius: Theme.radiusSm
+                    color: dolphArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: dolphArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+                        Text { text: "󰉋"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
+                        Text { text: "Archivos"; font.family: Theme.fontSans; font.pixelSize: 12; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: dolphArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec dolphin");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                // X64 Hello
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 44
+                    radius: Theme.radiusSm
+                    color: helloArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: helloArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+                        Text { text: "󰍉"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
+                        Text { text: "X64 Hello"; font.family: Theme.fontSans; font.pixelSize: 12; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: helloArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec x64-hello");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                // Monitor / btop
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 44
+                    radius: Theme.radiusSm
+                    color: monArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: monArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        spacing: 8
+                        Text { text: "󰍛"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
+                        Text { text: "Monitor Btop"; font.family: Theme.fontSans; font.pixelSize: 12; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: monArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec kitty -e btop");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+            }
+
+            // Pipewire Audio Slider Card
+            Rectangle {
+                id: audioCard
+                Layout.fillWidth: true
+                implicitHeight: 80
+                radius: Theme.radiusSm
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                readonly property var sink: Pipewire.defaultAudioSink
+                readonly property real vol: sink && sink.audio ? sink.audio.volume : 0.0
+                readonly property bool isMuted: sink && sink.audio ? sink.audio.muted : false
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: audioCard.isMuted ? "󰝟 Audio Silenciado" : "󰕾 Volumen Principal"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: audioCard.isMuted ? Theme.accent : Theme.textPrimary
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: audioCard.isMuted ? "MUTE" : Math.round(audioCard.vol * 100) + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 12
+                            color: Theme.accent
+                        }
+                    }
+
+                    Slider {
+                        Layout.fillWidth: true
+                        from: 0.0
+                        to: 1.0
+                        value: audioCard.vol
+                        onMoved: {
+                            if (audioCard.sink && audioCard.sink.audio) {
+                                audioCard.sink.audio.volume = value;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            // Session / Power Buttons
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                // Lock
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    radius: Theme.radiusSm
+                    color: lockArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text { text: "󰌾"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.textPrimary }
+                        Text { text: "Bloquear"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: lockArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec loginctl lock-session");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                // Reboot
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    radius: Theme.radiusSm
+                    color: rebootArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text { text: "󰑓"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.textPrimary }
+                        Text { text: "Reiniciar"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                    }
+
+                    MouseArea {
+                        id: rebootArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec systemctl reboot");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                // Power Off
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    radius: Theme.radiusSm
+                    color: offArea.containsMouse ? Theme.accent : Theme.bgCard
+                    border.color: offArea.containsMouse ? Theme.accentLight : Theme.borderSubtle
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text { text: "󰐥"; font.family: Theme.fontMono; font.pixelSize: 14; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
+                        Text { text: "Apagar"; font.family: Theme.fontSans; font.pixelSize: 11; font.bold: true; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
+                    }
+
+                    MouseArea {
+                        id: offArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch("exec systemctl poweroff");
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
