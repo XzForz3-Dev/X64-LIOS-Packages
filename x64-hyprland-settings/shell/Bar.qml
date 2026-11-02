@@ -35,6 +35,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.exclusiveZone: 32
+    WlrLayershell.namespace: "quickshell"
 
     // Track PipeWire default audio devices so Quickshell activates volume & mute telemetry
     PwObjectTracker {
@@ -46,163 +47,365 @@ PanelWindow {
         }
     }
 
-    // Background Surface with Cyberpunk Glass & Subtle Crimson Accent (Edge to Edge)
+    // =========================================================================
+    // SYSTEM TELEMETRY & BACKGROUND MONITORS
+    // =========================================================================
+
+    property int cpuUsage: 0
+    property string ramUsage: "0.0"
+
+    Process {
+        id: teleProcess
+        command: ["sh", "-c", "awk '{printf \"%.0f\", $1*25}' /proc/loadavg 2>/dev/null || echo 0; awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf \"%.1f\", (t-a)/1048576; else print 0}' /proc/meminfo 2>/dev/null || echo 0"]
+        stdout: StdioCollector {
+            id: teleCollector
+            onStreamFinished: {
+                if (!teleCollector.text) return;
+                var lines = teleCollector.text.trim().split("\n");
+                if (lines.length >= 2) {
+                    barWindow.cpuUsage = parseInt(lines[0]) || 0;
+                    barWindow.ramUsage = lines[1] || "0";
+                }
+            }
+        }
+    }
+
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            if (teleProcess.running) return;
+            teleProcess.running = true;
+        }
+    }
+
+    // Active Keyboard Layout Detector
+    property string kbLayout: "US"
+    Process {
+        id: kbProcess
+        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl devices -j 2>/dev/null | jq -r '.keyboards[] | select(.main == true) | .active_keymap' 2>/dev/null | head -n1 || echo 'English'"]
+        stdout: StdioCollector {
+            id: kbCollector
+            onStreamFinished: {
+                if (!kbCollector.text) return;
+                var text = kbCollector.text.trim().toLowerCase();
+                if (text.indexOf("span") !== -1 || text.indexOf("es") !== -1) {
+                    barWindow.kbLayout = "ES";
+                } else {
+                    barWindow.kbLayout = "US";
+                }
+            }
+        }
+    }
+
+    // Network Connectivity Detector
+    property string netType: "LAN"
+    property string netName: "Cable"
+    Process {
+        id: netProcess
+        command: ["sh", "-c", "route=$(ip route get 1.1.1.1 2>/dev/null | head -n1); if [ -n \"$route\" ]; then dev=$(echo \"$route\" | awk '{print $5}'); if [ -d \"/sys/class/net/$dev/wireless\" ]; then ssid=$(iw dev \"$dev\" link 2>/dev/null | awk -F': ' '/SSID/{print $2}'); echo \"WIFI|${ssid:-Wi-Fi}\"; else echo \"LAN|Cable\"; fi; else echo \"NONE|Desconectado\"; fi"]
+        stdout: StdioCollector {
+            id: netCollector
+            onStreamFinished: {
+                if (!netCollector.text) return;
+                var parts = netCollector.text.trim().split("|");
+                barWindow.netType = parts[0] || "LAN";
+                barWindow.netName = parts[1] || "Cable";
+            }
+        }
+    }
+
+    Timer {
+        interval: 4000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            if (!kbProcess.running) kbProcess.running = true;
+            if (!netProcess.running) netProcess.running = true;
+        }
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (!event || !event.name) return;
+            var name = String(event.name);
+            if (name.indexOf("activelayout") !== -1 || name === "configreloaded") {
+                if (!kbProcess.running) kbProcess.running = true;
+            }
+        }
+    }
+
+    // Real-time Clock Strings
+    property string timeStr: "00:00"
+    property string dateStr: "LUN 01 ENE"
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            var now = new Date();
+            var h = String(now.getHours()).padStart(2, '0');
+            var m = String(now.getMinutes()).padStart(2, '0');
+            barWindow.timeStr = h + ":" + m;
+
+            var days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+            var months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+            var dName = days[now.getDay()];
+            var dNum = String(now.getDate()).padStart(2, '0');
+            var mName = months[now.getMonth()];
+            barWindow.dateStr = dName + " " + dNum + " " + mName;
+        }
+    }
+
+    // =========================================================================
+    // BAR BACKGROUND SURFACE (AERODYNAMIC SATIN OBSIDIAN GLASS)
+    // =========================================================================
+
     Rectangle {
         id: barBackground
         anchors.fill: parent
-        radius: 0
-        color: Theme.bgGlass
+        color: "#0a0b10e6" // Deep obsidian OLED glass
 
-        // Bottom 1px Border Separator
+        // Top 1px specular highlight line
         Rectangle {
-            anchors {
-                bottom: parent.bottom
-                left: parent.left
-                right: parent.right
-            }
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
             height: 1
-            color: Theme.borderGlass
+            color: "#18ffffff"
         }
 
-        // Bottom Subtle Crimson Neon Glow Line
+        // Bottom 1px razor-sharp crimson neon glow line
         Rectangle {
-            anchors {
-                bottom: parent.bottom
-                left: parent.left
-                right: parent.right
-                leftMargin: 40
-                rightMargin: 40
-            }
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
             height: 1
-            color: Theme.accentGlow
+            color: "#44ff2b2b"
         }
+
+        // =====================================================================
+        // MASTER THREE-SECTION FLEXIBLE BAR LAYOUT
+        // =====================================================================
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 6
-            anchors.rightMargin: 6
-            spacing: 6
+            anchors.leftMargin: 8
+            anchors.rightMargin: 8
+            spacing: 8
 
-            // =============================================================
-            // LEFT SECTION: X64 BRAND + WORKSPACES + ACTIVE TITLE
-            // =============================================================
-
-            // X64 Launcher Trigger (Click: Menu, Right Click: Terminal)
+            // -----------------------------------------------------------------
+            // 1. LEFT CAPSULE: SOBERANA NAVEGACIÓN (Brand + Workspaces + Title)
+            // -----------------------------------------------------------------
             Rectangle {
-                id: brandBtn
-                implicitWidth: 58
+                id: navCapsule
                 implicitHeight: 24
-                radius: Theme.radiusSm
-                color: brandArea.containsMouse ? Theme.accentDim : Theme.bgCard
-                border.color: brandArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                implicitWidth: navRow.implicitWidth + 8
+                radius: 12
+                color: "#12131add"
+                border.color: "#1affffff"
                 border.width: 1
 
-                Behavior on color { ColorAnimation { duration: 150 } }
-                Behavior on border.color { ColorAnimation { duration: 150 } }
-
                 RowLayout {
+                    id: navRow
                     anchors.centerIn: parent
-                    spacing: 4
+                    spacing: 6
 
-                    Text {
-                        text: "󰍉"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 13
-                        color: brandArea.containsMouse ? Theme.textPrimary : Theme.accent
-                    }
-
-                    Text {
-                        text: "X64"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Theme.textPrimary
-                    }
-                }
-
-                MouseArea {
-                    id: brandArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: (mouse) => {
-                        if (mouse.button === Qt.LeftButton) {
-                            barWindow.toggleLauncher();
-                        } else if (mouse.button === Qt.RightButton) {
-                            Hyprland.dispatch("exec kitty");
-                        }
-                    }
-                }
-            }
-
-            // Divider
-            Rectangle {
-                implicitWidth: 1
-                implicitHeight: 14
-                color: Theme.borderSubtle
-            }
-
-            // Hyprland Workspaces (Dynamic, animated pills + Wheel Navigation)
-            RowLayout {
-                id: workspacesLayout
-                spacing: 3
-
-                function workspaceById(wsId) {
-                    if (!Hyprland.workspaces || !Hyprland.workspaces.values) return null;
-                    for (var i = 0; i < Hyprland.workspaces.values.length; i++) {
-                        if (Hyprland.workspaces.values[i].id === wsId) {
-                            return Hyprland.workspaces.values[i];
-                        }
-                    }
-                    return null;
-                }
-
-                Repeater {
-                    model: [1, 2, 3, 4, 5, 6, 7]
-
+                    // Brand Icon & Badge (Launcher on Left Click, Kitty on Right Click)
                     Rectangle {
-                        id: wsItem
-                        required property int modelData
-                        readonly property bool isFocused: Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id === modelData
-                        readonly property var wsObj: workspacesLayout.workspaceById(modelData)
-                        readonly property bool isOccupied: wsObj && wsObj.toplevels && wsObj.toplevels.values && wsObj.toplevels.values.length > 0
-
-                        implicitWidth: isFocused ? 28 : 22
-                        implicitHeight: 22
-                        radius: Theme.radiusSm
-
-                        color: isFocused ? Theme.accent : (isOccupied ? Theme.bgCard : (wsArea.containsMouse ? Theme.bgHover : "transparent"))
-                        border.color: isFocused ? Theme.accentLight : (isOccupied ? Theme.borderSubtle : "transparent")
-                        border.width: 1
-
-                        Behavior on implicitWidth {
-                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                        }
+                        id: brandPill
+                        implicitWidth: brandRow.implicitWidth + 8
+                        implicitHeight: 20
+                        radius: 10
+                        color: brandArea.containsMouse ? "#22ff2b2b" : "transparent"
                         Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                        Text {
+                        RowLayout {
+                            id: brandRow
                             anchors.centerIn: parent
-                            text: String(wsItem.modelData)
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: wsItem.isFocused || wsItem.isOccupied
-                            color: wsItem.isFocused ? "#ffffff" : (wsItem.isOccupied ? Theme.textPrimary : (wsArea.containsMouse ? Theme.textSecondary : Theme.textMuted))
-                            opacity: wsItem.isFocused || wsItem.isOccupied ? 1.0 : (wsArea.containsMouse ? 0.9 : 0.45)
+                            spacing: 4
+
+                            Text {
+                                text: "󰣇"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                color: Theme.accent
+                            }
+
+                            Text {
+                                text: "X64"
+                                font.family: Theme.fontSans
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.letterSpacing: 1.0
+                                color: Theme.textPrimary
+                            }
                         }
 
                         MouseArea {
-                            id: wsArea
+                            id: brandArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: Hyprland.dispatch("workspace " + wsItem.modelData)
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: (mouse) => {
+                                if (mouse.button === Qt.LeftButton) {
+                                    barWindow.toggleLauncher();
+                                } else if (mouse.button === Qt.RightButton) {
+                                    Hyprland.dispatch('hl.dsp.exec_cmd("kitty")');
+                                }
+                            }
+                        }
+                    }
+
+                    // Subtle Hairline Divider
+                    Rectangle {
+                        implicitWidth: 1
+                        implicitHeight: 12
+                        color: "#1affffff"
+                    }
+
+                    // Morphic Geometric Workspaces (Reactive Pills & Dots)
+                    Item {
+                        id: wsContainer
+                        implicitWidth: wsLayout.implicitWidth
+                        implicitHeight: 20
+
+                        RowLayout {
+                            id: wsLayout
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Repeater {
+                                model: [1, 2, 3, 4, 5, 6, 7]
+
+                                Item {
+                                    id: wsItem
+                                    required property int modelData
+
+                                    readonly property bool isFocused: Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id === modelData
+                                    readonly property bool isOccupied: {
+                                        if (!Hyprland.workspaces) return false;
+                                        var list = Hyprland.workspaces.values;
+                                        for (var i = 0; i < list.length; i++) {
+                                            if (list[i].id === modelData) return true;
+                                        }
+                                        return false;
+                                    }
+
+                                    implicitWidth: wsIndicator.width + 4
+                                    implicitHeight: 20
+
+                                    Rectangle {
+                                        id: wsIndicator
+                                        anchors.centerIn: parent
+
+                                        // Dynamic morphic pill: elongated glowing bar for active, dot for occupied/empty
+                                        width: {
+                                            if (wsItem.isFocused) return wsArea.containsMouse ? 20 : 16;
+                                            if (wsArea.containsMouse) return 8;
+                                            return wsItem.isOccupied ? 5 : 4;
+                                        }
+                                        height: wsItem.isFocused ? 5 : (wsItem.isOccupied ? 5 : 4)
+                                        radius: height / 2
+
+                                        color: {
+                                            if (wsItem.isFocused) return Theme.accent;
+                                            if (wsArea.containsMouse) return "#ffffff";
+                                            if (wsItem.isOccupied) return "#c0c0d0";
+                                            return "#404050";
+                                        }
+
+                                        Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                        Behavior on color { ColorAnimation { duration: 180 } }
+                                    }
+
+                                    MouseArea {
+                                        id: wsArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Hyprland.dispatch("workspace " + wsItem.modelData)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Mouse wheel over workspaces to cycle
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.NoButton
                             onWheel: (wheel) => {
                                 if (wheel.angleDelta.y > 0) {
                                     Hyprland.dispatch("workspace e-1");
-                                } else {
+                                } else if (wheel.angleDelta.y < 0) {
                                     Hyprland.dispatch("workspace e+1");
+                                }
+                            }
+                        }
+                    }
+
+                    // Active Window Title Pill (Fade in when a window is focused)
+                    readonly property var activeTop: ToplevelManager.activeToplevel
+                    readonly property string winTitle: activeTop ? (activeTop.title || activeTop.appId || "") : ""
+
+                    Rectangle {
+                        implicitWidth: 1
+                        implicitHeight: 12
+                        color: "#1affffff"
+                        visible: navRow.winTitle !== ""
+                    }
+
+                    Item {
+                        id: titleBox
+                        visible: navRow.winTitle !== ""
+                        implicitWidth: Math.min(160, titleRow.implicitWidth)
+                        implicitHeight: 20
+                        Layout.maximumWidth: 160
+
+                        RowLayout {
+                            id: titleRow
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Text {
+                                text: ""
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: Theme.accent
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            Text {
+                                text: navRow.winTitle
+                                font.family: Theme.fontSans
+                                font.pixelSize: 10
+                                font.weight: Font.Medium
+                                color: titleArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+                        }
+
+                        MouseArea {
+                            id: titleArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                            onClicked: (mouse) => {
+                                if (!navRow.activeTop) return;
+                                if (mouse.button === Qt.MiddleButton || mouse.button === Qt.RightButton) {
+                                    navRow.activeTop.close();
+                                } else {
+                                    navRow.activeTop.activate();
                                 }
                             }
                         }
@@ -210,115 +413,52 @@ PanelWindow {
                 }
             }
 
-            // Active Window Title Pill (via Wayland ToplevelManager + Click to Close)
-            Item {
-                id: activeTitleBox
-                implicitWidth: Math.min(240, activeTitleContent.implicitWidth)
-                implicitHeight: 24
-                Layout.maximumWidth: 240
-                Layout.preferredWidth: implicitWidth
-                Layout.preferredHeight: 24
-                readonly property var activeTop: ToplevelManager.activeToplevel
-                readonly property string winTitle: activeTop ? (activeTop.title || activeTop.appId || "") : ""
-                visible: winTitle !== ""
+            // Left Expanding Spacer
+            Item { Layout.fillWidth: true }
 
-                RowLayout {
-                    id: activeTitleContent
-                    anchors.fill: parent
-                    spacing: 5
-
-                    Rectangle {
-                        implicitWidth: 1
-                        implicitHeight: 14
-                        color: Theme.borderSubtle
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-
-                    Text {
-                        text: ""
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: Theme.accent
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-
-                    Text {
-                        id: activeTitleText
-                        text: activeTitleBox.winTitle
-                        font.family: Theme.fontSans
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-                        color: activeTitleArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignVCenter
-                    }
-                }
-
-                MouseArea {
-                    id: activeTitleArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-                    onClicked: (mouse) => {
-                        if (!activeTitleBox.activeTop) return;
-                        if (mouse.button === Qt.MiddleButton || mouse.button === Qt.RightButton) {
-                            activeTitleBox.activeTop.close();
-                        } else {
-                            activeTitleBox.activeTop.activate();
-                        }
-                    }
-                }
-            }
-
-            // Spacer pushing Center and Right
-            Item {
-                Layout.fillWidth: true
-            }
-
-            // =============================================================
-            // CENTER SECTION: CLOCK & DATE + NOW-PLAYING MPRIS
-            // =============================================================
-
-            // MPRIS Media Player Widget (Visible only when music is active)
+            // -----------------------------------------------------------------
+            // 2. CENTER SECTION: NOW-PLAYING MPRIS + CHRONOS MASTER CAPSULE
+            // -----------------------------------------------------------------
             RowLayout {
-                id: mprisBox
-                readonly property var players: Mpris.players ? Mpris.players.values : []
-                readonly property var activePlayer: {
-                    for (var i = 0; i < players.length; i++) {
-                        if (players[i].isPlaying) return players[i];
-                    }
-                    return players.length > 0 ? players[0] : null;
-                }
-                readonly property bool hasMedia: activePlayer !== null && (activePlayer.trackTitle !== "" || activePlayer.trackArtist !== "")
-                visible: hasMedia
+                spacing: 6
 
+                // MPRIS Media Capsule (Shows dynamically when track is playing)
                 Rectangle {
+                    id: mprisCapsule
+                    readonly property var players: Mpris.players ? Mpris.players.values : []
+                    readonly property var activePlayer: {
+                        for (var i = 0; i < players.length; i++) {
+                            if (players[i].isPlaying) return players[i];
+                        }
+                        return players.length > 0 ? players[0] : null;
+                    }
+                    readonly property bool hasMedia: activePlayer !== null && (activePlayer.trackTitle !== "" || activePlayer.trackArtist !== "")
+                    visible: hasMedia
+
                     implicitHeight: 24
-                    implicitWidth: Math.min(220, mprisContent.implicitWidth + 12)
-                    radius: Theme.radiusSm
-                    color: mprisArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: Theme.borderSubtle
+                    implicitWidth: Math.min(200, mprisRow.implicitWidth + 12)
+                    radius: 12
+                    color: mprisArea.containsMouse ? "#1c1d26dd" : "#12131add"
+                    border.color: mprisArea.containsMouse ? Theme.accent : "#1affffff"
                     border.width: 1
 
                     RowLayout {
-                        id: mprisContent
+                        id: mprisRow
                         anchors.centerIn: parent
-                        spacing: 5
+                        spacing: 4
 
                         Text {
-                            text: (mprisBox.activePlayer && mprisBox.activePlayer.isPlaying) ? "󰏤" : "󰐊"
+                            text: (mprisCapsule.activePlayer && mprisCapsule.activePlayer.isPlaying) ? "󰏤" : "󰐊"
                             font.family: Theme.fontMono
-                            font.pixelSize: 11
+                            font.pixelSize: 10
                             color: Theme.accent
                         }
 
                         Text {
                             text: {
-                                if (!mprisBox.activePlayer) return "";
-                                var t = mprisBox.activePlayer.trackTitle || "";
-                                var a = mprisBox.activePlayer.trackArtist || "";
+                                if (!mprisCapsule.activePlayer) return "";
+                                var t = mprisCapsule.activePlayer.trackTitle || "";
+                                var a = mprisCapsule.activePlayer.trackArtist || "";
                                 return a !== "" ? (t + " • " + a) : t;
                             }
                             font.family: Theme.fontSans
@@ -326,7 +466,7 @@ PanelWindow {
                             font.bold: true
                             color: Theme.textPrimary
                             elide: Text.ElideRight
-                            Layout.maximumWidth: 160
+                            Layout.maximumWidth: 150
                         }
                     }
 
@@ -337,618 +477,505 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: (mouse) => {
-                            if (!mprisBox.activePlayer) return;
-                            if (mouse.button === Qt.LeftButton) {
-                                mprisBox.activePlayer.playPause();
-                            } else if (mouse.button === Qt.RightButton) {
-                                mprisBox.activePlayer.next();
-                            }
+                            if (!mprisCapsule.activePlayer) return;
+                            if (mouse.button === Qt.LeftButton) mprisCapsule.activePlayer.playPause();
+                            else if (mouse.button === Qt.RightButton) mprisCapsule.activePlayer.next();
                         }
                         onWheel: (wheel) => {
-                            if (!mprisBox.activePlayer) return;
-                            if (wheel.angleDelta.y > 0) mprisBox.activePlayer.previous();
-                            else mprisBox.activePlayer.next();
+                            if (!mprisCapsule.activePlayer) return;
+                            if (wheel.angleDelta.y > 0) mprisCapsule.activePlayer.next();
+                            else mprisCapsule.activePlayer.previous();
                         }
                     }
                 }
-            }
 
-            // Digital Clock & Date Button
-            Rectangle {
-                id: clockBox
-                implicitHeight: 24
-                implicitWidth: clockLayout.implicitWidth + 14
-                radius: Theme.radiusSm
-                color: clockArea.containsMouse ? Theme.bgCard : "transparent"
-                border.color: clockArea.containsMouse ? Theme.borderSubtle : "transparent"
-                border.width: 1
+                // Chronos Master Capsule (Clock & Date -> Dropdown Calendar Popup)
+                Rectangle {
+                    id: clockCapsule
+                    implicitHeight: 24
+                    implicitWidth: clockRow.implicitWidth + 16
+                    radius: 12
+                    color: clockArea.containsMouse ? "#1e1f2bdd" : "#12131add"
+                    border.color: clockArea.containsMouse ? Theme.accent : "#1affffff"
+                    border.width: 1
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                RowLayout {
-                    id: clockLayout
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    Text {
-                        id: timeLabel
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Theme.textPrimary
-                    }
-
-                    Text {
-                        text: "•"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 8
-                        color: Theme.accent
-                    }
-
-                    Text {
-                        id: dateLabel
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: false
-                        color: Theme.textSecondary
-                    }
-                }
-
-                Timer {
-                    interval: 1000
-                    running: true
-                    repeat: true
-                    triggeredOnStart: true
-                    onTriggered: {
-                        var now = new Date();
-                        var h = String(now.getHours()).padStart(2, "0");
-                        var m = String(now.getMinutes()).padStart(2, "0");
-                        timeLabel.text = h + ":" + m;
-
-                        var days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
-                        var months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
-                        dateLabel.text = days[now.getDay()] + " " + String(now.getDate()).padStart(2, "0") + " " + months[now.getMonth()];
-                    }
-                }
-
-                MouseArea {
-                    id: clockArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: barWindow.toggleCalendar()
-                }
-            }
-
-            // Spacer pushing Right
-            Item {
-                Layout.fillWidth: true
-            }
-
-            // =============================================================
-            // RIGHT SECTION: TELEMETRY + KEYBOARD + NET + AUDIO + TRAY
-            // =============================================================
-
-            // Mini Telemetry (CPU & RAM)
-            Rectangle {
-                id: telemetryBox
-                implicitHeight: 22
-                implicitWidth: telemetryLayout.implicitWidth + 12
-                radius: Theme.radiusSm
-                color: Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                RowLayout {
-                    id: telemetryLayout
-                    anchors.centerIn: parent
-                    spacing: 8
-
-                    // CPU Metric
                     RowLayout {
-                        spacing: 3
+                        id: clockRow
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Text {
+                            text: "󰸗"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 11
+                            color: clockArea.containsMouse ? Theme.accentLight : Theme.accent
+                        }
+
+                        Text {
+                            text: barWindow.timeStr
+                            font.family: Theme.fontSans
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: Theme.textPrimary
+                        }
+
+                        Rectangle {
+                            implicitWidth: 3
+                            implicitHeight: 3
+                            radius: 1.5
+                            color: Theme.accent
+                        }
+
+                        Text {
+                            text: barWindow.dateStr
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            font.letterSpacing: 0.5
+                            color: Theme.textSecondary
+                        }
+                    }
+
+                    MouseArea {
+                        id: clockArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: barWindow.toggleCalendar()
+                    }
+                }
+            }
+
+            // Right Expanding Spacer
+            Item { Layout.fillWidth: true }
+
+            // -----------------------------------------------------------------
+            // 3. RIGHT SECTION: TWO STREAMLINED LUXURY ISLANDS
+            // -----------------------------------------------------------------
+            RowLayout {
+                spacing: 6
+
+                // Island 3A: Hardware Telemetry Capsule (CPU% & RAM)
+                Rectangle {
+                    id: telemetryCapsule
+                    implicitHeight: 24
+                    implicitWidth: telemetryRow.implicitWidth + 12
+                    radius: 12
+                    color: teleArea.containsMouse ? "#1c1d26dd" : "#12131add"
+                    border.color: teleArea.containsMouse ? Theme.borderAccent : "#1affffff"
+                    border.width: 1
+
+                    RowLayout {
+                        id: telemetryRow
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        // CPU
                         Text {
                             text: "󰻠"
                             font.family: Theme.fontMono
                             font.pixelSize: 11
-                            color: cpuText.isHigh ? Theme.accent : Theme.textMuted
+                            color: Theme.accent
                         }
-                        Text {
-                            id: cpuText
-                            property bool isHigh: false
-                            text: "0%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: isHigh ? Theme.accent : Theme.textSecondary
-                        }
-                    }
 
-                    // RAM Metric
-                    RowLayout {
-                        spacing: 3
+                        Text {
+                            text: barWindow.cpuUsage + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+
+                        // Divider
+                        Rectangle {
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#1affffff"
+                        }
+
+                        // RAM
                         Text {
                             text: "󰍛"
                             font.family: Theme.fontMono
                             font.pixelSize: 11
-                            color: Theme.textMuted
+                            color: "#00e5ff"
                         }
+
                         Text {
-                            id: ramText
-                            text: "0G"
+                            text: barWindow.ramUsage + "G"
                             font.family: Theme.fontMono
-                            font.pixelSize: 10
-                            color: Theme.textSecondary
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Theme.textPrimary
                         }
-                    }
-                }
-
-                // Shell Process to poll CPU and RAM every 2 seconds
-                Process {
-                    id: teleProc
-                    command: [
-                        "bash", "-c",
-                        "awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END {printf \"%.1fG\\n\", (t-a)/1024/1024}' /proc/meminfo; awk '{printf \"%.0f%%\\n\", $1*25}' /proc/loadavg"
-                    ]
-                    stdout: StdioCollector {
-                        id: teleCollector
-                        waitForEnd: true
-                        onStreamFinished: {
-                            var t = teleCollector.text;
-                            if (!t) return;
-                            var lines = t.trim().split("\n");
-                            if (lines.length >= 1) {
-                                ramText.text = lines[0].trim();
-                            }
-                            if (lines.length >= 2) {
-                                var cpuVal = parseInt(lines[1]) || 0;
-                                cpuText.text = cpuVal + "%";
-                                cpuText.isHigh = cpuVal > 80;
-                            }
-                        }
-                    }
-                }
-
-                Timer {
-                    interval: 2000
-                    running: true
-                    repeat: true
-                    triggeredOnStart: true
-                    onTriggered: {
-                        if (teleProc.running) return;
-                        teleProc.running = true;
-                    }
-                }
-            }
-
-            // Keyboard Layout Selector (US / ES)
-            Rectangle {
-                id: kbdBox
-                property string activeLayout: "US"
-
-                implicitWidth: kbdLayout.implicitWidth + 8
-                implicitHeight: 22
-                radius: Theme.radiusSm
-                color: kbdArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                RowLayout {
-                    id: kbdLayout
-                    anchors.centerIn: parent
-                    spacing: 3
-
-                    Text {
-                        text: "󰌌"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: Theme.accent
-                    }
-
-                    Text {
-                        text: kbdBox.activeLayout
-                        font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        font.bold: true
-                        color: Theme.textPrimary
-                    }
-                }
-
-                Process {
-                    id: kbdProc
-                    command: [
-                        "bash", "-c",
-                        "hyprctl devices -j | jq -r '.keyboards[] | select(.main == true) | .active_keymap' 2>/dev/null | head -n1"
-                    ]
-                    stdout: StdioCollector {
-                        id: kbdCollector
-                        waitForEnd: true
-                        onStreamFinished: {
-                            if (!kbdCollector.text) return;
-                            var text = kbdCollector.text.trim().toLowerCase();
-                            if (text.indexOf("spanish") !== -1 || text.indexOf("es") !== -1) {
-                                kbdBox.activeLayout = "ES";
-                            } else {
-                                kbdBox.activeLayout = "US";
-                            }
-                        }
-                    }
-                }
-
-                Timer {
-                    interval: 2000
-                    running: true
-                    repeat: true
-                    triggeredOnStart: true
-                    onTriggered: {
-                        if (!kbdProc.running) kbdProc.running = true;
-                    }
-                }
-
-                Connections {
-                    target: Hyprland
-                    function onRawEvent(event) {
-                        if (!event || !event.name) return;
-                        var name = String(event.name);
-                        if (name.indexOf("activelayout") !== -1 || name === "configreloaded") {
-                            if (!kbdProc.running) kbdProc.running = true;
-                        }
-                    }
-                }
-
-                MouseArea {
-                    id: kbdArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Hyprland.dispatch("switchxkblayout all next");
-                        kbdTimer.restart();
-                    }
-                }
-
-                Timer {
-                    id: kbdTimer
-                    interval: 300
-                    onTriggered: if (!kbdProc.running) kbdProc.running = true;
-                }
-            }
-
-            // Network Connectivity Indicator (Wi-Fi / Ethernet)
-            Rectangle {
-                id: netBox
-                property string netType: "eth"
-                property string netName: ""
-
-                implicitWidth: netLayout.implicitWidth + 8
-                implicitHeight: 22
-                radius: Theme.radiusSm
-                color: netArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                RowLayout {
-                    id: netLayout
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        text: netBox.netType === "wifi" ? "󰤨" : (netBox.netType === "eth" ? "󰈀" : "󰤭")
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: netBox.netType === "none" ? Theme.textMuted : Theme.accent
-                    }
-
-                    Text {
-                        text: netBox.netType === "wifi" ? (netBox.netName || "Wi-Fi") : (netBox.netType === "eth" ? "LAN" : "OFF")
-                        font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        font.bold: true
-                        color: Theme.textSecondary
-                    }
-                }
-
-                Process {
-                    id: netProc
-                    command: [
-                        "bash", "-c",
-                        "iface=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $5}'); if [[ -z \"$iface\" ]]; then echo 'none'; elif [[ \"$iface\" =~ ^wl ]]; then echo 'wifi'; iw dev \"$iface\" link 2>/dev/null | awk -F': ' '/SSID/ {print $2}'; else echo 'eth'; fi"
-                    ]
-                    stdout: StdioCollector {
-                        id: netCollector
-                        waitForEnd: true
-                        onStreamFinished: {
-                            if (!netCollector.text) return;
-                            var lines = netCollector.text.trim().split("\n");
-                            if (lines.length >= 1) {
-                                netBox.netType = lines[0].trim();
-                            }
-                            if (lines.length >= 2) {
-                                netBox.netName = lines[1].trim();
-                            }
-                        }
-                    }
-                }
-
-                Timer {
-                    interval: 6000
-                    running: true
-                    repeat: true
-                    triggeredOnStart: true
-                    onTriggered: {
-                        if (!netProc.running) netProc.running = true;
-                    }
-                }
-
-                MouseArea {
-                    id: netArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Hyprland.dispatch("exec nm-connection-editor")
-                }
-            }
-
-            // Microphone Volume / Mute Indicator
-            Rectangle {
-                id: micBox
-                readonly property var source: Pipewire.defaultAudioSource
-                readonly property real micVol: (source && source.audio) ? source.audio.volume : 0.0
-                readonly property bool micMuted: (source && source.audio) ? source.audio.muted : true
-
-                implicitWidth: micLayout.implicitWidth + 8
-                implicitHeight: 22
-                radius: Theme.radiusSm
-                color: micArea.containsMouse ? Theme.bgHover : (micBox.micMuted ? Theme.bgCard : Theme.accentDim)
-                border.color: micBox.micMuted ? Theme.borderSubtle : Theme.accent
-                border.width: 1
-
-                RowLayout {
-                    id: micLayout
-                    anchors.centerIn: parent
-                    spacing: 3
-
-                    Text {
-                        text: micBox.micMuted ? "󰍭" : "󰍬"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: micBox.micMuted ? Theme.textMuted : Theme.accent
-                    }
-
-                    Text {
-                        text: micBox.micMuted ? "MUT" : Math.round(micBox.micVol * 100) + "%"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        font.bold: true
-                        color: micBox.micMuted ? Theme.textMuted : Theme.textPrimary
-                    }
-                }
-
-                MouseArea {
-                    id: micArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (micBox.source && micBox.source.audio) {
-                            micBox.source.audio.muted = !micBox.source.audio.muted;
-                        }
-                    }
-                    onWheel: (wheel) => {
-                        if (micBox.source && micBox.source.audio) {
-                            var delta = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                            micBox.source.audio.volume = Math.max(0.0, Math.min(1.0, micBox.source.audio.volume + delta));
-                        }
-                    }
-                }
-            }
-
-            // Audio Output Module (PipeWire)
-            Rectangle {
-                id: audioBox
-                readonly property var sink: Pipewire.defaultAudioSink
-                readonly property real vol: (sink && sink.audio) ? sink.audio.volume : 0.0
-                readonly property bool muted: (sink && sink.audio) ? sink.audio.muted : false
-
-                implicitWidth: audioLayout.implicitWidth + 10
-                implicitHeight: 24
-                radius: Theme.radiusSm
-                color: audioArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                border.color: audioArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
-                border.width: 1
-
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                RowLayout {
-                    id: audioLayout
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        text: audioBox.muted ? "󰝟" : (audioBox.vol <= 0.01 ? "󰕿" : (audioBox.vol < 0.5 ? "󰖀" : "󰕾"))
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: audioBox.muted ? Theme.accent : (audioBox.vol > 1.0 ? Theme.accentHover : Theme.textPrimary)
-                    }
-
-                    Text {
-                        text: audioBox.muted ? "MUTE" : Math.round(audioBox.vol * 100) + "%"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: audioBox.muted ? Theme.accent : Theme.textSecondary
-                    }
-                }
-
-                MouseArea {
-                    id: audioArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onClicked: (mouse) => {
-                        if (mouse.button === Qt.LeftButton) {
-                            if (audioBox.sink && audioBox.sink.audio) {
-                                audioBox.sink.audio.muted = !audioBox.sink.audio.muted;
-                            }
-                        } else if (mouse.button === Qt.RightButton) {
-                            barWindow.toggleControl();
-                        }
-                    }
-                    onWheel: (wheel) => {
-                        if (audioBox.sink && audioBox.sink.audio) {
-                            var delta = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                            audioBox.sink.audio.volume = Math.max(0.0, Math.min(1.5, audioBox.sink.audio.volume + delta));
-                        }
-                    }
-                }
-            }
-
-            // System Tray with Collapsible Drawer (Chevron Toggle)
-            RowLayout {
-                spacing: 2
-
-                // Chevron Drawer Toggle
-                Rectangle {
-                    implicitWidth: 16
-                    implicitHeight: 22
-                    radius: Theme.radiusSm
-                    color: trayToggleArea.containsMouse ? Theme.bgHover : "transparent"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: barWindow.trayExpanded ? "❯" : "❮"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        color: Theme.textMuted
                     }
 
                     MouseArea {
-                        id: trayToggleArea
+                        id: teleArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: barWindow.trayExpanded = !barWindow.trayExpanded
+                        onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")')
                     }
                 }
 
-                // Tray items container with animated width
-                Item {
-                    id: trayContainer
-                    clip: true
-                    implicitWidth: barWindow.trayExpanded ? trayRow.implicitWidth : 0
-                    implicitHeight: 22
+                // Island 3B: Unified System Status & Control Suite (One Continuous Capsule)
+                Rectangle {
+                    id: systemCapsule
+                    implicitHeight: 24
+                    implicitWidth: systemRow.implicitWidth + 10
+                    radius: 12
+                    color: "#12131add"
+                    border.color: "#1affffff"
+                    border.width: 1
 
-                    Behavior on implicitWidth {
-                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                    }
+                    readonly property var defaultSink: Pipewire.defaultAudioSink
+                    readonly property real sinkVol: (defaultSink && defaultSink.audio) ? defaultSink.audio.volume : 0.0
+                    readonly property bool sinkMuted: (defaultSink && defaultSink.audio) ? defaultSink.audio.muted : false
+
+                    readonly property var defaultSource: Pipewire.defaultAudioSource
+                    readonly property real micVol: (defaultSource && defaultSource.audio) ? defaultSource.audio.volume : 0.0
+                    readonly property bool micMuted: (defaultSource && defaultSource.audio) ? defaultSource.audio.muted : true
 
                     RowLayout {
-                        id: trayRow
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 3
+                        id: systemRow
+                        anchors.centerIn: parent
+                        spacing: 5
 
-                        Repeater {
-                            model: SystemTray.items
+                        // [A] Keyboard Layout Indicator (Click switches layout)
+                        Rectangle {
+                            id: kbItem
+                            implicitWidth: kbRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: kbArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: kbRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: "󰌌"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: "#888899"
+                                }
+
+                                Text {
+                                    text: barWindow.kbLayout
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: kbArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Hyprland.dispatch("switchxkblayout all next")
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [B] Network Indicator (Click opens nm-connection-editor)
+                        Rectangle {
+                            id: netItem
+                            implicitWidth: netRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: netArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: netRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: barWindow.netType === "WIFI" ? "󰤨" : "󰈀"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: barWindow.netType === "NONE" ? "#ff4d4d" : Theme.textPrimary
+                                }
+
+                                Text {
+                                    text: barWindow.netType === "WIFI" ? barWindow.netName : "LAN"
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 9
+                                    font.weight: Font.Medium
+                                    color: Theme.textSecondary
+                                    Layout.maximumWidth: 60
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                id: netArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")')
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [C] Microphone Control (Click mutes, Wheel changes gain)
+                        Rectangle {
+                            id: micItem
+                            implicitWidth: micRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: micArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: micRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: systemCapsule.micMuted ? "󰍭" : "󰍬"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: systemCapsule.micMuted ? Theme.textMuted : Theme.accent
+                                }
+
+                                Text {
+                                    text: systemCapsule.micMuted ? "MUT" : Math.round(systemCapsule.micVol * 100) + "%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: systemCapsule.micMuted ? Theme.textMuted : Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: micArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (systemCapsule.defaultSource && systemCapsule.defaultSource.audio) {
+                                        systemCapsule.defaultSource.audio.muted = !systemCapsule.defaultSource.audio.muted;
+                                    }
+                                }
+                                onWheel: (wheel) => {
+                                    if (systemCapsule.defaultSource && systemCapsule.defaultSource.audio) {
+                                        var step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                        systemCapsule.defaultSource.audio.volume = Math.max(0.0, Math.min(1.0, systemCapsule.defaultSource.audio.volume + step));
+                                    }
+                                }
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [D] Master Volume Control (Click mutes, Wheel changes volume, Right click opens Control Center)
+                        Rectangle {
+                            id: volItem
+                            implicitWidth: volRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: volArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: volRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: systemCapsule.sinkMuted ? "󰝟" : (systemCapsule.sinkVol <= 0.01 ? "󰕿" : (systemCapsule.sinkVol < 0.5 ? "󰖀" : "󰕾"))
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textPrimary
+                                }
+
+                                Text {
+                                    text: systemCapsule.sinkMuted ? "MUT" : Math.round(systemCapsule.sinkVol * 100) + "%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: volArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.LeftButton) {
+                                        if (systemCapsule.defaultSink && systemCapsule.defaultSink.audio) {
+                                            systemCapsule.defaultSink.audio.muted = !systemCapsule.defaultSink.audio.muted;
+                                        }
+                                    } else if (mouse.button === Qt.RightButton) {
+                                        barWindow.toggleControl();
+                                    }
+                                }
+                                onWheel: (wheel) => {
+                                    if (systemCapsule.defaultSink && systemCapsule.defaultSink.audio) {
+                                        var step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                        systemCapsule.defaultSink.audio.volume = Math.max(0.0, Math.min(1.5, systemCapsule.defaultSink.audio.volume + step));
+                                    }
+                                }
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [E] System Tray Collapsible Drawer (Chevron toggle)
+                        RowLayout {
+                            spacing: 1
 
                             Rectangle {
-                                id: trayBtn
-                                required property var modelData
-                                implicitWidth: 20
-                                implicitHeight: 20
-                                radius: Theme.radiusSm
-                                color: trayArea.containsMouse ? Theme.bgHover : "transparent"
+                                implicitWidth: 14
+                                implicitHeight: 18
+                                radius: 7
+                                color: trayToggleArea.containsMouse ? "#20ffffff" : "transparent"
 
-                                Image {
+                                Text {
                                     anchors.centerIn: parent
-                                    width: 14
-                                    height: 14
-                                    sourceSize.width: 14
-                                    sourceSize.height: 14
-                                    source: trayBtn.modelData.icon || ""
-                                    fillMode: Image.PreserveAspectFit
+                                    text: barWindow.trayExpanded ? "❯" : "❮"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    color: trayToggleArea.containsMouse ? Theme.accent : Theme.textMuted
                                 }
 
                                 MouseArea {
-                                    id: trayArea
+                                    id: trayToggleArea
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: (mouse) => {
-                                        if (mouse.button === Qt.LeftButton) {
-                                            trayBtn.modelData.activate();
-                                        } else if (mouse.button === Qt.RightButton && trayBtn.modelData.hasMenu) {
-                                            trayBtn.modelData.secondaryActivate();
+                                    onClicked: barWindow.trayExpanded = !barWindow.trayExpanded
+                                }
+                            }
+
+                            Item {
+                                id: trayContainer
+                                clip: true
+                                implicitWidth: barWindow.trayExpanded ? trayItemsRow.implicitWidth : 0
+                                implicitHeight: 18
+
+                                Behavior on implicitWidth {
+                                    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                                }
+
+                                RowLayout {
+                                    id: trayItemsRow
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 3
+
+                                    Repeater {
+                                        model: SystemTray.items
+
+                                        Rectangle {
+                                            id: trayIconBtn
+                                            required property var modelData
+                                            implicitWidth: 18
+                                            implicitHeight: 18
+                                            radius: 6
+                                            color: trayIconArea.containsMouse ? "#25ffffff" : "transparent"
+
+                                            Image {
+                                                anchors.centerIn: parent
+                                                width: 13
+                                                height: 13
+                                                sourceSize.width: 13
+                                                sourceSize.height: 13
+                                                source: trayIconBtn.modelData.icon || ""
+                                                fillMode: Image.PreserveAspectFit
+                                            }
+
+                                            MouseArea {
+                                                id: trayIconArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                onClicked: (mouse) => {
+                                                    if (mouse.button === Qt.LeftButton) {
+                                                        trayIconBtn.modelData.activate();
+                                                    } else if (mouse.button === Qt.RightButton && trayIconBtn.modelData.hasMenu) {
+                                                        trayIconBtn.modelData.secondaryActivate();
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [F] Control Center Trigger Button
+                        Rectangle {
+                            id: ctrlBtn
+                            implicitWidth: 20
+                            implicitHeight: 18
+                            radius: 9
+                            color: ctrlArea.containsMouse ? "#25ffffff" : "transparent"
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰍜"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                color: ctrlArea.containsMouse ? Theme.accent : Theme.textPrimary
+                            }
+
+                            MouseArea {
+                                id: ctrlArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: barWindow.toggleControl()
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [G] Power / Fast Exit Trigger Button
+                        Rectangle {
+                            id: pwrBtn
+                            implicitWidth: 20
+                            implicitHeight: 18
+                            radius: 9
+                            color: pwrArea.containsMouse ? Theme.accent : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰐥"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                color: pwrArea.containsMouse ? "#ffffff" : Theme.accent
+                            }
+
+                            MouseArea {
+                                id: pwrArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: barWindow.togglePower()
+                            }
+                        }
                     }
-                }
-            }
-
-            // Divider
-            Rectangle {
-                implicitWidth: 1
-                implicitHeight: 14
-                color: Theme.borderSubtle
-            }
-
-            // Control Center Trigger
-            Rectangle {
-                id: controlBtn
-                implicitWidth: 26
-                implicitHeight: 24
-                radius: Theme.radiusSm
-                color: controlArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                border.color: controlArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
-                border.width: 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "󰍜"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 13
-                    color: controlArea.containsMouse ? Theme.accent : Theme.textPrimary
-                }
-
-                MouseArea {
-                    id: controlArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: barWindow.toggleControl()
-                }
-            }
-
-            // Power Session Trigger (Fast Exit)
-            Rectangle {
-                id: powerBtn
-                implicitWidth: 26
-                implicitHeight: 24
-                radius: Theme.radiusSm
-                color: powerArea.containsMouse ? Theme.accent : Theme.bgCard
-                border.color: powerArea.containsMouse ? Theme.accentLight : Theme.borderSubtle
-                border.width: 1
-
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "󰐥"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 12
-                    color: powerArea.containsMouse ? Theme.textPrimary : Theme.accent
-                }
-
-                MouseArea {
-                    id: powerArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: barWindow.togglePower()
                 }
             }
         }
