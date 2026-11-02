@@ -1,0 +1,16 @@
+<?xml version="1.1" encoding="UTF-8"?>
+
+<channel name="xfce4-terminal" version="1.0">
+  <property name="color-foreground" type="string" value="#c0c0c0"/>
+  <property name="color-background" type="string" value="#08080a"/>
+  <property name="color-cursor" type="string" value="#ff2b2b"/>
+  <property name="color-cursor-use-default" type="bool" value="false"/>
+  <property name="color-palette" type="string" value="#1c1c1c;#ff2b2b;#40e0d0;#f5c211;#1e90ff;#ff00ff;#00ffff;#a8a8a8;#4d4d4d;#ff4d4d;#40e0d0;#f5c211;#1e90ff;#ff00ff;#00ffff;#ffffff"/>
+  <property name="color-use-theme" type="bool" value="false"/>
+  <property name="font-name" type="string" value="JetBrainsMono Nerd Font 11"/>
+  <property name="font-use-system" type="bool" value="false"/>
+  <property name="misc-default-geometry" type="string" value="105x28"/>
+  <property name="misc-menubar-default" type="bool" value="false"/>
+  <property name="misc-toolbar-default" type="bool" value="false"/>
+  <property name="scrolling-bar" type="string" value="TERMINAL_SCROLLBAR_NONE"/>
+</channel>

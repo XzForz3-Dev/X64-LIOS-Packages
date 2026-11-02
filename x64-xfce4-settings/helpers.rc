@@ -1,0 +1,8 @@
+#
+# X64 LIOS Preferred Applications Configuration for Xfce
+#
+
+WebBrowser=chromium
+MailReader=thunderbird
+TerminalEmulator=kitty
+FileManager=thunar

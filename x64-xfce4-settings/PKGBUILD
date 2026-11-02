@@ -1,7 +1,7 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=3
-pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland) y LightDM Slick Greeter"
+pkgrel=4
+pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
 install='x64-xfce4-settings.install'
@@ -12,6 +12,7 @@ depends=(
     'lightdm'
     'lightdm-slick-greeter'
     'papirus-icon-theme'
+    'kitty'
 )
 source=(
     '07-slick-greeter-dock.jpg'
@@ -19,9 +20,17 @@ source=(
     'slick-greeter.conf'
     '10-wlroots.conf'
     'xsettings.xml'
+    'xfce4-terminal.xml'
+    'helpers.rc'
+    'themerc-override'
+    'xfwm4.xml'
     'screenshot.png'
 )
 sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -49,14 +58,25 @@ package() {
 
     # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark y Papirus-Dark)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-    install -m644 "${srcdir}/xsettings.xml" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
+    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml; do
+        install -m644 "${srcdir}/${conf}" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${conf}"
+    done
 
-    # 6. Entorno inicial para labwc en skeleton de nuevos usuarios
+    # 6. Aplicaciones preferidas (Kitty como terminal predeterminada) en /etc/skel
+    install -d "${pkgdir}/etc/skel/.config/xfce4"
+    install -m644 "${srcdir}/helpers.rc" "${pkgdir}/etc/skel/.config/xfce4/helpers.rc"
+
+    # 7. Tema oscuro de decoracion de ventanas para Labwc (themerc-override)
     install -d "${pkgdir}/etc/skel/.config/xfce4/labwc"
+    install -d "${pkgdir}/etc/skel/.config/labwc"
+    install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/xfce4/labwc/themerc-override"
+    install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/labwc/themerc-override"
+
+    # 8. Entorno inicial para labwc en skeleton de nuevos usuarios
     echo "WLR_NO_HARDWARE_CURSORS=1" > "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
     chmod 644 "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
 
-    # 7. Screenshot oficial de referencia
+    # 9. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-xfce4-settings"
     install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-xfce4-settings/screenshot.png"
 }

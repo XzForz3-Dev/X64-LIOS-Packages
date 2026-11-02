@@ -1,5 +1,5 @@
 post_install() {
-    # 1. Hide bare labwc session so only official Xfce sessions are presented
+    # 1. Ocultar sesión plana de labwc para mostrar solo sesiones oficiales Xfce
     if [ -f /usr/share/wayland-sessions/labwc.desktop ]; then
         if ! grep -q "NoDisplay=" /usr/share/wayland-sessions/labwc.desktop; then
             echo "NoDisplay=true" >> /usr/share/wayland-sessions/labwc.desktop
@@ -8,15 +8,60 @@ post_install() {
         fi
     fi
 
-    # 2. Patch labwc upstream environment template if present
+    # 2. Parchear plantilla de entorno labwc si existe
     if [ -f /usr/share/xfce4/labwc/labwc-environment ]; then
         if ! grep -q "WLR_NO_HARDWARE_CURSORS" /usr/share/xfce4/labwc/labwc-environment; then
             echo "WLR_NO_HARDWARE_CURSORS=1" >> /usr/share/xfce4/labwc/labwc-environment
         fi
     fi
+
+    # 3. Parchear helpers globales del sistema de forma segura
+    if [ -f /etc/xdg/xfce4/helpers.rc ]; then
+        sed -i 's/^TerminalEmulator=.*/TerminalEmulator=kitty/' /etc/xdg/xfce4/helpers.rc 2>/dev/null || true
+        sed -i 's/^WebBrowser=.*/WebBrowser=chromium/' /etc/xdg/xfce4/helpers.rc 2>/dev/null || true
+    fi
+
+    # 4. Propagar configuraciones soberanas a usuarios existentes en /home/*
+    for user_dir in /home/*; do
+        if [ -d "$user_dir" ]; then
+            u=$(basename "$user_dir")
+            g=$(id -gn "$u" 2>/dev/null || echo "$u")
+
+            # Xfconf configs
+            target_xfconf="$user_dir/.config/xfce4/xfconf/xfce-perchannel-xml"
+            mkdir -p "$target_xfconf"
+            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml "$target_xfconf/"
+            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml "$target_xfconf/"
+            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml "$target_xfconf/"
+
+            # Preferred applications (Kitty default)
+            [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
+
+            # Labwc dark themerc override
+            mkdir -p "$user_dir/.config/xfce4/labwc" "$user_dir/.config/labwc"
+            [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/xfce4/labwc/"
+            [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/labwc/"
+
+            # Labwc cursor workaround
+            [ -f /etc/skel/.config/xfce4/labwc/environment ] && cp -f /etc/skel/.config/xfce4/labwc/environment "$user_dir/.config/xfce4/labwc/"
+
+            chown -R "$u:$g" "$user_dir/.config/xfce4" "$user_dir/.config/labwc" 2>/dev/null || true
+
+            # Recargar labwc en vivo si está activo
+            pid=$(pgrep -u "$u" -x labwc 2>/dev/null | head -n1 || true)
+            uid=$(id -u "$u" 2>/dev/null || true)
+            if [ -n "$pid" ] && [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                su - "$u" -c "
+                    export LABWC_PID=$pid
+                    export WAYLAND_DISPLAY=\$(ls /run/user/$uid/wayland-* 2>/dev/null | head -n1 | xargs -r basename || echo 'wayland-0')
+                    export XDG_RUNTIME_DIR=/run/user/$uid
+                    labwc --reconfigure 2>/dev/null || true
+                " 2>/dev/null || true
+            fi
+        fi
+    done
 }
 
 post_upgrade() {
     post_install
 }
-
