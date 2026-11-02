@@ -191,26 +191,23 @@ PanelWindow {
         }
 
         // =====================================================================
-        // MASTER THREE-SECTION FLEXIBLE BAR LAYOUT
+        // THREE INDEPENDENTLY ANCHORED LUXURY SECTIONS (Zero Drift Architecture)
         // =====================================================================
 
-        RowLayout {
-            anchors.fill: parent
+        // -----------------------------------------------------------------
+        // 1. LEFT CAPSULE: SOBERANA NAVEGACIÓN (Brand + Workspaces + Title)
+        // -----------------------------------------------------------------
+        Rectangle {
+            id: navCapsule
+            anchors.left: parent.left
             anchors.leftMargin: 8
-            anchors.rightMargin: 8
-            spacing: 8
-
-            // -----------------------------------------------------------------
-            // 1. LEFT CAPSULE: SOBERANA NAVEGACIÓN (Brand + Workspaces + Title)
-            // -----------------------------------------------------------------
-            Rectangle {
-                id: navCapsule
-                implicitHeight: 24
-                implicitWidth: navRow.implicitWidth + 8
-                radius: 12
-                color: "#12131add"
-                border.color: "#1affffff"
-                border.width: 1
+            anchors.verticalCenter: parent.verticalCenter
+            implicitHeight: 24
+            implicitWidth: navRow.implicitWidth + 8
+            radius: 12
+            color: "#12131add"
+            border.color: "#1affffff"
+            border.width: 1
 
                 RowLayout {
                     id: navRow
@@ -413,13 +410,14 @@ PanelWindow {
                 }
             }
 
-            // Left Expanding Spacer
-            Item { Layout.fillWidth: true }
-
             // -----------------------------------------------------------------
             // 2. CENTER SECTION: NOW-PLAYING MPRIS + CHRONOS MASTER CAPSULE
+            // Mathematically pinned to absolute screen center (Zero Drift)
             // -----------------------------------------------------------------
             RowLayout {
+                id: centerSection
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
                 // MPRIS Media Capsule (Shows dynamically when track is playing)
@@ -549,13 +547,15 @@ PanelWindow {
                 }
             }
 
-            // Right Expanding Spacer
-            Item { Layout.fillWidth: true }
-
             // -----------------------------------------------------------------
             // 3. RIGHT SECTION: TWO STREAMLINED LUXURY ISLANDS
+            // Anchored to right bezel (Zero Drift)
             // -----------------------------------------------------------------
             RowLayout {
+                id: rightSection
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
                 // Island 3A: Hardware Telemetry Capsule (CPU% & RAM)
@@ -980,4 +980,3 @@ PanelWindow {
             }
         }
     }
-}
