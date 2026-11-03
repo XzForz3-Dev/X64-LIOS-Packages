@@ -7,11 +7,27 @@ PanelWindow {
 
     property bool nightlightActive: false
     property int brightnessVal: 100
+    property bool tempHidden: false
 
     readonly property double nightAlpha: nightlightActive ? 0.07 : 0.0
     readonly property double dimAlpha: Math.max(0.0, Math.min(0.72, (100 - brightnessVal) * 0.0085))
 
-    visible: nightlightActive || brightnessVal < 100
+    visible: !tempHidden && (nightlightActive || brightnessVal < 100)
+
+    onTempHiddenChanged: {
+        if (tempHidden) {
+            unhideSafetyTimer.restart();
+        } else {
+            unhideSafetyTimer.stop();
+        }
+    }
+
+    Timer {
+        id: unhideSafetyTimer
+        interval: 2500
+        repeat: false
+        onTriggered: filterWindow.tempHidden = false
+    }
 
     anchors {
         top: true

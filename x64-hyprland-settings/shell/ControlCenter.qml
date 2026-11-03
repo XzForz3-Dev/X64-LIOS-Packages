@@ -21,6 +21,9 @@ PanelWindow {
     property bool dndActive: false
     property bool isRecording: false
     property string recTime: "00:00"
+    property bool recMenuOpen: false
+    property string recScope: "fullscreen"
+    property string recAudio: "desktop"
     property bool hasBattery: false
     property int batPct: 100
     property string batStatus: "AC"
@@ -134,7 +137,8 @@ PanelWindow {
     Rectangle {
         id: card
         width: 372
-        height: Math.min(586, parent.height - 10)
+        height: Math.min((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 692 : 586, parent.height - 10)
+        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
         anchors {
             top: parent.top
             right: parent.right
@@ -320,13 +324,13 @@ PanelWindow {
             }
 
             // -----------------------------------------------------------------
-            // 2. SCREEN CAPTURE & LIVE SCREEN RECORDING SUITE
+            // 2. SCREEN CAPTURE & LIVE SCREEN RECORDING SUITE (DUAL ENGINE)
             // -----------------------------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6
 
-                // Capture Region
+                // Capture Region (Recortar)
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: 34
@@ -339,7 +343,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 5
                         Text { text: "󰆞"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: "Región"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: "Recortar"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -348,13 +352,14 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            controlWindow.recMenuOpen = false;
                             controlWindow.closeRequested();
-                            Hyprland.dispatch('hl.dsp.exec_cmd("x64-hyprland-ctl screenshot region")');
+                            controlWindow.runCtl(["screenshot", "region"]);
                         }
                     }
                 }
 
-                // Capture Fullscreen
+                // Capture Fullscreen (Pantalla)
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: 34
@@ -367,7 +372,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 5
                         Text { text: "󰄀"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: "Capturar"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: "Pantalla"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -376,19 +381,20 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            controlWindow.recMenuOpen = false;
                             controlWindow.closeRequested();
-                            Hyprland.dispatch('hl.dsp.exec_cmd("x64-hyprland-ctl screenshot full")');
+                            controlWindow.runCtl(["screenshot", "full"]);
                         }
                     }
                 }
 
-                // Screen Record Toggle
+                // Screen Record Button (Opens Options Sub-Panel or Stops Active Recording)
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: 34
                     radius: Theme.radiusSm
-                    color: controlWindow.isRecording ? Theme.accent : (recBtnArea.containsMouse ? Theme.bgHover : Theme.bgCard)
-                    border.color: controlWindow.isRecording ? Theme.accentLight : (recBtnArea.containsMouse ? Theme.accent : Theme.borderSubtle)
+                    color: controlWindow.isRecording ? Theme.accent : (controlWindow.recMenuOpen ? Theme.accentDim : (recBtnArea.containsMouse ? Theme.bgHover : Theme.bgCard))
+                    border.color: controlWindow.isRecording ? Theme.accentLight : ((controlWindow.recMenuOpen || recBtnArea.containsMouse) ? Theme.accent : Theme.borderSubtle)
                     border.width: 1
 
                     RowLayout {
@@ -398,13 +404,13 @@ PanelWindow {
                             text: controlWindow.isRecording ? "󰓛" : "󰑊"
                             font.family: Theme.fontMono
                             font.pixelSize: 12
-                            color: controlWindow.isRecording ? "#ffffff" : Theme.accent
+                            color: (controlWindow.isRecording || controlWindow.recMenuOpen) ? "#ffffff" : Theme.accent
                         }
                         Text {
-                            text: controlWindow.isRecording ? ("Fin " + controlWindow.recTime) : "Grabar"
+                            text: controlWindow.isRecording ? ("Fin " + controlWindow.recTime) : (controlWindow.recMenuOpen ? "Grabar ▴" : "Grabar ▾")
                             font.family: Theme.fontSans
                             font.pixelSize: 11
-                            font.bold: controlWindow.isRecording
+                            font.bold: controlWindow.isRecording || controlWindow.recMenuOpen
                             color: Theme.textPrimary
                         }
                     }
@@ -414,12 +420,161 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            var nextRec = !controlWindow.isRecording;
-                            controlWindow.isRecording = nextRec;
-                            controlWindow.runCtl(["record", nextRec ? "start" : "stop"]);
-                            if (nextRec) {
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: (mouse) => {
+                            if (controlWindow.isRecording) {
+                                controlWindow.isRecording = false;
+                                controlWindow.recMenuOpen = false;
+                                controlWindow.runCtl(["record", "stop"]);
+                            } else if (mouse.button === Qt.RightButton) {
+                                controlWindow.recMenuOpen = false;
+                                controlWindow.isRecording = true;
                                 controlWindow.closeRequested();
+                                controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
+                            } else {
+                                controlWindow.recMenuOpen = !controlWindow.recMenuOpen;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Expandable Omarchy-Style Recording Options Drawer (Area + Audio + Start)
+            Rectangle {
+                id: recDrawer
+                visible: controlWindow.recMenuOpen && !controlWindow.isRecording
+                Layout.fillWidth: true
+                implicitHeight: 98
+                radius: Theme.radiusSm
+                color: Theme.bgCard
+                border.color: Theme.borderAccent
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 5
+
+                    // Row 1: Scope Selector (Pantalla vs Región)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+
+                        Repeater {
+                            model: [
+                                { id: "fullscreen", label: "󰍹 Pantalla Completa" },
+                                { id: "region",     label: "󰆞 Seleccionar Región" }
+                            ]
+
+                            Rectangle {
+                                id: scopePill
+                                Layout.fillWidth: true
+                                implicitHeight: 24
+                                radius: Theme.radiusSm
+                                readonly property bool isSel: controlWindow.recScope === modelData.id
+                                color: isSel ? Theme.accentDim : (scopeArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
+                                border.color: isSel ? Theme.accent : (scopeArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: scopePill.isSel ? "#ffffff" : Theme.textSecondary
+                                }
+
+                                MouseArea {
+                                    id: scopeArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: controlWindow.recScope = modelData.id
+                                }
+                            }
+                        }
+                    }
+
+                    // Row 2: Audio Source Selector (Sin Audio | Audio PC | PC + Mic)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+
+                        Repeater {
+                            model: [
+                                { id: "none",    label: "󰝟 Sin Audio" },
+                                { id: "desktop", label: "󰕾 Audio PC" },
+                                { id: "both",    label: "󰍬 PC + Mic" }
+                            ]
+
+                            Rectangle {
+                                id: audPill
+                                Layout.fillWidth: true
+                                implicitHeight: 24
+                                radius: Theme.radiusSm
+                                readonly property bool isSel: controlWindow.recAudio === modelData.id
+                                color: isSel ? Theme.accentDim : (audArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
+                                border.color: isSel ? Theme.accent : (audArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: audPill.isSel ? "#ffffff" : Theme.textSecondary
+                                }
+
+                                MouseArea {
+                                    id: audArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: controlWindow.recAudio = modelData.id
+                                }
+                            }
+                        }
+                    }
+
+                    // Row 3: Start Recording Action Button
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 26
+                        radius: Theme.radiusSm
+                        color: startRecArea.containsMouse ? Theme.accentLight : Theme.accent
+                        border.color: Theme.accentLight
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Text {
+                                text: "󰑊"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 12
+                                color: "#ffffff"
+                            }
+                            Text {
+                                text: "Iniciar Grabación Ahora"
+                                font.family: Theme.fontSans
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: "#ffffff"
+                            }
+                        }
+
+                        MouseArea {
+                            id: startRecArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                controlWindow.recMenuOpen = false;
+                                controlWindow.isRecording = true;
+                                controlWindow.closeRequested();
+                                controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
                             }
                         }
                     }

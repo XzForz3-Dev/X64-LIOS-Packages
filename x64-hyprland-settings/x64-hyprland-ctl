@@ -235,56 +235,175 @@ cmd_power() {
 }
 
 # -----------------------------------------------------------------------------
-# 6. SCREEN RECORDING & SCREENSHOTS
+# 6. SCREEN RECORDING (DUAL ENGINE: gpu-screen-recorder + wf-recorder) & SCREENSHOTS
 # -----------------------------------------------------------------------------
+is_recorder_running() {
+    pgrep -x gpu-screen-recorder >/dev/null 2>&1 || pgrep -x wf-recorder >/dev/null 2>&1
+}
+
+cmd_record_worker() {
+    local scope="${1:-fullscreen}"
+    local audio_mode="${2:-desktop}"
+    local vid_dir="${HOME}/Videos"
+    mkdir -p "${vid_dir}"
+
+    sleep 0.22
+
+    local geom=""
+    if [ "$scope" = "region" ]; then
+        geom=$(slurp -b '#08080a88' -c '#ff2b2bff' -s '#ff2b2b18' -w 2 2>/dev/null || echo "")
+        [ -z "$geom" ] && return 0
+        sleep 0.08
+    fi
+
+    local out_file="${vid_dir}/X64-Rec-$(date +%Y%m%d-%H%M%S).mp4"
+    date +%s > "${STATE_DIR}/record.start"
+    echo "${out_file}" > "${STATE_DIR}/record.file"
+
+    local engine_used=""
+
+    # 1. Physical GPU Engine: gpu-screen-recorder (Zero-copy NVENC/VAAPI 60 FPS)
+    if ! systemd-detect-virt -q 2>/dev/null && command -v gpu-screen-recorder >/dev/null 2>&1 && ls /dev/dri/renderD* >/dev/null 2>&1; then
+        local gsr_args=(-f 60 -c mp4)
+        if [ "$scope" = "region" ] && [ -n "$geom" ]; then
+            local xy="${geom%% *}"
+            local wh="${geom##* }"
+            local gsr_reg="${wh}+${xy/,/+}"
+            gsr_args+=(-w region -region "${gsr_reg}")
+        else
+            gsr_args+=(-w screen)
+        fi
+
+        case "$audio_mode" in
+            desktop) gsr_args+=(-a "default_output") ;;
+            both)    gsr_args+=(-a "default_output|default_input") ;;
+            none|*)  ;;
+        esac
+
+        gsr_args+=(-o "${out_file}")
+        setsid -f gpu-screen-recorder "${gsr_args[@]}" >/dev/null 2>&1 < /dev/null
+        sleep 0.35
+        if pgrep -x gpu-screen-recorder >/dev/null 2>&1; then
+            engine_used="GPU 60fps"
+            echo "gpu-screen-recorder" > "${STATE_DIR}/record.engine"
+        fi
+    fi
+
+    # 2. Universal Software/VM Fallback Engine: wf-recorder (libx264 ultrafast yuv420p)
+    if [ -z "$engine_used" ]; then
+        local wf_args=(-c libx264 -p preset=ultrafast -x yuv420p)
+        if [ "$scope" = "region" ] && [ -n "$geom" ]; then
+            wf_args+=(-g "${geom}")
+        fi
+
+        local sink src
+        sink=$(pactl get-default-sink 2>/dev/null || echo "")
+        src=$(pactl get-default-source 2>/dev/null || echo "")
+
+        case "$audio_mode" in
+            desktop)
+                if [ -n "$sink" ]; then
+                    wf_args+=(--audio="${sink}.monitor")
+                else
+                    wf_args+=(--audio)
+                fi
+                ;;
+            both)
+                if [ -n "$src" ] && [[ "$src" != *.monitor ]]; then
+                    wf_args+=(--audio="${src}")
+                elif [ -n "$sink" ]; then
+                    wf_args+=(--audio="${sink}.monitor")
+                else
+                    wf_args+=(--audio)
+                fi
+                ;;
+            none|*) ;;
+        esac
+
+        wf_args+=(-f "${out_file}")
+        date +%s > "${STATE_DIR}/record.start"
+        setsid -f wf-recorder "${wf_args[@]}" >/dev/null 2>&1 < /dev/null
+        sleep 0.25
+        if pgrep -x wf-recorder >/dev/null 2>&1; then
+            engine_used="Ultrafast H.264"
+            echo "wf-recorder" > "${STATE_DIR}/record.engine"
+        fi
+    fi
+
+    local scope_lbl="Pantalla"
+    [ "$scope" = "region" ] && scope_lbl="Región"
+    local audio_lbl="Audio PC"
+    [ "$audio_mode" = "none" ] && audio_lbl="Sin Audio"
+    [ "$audio_mode" = "both" ] && audio_lbl="PC + Mic"
+
+    if [ -n "$engine_used" ]; then
+        notify_user "Grabación Iniciada (${scope_lbl})" "${audio_lbl} • ${engine_used} • Clic en REC para detener" "Grabadora X64"
+    else
+        rm -f "${STATE_DIR}/record.start"
+        notify_user "Error de Grabación" "No se pudo iniciar el motor de captura de video" "Grabadora X64"
+    fi
+}
+
 cmd_record() {
     local action="${1:-toggle}"
+    local scope="${2:-fullscreen}"
+    local audio_mode="${3:-desktop}"
     local is_rec=0
-    pgrep -x wf-recorder >/dev/null 2>&1 && is_rec=1
+    is_recorder_running && is_rec=1
 
     if [ "$action" = "toggle" ]; then
         [ "$is_rec" -eq 1 ] && action="stop" || action="start"
     fi
 
     if [ "$action" = "start" ] && [ "$is_rec" -eq 0 ]; then
-        local vid_dir="${HOME}/Videos"
-        mkdir -p "${vid_dir}"
-        local out_file="${vid_dir}/X64-Rec-$(date +%Y%m%d-%H%M%S).mp4"
-        date +%s > "${STATE_DIR}/record.start"
-        echo "${out_file}" > "${STATE_DIR}/record.file"
-        nohup wf-recorder -f "${out_file}" >/dev/null 2>&1 &
-        notify_user "Grabación de Pantalla Iniciada" "Haz clic en el indicador REC de la barra para finalizar" "Grabadora X64"
+        setsid -f "$0" record-worker "$scope" "$audio_mode" >/dev/null 2>&1 < /dev/null
     elif [ "$action" = "stop" ] && [ "$is_rec" -eq 1 ]; then
+        pkill -INT -x gpu-screen-recorder >/dev/null 2>&1 || true
         pkill -INT -x wf-recorder >/dev/null 2>&1 || true
-        rm -f "${STATE_DIR}/record.start"
+        rm -f "${STATE_DIR}/record.start" "${STATE_DIR}/record.engine"
         local saved_file
-        saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "~/Videos")
-        notify_user "Grabación Guardada" "Video MP4 guardado en ${saved_file}" "Grabadora X64"
+        saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "${HOME}/Videos")
+        notify_user "Grabación Guardada" "Video MP4 guardado: $(basename "$saved_file")" "Grabadora X64"
     fi
 }
 
-cmd_screenshot() {
+cmd_screenshot_worker() {
     local mode="${1:-full}"
     local pic_dir="${HOME}/Pictures/Screenshots"
     mkdir -p "${pic_dir}"
     local out_file="${pic_dir}/X64-Shot-$(date +%Y%m%d-%H%M%S).png"
 
     if [ "$mode" = "region" ]; then
-        sleep 0.2
+        sleep 0.22
         local geom
-        geom=$(slurp 2>/dev/null || echo "")
+        geom=$(slurp -b '#08080a88' -c '#ff2b2bff' -s '#ff2b2b18' -w 2 2>/dev/null || echo "")
         [ -z "$geom" ] && return 0
+        quickshell ipc call filter hide >/dev/null 2>&1 || true
+        sleep 0.05
         if grim -g "$geom" "$out_file"; then
-            wl-copy < "$out_file" 2>/dev/null || true
-            notify_user "Captura de Región" "Copiada al portapapeles y guardada en ${out_file}"
+            quickshell ipc call filter show >/dev/null 2>&1 || true
+            setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
+            notify_user "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")" "Captura X64"
+        else
+            quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
     else
-        sleep 0.3
+        sleep 0.25
+        quickshell ipc call filter hide >/dev/null 2>&1 || true
+        sleep 0.05
         if grim "$out_file"; then
-            wl-copy < "$out_file" 2>/dev/null || true
-            notify_user "Captura de Pantalla" "Copiada al portapapeles y guardada en ${out_file}"
+            quickshell ipc call filter show >/dev/null 2>&1 || true
+            setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
+            notify_user "Captura de Pantalla" "Copiada al portapapeles • $(basename "$out_file")" "Captura X64"
+        else
+            quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
     fi
+}
+
+cmd_screenshot() {
+    local mode="${1:-full}"
+    setsid -f "$0" screenshot-worker "$mode" >/dev/null 2>&1 < /dev/null
 }
 
 # -----------------------------------------------------------------------------
@@ -440,7 +559,7 @@ cmd_status() {
     # 8. Screen Recording State & Timer
     local rec_active="false"
     local rec_time="00:00"
-    if pgrep -x wf-recorder >/dev/null 2>&1; then
+    if is_recorder_running; then
         rec_active="true"
         local start_s now_s elapsed
         start_s=$(cat "${STATE_DIR}/record.start" 2>/dev/null || date +%s)
@@ -654,8 +773,10 @@ case "${1:-status}" in
     dnd)        cmd_dnd "${2:-toggle}" ;;
     brightness) cmd_brightness "${2:-get}" "${3:-100}" ;;
     power)      cmd_power "${2:-get}" "${3:-balanced}" ;;
-    record)     cmd_record "${2:-toggle}" ;;
-    screenshot) cmd_screenshot "${2:-full}" ;;
+    record)            cmd_record "${2:-toggle}" "${3:-fullscreen}" "${4:-desktop}" ;;
+    record-worker)     cmd_record_worker "${2:-fullscreen}" "${3:-desktop}" ;;
+    screenshot)        cmd_screenshot "${2:-full}" ;;
+    screenshot-worker) cmd_screenshot_worker "${2:-full}" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

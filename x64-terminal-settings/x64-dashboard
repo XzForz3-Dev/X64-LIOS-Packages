@@ -393,7 +393,7 @@ function install_desktop_menu
     switch $d_choice
         case 1
             echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
-            sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg hyprlock xdg-desktop-portal-hyprland x64-hyprland-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg hyprlock gpu-screen-recorder xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"

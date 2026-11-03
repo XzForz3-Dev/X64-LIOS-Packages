@@ -222,3 +222,4 @@ hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("x64-hyprland-ctl brightness up
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("x64-hyprland-ctl brightness down"),                 { locked = true, repeating = true })
 hl.bind("Print",                 hl.dsp.exec_cmd("x64-hyprland-ctl screenshot full"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("x64-hyprland-ctl screenshot region"))
+hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("x64-hyprland-ctl record toggle"))

@@ -66,6 +66,12 @@ ShellRoot {
         function close() {
             controlCenter.visible = false;
         }
+
+        function recordMenu() {
+            controlCenter.visible = true;
+            controlCenter.recMenuOpen = true;
+            root.closeAllExcept("control");
+        }
     }
 
     IpcHandler {
@@ -114,6 +120,18 @@ ShellRoot {
 
         function unlock() {
             lockScreen.unlockSession();
+        }
+    }
+
+    IpcHandler {
+        target: "filter"
+
+        function hide() {
+            screenFilter.tempHidden = true;
+        }
+
+        function show() {
+            screenFilter.tempHidden = false;
         }
     }
 

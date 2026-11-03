@@ -1,10 +1,10 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=22
+pkgrel=23
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'hyprlock' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'wf-recorder' 'brightnessctl' 'hyprsunset' 'libnotify')
+depends=('hyprland' 'hyprlock' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'hyprsunset' 'libnotify')
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'
