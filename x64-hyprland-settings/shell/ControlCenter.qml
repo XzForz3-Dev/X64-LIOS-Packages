@@ -309,6 +309,16 @@ PanelWindow {
 
                 Process {
                     id: scaleApplyProc
+                    onExited: {
+                        scaleRefreshTimer.restart();
+                    }
+                }
+
+                Timer {
+                    id: scaleRefreshTimer
+                    interval: 350
+                    repeat: false
+                    onTriggered: displayCard.refreshScale()
                 }
 
                 function refreshScale() {

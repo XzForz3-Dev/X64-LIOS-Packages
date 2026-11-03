@@ -1,20 +1,8 @@
 #!/bin/bash
 # ==============================================================================
 # X64 LIOS - Sovereign Hyprland Monitor Scaling Engine
-# Computes clean Wayland fractional divisors and applies them on the fly
+# Applies native fractional scaling directly to Wayland and Hyprland
 # ==============================================================================
-
-clean_scale() {
-  awk -v scale="$1" -v width="$2" -v height="$3" '
-    function gcd(a, b, t) { while (b) { t = a % b; a = b; b = t } return a }
-    BEGIN {
-      g = gcd(width * 120, height * 120)
-      k = int(scale * 120 + 0.5)
-      if (k > g) k = g
-      while (g % k != 0) k++
-      printf "%g\n", k / 120
-    }'
-}
 
 get_focused_info() {
   export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
@@ -36,23 +24,43 @@ case "$1" in
     ;;
   *)
     target_scale="$1"
+    # Normalize numeric format (e.g. 1.25 -> 1.25, 1 -> 1, 2.0 -> 2)
+    final_scale=$(awk -v s="$target_scale" 'BEGIN { printf "%g", s }')
+    if [ -z "$final_scale" ]; then
+      final_scale="1"
+    fi
+
     info=$(get_focused_info)
     name=$(echo "$info" | jq -r '.name // "Virtual-1"')
-    width=$(echo "$info" | jq -r '.width // 1920')
     height=$(echo "$info" | jq -r '.height // 1080')
 
-    final_scale=$(clean_scale "$target_scale" "$width" "$height")
+    # Determine mode:
+    # Virtual displays (QEMU/KVM Virtual-1) or non-standard viewport heights (like 1022)
+    # cause Wayland fractional coordinate misalignment unless pinned to standard 1080p.
+    # Physical displays (eDP-1, DP-1, HDMI-A-1) use 'preferred' (native EDID mode).
+    mode="preferred"
+    if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
+      mode="1920x1080@60"
+    fi
 
     export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
-    hyprctl eval "hl.monitor({ output = \"$name\", mode = \"preferred\", position = \"auto\", scale = $final_scale })" >/dev/null 2>&1
+    hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = $final_scale })" >/dev/null 2>&1
 
+    # Persist into user configuration
     lua_cfg="$HOME/.config/hypr/hyprland.lua"
     if [ -f "$lua_cfg" ]; then
       sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "$lua_cfg"
+      if [ "$mode" != "preferred" ]; then
+        sed -i -E "s/mode\s*=\s*\"[^\"]+\"/mode     = \"$mode\"/" "$lua_cfg"
+      fi
     fi
 
+    # Persist into /etc/skel if executed as root
     if [ -f "/etc/skel/.config/hypr/hyprland.lua" ] && [ "$(id -u)" -eq 0 ]; then
       sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "/etc/skel/.config/hypr/hyprland.lua"
+      if [ "$mode" != "preferred" ]; then
+        sed -i -E "s/mode\s*=\s*\"[^\"]+\"/mode     = \"$mode\"/" "/etc/skel/.config/hypr/hyprland.lua"
+      fi
     fi
 
     echo "$final_scale"
