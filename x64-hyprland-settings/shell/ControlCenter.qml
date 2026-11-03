@@ -13,6 +13,7 @@ PanelWindow {
     signal closeRequested()
     signal lockRequested()
     signal dndToggled(bool active)
+    signal nightlightToggled(bool active)
     signal brightnessChangedOsd(int val)
 
     property bool caffeineActive: false
@@ -270,6 +271,7 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             controlWindow.nightlightActive = !controlWindow.nightlightActive;
+                            controlWindow.nightlightToggled(controlWindow.nightlightActive);
                             controlWindow.runCtl(["nightlight", controlWindow.nightlightActive ? "on" : "off"]);
                         }
                     }

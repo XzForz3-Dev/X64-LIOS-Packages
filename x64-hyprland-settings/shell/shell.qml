@@ -192,13 +192,24 @@ ShellRoot {
         onDndToggled: (active) => {
             mainBar.dndActive = active;
         }
+        onNightlightToggled: (active) => {
+            mainBar.nightlightActive = active;
+        }
         onLockRequested: {
             root.closeAllExcept("none");
             lockScreen.lockSession();
         }
         onBrightnessChangedOsd: (val) => {
+            mainBar.brightnessVal = val;
             volumeOsd.showBrightness(val);
         }
+    }
+
+    // Universal Click-Through Screen Filter (Warm 4200K Nightlight + Software Dimming)
+    ScreenFilter {
+        id: screenFilter
+        nightlightActive: mainBar.nightlightActive
+        brightnessVal: mainBar.brightnessVal
     }
 
     // Unified On-Screen Display for Volume / Mute / Brightness Changes
