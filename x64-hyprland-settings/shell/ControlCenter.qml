@@ -14,16 +14,15 @@ PanelWindow {
 
     anchors {
         top: true
+        bottom: true
+        left: true
         right: true
     }
 
     margins {
         top: 32
-        right: 4
     }
 
-    implicitWidth: 360
-    implicitHeight: 560
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
@@ -48,12 +47,32 @@ PanelWindow {
         displayCard.refreshScale();
     }
 
-    Rectangle {
+    // Outside click dismiss backdrop
+    MouseArea {
         anchors.fill: parent
+        onClicked: controlWindow.closeRequested()
+    }
+
+    // Control Center Card pinned to top right
+    Rectangle {
+        id: card
+        width: 360
+        height: 560
+        anchors {
+            top: parent.top
+            right: parent.right
+            topMargin: 4
+            rightMargin: 8
+        }
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
+
+        // Consume inside clicks so clicking empty card padding does not dismiss
+        MouseArea {
+            anchors.fill: parent
+        }
 
         ColumnLayout {
             anchors.fill: parent

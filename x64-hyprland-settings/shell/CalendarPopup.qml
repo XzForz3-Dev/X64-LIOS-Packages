@@ -12,14 +12,15 @@ PanelWindow {
 
     anchors {
         top: true
+        bottom: true
+        left: true
+        right: true
     }
 
     margins {
         top: 32
     }
 
-    implicitWidth: 350
-    implicitHeight: cardLayout.implicitHeight + 32
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
@@ -84,14 +85,31 @@ PanelWindow {
     onViewMonthChanged: updateCalendar()
     onViewYearChanged: updateCalendar()
 
+    // Outside click dismiss backdrop
+    MouseArea {
+        anchors.fill: parent
+        onClicked: calWindow.closeRequested()
+    }
+
     // Centered Cyberpunk Calendar Card
     Rectangle {
         id: card
-        anchors.fill: parent
+        width: 350
+        height: cardLayout.implicitHeight + 32
+        anchors {
+            top: parent.top
+            topMargin: 4
+            horizontalCenter: parent.horizontalCenter
+        }
         radius: Theme.radiusMd
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
+
+        // Consume inside clicks so clicking empty padding does not dismiss
+        MouseArea {
+            anchors.fill: parent
+        }
 
         // Top Neon Glow Bar
         Rectangle {
