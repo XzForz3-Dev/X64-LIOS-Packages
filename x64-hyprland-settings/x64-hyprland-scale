@@ -1,8 +1,10 @@
 #!/bin/bash
 # ==============================================================================
 # X64 LIOS - Sovereign Hyprland Monitor Scaling Engine
-# Applies native fractional scaling directly to Wayland and Hyprland
+# Supports Automatic EDID PPI Scaling ("auto") and Fractional Presets (1.0..2.0)
 # ==============================================================================
+
+export LC_ALL=C
 
 get_focused_info() {
   export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
@@ -13,7 +15,23 @@ get_focused_info() {
   echo "$mon_info"
 }
 
+is_config_auto() {
+  local lua_cfg="$HOME/.config/hypr/hyprland.lua"
+  if [ -f "$lua_cfg" ] && grep -qE 'scale\s*=\s*"auto"' "$lua_cfg" 2>/dev/null; then
+    echo "true"
+  else
+    echo "false"
+  fi
+}
+
 case "$1" in
+  "status")
+    info=$(get_focused_info)
+    name=$(echo "$info" | jq -r '.name // "Virtual-1"')
+    scale=$(echo "$info" | jq -r '.scale // 1')
+    auto_state=$(is_config_auto)
+    echo "${name}|${scale}|${auto_state}"
+    ;;
   "current"|"")
     info=$(get_focused_info)
     echo "$info" | jq -r '.scale // 1'
@@ -22,11 +40,34 @@ case "$1" in
     info=$(get_focused_info)
     echo "$info" | jq -r '.name // "Virtual-1"'
     ;;
+  "auto"|"AUTO")
+    info=$(get_focused_info)
+    name=$(echo "$info" | jq -r '.name // "Virtual-1"')
+    height=$(echo "$info" | jq -r '.height // 1080')
+
+    mode="preferred"
+    if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
+      mode="1920x1080@60"
+    fi
+
+    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
+    hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = \"auto\" })" >/dev/null 2>&1
+
+    lua_cfg="$HOME/.config/hypr/hyprland.lua"
+    if [ -f "$lua_cfg" ]; then
+      sed -i -E 's/scale\s*=\s*("auto"|[0-9.]+)/scale    = "auto"/' "$lua_cfg"
+    fi
+
+    if [ -f "/etc/skel/.config/hypr/hyprland.lua" ] && [ "$(id -u)" -eq 0 ]; then
+      sed -i -E 's/scale\s*=\s*("auto"|[0-9.]+)/scale    = "auto"/' "/etc/skel/.config/hypr/hyprland.lua"
+    fi
+
+    echo "auto"
+    ;;
   *)
     target_scale="$1"
-    # Normalize numeric format (e.g. 1.25 -> 1.25, 1 -> 1, 2.0 -> 2)
     final_scale=$(awk -v s="$target_scale" 'BEGIN { printf "%g", s }')
-    if [ -z "$final_scale" ]; then
+    if [ -z "$final_scale" ] || [ "$final_scale" = "0" ]; then
       final_scale="1"
     fi
 
@@ -34,10 +75,6 @@ case "$1" in
     name=$(echo "$info" | jq -r '.name // "Virtual-1"')
     height=$(echo "$info" | jq -r '.height // 1080')
 
-    # Determine mode:
-    # Virtual displays (QEMU/KVM Virtual-1) or non-standard viewport heights (like 1022)
-    # cause Wayland fractional coordinate misalignment unless pinned to standard 1080p.
-    # Physical displays (eDP-1, DP-1, HDMI-A-1) use 'preferred' (native EDID mode).
     mode="preferred"
     if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
       mode="1920x1080@60"
@@ -46,7 +83,6 @@ case "$1" in
     export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
     hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = $final_scale })" >/dev/null 2>&1
 
-    # Persist into user configuration
     lua_cfg="$HOME/.config/hypr/hyprland.lua"
     if [ -f "$lua_cfg" ]; then
       sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "$lua_cfg"
@@ -55,7 +91,6 @@ case "$1" in
       fi
     fi
 
-    # Persist into /etc/skel if executed as root
     if [ -f "/etc/skel/.config/hypr/hyprland.lua" ] && [ "$(id -u)" -eq 0 ]; then
       sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "/etc/skel/.config/hypr/hyprland.lua"
       if [ "$mode" != "preferred" ]; then

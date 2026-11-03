@@ -735,29 +735,22 @@ PanelWindow {
 
                 property real currentScale: 1.0
                 property string currentMonitor: "Virtual-1"
+                property bool isAutoScale: true
 
                 Process {
-                    id: scaleQueryProc
-                    command: ["x64-hyprland-scale", "current"]
+                    id: scaleStatusProc
+                    command: ["x64-hyprland-scale", "status"]
                     stdout: StdioCollector {
-                        id: scaleCollector
+                        id: scaleStatusCollector
                         onStreamFinished: {
-                            if (!scaleCollector.text) return;
-                            var s = parseFloat(scaleCollector.text.trim());
-                            if (!isNaN(s) && s > 0) displayCard.currentScale = s;
-                        }
-                    }
-                }
-
-                Process {
-                    id: monQueryProc
-                    command: ["x64-hyprland-scale", "monitor"]
-                    stdout: StdioCollector {
-                        id: monCollector
-                        onStreamFinished: {
-                            if (!monCollector.text) return;
-                            var m = monCollector.text.trim();
-                            if (m !== "") displayCard.currentMonitor = m;
+                            if (!scaleStatusCollector.text) return;
+                            var parts = scaleStatusCollector.text.trim().split("|");
+                            if (parts.length >= 3) {
+                                if (parts[0] !== "") displayCard.currentMonitor = parts[0];
+                                var s = parseFloat(parts[1]);
+                                if (!isNaN(s) && s > 0) displayCard.currentScale = s;
+                                displayCard.isAutoScale = (parts[2] === "true");
+                            }
                         }
                     }
                 }
@@ -777,13 +770,17 @@ PanelWindow {
                 }
 
                 function refreshScale() {
-                    if (!scaleQueryProc.running) scaleQueryProc.running = true;
-                    if (!monQueryProc.running) monQueryProc.running = true;
+                    if (!scaleStatusProc.running) scaleStatusProc.running = true;
                 }
 
-                function applyScale(sVal) {
-                    displayCard.currentScale = sVal;
-                    scaleApplyProc.command = ["x64-hyprland-scale", String(sVal)];
+                function applyScale(sVal, autoMode) {
+                    displayCard.isAutoScale = Boolean(autoMode);
+                    if (autoMode) {
+                        scaleApplyProc.command = ["x64-hyprland-scale", "auto"];
+                    } else {
+                        displayCard.currentScale = sVal;
+                        scaleApplyProc.command = ["x64-hyprland-scale", String(sVal)];
+                    }
                     scaleApplyProc.running = true;
                 }
 
@@ -803,7 +800,7 @@ PanelWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: displayCard.currentMonitor + " (" + Math.round(displayCard.currentScale * 100) + "%)"
+                            text: displayCard.currentMonitor + (displayCard.isAutoScale ? (" (AUTO • " + Math.round(displayCard.currentScale * 100) + "%)") : (" (" + Math.round(displayCard.currentScale * 100) + "%)"))
                             font.family: Theme.fontMono
                             font.pixelSize: 10
                             font.bold: true
@@ -811,17 +808,18 @@ PanelWindow {
                         }
                     }
 
-                    // Quick Scale Preset Pills
+                    // Quick Scale Preset Pills (AUTO + Manual Fractional Presets)
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 6
+                        spacing: 5
 
                         Repeater {
                             model: [
-                                { label: "100%", val: 1.0 },
-                                { label: "125%", val: 1.25 },
-                                { label: "150%", val: 1.5 },
-                                { label: "200%", val: 2.0 }
+                                { label: "AUTO", val: 0.0,  isAuto: true },
+                                { label: "100%", val: 1.0,  isAuto: false },
+                                { label: "125%", val: 1.25, isAuto: false },
+                                { label: "150%", val: 1.5,  isAuto: false },
+                                { label: "200%", val: 2.0,  isAuto: false }
                             ]
 
                             Rectangle {
@@ -829,7 +827,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 implicitHeight: 24
                                 radius: Theme.radiusSm
-                                readonly property bool isActive: Math.abs(displayCard.currentScale - modelData.val) < 0.05
+                                readonly property bool isActive: modelData.isAuto ? displayCard.isAutoScale : (!displayCard.isAutoScale && Math.abs(displayCard.currentScale - modelData.val) < 0.05)
                                 color: isActive ? Theme.accentDim : (scaleBtnArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
                                 border.color: isActive ? Theme.accent : (scaleBtnArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
                                 border.width: 1
@@ -841,7 +839,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text: modelData.label
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 10
+                                    font.pixelSize: 9
                                     font.bold: true
                                     color: scaleBtn.isActive ? Theme.textPrimary : (scaleBtnArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
                                 }
@@ -851,7 +849,7 @@ PanelWindow {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: displayCard.applyScale(modelData.val)
+                                    onClicked: displayCard.applyScale(modelData.val, modelData.isAuto)
                                 }
                             }
                         }
