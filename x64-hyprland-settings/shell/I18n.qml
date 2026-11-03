@@ -142,3 +142,4 @@ QtObject {
     readonly property string teleActiveProcesses: isEs ? "PROCESOS ACTIVOS (TOP RECURSOS)" : "ACTIVE PROCESSES (TOP USAGE)"
     readonly property string teleOpenBtop: isEs ? "Abrir Monitor Completo (Btop)" : "Open Full Monitor (Btop)"
 }
+

@@ -32,14 +32,16 @@ PanelWindow {
 
     anchors {
         top: true
-        bottom: true
-        left: true
         right: true
     }
 
     margins {
-        top: 32
+        top: 36
+        right: 96
     }
+
+    implicitWidth: 356
+    implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 50)
 
     color: "transparent"
 
@@ -47,6 +49,15 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-popup"
     WlrLayershell.keyboardFocus: netWindow.passwordSsid !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+    HyprlandFocusGrab {
+        active: netWindow.visible
+        windows: [netWindow]
+        onCleared: {
+            netWindow.passwordSsid = "";
+            netWindow.closeRequested();
+        }
+    }
 
     function refreshNet(doScan) {
         if (netStatusProc.running) return;
@@ -122,35 +133,14 @@ PanelWindow {
         onTriggered: netWindow.refreshNet(false)
     }
 
-    // Outside click dismiss backdrop
-    MouseArea {
-        anchors.fill: parent
-        onClicked: {
-            netWindow.passwordSsid = "";
-            netWindow.closeRequested();
-        }
-    }
-
     // Network Popup Card anchored below Island 3B Network Indicator
     Rectangle {
         id: card
-        width: 356
-        height: cardLayout.implicitHeight + 30
-        anchors {
-            top: parent.top
-            right: parent.right
-            topMargin: 4
-            rightMargin: 96
-        }
+        anchors.fill: parent
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
-
-        // Consume inside clicks
-        MouseArea {
-            anchors.fill: parent
-        }
 
         // Top Neon Crimson Glow Bar
         Rectangle {

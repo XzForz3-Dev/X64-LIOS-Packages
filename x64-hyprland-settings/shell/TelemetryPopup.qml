@@ -47,20 +47,28 @@ PanelWindow {
 
     anchors {
         top: true
-        bottom: true
-        left: true
         right: true
     }
 
     margins {
-        top: 32
+        top: 36
+        right: 175
     }
+
+    implicitWidth: 370
+    implicitHeight: cardLayout.implicitHeight + 30
 
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-popup"
+
+    HyprlandFocusGrab {
+        active: teleWindow.visible
+        windows: [teleWindow]
+        onCleared: teleWindow.closeRequested()
+    }
 
     Process {
         id: statusProc
@@ -122,32 +130,14 @@ PanelWindow {
         }
     }
 
-    // Outside click dismiss backdrop
-    MouseArea {
-        anchors.fill: parent
-        onClicked: teleWindow.closeRequested()
-    }
-
     // Telemetry Cockpit Card pinned below Island 3A
     Rectangle {
         id: card
-        width: 370
-        height: cardLayout.implicitHeight + 30
-        anchors {
-            top: parent.top
-            right: parent.right
-            topMargin: 4
-            rightMargin: 175
-        }
+        anchors.fill: parent
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
-
-        // Consume inside clicks
-        MouseArea {
-            anchors.fill: parent
-        }
 
         // Top Neon Crimson Accent Line
         Rectangle {

@@ -32,20 +32,28 @@ PanelWindow {
 
     anchors {
         top: true
-        bottom: true
-        left: true
         right: true
     }
 
     margins {
-        top: 32
+        top: 36
+        right: 8
     }
+
+    implicitWidth: 372
+    implicitHeight: Math.min((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 692 : 586, (screen ? screen.height : 1080) - 50)
 
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-popup"
+
+    HyprlandFocusGrab {
+        active: controlWindow.visible
+        windows: [controlWindow]
+        onCleared: controlWindow.closeRequested()
+    }
 
     PwObjectTracker {
         objects: {
@@ -127,33 +135,14 @@ PanelWindow {
         controlWindow.refreshAll();
     }
 
-    // Outside click dismiss backdrop
-    MouseArea {
-        anchors.fill: parent
-        onClicked: controlWindow.closeRequested()
-    }
-
     // Control Center Card pinned to top right
     Rectangle {
         id: card
-        width: 372
-        height: Math.min((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 692 : 586, parent.height - 10)
-        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-        anchors {
-            top: parent.top
-            right: parent.right
-            topMargin: 4
-            rightMargin: 8
-        }
+        anchors.fill: parent
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
-
-        // Consume inside clicks so clicking empty card padding does not dismiss
-        MouseArea {
-            anchors.fill: parent
-        }
 
         ColumnLayout {
             anchors.fill: parent
