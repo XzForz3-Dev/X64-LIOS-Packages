@@ -1,26 +1,28 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd')
+depends=('hyprland' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'wf-recorder' 'brightnessctl' 'hyprsunset')
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'
     'hyprland.conf'
     '01-monolith.jpg'
     'x64-hyprland-scale'
+    'x64-hyprland-ctl'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
     echo "X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua)" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 
-    # Install monitor scaling CLI engine
+    # Install monitor scaling & desktop control CLI engines
     install -Dm755 "${srcdir}/x64-hyprland-scale" "${pkgdir}/usr/bin/x64-hyprland-scale"
+    install -Dm755 "${srcdir}/x64-hyprland-ctl" "${pkgdir}/usr/bin/x64-hyprland-ctl"
 
     # Install skeleton and system-wide default configuration
     install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/skel/.config/hypr/hyprland.lua"

@@ -16,13 +16,31 @@ PanelWindow {
         bottom: 60
     }
 
-    implicitWidth: 240
+    implicitWidth: 250
     implicitHeight: 46
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
 
     visible: false
+
+    property bool ready: false
+    property string mode: "volume" // "volume" or "brightness"
+    property int brightnessVal: 100
+
+    function showBrightness(val) {
+        osdWindow.mode = "brightness";
+        osdWindow.brightnessVal = Math.round(val);
+        osdWindow.visible = true;
+        hideTimer.restart();
+    }
+
+    Timer {
+        interval: 600
+        running: true
+        repeat: false
+        onTriggered: osdWindow.ready = true
+    }
 
     PwObjectTracker {
         objects: {
@@ -37,11 +55,15 @@ PanelWindow {
     readonly property bool currentMuted: sink && sink.audio ? sink.audio.muted : false
 
     onCurrentVolChanged: {
+        if (!osdWindow.ready) return;
+        osdWindow.mode = "volume";
         osdWindow.visible = true;
         hideTimer.restart();
     }
 
     onCurrentMutedChanged: {
+        if (!osdWindow.ready) return;
+        osdWindow.mode = "volume";
         osdWindow.visible = true;
         hideTimer.restart();
     }
@@ -67,27 +89,41 @@ PanelWindow {
             spacing: 12
 
             Text {
-                text: osdWindow.currentMuted ? "󰝟" : (osdWindow.currentVol > 0.66 ? "󰕾" : (osdWindow.currentVol > 0.33 ? "󰖀" : "󰕿"))
+                text: {
+                    if (osdWindow.mode === "brightness") return "󰃠";
+                    return osdWindow.currentMuted ? "󰝟" : (osdWindow.currentVol > 0.66 ? "󰕾" : (osdWindow.currentVol > 0.33 ? "󰖀" : "󰕿"));
+                }
                 font.family: Theme.fontMono
                 font.pixelSize: 16
-                color: osdWindow.currentMuted ? Theme.accent : Theme.textPrimary
+                color: osdWindow.mode === "brightness" ? "#ffaa00" : (osdWindow.currentMuted ? Theme.accent : Theme.textPrimary)
             }
 
-            ProgressBar {
+            Rectangle {
                 Layout.fillWidth: true
-                from: 0.0
-                to: 1.0
-                value: osdWindow.currentVol
+                height: 6
+                radius: 3
+                color: "#1c1d26"
+
+                Rectangle {
+                    readonly property real progress: osdWindow.mode === "brightness" ? (osdWindow.brightnessVal / 100.0) : (osdWindow.currentMuted ? 0.0 : Math.min(1.0, osdWindow.currentVol))
+                    width: Math.max(4, parent.width * progress)
+                    height: parent.height
+                    radius: 3
+                    color: osdWindow.mode === "brightness" ? "#ffaa00" : Theme.accent
+                    Behavior on width { NumberAnimation { duration: 100 } }
+                }
             }
 
             Text {
-                text: osdWindow.currentMuted ? "MUTE" : Math.round(osdWindow.currentVol * 100) + "%"
+                text: {
+                    if (osdWindow.mode === "brightness") return osdWindow.brightnessVal + "%";
+                    return osdWindow.currentMuted ? "MUTE" : Math.round(osdWindow.currentVol * 100) + "%";
+                }
                 font.family: Theme.fontMono
                 font.pixelSize: 11
                 font.bold: true
-                color: osdWindow.currentMuted ? Theme.accent : Theme.textPrimary
+                color: osdWindow.mode === "brightness" ? "#ffaa00" : (osdWindow.currentMuted ? Theme.accent : Theme.textPrimary)
             }
         }
     }
 }
-

@@ -34,7 +34,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
 
     -- Quickshell Cyberpunk Desktop Shell (Top Bar, App Launcher, Control Center, OSD)
-    hl.exec_cmd("killall quickshell 2>/dev/null; quickshell -n &")
+    hl.exec_cmd("killall quickshell 2>/dev/null; QT_QUICK_BACKEND=software quickshell -n &")
 
     -- X64 System Update Tray Monitor (SNI)
     hl.exec_cmd("x64-update-tray &")
@@ -211,8 +211,12 @@ hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Multimedia Audio and Brightness keys
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),      { locked = true, repeating = true })
-hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),     { locked = true, repeating = true })
-hl.bind("XF86AudioMicMute",     hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),   { locked = true, repeating = true })
+-- Multimedia Audio, Brightness and Screenshot keys
+hl.bind("XF86AudioRaiseVolume",  hl.dsp.exec_cmd("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
+hl.bind("XF86AudioLowerVolume",  hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),        { locked = true, repeating = true })
+hl.bind("XF86AudioMute",         hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),       { locked = true, repeating = true })
+hl.bind("XF86AudioMicMute",      hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),     { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("x64-hyprland-ctl brightness up"),                   { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("x64-hyprland-ctl brightness down"),                 { locked = true, repeating = true })
+hl.bind("Print",                 hl.dsp.exec_cmd("x64-hyprland-ctl screenshot full"))
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("x64-hyprland-ctl screenshot region"))

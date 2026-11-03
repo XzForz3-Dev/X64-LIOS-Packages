@@ -4,3 +4,4 @@ AppLauncher 1.0 AppLauncher.qml
 ControlCenter 1.0 ControlCenter.qml
 VolumeOsd 1.0 VolumeOsd.qml
 CalendarPopup 1.0 CalendarPopup.qml
+TelemetryPopup 1.0 TelemetryPopup.qml

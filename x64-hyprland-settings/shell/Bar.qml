@@ -15,6 +15,8 @@ PanelWindow {
     signal toggleCalendar()
     signal toggleControl()
     signal togglePower()
+    signal toggleTelemetry()
+    signal brightnessChangedOsd(int val)
 
     property bool trayExpanded: true
 
@@ -48,30 +50,62 @@ PanelWindow {
     }
 
     // =========================================================================
-    // SYSTEM TELEMETRY & BACKGROUND MONITORS
+    // SYSTEM TELEMETRY & BACKGROUND MONITORS (x64-hyprland-ctl)
     // =========================================================================
 
     property int cpuUsage: 0
     property string ramUsage: "0.0"
+    property int cpuTemp: 40
+    property bool caffeineActive: false
+    property bool nightlightActive: false
+    property bool dndActive: false
+    property bool isRecording: false
+    property string recTime: "00:00"
+    property bool hasBattery: false
+    property int batPct: 100
+    property string batStatus: "AC"
+    property int brightnessVal: 100
+
+    function runCtl(args) {
+        ctlActionProc.command = ["x64-hyprland-ctl"].concat(args);
+        ctlActionProc.running = true;
+    }
+
+    Process {
+        id: ctlActionProc
+        onExited: {
+            if (!teleProcess.running) teleProcess.running = true;
+        }
+    }
 
     Process {
         id: teleProcess
-        command: ["sh", "-c", "awk '{printf \"%.0f\", $1*25}' /proc/loadavg 2>/dev/null || echo 0; awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{if(t>0) printf \"%.1f\", (t-a)/1048576; else print 0}' /proc/meminfo 2>/dev/null || echo 0"]
+        command: ["x64-hyprland-ctl", "status"]
         stdout: StdioCollector {
             id: teleCollector
             onStreamFinished: {
                 if (!teleCollector.text) return;
-                var lines = teleCollector.text.trim().split("\n");
-                if (lines.length >= 2) {
-                    barWindow.cpuUsage = parseInt(lines[0]) || 0;
-                    barWindow.ramUsage = lines[1] || "0";
-                }
+                try {
+                    var d = JSON.parse(teleCollector.text.trim());
+                    barWindow.cpuUsage = d.cpu || 0;
+                    barWindow.ramUsage = d.ramUsed || "0.0";
+                    barWindow.cpuTemp = d.temp || 40;
+                    barWindow.caffeineActive = Boolean(d.caffeine);
+                    barWindow.nightlightActive = Boolean(d.nightlight);
+                    barWindow.dndActive = Boolean(d.dnd);
+                    barWindow.isRecording = Boolean(d.recording);
+                    barWindow.recTime = d.recTime || "00:00";
+                    barWindow.hasBattery = Boolean(d.hasBattery);
+                    barWindow.batPct = d.batPct !== undefined ? d.batPct : 100;
+                    barWindow.batStatus = d.batStatus || "AC";
+                    barWindow.brightnessVal = d.brightness !== undefined ? d.brightness : 100;
+                } catch (e) {}
             }
         }
     }
 
     Timer {
-        interval: 2000
+        interval: 1200
         running: true
         repeat: true
         triggeredOnStart: true
@@ -545,6 +579,58 @@ PanelWindow {
                         onClicked: barWindow.toggleCalendar()
                     }
                 }
+
+                // Live Screen Recording Capsule (Omarchy-style 1-click stop)
+                Rectangle {
+                    id: recCapsule
+                    visible: barWindow.isRecording
+                    implicitHeight: 24
+                    implicitWidth: recRow.implicitWidth + 14
+                    radius: 12
+                    color: recArea.containsMouse ? Theme.accent : "#2a0b0fdd"
+                    border.color: Theme.accent
+                    border.width: 1
+
+                    RowLayout {
+                        id: recRow
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        Text {
+                            id: recDot
+                            text: "󰑊"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 11
+                            color: recArea.containsMouse ? "#ffffff" : Theme.accent
+
+                            SequentialAnimation on opacity {
+                                running: barWindow.isRecording
+                                loops: Animation.Infinite
+                                NumberAnimation { from: 1.0; to: 0.25; duration: 600 }
+                                NumberAnimation { from: 0.25; to: 1.0; duration: 600 }
+                            }
+                        }
+
+                        Text {
+                            text: "REC " + barWindow.recTime
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: "#ffffff"
+                        }
+                    }
+
+                    MouseArea {
+                        id: recArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            barWindow.isRecording = false;
+                            barWindow.runCtl(["record", "stop"]);
+                        }
+                    }
+                }
             }
 
             // -----------------------------------------------------------------
@@ -558,7 +644,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
-                // Island 3A: Hardware Telemetry Capsule (CPU% & RAM)
+                // Island 3A: Hardware Telemetry Capsule (CPU%, RAM & Temp °C)
                 Rectangle {
                     id: telemetryCapsule
                     implicitHeight: 24
@@ -611,6 +697,29 @@ PanelWindow {
                             font.bold: true
                             color: Theme.textPrimary
                         }
+
+                        // Divider
+                        Rectangle {
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#1affffff"
+                        }
+
+                        // CPU Temperature
+                        Text {
+                            text: "󰔏"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            color: barWindow.cpuTemp >= 78 ? "#ff2b2b" : (barWindow.cpuTemp >= 65 ? "#ffaa00" : "#ff7744")
+                        }
+
+                        Text {
+                            text: barWindow.cpuTemp + "°C"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: barWindow.cpuTemp >= 78 ? "#ff2b2b" : Theme.textPrimary
+                        }
                     }
 
                     MouseArea {
@@ -618,7 +727,14 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")')
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")');
+                            } else {
+                                barWindow.toggleTelemetry();
+                            }
+                        }
                     }
                 }
 
@@ -644,6 +760,89 @@ PanelWindow {
                         id: systemRow
                         anchors.centerIn: parent
                         spacing: 5
+
+                        // [0] Active Quick-Toggle Indicators (Caffeine / Nightlight / DND)
+                        Rectangle {
+                            visible: barWindow.caffeineActive
+                            implicitWidth: 18
+                            implicitHeight: 18
+                            radius: 9
+                            color: cafBarArea.containsMouse ? Theme.accent : "#33ff2b2b"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰅶"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: cafBarArea.containsMouse ? "#ffffff" : Theme.accent
+                            }
+                            MouseArea {
+                                id: cafBarArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    barWindow.caffeineActive = false;
+                                    barWindow.runCtl(["caffeine", "off"]);
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: barWindow.nightlightActive
+                            implicitWidth: 18
+                            implicitHeight: 18
+                            radius: 9
+                            color: nlBarArea.containsMouse ? "#ffaa00" : "#33ffaa00"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰖔"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: nlBarArea.containsMouse ? "#08080a" : "#ffaa00"
+                            }
+                            MouseArea {
+                                id: nlBarArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    barWindow.nightlightActive = false;
+                                    barWindow.runCtl(["nightlight", "off"]);
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: barWindow.dndActive
+                            implicitWidth: 18
+                            implicitHeight: 18
+                            radius: 9
+                            color: dndBarArea.containsMouse ? "#a855f7" : "#33a855f7"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰂛"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: dndBarArea.containsMouse ? "#ffffff" : "#c084fc"
+                            }
+                            MouseArea {
+                                id: dndBarArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    barWindow.dndActive = false;
+                                    barWindow.runCtl(["dnd", "off"]);
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: barWindow.caffeineActive || barWindow.nightlightActive || barWindow.dndActive
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#1affffff"
+                        }
 
                         // [A] Keyboard Layout Indicator (Click switches layout)
                         Rectangle {
@@ -679,7 +878,7 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: Hyprland.dispatch("switchxkblayout all next")
+                                onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("hyprctl switchxkblayout all next")')
                             }
                         }
 
@@ -830,6 +1029,107 @@ PanelWindow {
                                         systemCapsule.defaultSink.audio.volume = Math.max(0.0, Math.min(1.5, systemCapsule.defaultSink.audio.volume + step));
                                     }
                                 }
+                            }
+                        }
+
+                        // Divider
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+
+                        // [D2] Display Brightness Control (Wheel adjusts brightness + OSD, Click opens Control Center)
+                        Rectangle {
+                            id: brItem
+                            implicitWidth: brRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: brArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: brRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: "󰃠"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: "#ffaa00"
+                                }
+
+                                Text {
+                                    text: barWindow.brightnessVal + "%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: brArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: barWindow.toggleControl()
+                                onWheel: (wheel) => {
+                                    var step = wheel.angleDelta.y > 0 ? 5 : -5;
+                                    var nextBr = Math.max(15, Math.min(100, barWindow.brightnessVal + step));
+                                    barWindow.brightnessVal = nextBr;
+                                    barWindow.brightnessChangedOsd(nextBr);
+                                    barWindow.runCtl(["brightness", "set", String(nextBr)]);
+                                }
+                            }
+                        }
+
+                        // [D3] Smart Battery Indicator (Auto-shows only when physical battery is present)
+                        Rectangle {
+                            visible: barWindow.hasBattery
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#1affffff"
+                        }
+
+                        Rectangle {
+                            id: batItem
+                            visible: barWindow.hasBattery
+                            implicitWidth: batRow.implicitWidth + 4
+                            implicitHeight: 18
+                            radius: 9
+                            color: batArea.containsMouse ? "#20ffffff" : "transparent"
+
+                            RowLayout {
+                                id: batRow
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: {
+                                        if (barWindow.batStatus === "Charging" || barWindow.batStatus === "Full") return "󰂄";
+                                        if (barWindow.batPct >= 85) return "󰁹";
+                                        if (barWindow.batPct >= 60) return "󰂀";
+                                        if (barWindow.batPct >= 35) return "󰁾";
+                                        if (barWindow.batPct >= 15) return "󰁻";
+                                        return "󰂃";
+                                    }
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: (barWindow.batStatus === "Charging" || barWindow.batStatus === "Full") ? "#4ade80" : (barWindow.batPct <= 15 ? Theme.accent : Theme.textPrimary)
+                                }
+
+                                Text {
+                                    text: barWindow.batPct + "%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: barWindow.batPct <= 15 ? Theme.accent : Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: batArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: barWindow.toggleControl()
                             }
                         }
 
