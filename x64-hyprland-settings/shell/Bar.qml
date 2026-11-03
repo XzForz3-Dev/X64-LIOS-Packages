@@ -40,6 +40,12 @@ PanelWindow {
     WlrLayershell.exclusiveZone: 32
     WlrLayershell.namespace: "quickshell"
 
+    // Native Wayland Idle Inhibitor (zwp_idle_inhibit_manager_v1) for Modo Café
+    IdleInhibitor {
+        enabled: barWindow.caffeineActive
+        window: barWindow
+    }
+
     // Track PipeWire default audio devices so Quickshell activates volume & mute telemetry
     PwObjectTracker {
         objects: {
@@ -68,8 +74,15 @@ PanelWindow {
     property int brightnessVal: 100
 
     function runCtl(args) {
+        toggleGuardTimer.restart();
         ctlActionProc.command = ["x64-hyprland-ctl"].concat(args);
         ctlActionProc.running = true;
+    }
+
+    Timer {
+        id: toggleGuardTimer
+        interval: 900
+        repeat: false
     }
 
     Process {
@@ -91,9 +104,11 @@ PanelWindow {
                     barWindow.cpuUsage = d.cpu || 0;
                     barWindow.ramUsage = d.ramUsed || "0.0";
                     barWindow.cpuTemp = d.temp || 40;
-                    barWindow.caffeineActive = Boolean(d.caffeine);
-                    barWindow.nightlightActive = Boolean(d.nightlight);
-                    barWindow.dndActive = Boolean(d.dnd);
+                    if (!toggleGuardTimer.running) {
+                        barWindow.caffeineActive = Boolean(d.caffeine);
+                        barWindow.nightlightActive = Boolean(d.nightlight);
+                        barWindow.dndActive = Boolean(d.dnd);
+                    }
                     barWindow.isRecording = Boolean(d.recording);
                     barWindow.recTime = d.recTime || "00:00";
                     barWindow.hasBattery = Boolean(d.hasBattery);

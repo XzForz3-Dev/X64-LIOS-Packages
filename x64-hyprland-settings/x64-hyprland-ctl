@@ -78,39 +78,30 @@ apply_ctm_state() {
 }
 
 # -----------------------------------------------------------------------------
-# 1. CAFFEINE (IDLE INHIBITOR)
+# 1. CAFFEINE (IDLE INHIBITOR: Wayland zwp_idle_inhibit_v1 + systemd-inhibit)
 # -----------------------------------------------------------------------------
 cmd_caffeine() {
     local action="${1:-toggle}"
     local cur
     cur=$(cat "${STATE_DIR}/caffeine" 2>/dev/null || echo "0")
 
-    # Verify PID is actually alive
-    if [ "$cur" = "1" ] && [ -f "${STATE_DIR}/caffeine.pid" ]; then
-        local pid
-        pid=$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null || echo "")
-        if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
-            cur="0"
-        fi
-    fi
-
     if [ "$action" = "toggle" ]; then
         [ "$cur" = "1" ] && action="off" || action="on"
     fi
 
     if [ "$action" = "on" ]; then
+        echo "1" > "${STATE_DIR}/caffeine"
         if [ -f "${STATE_DIR}/caffeine.pid" ]; then
             kill "$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null)" 2>/dev/null || true
         fi
-        nohup systemd-inhibit --what=idle:sleep --who="X64 LIOS" --why="Modo Cafe Activo" sleep infinity >/dev/null 2>&1 &
-        echo $! > "${STATE_DIR}/caffeine.pid"
-        echo "1" > "${STATE_DIR}/caffeine"
+        setsid -f sh -c 'echo $$ > "'"${STATE_DIR}/caffeine.pid"'"; exec systemd-inhibit --what=idle --who="X64 LIOS" --why="Modo Cafe Activo" sleep infinity 2>/dev/null || exec sleep infinity' >/dev/null 2>&1 < /dev/null
     elif [ "$action" = "off" ]; then
+        echo "0" > "${STATE_DIR}/caffeine"
         if [ -f "${STATE_DIR}/caffeine.pid" ]; then
             kill "$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null)" 2>/dev/null || true
             rm -f "${STATE_DIR}/caffeine.pid"
         fi
-        echo "0" > "${STATE_DIR}/caffeine"
+        pkill -f "Modo Cafe Activo" 2>/dev/null || true
     fi
 }
 
@@ -418,12 +409,6 @@ cmd_status() {
     # 7. Toggles State
     local caf_val nl_val dnd_val
     caf_val=$(cat "${STATE_DIR}/caffeine" 2>/dev/null || echo "0")
-    if [ "$caf_val" = "1" ] && [ -f "${STATE_DIR}/caffeine.pid" ]; then
-        if ! kill -0 "$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null)" 2>/dev/null; then
-            caf_val="0"
-            echo "0" > "${STATE_DIR}/caffeine"
-        fi
-    fi
     nl_val=$(cat "${STATE_DIR}/nightlight" 2>/dev/null || echo "0")
     dnd_val=$(cat "${STATE_DIR}/dnd" 2>/dev/null || echo "0")
 

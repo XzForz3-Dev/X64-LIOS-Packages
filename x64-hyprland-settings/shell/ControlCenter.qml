@@ -51,8 +51,15 @@ PanelWindow {
     }
 
     function runCtl(args) {
+        ctlGuardTimer.restart();
         ctlExecProc.command = ["x64-hyprland-ctl"].concat(args);
         ctlExecProc.running = true;
+    }
+
+    Timer {
+        id: ctlGuardTimer
+        interval: 900
+        repeat: false
     }
 
     function refreshAll() {
@@ -76,15 +83,17 @@ PanelWindow {
                 if (!ctlCollector.text) return;
                 try {
                     var d = JSON.parse(ctlCollector.text.trim());
-                    controlWindow.caffeineActive = Boolean(d.caffeine);
-                    controlWindow.nightlightActive = Boolean(d.nightlight);
-                    controlWindow.dndActive = Boolean(d.dnd);
+                    if (!ctlGuardTimer.running) {
+                        controlWindow.caffeineActive = Boolean(d.caffeine);
+                        controlWindow.nightlightActive = Boolean(d.nightlight);
+                        controlWindow.dndActive = Boolean(d.dnd);
+                        controlWindow.powerProfile = d.powerProfile || "balanced";
+                    }
                     controlWindow.isRecording = Boolean(d.recording);
                     controlWindow.recTime = d.recTime || "00:00";
                     controlWindow.hasBattery = Boolean(d.hasBattery);
                     controlWindow.batPct = d.batPct !== undefined ? d.batPct : 100;
                     controlWindow.batStatus = d.batStatus || "AC";
-                    controlWindow.powerProfile = d.powerProfile || "balanced";
                     if (!brSlider.pressed && d.brightness !== undefined) {
                         controlWindow.brightnessVal = d.brightness;
                     }
