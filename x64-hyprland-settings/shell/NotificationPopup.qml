@@ -16,14 +16,16 @@ PanelWindow {
     }
 
     function pushNotification(app, sum, bod) {
-        if (notifWindow.dndEnabled) {
-            return;
-        }
         var cleanApp = app || "X64 LIOS";
         var cleanSum = sum || "Notificación";
         var cleanBod = bod || "";
 
-        // If a toast from the same category/title prefix is already visible, update it in place
+        // Block all notifications while DND is active EXCEPT the DND toggle confirmation itself
+        if (notifWindow.dndEnabled && cleanApp !== "No Molestar") {
+            return;
+        }
+
+        // If a toast from the same category/title is already visible, replace it in place
         for (var i = 0; i < toastModel.count; i++) {
             var item = toastModel.get(i);
             if (item.summary === cleanSum || (cleanApp !== "X64 LIOS" && item.appName === cleanApp)) {
@@ -44,7 +46,7 @@ PanelWindow {
         });
     }
 
-    visible: toastModel.count > 0 && !notifWindow.dndEnabled
+    visible: toastModel.count > 0
 
     anchors {
         top: true
@@ -68,7 +70,11 @@ PanelWindow {
 
     onDndEnabledChanged: {
         if (dndEnabled) {
-            toastModel.clear();
+            for (var i = toastModel.count - 1; i >= 0; i--) {
+                if (toastModel.get(i).appName !== "No Molestar") {
+                    toastModel.remove(i);
+                }
+            }
         }
     }
 
@@ -113,14 +119,17 @@ PanelWindow {
         Repeater {
             model: toastModel
             delegate: Rectangle {
+                readonly property bool isDndToast: model.appName === "No Molestar"
+                readonly property color toastAccent: isDndToast ? "#c084fc" : Theme.accent
+
                 Layout.fillWidth: true
                 implicitHeight: cardInner.implicitHeight + 22
                 radius: Theme.radiusMd
                 color: Theme.bgGlass
-                border.color: Theme.borderAccent
+                border.color: isDndToast ? "#88a855f7" : Theme.borderAccent
                 border.width: 1
 
-                // Top Neon Crimson Glow Line
+                // Top Neon Accent Glow Line
                 Rectangle {
                     anchors {
                         top: parent.top
@@ -131,7 +140,7 @@ PanelWindow {
                     }
                     height: 2
                     radius: 1
-                    color: Theme.accent
+                    color: parent.toastAccent
                 }
 
                 ColumnLayout {
@@ -145,10 +154,10 @@ PanelWindow {
                         spacing: 6
 
                         Text {
-                            text: "󰂚"
+                            text: isDndToast ? "󰂛" : "󰂚"
                             font.family: Theme.fontMono
                             font.pixelSize: 11
-                            color: Theme.accent
+                            color: toastAccent
                         }
 
                         Text {
@@ -156,7 +165,7 @@ PanelWindow {
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             font.bold: true
-                            color: Theme.accent
+                            color: toastAccent
                             Layout.fillWidth: true
                             elide: Text.ElideRight
                         }
@@ -201,7 +210,7 @@ PanelWindow {
                             width: parent.width * Math.max(0.0, model.ticks / 45.0)
                             height: parent.height
                             radius: 1
-                            color: Theme.accent
+                            color: toastAccent
                         }
                     }
                 }

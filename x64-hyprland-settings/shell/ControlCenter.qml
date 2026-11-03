@@ -12,6 +12,7 @@ PanelWindow {
 
     signal closeRequested()
     signal lockRequested()
+    signal dndToggled(bool active)
     signal brightnessChangedOsd(int val)
 
     property bool caffeineActive: false
@@ -309,6 +310,7 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             controlWindow.dndActive = !controlWindow.dndActive;
+                            controlWindow.dndToggled(controlWindow.dndActive);
                             controlWindow.runCtl(["dnd", controlWindow.dndActive ? "on" : "off"]);
                         }
                     }

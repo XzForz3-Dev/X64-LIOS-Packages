@@ -147,9 +147,14 @@ cmd_dnd() {
 
     if [ "$action" = "on" ]; then
         echo "1" > "${STATE_DIR}/dnd"
+        if command -v notify-send >/dev/null 2>&1; then
+            notify-send -a "No Molestar" "Modo No Molestar Activado" "Las notificaciones emergentes han sido silenciadas" 2>/dev/null || true
+        fi
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/dnd"
-        notify_user "No Molestar Desactivado" "Notificaciones de escritorio nuevamente activas" "X64 LIOS"
+        if command -v notify-send >/dev/null 2>&1; then
+            notify-send -a "No Molestar" "Modo No Molestar Desactivado" "Notificaciones de escritorio nuevamente activas" 2>/dev/null || true
+        fi
     fi
 }
 

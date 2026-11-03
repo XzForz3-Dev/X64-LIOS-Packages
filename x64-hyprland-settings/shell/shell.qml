@@ -189,6 +189,9 @@ ShellRoot {
         id: controlCenter
         visible: false
         onCloseRequested: controlCenter.visible = false
+        onDndToggled: (active) => {
+            mainBar.dndActive = active;
+        }
         onLockRequested: {
             root.closeAllExcept("none");
             lockScreen.lockSession();
