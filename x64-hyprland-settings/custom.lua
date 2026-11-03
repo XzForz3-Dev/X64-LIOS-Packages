@@ -1,14 +1,14 @@
 -- ==============================================================================
--- X64 LIOS - Archivo Personal de Usuario para Hyprland (custom.lua)
+-- X64 LIOS - User Custom Configuration File (custom.lua)
 -- ==============================================================================
--- Este archivo se carga automáticamente al final de ~/.config/hypr/hyprland.lua
--- y NUNCA es sobrescrito por las actualizaciones del sistema (pacman -Syu).
+-- This file is automatically loaded at the end of ~/.config/hypr/hyprland.lua
+-- and is NEVER overwritten during system updates (pacman -Syu).
 --
--- Aquí puedes añadir tus propios atajos de teclado, reglas de ventanas,
--- fondos de pantalla personalizados, monitores o sobreescribir bordes y gaps.
+-- Feel free to add your custom keybindings, window rules, wallpapers,
+-- monitor configurations, or override gaps, animations, and border colors here.
 -- ==============================================================================
 
--- 1. EJEMPLO: Cambiar bordes, gaps o colores del marco activo
+-- 1. EXAMPLE: Customize window borders, gaps, or active outline colors
 -- hl.config({
 --     general = {
 --         gaps_in  = 6,
@@ -20,10 +20,10 @@
 --     },
 -- })
 
--- 2. EJEMPLO: Añadir tus propios atajos de teclado
+-- 2. EXAMPLE: Add custom application keybindings
 -- hl.bind("SUPER + B", hl.dsp.exec_cmd("chromium"))
 
--- 3. EJEMPLO: Usar tu propio fondo de pantalla o iniciar programas propios
+-- 3. EXAMPLE: Autostart personal background daemons or custom wallpaper
 -- hl.on("hyprland.start", function ()
---     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i ~/Pictures/mi-wallpaper.jpg -m fill &")
+--     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i ~/Pictures/my-wallpaper.jpg -m fill &")
 -- end)

@@ -3,9 +3,8 @@ import QtQuick
 
 // =============================================================================
 // X64 LIOS - Quickshell Global Theme & Color Palette (Theme.qml)
-// Puedes personalizar libremente los colores, bordes y tipografías aquí.
-// Si modificas el color 'accent', el instalador conservará tu Theme.qml intacto
-// durante futuras actualizaciones del sistema.
+// Customize colors, borders, and typography here.
+// Modifying 'accent' ensures this Theme.qml is preserved across system updates.
 // =============================================================================
 QtObject {
     // Cyberpunk OLED Color Palette (Qt6 #AARRGGBB format)

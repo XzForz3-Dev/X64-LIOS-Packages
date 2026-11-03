@@ -13,7 +13,7 @@ sync_user_configs() {
 
             # 1. Hyprland Configurations (~/.config/hypr)
             if [ -d /etc/skel/.config/hypr ]; then
-                # Si el usuario eliminó/deshabilitó hyprland.lua en upgrade para usar su propio hyprland.conf, respetarlo
+                # If user disabled hyprland.lua to use their own hyprland.conf, respect their choice on upgrades
                 if [ "$mode" = "upgrade" ] && [ ! -f "$target_hypr/hyprland.lua" ] && [ -f "$target_hypr/hyprland.conf" ]; then
                     cp -f /etc/skel/.config/hypr/hyprland.lua "$target_hypr/hyprland.lua.pacnew" 2>/dev/null || true
                 else
@@ -24,7 +24,7 @@ sync_user_configs() {
                     fi
                 fi
 
-                # NUNCA sobrescribir custom.lua si el usuario ya lo tiene
+                # NEVER overwrite custom.lua if it already exists
                 if [ ! -f "$target_hypr/custom.lua" ]; then
                     cp -f /etc/skel/.config/hypr/custom.lua "$target_hypr/custom.lua" 2>/dev/null || true
                 fi
@@ -32,7 +32,7 @@ sync_user_configs() {
 
             # 2. Quickshell QML Shell (~/.config/quickshell)
             if [ -d /etc/skel/.config/quickshell ]; then
-                # Si el usuario personalizó Theme.qml (cambió el color accent #ff2b2b), preservar su Theme.qml
+                # If user customized Theme.qml (modified accent color), preserve their custom theme
                 local preserve_theme=0
                 if [ "$mode" = "upgrade" ] && [ -f "$target_qs/Theme.qml" ]; then
                     if ! grep -q 'accent: "#ff2b2b"' "$target_qs/Theme.qml" 2>/dev/null; then
