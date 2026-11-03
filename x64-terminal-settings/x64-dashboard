@@ -1,12 +1,19 @@
 #!/usr/bin/env fish
 # ==============================================================================
 # X64 LIOS - SERVER & RESCUE DASHBOARD (TTY1)
+# Official Management Center for Server / CLI Installations and Recovery
 # Centro de Mando Oficial para Instalaciones Server / CLI y Recuperación
 # ==============================================================================
 
+# Regional localization detection (Default: en_US, Fallback: es_* when $LANG =~ ^es)
+set -g is_es 0
+if string match -qr '^es' "$LANG"; or string match -qr '^es' "$LC_ALL"; or string match -qr '^es' "$LC_MESSAGES"
+    set -g is_es 1
+end
+
 function draw_dashboard
     clear
-    # Espacio superior para que el logo respire con elegancia
+    # Breathing room for header
     echo ""
     echo ""
 
@@ -19,7 +26,7 @@ function draw_dashboard
     set -l red "\e[1;31m"
     set -l cyan "\e[1;36m"
 
-    # Telemetría en tiempo real
+    # Real-time telemetry
     set -l os_name (cat /etc/os-release 2>/dev/null | grep "^PRETTY_NAME=" | cut -d '=' -f 2 | tr -d '"')
     test -z "$os_name"; and set os_name "X64 LIOS Linux"
     set -l kernel_ver (uname -r)
@@ -27,43 +34,62 @@ function draw_dashboard
     set -l current_time (date '+%Y-%m-%d %H:%M:%S')
     set -l uptime_str (uptime -p | sed 's/up //')
     set -l ip_addr (ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
-    test -z "$ip_addr"; and set ip_addr "Desconectado"
+    if test -z "$ip_addr"
+        set ip_addr (test $is_es -eq 1; and echo "Desconectado"; or echo "Disconnected")
+    end
     set -l mem_used (free -m | awk '/Mem:/ {print $3}')
     set -l mem_total (free -m | awk '/Mem:/ {print $2}')
     set -l ram_str "$mem_used MiB / $mem_total MiB"
-    set -l disk_free (df -h / | awk 'NR==2 {print $4}')" libres"
+    set -l disk_free (df -h / | awk 'NR==2 {print $4}')(test $is_es -eq 1; and echo " libres"; or echo " free")
 
-    # Estado de servicios (sin sudo para evitar pedir contraseña)
+    # Service status
     set -l ssh_status (systemctl is-active sshd 2>/dev/null)
     set -l ufw_status (systemctl is-active ufw 2>/dev/null)
 
-    set -l ssh_txt (test "$ssh_status" = "active"; and echo "[ ACTIVO ]"; or echo "[ INACTIVO ]")
-    set -l ufw_txt (test "$ufw_status" = "active"; and echo "[ ACTIVO ]"; or echo "[ INACTIVO ]")
+    set -l active_tag (test $is_es -eq 1; and echo "[ ACTIVO ]"; or echo "[ ACTIVE ]")
+    set -l inactive_tag (test $is_es -eq 1; and echo "[ INACTIVO ]"; or echo "[ INACTIVE ]")
+    set -l ssh_txt (test "$ssh_status" = "active"; and echo "$active_tag"; or echo "$inactive_tag")
+    set -l ufw_txt (test "$ufw_status" = "active"; and echo "$active_tag"; or echo "$inactive_tag")
     set -l ssh_color (test "$ssh_status" = "active"; and echo "\e[1;32m"; or echo "\e[1;30m")
     set -l ufw_color (test "$ufw_status" = "active"; and echo "\e[1;32m"; or echo "\e[1;30m")
 
-    # Logo ASCII Oficial X64 LIOS (Centrado con aire)
+    # Official X64 LIOS ASCII Logo
     echo -e "$red    ██╗  ██╗ ██████╗ ██╗  ██╗    ██╗     ██╗ ██████╗ ███████╗$reset"
     echo -e "$red    ╚██╗██╔╝██╔════╝ ██║  ██║    ██║     ██║██╔═══██╗██╔════╝$reset"
     echo -e "$red     ╚███╔╝ ███████╗ ███████║    ██║     ██║██║   ██║███████╗$reset"
     echo -e "$red     ██╔██╗ ██╔═══██╗╚════██║    ██║     ██║██║   ██║╚════██║$reset"
     echo -e "$red    ██╔╝ ██╗╚██████╔╝     ██║    ███████╗██║╚██████╔╝███████║$reset"
     echo -e "$red    ╚═╝  ╚═╝ ╚═════╝      ╚═╝    ╚══════╝╚═╝ ╚═════╝ ╚══════╝$reset"
-    echo -e "          $title C O N S O L E   //   C E N T R O   D E   M A N D O$reset\n"
+    if test $is_es -eq 1
+        echo -e "          $title C O N S O L E   //   C E N T R O   D E   M A N D O$reset\n"
+    else
+        echo -e "          $title C O N S O L E   //   C O N T R O L   C E N T E R$reset\n"
+    end
 
-    # Sección 1: Telemetría
+    # Section 1: System Telemetry
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title TELEMETRÍA DEL SISTEMA$reset"
+    if test $is_es -eq 1
+        echo -e "   $title TELEMETRÍA DEL SISTEMA$reset"
+    else
+        echo -e "   $title SYSTEM TELEMETRY$reset"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
+    set -l lbl_time (test $is_es -eq 1; and echo "[HORA]"; or echo "[TIME]")
+    set -l lbl_disk (test $is_es -eq 1; and echo "[DISCO]"; or echo "[DISK]")
+
     printf "    \e[1;36m%-8s\e[0m \e[0;37m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[OS]" "$os_name" "[KERNEL]" "$kernel_ver"
     printf "    \e[1;36m%-8s\e[0m \e[0;37m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[HOST]" "$host_node" "[UPTIME]" "$uptime_str"
-    printf "    \e[1;36m%-8s\e[0m \e[1;32m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[IP]" "$ip_addr" "[HORA]" "$current_time"
-    printf "    \e[1;36m%-8s\e[0m \e[0;37m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[RAM]" "$ram_str" "[DISCO]" "$disk_free"
+    printf "    \e[1;36m%-8s\e[0m \e[1;32m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[IP]" "$ip_addr" "$lbl_time" "$current_time"
+    printf "    \e[1;36m%-8s\e[0m \e[0;37m%-24s\e[0m \e[1;36m%-9s\e[0m \e[0;37m%-28s\e[0m\n" "[RAM]" "$ram_str" "$lbl_disk" "$disk_free"
     printf "    \e[1;36m%-8s\e[0m $ssh_color%-24s\e[0m \e[1;36m%-9s\e[0m $ufw_color%-28s\e[0m\n" "[SSH]" "$ssh_txt" "[UFW]" "$ufw_txt"
 
-    # Sección 2: Entornos Gráficos
+    # Section 2: Graphical Environment
     echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title ENTORNO GRÁFICO$reset"
+    if test $is_es -eq 1
+        echo -e "   $title ENTORNO GRÁFICO$reset"
+    else
+        echo -e "   $title GRAPHICAL ENVIRONMENT$reset"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     set -g desktop_names
@@ -86,7 +112,7 @@ function draw_dashboard
         set -a desktop_dms "cosmic-greeter"
     end
     if type -q niri-session
-        set -a desktop_names "Niri (Scroll-infinito - Wayland)"
+        set -a desktop_names (test $is_es -eq 1; and echo "Niri (Scroll-infinito - Wayland)"; or echo "Niri (Infinite Scroll - Wayland)")
         set -a desktop_dms "sddm"
     end
     if type -q cinnamon-session
@@ -101,33 +127,72 @@ function draw_dashboard
     set -g has_desktop (count $desktop_names)
 
     if test $has_desktop -eq 0
-        echo -e "    \e[1;33m[!]\e[0m \e[0;37mNo hay ningún entorno gráfico instalado (Modo Server / CLI puro).\e[0m"
-        echo -e "    \e[1;33m[1]\e[0m \e[1;37mInstalar un Entorno de Escritorio Oficial (Hyprland, GNOME, etc.)\e[0m"
+        if test $is_es -eq 1
+            echo -e "    \e[1;33m[!]\e[0m \e[0;37mNo hay ningún entorno gráfico instalado (Modo Server / CLI puro).\e[0m"
+            echo -e "    \e[1;33m[1]\e[0m \e[1;37mInstalar un Entorno de Escritorio Oficial (Hyprland, GNOME, etc.)\e[0m"
+        else
+            echo -e "    \e[1;33m[!]\e[0m \e[0;37mNo graphical environment installed (Pure Server / CLI Mode).\e[0m"
+            echo -e "    \e[1;33m[1]\e[0m \e[1;37mInstall an Official Desktop Environment (Hyprland, GNOME, etc.)\e[0m"
+        end
     else
         set -l dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
         if test "$dm_active" = "active"
-            printf "    \e[1;32m[1]\e[0m \e[0;37mDetener Servicio Gráfico (\e[1;32m%s ACTIVO\e[0m\e[0;37m)\e[0m\n" "$desktop_dms[1]"
-            echo -e "    \e[1;36m[G]\e[0m \e[1;37mConmutar a la Pantalla Gráfica (VT2)\e[0m"
+            if test $is_es -eq 1
+                printf "    \e[1;32m[1]\e[0m \e[0;37mDetener Servicio Gráfico (\e[1;32m%s ACTIVO\e[0m\e[0;37m)\e[0m\n" "$desktop_dms[1]"
+                echo -e "    \e[1;36m[G]\e[0m \e[1;37mConmutar a la Pantalla Gráfica (VT2)\e[0m"
+            else
+                printf "    \e[1;32m[1]\e[0m \e[0;37mStop Graphical Service (\e[1;32m%s ACTIVE\e[0m\e[0;37m)\e[0m\n" "$desktop_dms[1]"
+                echo -e "    \e[1;36m[G]\e[0m \e[1;37mSwitch to Graphical Screen (VT2)\e[0m"
+            end
         else
-            printf "    \e[1;32m[1]\e[0m \e[0;37mIniciar %s\e[0m\n" "$desktop_names[1]"
+            if test $is_es -eq 1
+                printf "    \e[1;32m[1]\e[0m \e[0;37mIniciar %s\e[0m\n" "$desktop_names[1]"
+            else
+                printf "    \e[1;32m[1]\e[0m \e[0;37mStart %s\e[0m\n" "$desktop_names[1]"
+            end
         end
-        echo -e "    \e[1;33m[I]\e[0m \e[1;37mInstalar o alternar a otro Entorno de Escritorio adicional\e[0m"
+        if test $is_es -eq 1
+            echo -e "    \e[1;33m[I]\e[0m \e[1;37mInstalar o alternar a otro Entorno de Escritorio adicional\e[0m"
+        else
+            echo -e "    \e[1;33m[I]\e[0m \e[1;37mInstall or switch to another Desktop Environment\e[0m"
+        end
     end
 
-    # Sección 3: Herramientas
+    # Section 3: Server & Maintenance Tools
     echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title HERRAMIENTAS DE SERVIDOR Y MANTENIMIENTO$reset"
+    if test $is_es -eq 1
+        echo -e "   $title HERRAMIENTAS DE SERVIDOR Y MANTENIMIENTO$reset"
+    else
+        echo -e "   $title SERVER & MAINTENANCE TOOLS$reset"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Monitor de Recursos (btop)" "[5]" "Diagnóstico de Red e IPs"
-    printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Acceso Remoto SSH y Firewall" "[6]" "Limpieza Profunda de Caché"
-    printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[4]" "Actualizar Sistema (Pacman)" "[7]" "Registro de Errores (Boot)"
 
-    # Sección 4: Control del Sistema
+    if test $is_es -eq 1
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Monitor de Recursos (btop)" "[5]" "Diagnóstico de Red e IPs"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Acceso Remoto SSH y Firewall" "[6]" "Limpieza Profunda de Caché"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[4]" "Actualizar Sistema (Pacman)" "[7]" "Registro de Errores (Boot)"
+    else
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Resource Monitor (btop)" "[5]" "Network & IP Diagnostics"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Remote SSH & Firewall" "[6]" "Deep System Cache Clean"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[4]" "System Update (Pacman)" "[7]" "Boot Error Logs (Journal)"
+    end
+
+    # Section 4: System Control
     echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title CONTROL DEL SISTEMA$reset"
+    if test $is_es -eq 1
+        echo -e "   $title CONTROL DEL SISTEMA$reset"
+    else
+        echo -e "   $title SYSTEM CONTROL$reset"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[8]" "Consola Pura (Fish Shell)" "[9]" "Reiniciar el Servidor"
-    printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m\n" "[0]" "Apagar el Servidor"
+
+    if test $is_es -eq 1
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[8]" "Consola Pura (Fish Shell)" "[9]" "Reiniciar el Servidor"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m\n" "[0]" "Apagar el Servidor"
+    else
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[8]" "Pure Console (Fish Shell)" "[9]" "Reboot System"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m\n" "[0]" "Shut Down System"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 end
 
@@ -141,43 +206,76 @@ function configure_desktop_boot_mode -a dm_service desktop_name
     set -l title "\e[1;37m"
 
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title CONFIGURACIÓN DE ARRANQUE DEL SISTEMA$reset"
+    if test $is_es -eq 1
+        echo -e "   $title CONFIGURACIÓN DE ARRANQUE DEL SISTEMA$reset"
+    else
+        echo -e "   $title SYSTEM BOOT CONFIGURATION$reset"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
-    echo -e "    \e[1;32m¡$desktop_name instalado con éxito!\e[0m\n"
-    echo -e "    ¿Cómo deseas que arranque este equipo a partir de ahora?\n"
-    echo -e "    \e[1;33m[1]\e[0m \e[1;37mModo Servidor / Consola (Recomendado)\e[0m"
-    echo -e "        \e[0;37mArrancar siempre en el Centro de Mando TTY1 e iniciar el escritorio bajo demanda.\e[0m\n"
-    echo -e "    \e[1;36m[2]\e[0m \e[1;37mModo Escritorio Completo (PC de uso diario)\e[0m"
-    echo -e "        \e[0;37mArrancar automáticamente en la pantalla gráfica de inicio de sesión ($dm_service).\e[0m\n"
+
+    if test $is_es -eq 1
+        echo -e "    \e[1;32m¡$desktop_name instalado con éxito!\e[0m\n"
+        echo -e "    ¿Cómo deseas que arranque este equipo a partir de ahora?\n"
+        echo -e "    \e[1;33m[1]\e[0m \e[1;37mModo Servidor / Consola (Recomendado)\e[0m"
+        echo -e "        \e[0;37mArrancar siempre en el Centro de Mando TTY1 e iniciar el escritorio bajo demanda.\e[0m\n"
+        echo -e "    \e[1;36m[2]\e[0m \e[1;37mModo Escritorio Completo (PC de uso diario)\e[0m"
+        echo -e "        \e[0;37mArrancar automáticamente en la pantalla gráfica de inicio de sesión ($dm_service).\e[0m\n"
+    else
+        echo -e "    \e[1;32m$desktop_name installed successfully!\e[0m\n"
+        echo -e "    How would you like this system to boot from now on?\n"
+        echo -e "    \e[1;33m[1]\e[0m \e[1;37mServer / Console Mode (Recommended)\e[0m"
+        echo -e "        \e[0;37mAlways boot into TTY1 Control Center and start desktop on demand.\e[0m\n"
+        echo -e "    \e[1;36m[2]\e[0m \e[1;37mFull Desktop Mode (Daily Driver PC)\e[0m"
+        echo -e "        \e[0;37mAutomatically boot into graphical login screen ($dm_service).\e[0m\n"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     echo ""
-    read -l -P (echo -e "  \e[1;31m> Selecciona el modo de arranque [1, 2]: \e[0m") boot_choice
+    set -l prompt_boot (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona el modo de arranque [1, 2]: \e[0m"; or echo "  \e[1;31m> Select boot mode [1, 2]: \e[0m")
+    read -l -P (echo -e "$prompt_boot") boot_choice
 
     if test "$boot_choice" = "2"
         sudo systemctl enable $dm_service
         sudo systemctl set-default graphical.target
-        echo -e "\n    \e[1;32m[OK] Modo Escritorio Automático activado ($dm_service habilitado al inicio).\e[0m"
+        if test $is_es -eq 1
+            echo -e "\n    \e[1;32m[OK] Modo Escritorio Automático activado ($dm_service habilitado al inicio).\e[0m"
+        else
+            echo -e "\n    \e[1;32m[OK] Automatic Desktop Mode activated ($dm_service enabled at boot).\e[0m"
+        end
     else
         sudo systemctl disable $dm_service 2>/dev/null
         sudo systemctl set-default multi-user.target 2>/dev/null
-        echo -e "\n    \e[1;33m[OK] Modo Servidor / Consola preservado (TTY1 por defecto).\e[0m"
-        echo -e "    \e[0;37mPodrás iniciar tu escritorio desde la opción [1] del Centro de Mando.\e[0m"
+        if test $is_es -eq 1
+            echo -e "\n    \e[1;33m[OK] Modo Servidor / Consola preservado (TTY1 por defecto).\e[0m"
+            echo -e "    \e[0;37mPodrás iniciar tu escritorio desde la opción [1] del Centro de Mando.\e[0m"
+        else
+            echo -e "\n    \e[1;33m[OK] Server / Console Mode preserved (TTY1 default).\e[0m"
+            echo -e "    \e[0;37mYou can start your desktop anytime from option [1] in the Control Center.\e[0m"
+        end
     end
     echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    read -l -P "  Presiona Enter para volver..." dummy
+    set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
+    read -l -P "$prompt_back" dummy
 end
 
 function clean_previous_desktops -a target_id
-    echo -e "\n  \e[1;33m[*] Retirando entorno anterior para mantener la pureza del sistema...\e[0m"
+    if test $is_es -eq 1
+        echo -e "\n  \e[1;33m[*] Retirando entorno anterior para mantener la pureza del sistema...\e[0m"
+    else
+        echo -e "\n  \e[1;33m[*] Removing previous desktop environment to maintain 100% system purity...\e[0m"
+    end
 
-    # Detener y desactivar display managers anteriores
+    # Stop and disable previous display managers
     sudo systemctl stop sddm gdm lightdm cosmic-greeter 2>/dev/null
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
-    # Retirar paquetes del entorno previo con cascada recursiva segura (-Rcs)
+    # Remove packages from previous desktop with safe recursive cascade (-Rcs)
     if test "$target_id" != "1"; and test (count (pacman -Qq hyprland x64-hyprland-settings 2>/dev/null)) -gt 0
-        echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes (Quickshell, Dolphin)...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes (Quickshell, Dolphin)...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling Hyprland and components (Quickshell, Dolphin)...\e[0m"
+        end
         set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg hyprlock xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
@@ -185,7 +283,11 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "2"; and test (count (pacman -Qq gnome-shell x64-gnome-settings 2>/dev/null)) -gt 0
-        echo -e "  \e[0;37m-> Desinstalando suite completa de GNOME...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando suite completa de GNOME...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling full GNOME suite...\e[0m"
+        end
         set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme gnome-screenshot gnome-themes-extra gnome-desktop-4 gnome-desktop-common 2>/dev/null | sort -u)
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
@@ -194,7 +296,11 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "3"; and type -q startplasma-wayland
-        echo -e "  \e[0;37m-> Desinstalando suite completa de KDE Plasma 6...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando suite completa de KDE Plasma 6...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling full KDE Plasma 6 suite...\e[0m"
+        end
         set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons ffmpegthumbs kdegraphics-thumbnailers kdegraphics-mobipocket kdialog kio-admin kio-fuse kwallet kwallet-pam phonon-qt6-vlc phonon-qt6 breeze-gtk xsettingsd 2>/dev/null | sort -u)
         if test (count $kde_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $kde_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $kde_pkgs 2>/dev/null
@@ -202,7 +308,11 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
-        echo -e "  \e[0;37m-> Desinstalando suite completa de COSMIC Desktop...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando suite completa de COSMIC Desktop...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling full COSMIC Desktop suite...\e[0m"
+        end
         set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
         if test (count $cosmic_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
@@ -210,7 +320,11 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "5"; and type -q niri-session
-        echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando Niri y componentes...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling Niri and components...\e[0m"
+        end
         set -l niri_pkgs (pacman -Qq x64-niri-settings niri noctalia nautilus dolphin fuzzel waybar 2>/dev/null | sort -u)
         if test (count $niri_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $niri_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $niri_pkgs 2>/dev/null
@@ -218,15 +332,23 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" != "6"; and type -q cinnamon-session
-        echo -e "  \e[0;37m-> Desinstalando suite completa de Cinnamon...\e[0m"
-        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando suite completa de Cinnamon...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling full Cinnamon suite...\e[0m"
+        end
+        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
         if test (count $cin_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cin_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cin_pkgs 2>/dev/null
         end
     end
 
     if test "$target_id" != "7"; and test (count (pacman -Qq xfce4-session xfce4-settings libxfce4ui 2>/dev/null)) -gt 0
-        echo -e "  \e[0;37m-> Desinstalando suite completa de Xfce4...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando suite completa de Xfce4...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling full Xfce4 suite...\e[0m"
+        end
         set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm-slick-greeter lightdm-gtk-greeter labwc 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
@@ -234,14 +356,22 @@ function clean_previous_desktops -a target_id
     end
 
     if test "$target_id" = "8"
-        echo -e "  \e[0;37m-> Desinstalando gestores de pantalla y navegador gráfico (Chromium)...\e[0m"
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando gestores de pantalla y navegador gráfico (Chromium)...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling display managers and graphical browser (Chromium)...\e[0m"
+        end
         set -l dm_pkgs (pacman -Qq sddm lightdm gdm cosmic-greeter x64-sddm-theme chromium 2>/dev/null | sort -u)
         if test (count $dm_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $dm_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $dm_pkgs 2>/dev/null
         end
     end
 
-    echo -e "  \e[1;32m[OK] Limpieza de entorno anterior completada con éxito.\e[0m"
+    if test $is_es -eq 1
+        echo -e "  \e[1;32m[OK] Limpieza de entorno anterior completada con éxito.\e[0m"
+    else
+        echo -e "  \e[1;32m[OK] Previous desktop cleanup completed successfully.\e[0m"
+    end
 end
 
 function install_desktop_menu
@@ -263,39 +393,56 @@ function install_desktop_menu
     set -l xfce_tag ""
     set -l nodesktop_tag ""
 
-    type -q Hyprland; and set hypr_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q gnome-shell; and set gnome_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q startplasma-wayland; and set kde_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q cosmic-session; and set cosmic_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q niri-session; and set niri_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q cinnamon-session; and set cinnamon_tag " \e[1;32m[ACTIVO]\e[0m"
-    type -q xfce4-session; and set xfce_tag " \e[1;32m[ACTIVO]\e[0m"
-    test $has_desktop -eq 0; and set nodesktop_tag " \e[1;32m[ACTIVO]\e[0m"
+    set -l active_lbl (test $is_es -eq 1; and echo " \e[1;32m[ACTIVO]\e[0m"; or echo " \e[1;32m[ACTIVE]\e[0m")
+    type -q Hyprland; and set hypr_tag "$active_lbl"
+    type -q gnome-shell; and set gnome_tag "$active_lbl"
+    type -q startplasma-wayland; and set kde_tag "$active_lbl"
+    type -q cosmic-session; and set cosmic_tag "$active_lbl"
+    type -q niri-session; and set niri_tag "$active_lbl"
+    type -q cinnamon-session; and set cinnamon_tag "$active_lbl"
+    type -q xfce4-session; and set xfce_tag "$active_lbl"
+    test $has_desktop -eq 0; and set nodesktop_tag "$active_lbl"
 
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    echo -e "   $title X64 LIOS - GESTIÓN Y MUTACIÓN DE ENTORNOS DE ESCRITORIO$reset"
-    echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
-    echo -e "  Selecciona el escritorio oficial que deseas configurar en este equipo:\n"
-    echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset       $val(X64 Cyberpunk Edition - Wayland, animaciones fluidas)$reset$hypr_tag"
-    echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset$gnome_tag"
-    echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Máximo rendimiento y control)$reset$kde_tag"
-    echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
-    echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
-    echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
-    echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
-    echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset$nodesktop_tag\n"
-    echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
+    if test $is_es -eq 1
+        echo -e "   $title X64 LIOS - GESTIÓN Y MUTACIÓN DE ENTORNOS DE ESCRITORIO$reset"
+        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+        echo -e "  Selecciona el escritorio oficial que deseas configurar en este equipo:\n"
+        echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset       $val(X64 Cyberpunk Edition - Wayland, animaciones fluidas)$reset$hypr_tag"
+        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset$gnome_tag"
+        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Máximo rendimiento y control)$reset$kde_tag"
+        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
+        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
+        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
+        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
+        echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset$nodesktop_tag\n"
+        echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
+    else
+        echo -e "   $title X64 LIOS - DESKTOP MANAGEMENT & MUTATION$reset"
+        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+        echo -e "  Select the official desktop you wish to configure on this system:\n"
+        echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset       $val(X64 Cyberpunk Edition - Wayland, fluid animations)$reset$hypr_tag"
+        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Modern, sleek and polished)$reset$gnome_tag"
+        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Maximum performance and control)$reset$kde_tag"
+        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop developed by System76)$reset$cosmic_tag"
+        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Innovative infinite horizontal scroll tiling)$reset$niri_tag"
+        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Classic traditional high-stability environment)$reset$cinnamon_tag"
+        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ultra-lightweight with minimal RAM footprint)$reset$xfce_tag"
+        echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Pure Server / TTY Console Mode without GUI)$reset$nodesktop_tag\n"
+        echo -e "    \e[1;33m[0]\e[0m Return to Main Dashboard"
+    end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     echo ""
-    read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1-8, 0]: \e[0m") d_choice
+    set -l prompt_choice (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-8, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-8, 0]: \e[0m")
+    read -l -P (echo -e "$prompt_choice") d_choice
     test $status -ne 0; and return
 
     if test "$d_choice" = "0"; or test -z "$d_choice"
         return
     end
 
-    # Nombres de entornos
+    # Environment names
     set -l target_name ""
     set -l target_dm ""
     switch $d_choice
@@ -312,7 +459,7 @@ function install_desktop_menu
             set target_name "COSMIC Desktop (System76 Rust Edition)"
             set target_dm "cosmic-greeter"
         case 5
-            set target_name "Niri (X64 Scroll-Infinito Edition)"
+            set target_name (test $is_es -eq 1; and echo "Niri (X64 Scroll-Infinito Edition)"; or echo "Niri (X64 Infinite-Scroll Edition)")
             set target_dm "sddm"
         case 6
             set target_name "Cinnamon (X64 Classic Edition)"
@@ -321,13 +468,13 @@ function install_desktop_menu
             set target_name "Xfce4 (X64 Ultra-Lightweight Edition)"
             set target_dm "lightdm"
         case 8
-            set target_name "No Desktop (Modo Servidor / Consola TTY Pura)"
+            set target_name (test $is_es -eq 1; and echo "No Desktop (Modo Servidor / Consola TTY Pura)"; or echo "No Desktop (Pure Server / TTY Console Mode)")
             set target_dm "none"
         case '*'
             return
     end
 
-    # Comprobar si el usuario seleccionó el mismo escritorio que ya tiene
+    # Check if target is already current desktop
     set -l is_current 0
     if test "$d_choice" = "1"; and type -q Hyprland; set is_current 1; end
     if test "$d_choice" = "2"; and type -q gnome-shell; set is_current 1; end
@@ -343,16 +490,27 @@ function install_desktop_menu
         echo ""
         echo ""
         echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-        echo -e "   $title AVISO: ENTORNO YA ACTIVO EN EL SISTEMA$reset"
-        echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
-        echo -e "    \e[1;32m¡$target_name ya es tu escritorio activo actual!\e[0m\n"
-        echo -e "    ¿Deseas reinstalar o reparar sus componentes oficiales?\n"
-        echo -e "    \e[1;33m[1]\e[0m Reinstalar / Reparar paquetes de $target_name"
-        echo -e "    \e[1;36m[2]\e[0m Reconfigurar modo de arranque (Consola TTY vs Inicio Gráfico)"
-        echo -e "    \e[1;31m[0]\e[0m Cancelar y volver al Dashboard\n"
+        if test $is_es -eq 1
+            echo -e "   $title AVISO: ENTORNO YA ACTIVO EN EL SISTEMA$reset"
+            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+            echo -e "    \e[1;32m¡$target_name ya es tu escritorio activo actual!\e[0m\n"
+            echo -e "    ¿Deseas reinstalar o reparar sus componentes oficiales?\n"
+            echo -e "    \e[1;33m[1]\e[0m Reinstalar / Reparar paquetes de $target_name"
+            echo -e "    \e[1;36m[2]\e[0m Reconfigurar modo de arranque (Consola TTY vs Inicio Gráfico)"
+            echo -e "    \e[1;31m[0]\e[0m Cancelar y volver al Dashboard\n"
+        else
+            echo -e "   $title NOTICE: ENVIRONMENT ALREADY ACTIVE ON SYSTEM$reset"
+            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+            echo -e "    \e[1;32m$target_name is already your current active desktop!\e[0m\n"
+            echo -e "    Would you like to reinstall or repair its official components?\n"
+            echo -e "    \e[1;33m[1]\e[0m Reinstall / Repair $target_name packages"
+            echo -e "    \e[1;36m[2]\e[0m Reconfigure boot mode (TTY Console vs Graphical Login)"
+            echo -e "    \e[1;31m[0]\e[0m Cancel and return to Dashboard\n"
+        end
         echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
         echo ""
-        read -l -P (echo -e "  \e[1;31m> Opción [1, 2, 0]: \e[0m") same_choice
+        set -l prompt_same (test $is_es -eq 1; and echo "  \e[1;31m> Opción [1, 2, 0]: \e[0m"; or echo "  \e[1;31m> Option [1, 2, 0]: \e[0m")
+        read -l -P (echo -e "$prompt_same") same_choice
         if test "$same_choice" = "2"
             configure_desktop_boot_mode $target_dm "$target_name"
             return
@@ -360,95 +518,149 @@ function install_desktop_menu
             return
         end
     else
-        # Si tiene otro escritorio instalado, ejecutar protocolo de Transición Limpia (Opción 1)
+        # If another desktop is installed, execute Clean Transition Protocol
         if test $has_desktop -gt 0
             clear
             echo ""
             echo ""
             echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-            echo -e "   $title TRANSICIÓN LIMPIA DE ESCRITORIO (MODO PUREZA X64)$reset"
-            echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
-            echo -e "    \e[1;33m[!] Entorno actual detectado:\e[0m \e[1;37m$desktop_names[1]\e[0m\n"
-            echo -e "    Para evitar duplicación de aplicaciones (múltiples exploradores de archivos,"
-            echo -e "    centros de control y reproductores) y colisiones de demonios en segundo plano:\n"
-            echo -e "    \e[1;31m1.\e[0m Se desinstalará limpiamente \e[1;33m$desktop_names[1]\e[0m y sus dependencias."
-            echo -e "    \e[1;32m2.\e[0m Se instalará y configurará \e[1;37m$target_name\e[0m."
-            echo -e "    \e[1;36m3.\e[0m Podrás configurar el modo de arranque (Consola TTY o Gráfico).\n"
+            if test $is_es -eq 1
+                echo -e "   $title TRANSICIÓN LIMPIA DE ESCRITORIO (MODO PUREZA X64)$reset"
+                echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+                echo -e "    \e[1;33m[!] Entorno actual detectado:\e[0m \e[1;37m$desktop_names[1]\e[0m\n"
+                echo -e "    Para evitar duplicación de aplicaciones (múltiples exploradores de archivos,"
+                echo -e "    centros de control y reproductores) y colisiones de demonios en segundo plano:\n"
+                echo -e "    \e[1;31m1.\e[0m Se desinstalará limpiamente \e[1;33m$desktop_names[1]\e[0m y sus dependencias."
+                echo -e "    \e[1;32m2.\e[0m Se instalará y configurará \e[1;37m$target_name\e[0m."
+                echo -e "    \e[1;36m3.\e[0m Podrás configurar el modo de arranque (Consola TTY o Gráfico).\n"
+            else
+                echo -e "   $title CLEAN DESKTOP TRANSITION (X64 PURITY MODE)$reset"
+                echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
+                echo -e "    \e[1;33m[!] Current environment detected:\e[0m \e[1;37m$desktop_names[1]\e[0m\n"
+                echo -e "    To prevent application bloat (duplicate file managers, control panels,"
+                echo -e "    and media players) and background daemon collisions:\n"
+                echo -e "    \e[1;31m1.\e[0m Cleanly remove \e[1;33m$desktop_names[1]\e[0m and its dependencies."
+                echo -e "    \e[1;32m2.\e[0m Install and configure \e[1;37m$target_name\e[0m."
+                echo -e "    \e[1;36m3.\e[0m Configure your boot mode (TTY Console or Graphical).\n"
+            end
             echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> ¿Proceder con la transición limpia a $target_name? [S/n]: \e[0m") trans_choice
-            if test -n "$trans_choice"; and test "$trans_choice" != "s"; and test "$trans_choice" != "S"
-                echo -e "\n  \e[1;33m[INFO] Transición cancelada. Tu escritorio actual no ha sido modificado.\e[0m"
+            set -l prompt_trans (test $is_es -eq 1; and echo "  \e[1;31m> ¿Proceder con la transición limpia a $target_name? [S/n]: \e[0m"; or echo "  \e[1;31m> Proceed with clean transition to $target_name? [Y/n]: \e[0m")
+            read -l -P (echo -e "$prompt_trans") trans_choice
+            if test -n "$trans_choice"; and test "$trans_choice" != "s"; and test "$trans_choice" != "S"; and test "$trans_choice" != "y"; and test "$trans_choice" != "Y"
+                if test $is_es -eq 1
+                    echo -e "\n  \e[1;33m[INFO] Transición cancelada. Tu escritorio actual no ha sido modificado.\e[0m"
+                else
+                    echo -e "\n  \e[1;33m[INFO] Transition cancelled. Your current desktop was not modified.\e[0m"
+                end
                 sleep 2
                 return
             end
 
-            # Ejecutar limpieza del entorno previo
+            # Execute previous environment cleanup
             clean_previous_desktops $d_choice
         end
     end
 
-    # Instalación del entorno seleccionado (Paridad 1:1 con Suites Maestras de Calamares)
+    # Installation of selected desktop suite (1:1 parity with Calamares Master Suites)
     set -l install_ok 0
     switch $d_choice
         case 1
-            echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Hyprland (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg hyprlock gpu-screen-recorder xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"
             end
         case 2
-            echo -e "\n  \e[1;32m[*] Instalando GNOME Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando GNOME Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS GNOME (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" baobab decibels file-roller gdm gnome-backgrounds gnome-bluetooth-3.0 gnome-calculator gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell gnome-shell-extensions gnome-text-editor gnome-tweaks gnome-user-docs gnome-user-share gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb loupe mutter nautilus papers resources showtime simple-scan snapshot sushi xdg-user-dirs-gtk x64-gnome-settings adw-gtk-theme kitty chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode gdm "GNOME (X64 Stealth Edition)"
             end
         case 3
-            echo -e "\n  \e[1;32m[*] Instalando KDE Plasma 6 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando KDE Plasma 6 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS KDE Plasma 6 (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" ark bluedevil breeze-gtk discover dolphin ffmpegthumbs filelight flatpak fwupd gwenview haruna kate kcalc kde-gtk-config kdeconnect kdegraphics-thumbnailers kdeplasma-addons kdialog kinfocenter kio-admin kio-fuse konsole kscreen kwallet-pam kwalletmanager okular partitionmanager phonon-qt6-vlc plasma-browser-integration plasma-desktop plasma-disks plasma-firewall plasma-nm plasma-pa plasma-systemmonitor plasma-thunderbolt plasma-vault plasma-workspace-wallpapers powerdevil print-manager sddm sddm-kcm x64-sddm-theme skanpage spectacle tesseract-data-eng xsettingsd x64-kde-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "KDE Plasma 6 (X64 Gaming Edition)"
             end
         case 4
-            echo -e "\n  \e[1;32m[*] Instalando COSMIC Desktop Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando COSMIC Desktop Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS COSMIC Desktop (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers gnome-keyring xdg-desktop-portal-cosmic xdg-desktop-portal-gtk xorg-xwayland x64-cosmic-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode cosmic-greeter "COSMIC Desktop (System76 Rust Edition)"
             end
         case 5
-            echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS (Suite Completa Noctalia Shell)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando Niri Oficial de X64 LIOS (Suite Completa Noctalia Shell)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Niri (Full Noctalia Shell Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" niri sddm x64-sddm-theme kitty nautilus noctalia xdg-desktop-portal-gnome x64-niri-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Niri (X64 Noctalia Shell Edition)"
             end
         case 6
-            echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando Cinnamon Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Cinnamon (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-keyring gnome-terminal kitty x64-cinnamon-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Cinnamon (X64 Classic Edition)"
             end
         case 7
-            echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando Xfce4 Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Xfce4 (Full Calamares Suite)...\e[0m"
+            end
             sudo pacman -S --needed --noconfirm --overwrite "*" xfce4 xfce4-goodies labwc xorg-xwayland lightdm lightdm-slick-greeter thunar file-roller ristretto network-manager-applet x64-xfce4-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
             end
         case 8
-            echo -e "\n  \e[1;32m[*] Configurando Sistema en Modo No Desktop (Consola TTY Pura)...\e[0m"
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Configurando Sistema en Modo No Desktop (Consola TTY Pura)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Configuring System in No Desktop Mode (Pure TTY Console)...\e[0m"
+            end
             sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
             sudo systemctl set-default multi-user.target 2>/dev/null
             set install_ok 1
-            echo -e "  \e[1;32m[OK] Todos los gestores gráficos han sido deshabilitados.\e[0m"
-            echo -e "  \e[1;32m[OK] Target configurado en multi-user.target (Consola TTY).\e[0m\n"
-            read -l -P (echo -e "  \e[1;31m¿Deseas reiniciar ahora para entrar en consola TTY? [s/N]: \e[0m") r_ans
-            if test "$r_ans" = "s"; or test "$r_ans" = "S"
+            if test $is_es -eq 1
+                echo -e "  \e[1;32m[OK] Todos los gestores gráficos han sido deshabilitados.\e[0m"
+                echo -e "  \e[1;32m[OK] Target configurado en multi-user.target (Consola TTY).\e[0m\n"
+                read -l -P (echo -e "  \e[1;31m¿Deseas reiniciar ahora para entrar en consola TTY? [s/N]: \e[0m") r_ans
+            else
+                echo -e "  \e[1;32m[OK] All graphical display managers have been disabled.\e[0m"
+                echo -e "  \e[1;32m[OK] Target configured to multi-user.target (TTY Console).\e[0m\n"
+                read -l -P (echo -e "  \e[1;31mDo you want to reboot now into TTY console? [y/N]: \e[0m") r_ans
+            end
+            if test "$r_ans" = "s"; or test "$r_ans" = "S"; or test "$r_ans" = "y"; or test "$r_ans" = "Y"
                 sudo reboot
             end
         case '*'
@@ -456,21 +668,27 @@ function install_desktop_menu
     end
 
     if test $install_ok -ne 1
-        echo -e "\n  \e[1;31m[ERROR] La instalación del entorno falló o fue interrumpida.\e[0m"
-        read -l -P "  Presiona Enter para volver..." dummy
+        if test $is_es -eq 1
+            echo -e "\n  \e[1;31m[ERROR] La instalación del entorno falló o fue interrumpida.\e[0m"
+            read -l -P "  Presiona Enter para volver..." dummy
+        else
+            echo -e "\n  \e[1;31m[ERROR] Desktop environment installation failed or was interrupted.\e[0m"
+            read -l -P "  Press Enter to return..." dummy
+        end
     end
 
-    # Sincronizar configuraciones oficiales de /etc/skel al directorio del usuario activo
+    # Sync official default configurations from /etc/skel to active user directory
     if test -d /etc/skel/.config
         cp -rn /etc/skel/.config/* $HOME/.config/ 2>/dev/null
     end
 end
 
-# Loop interactivo del Dashboard
+# Interactive Dashboard Loop
 while true
     draw_dashboard
     echo ""
-    read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1-9, 0]: \e[0m") choice
+    set -l prompt_main (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-9, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-9, 0]: \e[0m")
+    read -l -P (echo -e "$prompt_main") choice
     test $status -ne 0; and break
 
     switch $choice
@@ -482,24 +700,41 @@ while true
                 fastfetch 2>/dev/null
             end
             echo ""
-            echo -e "  \e[0;37m(Escribe \e[1;33mx64-dashboard\e[0m \e[0;37men cualquier momento para volver al Centro de Mando)\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "  \e[0;37m(Escribe \e[1;33mx64-dashboard\e[0m \e[0;37men cualquier momento para volver al Centro de Mando)\e[0m\n"
+            else
+                echo -e "  \e[0;37m(Type \e[1;33mx64-dashboard\e[0m \e[0;37mat any time to return to the Control Center)\e[0m\n"
+            end
             break
         case 9 'r' 'R'
             clear
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mREINICIAR EL SERVIDOR\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            echo -e "    ¿Estás seguro de que deseas reiniciar el sistema ahora mismo?\n"
-            echo -e "    \e[1;33m[1]\e[0m \e[1;37mSí, reiniciar ahora\e[0m"
-            echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancelar y volver al Centro de Mando\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mREINICIAR EL SERVIDOR\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    ¿Estás seguro de que deseas reiniciar el sistema ahora mismo?\n"
+                echo -e "    \e[1;33m[1]\e[0m \e[1;37mSí, reiniciar ahora\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancelar y volver al Centro de Mando\e[0m\n"
+            else
+                echo -e "   \e[1;37mREBOOT SYSTEM\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    Are you sure you want to reboot the system right now?\n"
+                echo -e "    \e[1;33m[1]\e[0m \e[1;37mYes, reboot now\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancel and return to Control Center\e[0m\n"
+            end
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> Confirmar [1, 0]: \e[0m") r_choice
+            set -l prompt_reboot (test $is_es -eq 1; and echo "  \e[1;31m> Confirmar [1, 0]: \e[0m"; or echo "  \e[1;31m> Confirm [1, 0]: \e[0m")
+            read -l -P (echo -e "$prompt_reboot") r_choice
             if test "$r_choice" = "1"
                 clear
-                echo -e "\e[1;33mReiniciando el sistema...\e[0m"
+                if test $is_es -eq 1
+                    echo -e "\e[1;33mReiniciando el sistema...\e[0m"
+                else
+                    echo -e "\e[1;33mRebooting the system...\e[0m"
+                end
                 sudo systemctl reboot
                 break
             end
@@ -508,17 +743,30 @@ while true
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mAPAGAR EL SERVIDOR\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            echo -e "    ¿Estás seguro de que deseas apagar este equipo por completo?\n"
-            echo -e "    \e[1;31m[1]\e[0m \e[1;37mSí, apagar ahora\e[0m"
-            echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancelar y volver al Centro de Mando\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mAPAGAR EL SERVIDOR\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    ¿Estás seguro de que deseas apagar este equipo por completo?\n"
+                echo -e "    \e[1;31m[1]\e[0m \e[1;37mSí, apagar ahora\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancelar y volver al Centro de Mando\e[0m\n"
+            else
+                echo -e "   \e[1;37mSHUT DOWN SYSTEM\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    Are you sure you want to completely power off this machine?\n"
+                echo -e "    \e[1;31m[1]\e[0m \e[1;37mYes, shut down now\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mCancel and return to Control Center\e[0m\n"
+            end
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> Confirmar [1, 0]: \e[0m") a_choice
+            set -l prompt_poweroff (test $is_es -eq 1; and echo "  \e[1;31m> Confirmar [1, 0]: \e[0m"; or echo "  \e[1;31m> Confirm [1, 0]: \e[0m")
+            read -l -P (echo -e "$prompt_poweroff") a_choice
             if test "$a_choice" = "1"
                 clear
-                echo -e "\e[1;31mApagando el servidor...\e[0m"
+                if test $is_es -eq 1
+                    echo -e "\e[1;31mApagando el servidor...\e[0m"
+                else
+                    echo -e "\e[1;31mShutting down the server...\e[0m"
+                end
                 sudo systemctl poweroff
                 break
             end
@@ -538,19 +786,35 @@ while true
                     echo ""
                     echo ""
                     echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                    echo -e "   \e[1;37mDETENER ENTORNO GRÁFICO ($desktop_dms[1])\e[0m"
-                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                    echo -e "    El servicio gráfico \e[1;32m$desktop_dms[1]\e[0m está actualmente en ejecución.\n"
-                    echo -e "    \e[1;31m[1]\e[0m Detener servicio gráfico y liberar memoria RAM"
-                    echo -e "    \e[1;36m[2]\e[0m Conmutar de vuelta a la pantalla gráfica (VT2)"
-                    echo -e "    \e[1;33m[0]\e[0m Volver al Centro de Mando\n"
+                    if test $is_es -eq 1
+                        echo -e "   \e[1;37mDETENER ENTORNO GRÁFICO ($desktop_dms[1])\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    El servicio gráfico \e[1;32m$desktop_dms[1]\e[0m está actualmente en ejecución.\n"
+                        echo -e "    \e[1;31m[1]\e[0m Detener servicio gráfico y liberar memoria RAM"
+                        echo -e "    \e[1;36m[2]\e[0m Conmutar de vuelta a la pantalla gráfica (VT2)"
+                        echo -e "    \e[1;33m[0]\e[0m Volver al Centro de Mando\n"
+                    else
+                        echo -e "   \e[1;37mSTOP GRAPHICAL ENVIRONMENT ($desktop_dms[1])\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    The graphical service \e[1;32m$desktop_dms[1]\e[0m is currently running.\n"
+                        echo -e "    \e[1;31m[1]\e[0m Stop graphical service and free RAM"
+                        echo -e "    \e[1;36m[2]\e[0m Switch back to graphical screen (VT2)"
+                        echo -e "    \e[1;33m[0]\e[0m Return to Control Center\n"
+                    end
                     echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
                     echo ""
-                    read -l -P (echo -e "  \e[1;31m> Opción [1, 2, 0]: \e[0m") dm_stop_choice
+                    set -l prompt_dm_stop (test $is_es -eq 1; and echo "  \e[1;31m> Opción [1, 2, 0]: \e[0m"; or echo "  \e[1;31m> Option [1, 2, 0]: \e[0m")
+                    read -l -P (echo -e "$prompt_dm_stop") dm_stop_choice
                     if test "$dm_stop_choice" = "1"
-                        echo -e "\n  \e[1;33mDeteniendo $desktop_dms[1]...\e[0m"
-                        sudo systemctl stop $desktop_dms[1]
-                        echo -e "  \e[1;32m[OK] Servicio detenido y memoria liberada.\e[0m"
+                        if test $is_es -eq 1
+                            echo -e "\n  \e[1;33mDeteniendo $desktop_dms[1]...\e[0m"
+                            sudo systemctl stop $desktop_dms[1]
+                            echo -e "  \e[1;32m[OK] Servicio detenido y memoria liberada.\e[0m"
+                        else
+                            echo -e "\n  \e[1;33mStopping $desktop_dms[1]...\e[0m"
+                            sudo systemctl stop $desktop_dms[1]
+                            echo -e "  \e[1;32m[OK] Service stopped and RAM released.\e[0m"
+                        end
                         sleep 1
                     else if test "$dm_stop_choice" = "2"
                         sudo chvt 2 2>/dev/null
@@ -560,16 +824,29 @@ while true
                     echo ""
                     echo ""
                     echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                    echo -e "   \e[1;37mINICIANDO ENTORNO GRÁFICO OFICIAL\e[0m"
-                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                    echo -e "    \e[1;32m[*] Entorno:\e[0m  \e[1;37m$desktop_names[1]\e[0m"
-                    echo -e "    \e[1;36m[*] Gestor:\e[0m   \e[1;37m$desktop_dms[1]\e[0m (Pantalla de acceso X64 LIOS)\n"
-                    echo -e "    \e[0;37mEl sistema iniciará el gestor de pantalla con integración completa de\e[0m"
-                    echo -e "    \e[0;37mseguridad PAM, D-Bus de sesión y aceleración gráfica en unos segundos.\e[0m\n"
-                    echo -e "    \e[1;33m[Tip]\e[0m \e[0;37mPara volver a este Centro de Mando en cualquier momento:\e[0m"
-                    echo -e "          \e[1;37mPresiona Ctrl + Alt + F1\e[0m\n"
-                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                    echo -e -n "\n  \e[1;32mIniciando $desktop_dms[1]...\e[0m\n"
+                    if test $is_es -eq 1
+                        echo -e "   \e[1;37mINICIANDO ENTORNO GRÁFICO OFICIAL\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    \e[1;32m[*] Entorno:\e[0m  \e[1;37m$desktop_names[1]\e[0m"
+                        echo -e "    \e[1;36m[*] Gestor:\e[0m   \e[1;37m$desktop_dms[1]\e[0m (Pantalla de acceso X64 LIOS)\n"
+                        echo -e "    \e[0;37mEl sistema iniciará el gestor de pantalla con integración completa de\e[0m"
+                        echo -e "    \e[0;37mseguridad PAM, D-Bus de sesión y aceleración gráfica en unos segundos.\e[0m\n"
+                        echo -e "    \e[1;33m[Tip]\e[0m \e[0;37mPara volver a este Centro de Mando en cualquier momento:\e[0m"
+                        echo -e "          \e[1;37mPresiona Ctrl + Alt + F1\e[0m\n"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        echo -e -n "\n  \e[1;32mIniciando $desktop_dms[1]...\e[0m\n"
+                    else
+                        echo -e "   \e[1;37mSTARTING OFFICIAL GRAPHICAL ENVIRONMENT\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    \e[1;32m[*] Environment:\e[0m  \e[1;37m$desktop_names[1]\e[0m"
+                        echo -e "    \e[1;36m[*] Manager:\e[0m      \e[1;37m$desktop_dms[1]\e[0m (X64 LIOS Login Screen)\n"
+                        echo -e "    \e[0;37mThe system will start the display manager with full PAM security,\e[0m"
+                        echo -e "    \e[0;37msession D-Bus and hardware acceleration in a few seconds.\e[0m\n"
+                        echo -e "    \e[1;33m[Tip]\e[0m \e[0;37mTo return to this Control Center at any time:\e[0m"
+                        echo -e "          \e[1;37mPress Ctrl + Alt + F1\e[0m\n"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        echo -e -n "\n  \e[1;32mStarting $desktop_dms[1]...\e[0m\n"
+                    end
                     sudo systemctl start $desktop_dms[1]
                     sleep 2
                 end
@@ -587,42 +864,75 @@ while true
             set -l cur_ssh (systemctl is-active sshd 2>/dev/null)
             set -l my_ip (ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
             test -z "$my_ip"; and set my_ip (ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n 1)
-            test -z "$my_ip"; and set my_ip "Sin conexión de red"
+            if test -z "$my_ip"
+                set my_ip (test $is_es -eq 1; and echo "Sin conexión de red"; or echo "No network connection")
+            end
 
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mESTADO DEL ACCESO REMOTO (SSH & FIREWALL)\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mESTADO DEL ACCESO REMOTO (SSH & FIREWALL)\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
 
-            if test "$cur_ssh" = "active"
-                echo -e "    Estado del servicio: \e[1;32m[ ACTIVO ]\e[0m"
-                echo -e "    Dirección IP local:  \e[1;33m$my_ip\e[0m\n"
-                echo -e "    \e[0;37m(Nota informativa: Para entrar a este servidor desde otra PC de tu red,\e[0m"
-                echo -e "     \e[0;37mdebes abrir una terminal en esa otra PC y escribir: \e[1;36mssh $USER@$my_ip\e[0m\e[0;37m)\e[0m\n"
-                echo -e "    \e[1;33m[1]\e[0m \e[1;37mMantener activo y volver al Centro de Mando\e[0m"
-                echo -e "    \e[1;31m[2]\e[0m \e[1;37mDesactivar SSH (Apagar acceso remoto por red)\e[0m\n"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                echo ""
-                read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1-2]: \e[0m") ssh_action
-                if test "$ssh_action" = "2"
-                    sudo systemctl disable --now sshd
-                    echo -e "\n  \e[1;31mSSH ha sido desactivado con éxito.\e[0m"
-                    read -l -P "  Presiona Enter para volver..." dummy
+                if test "$cur_ssh" = "active"
+                    echo -e "    Estado del servicio: \e[1;32m[ ACTIVO ]\e[0m"
+                    echo -e "    Dirección IP local:  \e[1;33m$my_ip\e[0m\n"
+                    echo -e "    \e[0;37m(Nota informativa: Para entrar a este servidor desde otra PC de tu red,\e[0m"
+                    echo -e "     \e[0;37mdebes abrir una terminal en esa otra PC y escribir: \e[1;36mssh $USER@$my_ip\e[0m\e[0;37m)\e[0m\n"
+                    echo -e "    \e[1;33m[1]\e[0m \e[1;37mMantener activo y volver al Centro de Mando\e[0m"
+                    echo -e "    \e[1;31m[2]\e[0m \e[1;37mDesactivar SSH (Apagar acceso remoto por red)\e[0m\n"
+                else
+                    echo -e "    Estado del servicio: \e[1;30m[ INACTIVO ]\e[0m\n"
+                    echo -e "    \e[0;37mEl acceso remoto por red está actualmente apagado.\e[0m\n"
+                    echo -e "    \e[1;32m[1]\e[0m \e[1;37mActivar SSH y permitir puerto en Firewall\e[0m"
+                    echo -e "    \e[1;33m[2]\e[0m \e[1;37mDejar inactivo y volver al Centro de Mando\e[0m\n"
                 end
             else
-                echo -e "    Estado del servicio: \e[1;30m[ INACTIVO ]\e[0m\n"
-                echo -e "    \e[0;37mEl acceso remoto por red está actualmente apagado.\e[0m\n"
-                echo -e "    \e[1;32m[1]\e[0m \e[1;37mActivar SSH y permitir puerto en Firewall\e[0m"
-                echo -e "    \e[1;33m[2]\e[0m \e[1;37mDejar inactivo y volver al Centro de Mando\e[0m\n"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                echo ""
-                read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1-2]: \e[0m") ssh_action
+                echo -e "   \e[1;37mREMOTE ACCESS STATUS (SSH & FIREWALL)\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+
+                if test "$cur_ssh" = "active"
+                    echo -e "    Service status:   \e[1;32m[ ACTIVE ]\e[0m"
+                    echo -e "    Local IP address: \e[1;33m$my_ip\e[0m\n"
+                    echo -e "    \e[0;37m(Tip: To connect to this machine from another computer on your network,\e[0m"
+                    echo -e "     \e[0;37mopen a terminal and run: \e[1;36mssh $USER@$my_ip\e[0m\e[0;37m)\e[0m\n"
+                    echo -e "    \e[1;33m[1]\e[0m \e[1;37mKeep active and return to Control Center\e[0m"
+                    echo -e "    \e[1;31m[2]\e[0m \e[1;37mDisable SSH (Turn off remote network access)\e[0m\n"
+                else
+                    echo -e "    Service status:   \e[1;30m[ INACTIVE ]\e[0m\n"
+                    echo -e "    \e[0;37mRemote network access is currently turned off.\e[0m\n"
+                    echo -e "    \e[1;32m[1]\e[0m \e[1;37mEnable SSH and allow port in Firewall\e[0m"
+                    echo -e "    \e[1;33m[2]\e[0m \e[1;37mLeave inactive and return to Control Center\e[0m\n"
+                end
+            end
+            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+            echo ""
+            set -l prompt_ssh_act (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-2]: \e[0m"; or echo "  \e[1;31m> Select an option [1-2]: \e[0m")
+            read -l -P (echo -e "$prompt_ssh_act") ssh_action
+            if test "$cur_ssh" = "active"
+                if test "$ssh_action" = "2"
+                    sudo systemctl disable --now sshd
+                    if test $is_es -eq 1
+                        echo -e "\n  \e[1;31mSSH ha sido desactivado con éxito.\e[0m"
+                        read -l -P "  Presiona Enter para volver..." dummy
+                    else
+                        echo -e "\n  \e[1;31mSSH has been disabled successfully.\e[0m"
+                        read -l -P "  Press Enter to return..." dummy
+                    end
+                end
+            else
                 if test "$ssh_action" = "1"
                     sudo systemctl enable --now sshd
                     sudo ufw allow 22/tcp
                     sudo ufw reload
-                    echo -e "\n  \e[1;32m¡SSH activado con éxito y regla de firewall configurada!\e[0m"
-                    echo -e "  Tu IP local es: \e[1;33m$my_ip\e[0m"
-                    read -l -P "  Presiona Enter para volver..." dummy
+                    if test $is_es -eq 1
+                        echo -e "\n  \e[1;32m¡SSH activado con éxito y regla de firewall configurada!\e[0m"
+                        echo -e "  Tu IP local es: \e[1;33m$my_ip\e[0m"
+                        read -l -P "  Presiona Enter para volver..." dummy
+                    else
+                        echo -e "\n  \e[1;32mSSH enabled successfully and firewall rule configured!\e[0m"
+                        echo -e "  Your local IP is: \e[1;33m$my_ip\e[0m"
+                        read -l -P "  Press Enter to return..." dummy
+                    end
                 end
             end
         case 4 'u' 'U'
@@ -630,85 +940,149 @@ while true
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mX64 LIOS - ACTUALIZACIÓN DEL SISTEMA\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            echo -e "    Esta herramienta sincronizará los repositorios oficiales de X64 LIOS"
-            echo -e "    y actualizará todos los paquetes creando un snapshot previo con Snapper.\n"
-            echo -e "    \e[1;32m[1]\e[0m \e[1;37mIniciar actualización completa del sistema\e[0m"
-            echo -e "    \e[1;33m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mX64 LIOS - ACTUALIZACIÓN DEL SISTEMA\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    Esta herramienta sincronizará los repositorios oficiales de X64 LIOS"
+                echo -e "    y actualizará todos los paquetes creando un snapshot previo con Snapper.\n"
+                echo -e "    \e[1;32m[1]\e[0m \e[1;37mIniciar actualización completa del sistema\e[0m"
+                echo -e "    \e[1;33m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            else
+                echo -e "   \e[1;37mX64 LIOS - SYSTEM UPDATE\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    This tool will synchronize official X64 LIOS repositories"
+                echo -e "    and update all packages with an automatic Snapper safety snapshot.\n"
+                echo -e "    \e[1;32m[1]\e[0m \e[1;37mStart full system update\e[0m"
+                echo -e "    \e[1;33m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
+            end
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m") u_choice
+            set -l prompt_upd (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1, 0]: \e[0m")
+            read -l -P (echo -e "$prompt_upd") u_choice
             if test "$u_choice" = "1"
-                echo -e "\n    \e[1;36mConectando con repositorios y actualizando paquetes...\e[0m\n"
+                if test $is_es -eq 1
+                    echo -e "\n    \e[1;36mConectando con repositorios y actualizando paquetes...\e[0m\n"
+                else
+                    echo -e "\n    \e[1;36mConnecting to repositories and updating packages...\e[0m\n"
+                end
                 sudo pacman -Syu
-                echo -e "\n    \e[1;32m¡Actualización completada con éxito!\e[0m"
-                read -l -P "  Presiona Enter para volver..." dummy
+                if test $is_es -eq 1
+                    echo -e "\n    \e[1;32m¡Actualización completada con éxito!\e[0m"
+                    read -l -P "  Presiona Enter para volver..." dummy
+                else
+                    echo -e "\n    \e[1;32mSystem update completed successfully!\e[0m"
+                    read -l -P "  Press Enter to return..." dummy
+                end
             end
         case 5 'n' 'N'
             clear
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mDIAGNÓSTICO DE RED E INTERFACES\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            ip -br addr | sed 's/^/    /'
-            echo -e "\n    \e[1;33mPrueba de conectividad a Internet (Ping 1.1.1.1):\e[0m"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mDIAGNÓSTICO DE RED E INTERFACES\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                ip -br addr | sed 's/^/    /'
+                echo -e "\n    \e[1;33mPrueba de conectividad a Internet (Ping 1.1.1.1):\e[0m"
+            else
+                echo -e "   \e[1;37mNETWORK & INTERFACE DIAGNOSTICS\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                ip -br addr | sed 's/^/    /'
+                echo -e "\n    \e[1;33mInternet connectivity test (Ping 1.1.1.1):\e[0m"
+            end
             ping -c 3 1.1.1.1 | sed 's/^/    /'
             echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            read -l -P "  Presiona Enter para volver..." dummy
+            set -l prompt_net_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
+            read -l -P "$prompt_net_back" dummy
         case 6 'l' 'L'
             clear
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mLIMPIEZA PROFUNDA DEL SISTEMA\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            echo -e "    Esta operación purgará paquetes parciales corruptos, vaciará la caché"
-            echo -e "    antigua de pacman y compactará los registros de journalctl.\n"
-            echo -e "    \e[1;33m[1]\e[0m \e[1;37mEjecutar limpieza profunda ahora\e[0m"
-            echo -e "    \e[1;32m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mLIMPIEZA PROFUNDA DEL SISTEMA\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    Esta operación purgará paquetes parciales corruptos, vaciará la caché"
+                echo -e "    antigua de pacman y compactará los registros de journalctl.\n"
+                echo -e "    \e[1;33m[1]\e[0m \e[1;37mEjecutar limpieza profunda ahora\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            else
+                echo -e "   \e[1;37mDEEP SYSTEM CLEANUP\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    This operation will purge corrupted partial downloads, clean old"
+                echo -e "    pacman package cache, and vacuum journalctl log entries.\n"
+                echo -e "    \e[1;33m[1]\e[0m \e[1;37mRun deep cleanup now\e[0m"
+                echo -e "    \e[1;32m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
+            end
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m") l_choice
+            set -l prompt_clean (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1, 0]: \e[0m")
+            read -l -P (echo -e "$prompt_clean") l_choice
             if test "$l_choice" = "1"
-                echo -e "\n    \e[1;36m1. Limpiando descargas parciales e incompletas...\e[0m"
-                sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
-                echo -e "       \e[1;32m[OK] Paquetes temporales limpios.\e[0m\n"
+                if test $is_es -eq 1
+                    echo -e "\n    \e[1;36m1. Limpiando descargas parciales e incompletas...\e[0m"
+                    sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                    echo -e "       \e[1;32m[OK] Paquetes temporales limpios.\e[0m\n"
 
-                echo -e "    \e[1;36m2. Purgando caché de paquetes descargados antiguos...\e[0m"
-                sudo pacman -Sc --noconfirm | sed 's/^/       /'
-                echo ""
+                    echo -e "    \e[1;36m2. Purgando caché de paquetes descargados antiguos...\e[0m"
+                    sudo pacman -Sc --noconfirm | sed 's/^/       /'
+                    echo ""
 
-                echo -e "    \e[1;36m3. Compactando registros del sistema (journalctl)...\e[0m"
-                sudo journalctl --vacuum-time=1w | sed 's/^/       /'
+                    echo -e "    \e[1;36m3. Compactando registros del sistema (journalctl)...\e[0m"
+                    sudo journalctl --vacuum-time=1w | sed 's/^/       /'
 
-                echo -e "\n    \e[1;32m¡Limpieza finalizada con éxito!\e[0m\n"
+                    echo -e "\n    \e[1;32m¡Limpieza finalizada con éxito!\e[0m\n"
+                else
+                    echo -e "\n    \e[1;36m1. Purging partial and incomplete downloads...\e[0m"
+                    sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                    echo -e "       \e[1;32m[OK] Temporary files cleared.\e[0m\n"
+
+                    echo -e "    \e[1;36m2. Cleaning old downloaded package cache...\e[0m"
+                    sudo pacman -Sc --noconfirm | sed 's/^/       /'
+                    echo ""
+
+                    echo -e "    \e[1;36m3. Vacuuming system logs (journalctl)...\e[0m"
+                    sudo journalctl --vacuum-time=1w | sed 's/^/       /'
+
+                    echo -e "\n    \e[1;32mDeep cleanup finished successfully!\e[0m\n"
+                end
                 echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                read -l -P "  Presiona Enter para volver..." dummy
+                set -l prompt_clean_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
+                read -l -P "$prompt_clean_back" dummy
             end
         case 7 'e' 'E'
             clear
             echo ""
             echo ""
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo -e "   \e[1;37mREGISTRO DE ERRORES DEL SISTEMA (JOURNALCTL)\e[0m"
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-            echo -e "    Esta herramienta consulta el registro de fallos críticos del último"
-            echo -e "    arranque (prioridad advertencia y error del sistema).\n"
-            echo -e "    \e[0;33m[Tip: Usa las flechas para desplazarte y presiona 'q' para salir del visor]\e[0m\n"
-            echo -e "    \e[1;36m[1]\e[0m \e[1;37mAbrir visor de registros ahora\e[0m"
-            echo -e "    \e[1;33m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            if test $is_es -eq 1
+                echo -e "   \e[1;37mREGISTRO DE ERRORES DEL SISTEMA (JOURNALCTL)\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    Esta herramienta consulta el registro de fallos críticos del último"
+                echo -e "    arranque (prioridad advertencia y error del sistema).\n"
+                echo -e "    \e[0;33m[Tip: Usa las flechas para desplazarte y presiona 'q' para salir del visor]\e[0m\n"
+                echo -e "    \e[1;36m[1]\e[0m \e[1;37mAbrir visor de registros ahora\e[0m"
+                echo -e "    \e[1;33m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+            else
+                echo -e "   \e[1;37mSYSTEM ERROR LOGS (JOURNALCTL)\e[0m"
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                echo -e "    This tool inspects critical failure logs from the last boot"
+                echo -e "    (system warning and error priority).\n"
+                echo -e "    \e[0;33m[Tip: Use arrow keys to navigate and press 'q' to exit the viewer]\e[0m\n"
+                echo -e "    \e[1;36m[1]\e[0m \e[1;37mOpen log viewer now\e[0m"
+                echo -e "    \e[1;33m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
+            end
             echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
             echo ""
-            read -l -P (echo -e "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m") e_choice
+            set -l prompt_err (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1, 0]: \e[0m")
+            read -l -P (echo -e "$prompt_err") e_choice
             if test "$e_choice" = "1"
                 sudo journalctl -p 3 -xb
                 echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                read -l -P "  Presiona Enter para volver..." dummy
+                set -l prompt_err_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
+                read -l -P "$prompt_err_back" dummy
             end
         case '*'
-            # Opción no reconocida, continuar ciclo
             continue
     end
 end
