@@ -176,17 +176,17 @@ function clean_previous_desktops -a target_id
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
     # Retirar paquetes del entorno previo con cascada recursiva segura (-Rcs)
-    if test "$target_id" != "1"; and type -q Hyprland
+    if test "$target_id" != "1"; and test (count (pacman -Qq hyprland x64-hyprland-settings 2>/dev/null)) -gt 0
         echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes (Quickshell, Dolphin)...\e[0m"
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine 2>/dev/null | sort -u)
+        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
         end
     end
 
-    if test "$target_id" != "2"; and type -q gnome-shell
+    if test "$target_id" != "2"; and test (count (pacman -Qq gnome-shell x64-gnome-settings 2>/dev/null)) -gt 0
         echo -e "  \e[0;37m-> Desinstalando suite completa de GNOME...\e[0m"
-        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme 2>/dev/null | sort -u)
+        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme gnome-screenshot gnome-themes-extra gnome-desktop-4 gnome-desktop-common 2>/dev/null | sort -u)
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
@@ -225,9 +225,9 @@ function clean_previous_desktops -a target_id
         end
     end
 
-    if test "$target_id" != "7"; and type -q xfce4-session
+    if test "$target_id" != "7"; and test (count (pacman -Qq xfce4-session xfce4-settings libxfce4ui 2>/dev/null)) -gt 0
         echo -e "  \e[0;37m-> Desinstalando suite completa de Xfce4...\e[0m"
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel thunar ristretto file-roller lightdm-slick-greeter lightdm-gtk-greeter labwc 2>/dev/null | sort -u)
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm-slick-greeter lightdm-gtk-greeter labwc 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
         end
