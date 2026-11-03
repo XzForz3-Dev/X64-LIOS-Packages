@@ -479,6 +479,164 @@ cmd_status() {
         "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}"
 }
 
+# -----------------------------------------------------------------------------
+# 8. NETWORK & WI-FI MANAGER (nmcli + ip route)
+# -----------------------------------------------------------------------------
+cmd_net() {
+    local sub="${1:-status}"
+
+    case "$sub" in
+        wifi)
+            local mode="${2:-toggle}"
+            local cur
+            cur=$(nmcli radio wifi 2>/dev/null || echo "enabled")
+            if [ "$mode" = "toggle" ]; then
+                [ "$cur" = "enabled" ] && mode="off" || mode="on"
+            fi
+            nmcli radio wifi "$mode" >/dev/null 2>&1 || true
+            if [ "$mode" = "on" ]; then
+                notify_user "Wi-Fi Activado" "Escaneando redes inalámbricas disponibles..."
+            else
+                notify_user "Wi-Fi Desactivado" "Radio inalámbrico apagado"
+            fi
+            ;;
+        connect)
+            local ssid="${2:-}"
+            local pass="${3:-}"
+            [ -z "$ssid" ] && return 1
+            local out
+            if [ -n "$pass" ]; then
+                if out=$(nmcli dev wifi connect "$ssid" password "$pass" 2>&1); then
+                    notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    echo "OK"
+                    return 0
+                else
+                    notify_user "Error de Conexión Wi-Fi" "Verifica la contraseña de ${ssid}"
+                    echo "ERR: $out"
+                    return 1
+                fi
+            else
+                if out=$(nmcli connection up "$ssid" 2>&1 || nmcli dev wifi connect "$ssid" 2>&1); then
+                    notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    echo "OK"
+                    return 0
+                else
+                    echo "NEED_PASS"
+                    return 2
+                fi
+            fi
+            ;;
+        disconnect)
+            local target="${2:-}"
+            [ -z "$target" ] && return 1
+            nmcli connection down "$target" >/dev/null 2>&1 || nmcli dev disconnect "$target" >/dev/null 2>&1 || true
+            notify_user "Red Desconectada" "Se desconectó ${target}"
+            ;;
+        eth-toggle)
+            local dev="${2:-}"
+            [ -z "$dev" ] && return 1
+            local st
+            st=$(cat "/sys/class/net/${dev}/operstate" 2>/dev/null || echo "down")
+            if [ "$st" = "up" ]; then
+                nmcli dev disconnect "$dev" >/dev/null 2>&1 || true
+                notify_user "Ethernet Desconectado" "Interfaz ${dev} desconectada"
+            else
+                nmcli dev connect "$dev" >/dev/null 2>&1 || true
+                notify_user "Ethernet Conectado" "Interfaz ${dev} reconectada"
+            fi
+            ;;
+        scan|status|*)
+            if [ "$sub" = "scan" ]; then
+                nmcli dev wifi rescan >/dev/null 2>&1 || true
+            fi
+
+            # 1. Detect Ethernet & Wi-Fi hardware
+            local eth_dev="" eth_conn="false" eth_name="Cable Ethernet"
+            local has_wifi_hw="false" wifi_enabled="false" wifi_dev="" wifi_conn="false" wifi_ssid=""
+
+            for net_path in /sys/class/net/*; do
+                local dname
+                dname=$(basename "$net_path")
+                [ "$dname" = "lo" ] && continue
+                if [ -d "${net_path}/wireless" ] || [ -d "${net_path}/phy80211" ]; then
+                    has_wifi_hw="true"
+                    [ -z "$wifi_dev" ] && wifi_dev="$dname"
+                else
+                    if [ -z "$eth_dev" ]; then
+                        eth_dev="$dname"
+                    fi
+                fi
+            done
+
+            if [ -n "$eth_dev" ]; then
+                local op
+                op=$(cat "/sys/class/net/${eth_dev}/operstate" 2>/dev/null || echo "down")
+                if [ "$op" = "up" ]; then
+                    eth_conn="true"
+                fi
+                local nm_eth_name
+                nm_eth_name=$(nmcli -t -f DEVICE,CONNECTION dev 2>/dev/null | awk -F: -v d="$eth_dev" '$1==d && $2!="" && $2!="--" {print $2; exit}')
+                [ -n "$nm_eth_name" ] && eth_name="$nm_eth_name"
+            fi
+
+            local radio_st
+            radio_st=$(nmcli radio wifi 2>/dev/null || echo "enabled")
+            [ "$radio_st" = "enabled" ] && wifi_enabled="true"
+
+            # 2. IP, Gateway & DNS
+            local ip_addr="Desconectado" gw_addr="--" dns_addr="--"
+            ip_addr=$(ip -4 -o addr show scope global 2>/dev/null | awk 'NR==1 {split($4,a,"/"); print a[1]}')
+            [ -z "$ip_addr" ] && ip_addr="Desconectado"
+            gw_addr=$(ip route show default 2>/dev/null | awk 'NR==1 {print $3}')
+            [ -z "$gw_addr" ] && gw_addr="--"
+            dns_addr=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
+            [ -z "$dns_addr" ] && dns_addr="--"
+
+            # 3. Wi-Fi Networks List (if Wi-Fi hardware exists and is enabled)
+            local nets_json="[]"
+            if [ "$has_wifi_hw" = "true" ] && [ "$wifi_enabled" = "true" ]; then
+                local saved_list
+                saved_list=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2 ~ /wireless|wifi/ {print $1}')
+                nets_json=$(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan no 2>/dev/null | awk -F: -v saved="$saved_list" '
+                    BEGIN {
+                        n = split(saved, s_arr, "\n");
+                        for (i=1; i<=n; i++) if (s_arr[i] != "") is_saved[s_arr[i]] = 1;
+                        printf "[";
+                        count = 0;
+                    }
+                    {
+                        in_use = ($1 == "*" ? "true" : "false");
+                        ssid = $2;
+                        sig = $3 + 0;
+                        sec = $4;
+                        if (ssid == "" || ssid == "--") next;
+                        if (seen[ssid]++) next;
+                        gsub(/\\:/, ":", ssid);
+                        gsub(/"/, "\\\"", ssid);
+                        gsub(/"/, "", sec);
+                        if (sec == "" || sec == "--") sec = "Abierta";
+                        sv = ( (ssid in is_saved) || in_use == "true" ) ? "true" : "false";
+                        if (count > 0) printf ",";
+                        printf "{\"ssid\":\"%s\",\"signal\":%d,\"security\":\"%s\",\"connected\":%s,\"saved\":%s}", ssid, sig, sec, in_use, sv;
+                        count++;
+                        if (count >= 12) exit;
+                    }
+                    END { printf "]" }
+                ')
+                [ -z "$nets_json" ] && nets_json="[]"
+                wifi_ssid=$(nmcli -t -f IN-USE,SSID dev wifi list --rescan no 2>/dev/null | awk -F: '$1=="*" {print $2; exit}')
+                if [ -n "$wifi_ssid" ]; then
+                    wifi_conn="true"
+                fi
+            fi
+
+            printf '{"ethConnected":%s,"ethDevice":"%s","ethName":"%s","ip":"%s","gateway":"%s","dns":"%s","hasWifiHw":%s,"wifiEnabled":%s,"wifiConnected":%s,"wifiSsid":"%s","wifiDevice":"%s","networks":%s}\n' \
+                "$eth_conn" "${eth_dev:-eth0}" "$eth_name" "$ip_addr" "$gw_addr" "$dns_addr" \
+                "$has_wifi_hw" "$wifi_enabled" "$wifi_conn" "$wifi_ssid" "${wifi_dev:-wlan0}" "$nets_json"
+            ;;
+    esac
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -488,5 +646,6 @@ case "${1:-status}" in
     power)      cmd_power "${2:-get}" "${3:-balanced}" ;;
     record)     cmd_record "${2:-toggle}" ;;
     screenshot) cmd_screenshot "${2:-full}" ;;
+    net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

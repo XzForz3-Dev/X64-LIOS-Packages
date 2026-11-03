@@ -16,6 +16,7 @@ PanelWindow {
     signal toggleControl()
     signal togglePower()
     signal toggleTelemetry()
+    signal toggleNetwork()
     signal brightnessChangedOsd(int val)
 
     property bool trayExpanded: true
@@ -950,9 +951,9 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 onClicked: (mouse) => {
                                     if (mouse.button === Qt.RightButton) {
-                                        barWindow.toggleTelemetry();
-                                    } else {
                                         Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")');
+                                    } else {
+                                        barWindow.toggleNetwork();
                                     }
                                 }
                             }

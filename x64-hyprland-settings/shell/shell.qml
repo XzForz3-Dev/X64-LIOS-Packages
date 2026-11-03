@@ -10,6 +10,7 @@ ShellRoot {
         if (targetName !== "calendar") calendarPopup.visible = false;
         if (targetName !== "control") controlCenter.visible = false;
         if (targetName !== "telemetry") telemetryPopup.visible = false;
+        if (targetName !== "network") networkPopup.visible = false;
     }
 
     // IPC Handlers for Hyprland Keybindings & Scripts
@@ -85,6 +86,24 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "network"
+
+        function toggle() {
+            networkPopup.visible = !networkPopup.visible;
+            if (networkPopup.visible) root.closeAllExcept("network");
+        }
+
+        function open() {
+            networkPopup.visible = true;
+            root.closeAllExcept("network");
+        }
+
+        function close() {
+            networkPopup.visible = false;
+        }
+    }
+
     // Top Bar Floating Island
     Bar {
         id: mainBar
@@ -114,6 +133,11 @@ ShellRoot {
             if (telemetryPopup.visible) root.closeAllExcept("telemetry");
         }
 
+        onToggleNetwork: {
+            networkPopup.visible = !networkPopup.visible;
+            if (networkPopup.visible) root.closeAllExcept("network");
+        }
+
         onBrightnessChangedOsd: (val) => {
             volumeOsd.showBrightness(val);
         }
@@ -138,6 +162,13 @@ ShellRoot {
         id: telemetryPopup
         visible: false
         onCloseRequested: telemetryPopup.visible = false
+    }
+
+    // Native Network & Wi-Fi Popup (Omarchy 4 Quattro style)
+    NetworkPopup {
+        id: networkPopup
+        visible: false
+        onCloseRequested: networkPopup.visible = false
     }
 
     // Control Center Sliding Panel
