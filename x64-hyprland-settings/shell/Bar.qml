@@ -98,9 +98,26 @@ PanelWindow {
                     barWindow.hasBattery = Boolean(d.hasBattery);
                     barWindow.batPct = d.batPct !== undefined ? d.batPct : 100;
                     barWindow.batStatus = d.batStatus || "AC";
-                    barWindow.brightnessVal = d.brightness !== undefined ? d.brightness : 100;
+                    if (!brGuardTimer.running && d.brightness !== undefined) {
+                        barWindow.brightnessVal = d.brightness;
+                    }
                 } catch (e) {}
             }
+        }
+    }
+
+    Timer {
+        id: brGuardTimer
+        interval: 900
+        repeat: false
+    }
+
+    Timer {
+        id: kbGuardTimer
+        interval: 800
+        repeat: false
+        onTriggered: {
+            if (!kbProcess.running) kbProcess.running = true;
         }
     }
 
@@ -119,11 +136,11 @@ PanelWindow {
     property string kbLayout: "US"
     Process {
         id: kbProcess
-        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl devices -j 2>/dev/null | jq -r '.keyboards[] | select(.main == true) | .active_keymap' 2>/dev/null | head -n1 || echo 'English'"]
+        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true) | .active_keymap), (.keyboards[0].active_keymap)' 2>/dev/null | head -n1 || echo 'English'"]
         stdout: StdioCollector {
             id: kbCollector
             onStreamFinished: {
-                if (!kbCollector.text) return;
+                if (!kbCollector.text || kbGuardTimer.running) return;
                 var text = kbCollector.text.trim().toLowerCase();
                 if (text.indexOf("span") !== -1 || text.indexOf("es") !== -1) {
                     barWindow.kbLayout = "ES";
@@ -132,6 +149,11 @@ PanelWindow {
                 }
             }
         }
+    }
+
+    Process {
+        id: kbSwitchProc
+        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl switchxkblayout all next >/dev/null 2>&1"]
     }
 
     // Network Connectivity Detector
@@ -844,7 +866,7 @@ PanelWindow {
                             color: "#1affffff"
                         }
 
-                        // [A] Keyboard Layout Indicator (Click switches layout)
+                        // [A] Keyboard Layout Indicator (0ms instant switch US <-> ES)
                         Rectangle {
                             id: kbItem
                             implicitWidth: kbRow.implicitWidth + 4
@@ -861,7 +883,7 @@ PanelWindow {
                                     text: "󰌌"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
-                                    color: "#888899"
+                                    color: barWindow.kbLayout === "ES" ? Theme.accent : "#a6adc8"
                                 }
 
                                 Text {
@@ -878,14 +900,18 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("hyprctl switchxkblayout all next")')
+                                onClicked: {
+                                    barWindow.kbLayout = (barWindow.kbLayout === "US" ? "ES" : "US");
+                                    kbGuardTimer.restart();
+                                    if (!kbSwitchProc.running) kbSwitchProc.running = true;
+                                }
                             }
                         }
 
                         // Divider
                         Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
 
-                        // [B] Network Indicator (Click opens nm-connection-editor)
+                        // [B] Network Indicator (Left click: nm-connection-editor, Right click: Telemetry Cockpit)
                         Rectangle {
                             id: netItem
                             implicitWidth: netRow.implicitWidth + 4
@@ -902,15 +928,15 @@ PanelWindow {
                                     text: barWindow.netType === "WIFI" ? "󰤨" : "󰈀"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
-                                    color: barWindow.netType === "NONE" ? "#ff4d4d" : Theme.textPrimary
+                                    color: barWindow.netType === "NONE" ? "#ff4d4d" : "#10b981"
                                 }
 
                                 Text {
                                     text: barWindow.netType === "WIFI" ? barWindow.netName : "LAN"
-                                    font.family: Theme.fontSans
+                                    font.family: Theme.fontMono
                                     font.pixelSize: 9
-                                    font.weight: Font.Medium
-                                    color: Theme.textSecondary
+                                    font.bold: true
+                                    color: Theme.textPrimary
                                     Layout.maximumWidth: 60
                                     elide: Text.ElideRight
                                 }
@@ -921,16 +947,29 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")')
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.RightButton) {
+                                        barWindow.toggleTelemetry();
+                                    } else {
+                                        Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")');
+                                    }
+                                }
                             }
                         }
 
-                        // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                        // Divider (Only visible when physical Microphone is present)
+                        Rectangle {
+                            visible: systemCapsule.defaultSource !== null
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#1affffff"
+                        }
 
-                        // [C] Microphone Control (Click mutes, Wheel changes gain)
+                        // [C] Smart Microphone Control (Auto-shows only when physical mic exists; Click mutes, Wheel changes gain)
                         Rectangle {
                             id: micItem
+                            visible: systemCapsule.defaultSource !== null
                             implicitWidth: micRow.implicitWidth + 4
                             implicitHeight: 18
                             radius: 9
@@ -945,15 +984,15 @@ PanelWindow {
                                     text: systemCapsule.micMuted ? "󰍭" : "󰍬"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
-                                    color: systemCapsule.micMuted ? Theme.textMuted : Theme.accent
+                                    color: systemCapsule.micMuted ? Theme.accent : "#10b981"
                                 }
 
                                 Text {
                                     text: systemCapsule.micMuted ? "MUT" : Math.round(systemCapsule.micVol * 100) + "%"
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 8
+                                    font.pixelSize: 9
                                     font.bold: true
-                                    color: systemCapsule.micMuted ? Theme.textMuted : Theme.textPrimary
+                                    color: systemCapsule.micMuted ? Theme.accent : Theme.textPrimary
                                 }
                             }
 
@@ -1035,7 +1074,7 @@ PanelWindow {
                         // Divider
                         Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
 
-                        // [D2] Display Brightness Control (Wheel adjusts brightness + OSD, Click opens Control Center)
+                        // [D2] Display Brightness Control (Debounce-guarded Wheel + OSD, Click opens Control Center)
                         Rectangle {
                             id: brItem
                             implicitWidth: brRow.implicitWidth + 4
@@ -1071,6 +1110,7 @@ PanelWindow {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: barWindow.toggleControl()
                                 onWheel: (wheel) => {
+                                    brGuardTimer.restart();
                                     var step = wheel.angleDelta.y > 0 ? 5 : -5;
                                     var nextBr = Math.max(15, Math.min(100, barWindow.brightnessVal + step));
                                     barWindow.brightnessVal = nextBr;
