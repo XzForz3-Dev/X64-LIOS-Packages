@@ -178,7 +178,7 @@ function clean_previous_desktops -a target_id
     # Retirar paquetes del entorno previo con cascada recursiva segura (-Rcs)
     if test "$target_id" != "1"; and test (count (pacman -Qq hyprland x64-hyprland-settings 2>/dev/null)) -gt 0
         echo -e "  \e[0;37m-> Desinstalando Hyprland y componentes (Quickshell, Dolphin)...\e[0m"
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
+        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg hyprlock xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
         end
@@ -393,7 +393,7 @@ function install_desktop_menu
     switch $d_choice
         case 1
             echo -e "\n  \e[1;32m[*] Instalando Hyprland Oficial de X64 LIOS (Suite Completa Calamares)...\e[0m"
-            sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg xdg-desktop-portal-hyprland x64-hyprland-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg hyprlock xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"

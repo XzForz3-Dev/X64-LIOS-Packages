@@ -104,6 +104,19 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "lock"
+
+        function lock() {
+            root.closeAllExcept("none");
+            lockScreen.lockSession();
+        }
+
+        function unlock() {
+            lockScreen.unlockSession();
+        }
+    }
+
     // Top Bar Floating Island
     Bar {
         id: mainBar
@@ -176,6 +189,10 @@ ShellRoot {
         id: controlCenter
         visible: false
         onCloseRequested: controlCenter.visible = false
+        onLockRequested: {
+            root.closeAllExcept("none");
+            lockScreen.lockSession();
+        }
         onBrightnessChangedOsd: (val) => {
             volumeOsd.showBrightness(val);
         }
@@ -184,5 +201,17 @@ ShellRoot {
     // Unified On-Screen Display for Volume / Mute / Brightness Changes
     VolumeOsd {
         id: volumeOsd
+    }
+
+    // Native Notification Server & Toast Overlay (Respects DND No Molestar)
+    NotificationPopup {
+        id: notifPopup
+        dndEnabled: mainBar.dndActive
+        sidePanelOpen: controlCenter.visible || networkPopup.visible
+    }
+
+    // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)
+    LockScreen {
+        id: lockScreen
     }
 }

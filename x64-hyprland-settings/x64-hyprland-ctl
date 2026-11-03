@@ -10,10 +10,12 @@
 # =============================================================================
 
 set -u
-export LC_ALL=C
+export LC_ALL=C.UTF-8
+export LC_NUMERIC=C
 
 UID_NUM=$(id -u)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID_NUM}}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 STATE_DIR="${XDG_RUNTIME_DIR}/x64-shell"
 mkdir -p "${STATE_DIR}"
 
@@ -43,10 +45,11 @@ fi
 notify_user() {
     local title="$1"
     local body="$2"
+    local app="${3:-X64 LIOS}"
     local dnd_val
     dnd_val=$(cat "${STATE_DIR}/dnd" 2>/dev/null || echo "0")
     if [ "$dnd_val" != "1" ] && command -v notify-send >/dev/null 2>&1; then
-        notify-send -a "X64 LIOS" "$title" "$body" 2>/dev/null || true
+        notify-send -a "$app" "$title" "$body" 2>/dev/null || true
     fi
 }
 
@@ -95,6 +98,7 @@ cmd_caffeine() {
             kill "$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null)" 2>/dev/null || true
         fi
         setsid -f sh -c 'echo $$ > "'"${STATE_DIR}/caffeine.pid"'"; exec systemd-inhibit --what=idle --who="X64 LIOS" --why="Modo Cafe Activo" sleep infinity 2>/dev/null || exec sleep infinity' >/dev/null 2>&1 < /dev/null
+        notify_user "Modo Café Activado" "Inhibidor Wayland activo • Pantalla sin suspensión" "Modo Café"
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/caffeine"
         if [ -f "${STATE_DIR}/caffeine.pid" ]; then
@@ -102,6 +106,7 @@ cmd_caffeine() {
             rm -f "${STATE_DIR}/caffeine.pid"
         fi
         pkill -f "Modo Cafe Activo" 2>/dev/null || true
+        notify_user "Modo Café Desactivado" "Suspensión automática e inactividad restauradas" "Modo Café"
     fi
 }
 
@@ -120,9 +125,11 @@ cmd_nightlight() {
     if [ "$action" = "on" ]; then
         echo "1" > "${STATE_DIR}/nightlight"
         apply_ctm_state
+        notify_user "Luz Nocturna Activada" "Filtro ocular cálido (4200K) aplicado" "Luz Nocturna"
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/nightlight"
         apply_ctm_state
+        notify_user "Luz Nocturna Desactivada" "Temperatura de color original (6500K) restaurada" "Luz Nocturna"
     fi
 }
 
@@ -142,6 +149,7 @@ cmd_dnd() {
         echo "1" > "${STATE_DIR}/dnd"
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/dnd"
+        notify_user "No Molestar Desactivado" "Notificaciones de escritorio nuevamente activas" "X64 LIOS"
     fi
 }
 
@@ -200,9 +208,20 @@ cmd_power() {
 
     if [ "$sub" = "set" ]; then
         case "$prof" in
-            performance|balanced|power-saver)
+            performance)
                 echo "$prof" > "${STATE_DIR}/power_profile"
                 powerprofilesctl set "$prof" >/dev/null 2>&1 || true
+                notify_user "Perfil de Energía: Rendimiento" "Frecuencia máxima de CPU activada" "Energía X64"
+                ;;
+            balanced)
+                echo "$prof" > "${STATE_DIR}/power_profile"
+                powerprofilesctl set "$prof" >/dev/null 2>&1 || true
+                notify_user "Perfil de Energía: Equilibrado" "Balance dinámico entre potencia y consumo" "Energía X64"
+                ;;
+            power-saver)
+                echo "$prof" > "${STATE_DIR}/power_profile"
+                powerprofilesctl set "$prof" >/dev/null 2>&1 || true
+                notify_user "Perfil de Energía: Ahorro" "Modo eficiencia energética activado" "Energía X64"
                 ;;
         esac
     else
@@ -229,12 +248,13 @@ cmd_record() {
         date +%s > "${STATE_DIR}/record.start"
         echo "${out_file}" > "${STATE_DIR}/record.file"
         nohup wf-recorder -f "${out_file}" >/dev/null 2>&1 &
+        notify_user "Grabación de Pantalla Iniciada" "Haz clic en el indicador REC de la barra para finalizar" "Grabadora X64"
     elif [ "$action" = "stop" ] && [ "$is_rec" -eq 1 ]; then
         pkill -INT -x wf-recorder >/dev/null 2>&1 || true
         rm -f "${STATE_DIR}/record.start"
         local saved_file
         saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "~/Videos")
-        notify_user "Grabación Guardada" "Video guardado en ${saved_file}"
+        notify_user "Grabación Guardada" "Video MP4 guardado en ${saved_file}" "Grabadora X64"
     fi
 }
 

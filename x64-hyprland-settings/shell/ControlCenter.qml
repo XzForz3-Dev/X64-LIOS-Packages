@@ -11,6 +11,7 @@ PanelWindow {
     id: controlWindow
 
     signal closeRequested()
+    signal lockRequested()
     signal brightnessChangedOsd(int val)
 
     property bool caffeineActive: false
@@ -897,8 +898,8 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("loginctl lock-session")');
                             controlWindow.closeRequested();
+                            controlWindow.lockRequested();
                         }
                     }
                 }

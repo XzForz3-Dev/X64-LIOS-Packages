@@ -4,7 +4,21 @@
 # Supports Automatic EDID PPI Scaling ("auto") and Fractional Presets (1.0..2.0)
 # ==============================================================================
 
-export LC_ALL=C
+export LC_ALL=C.UTF-8
+export LC_NUMERIC=C
+UID_NUM=$(id -u)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID_NUM}}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+
+notify_scale() {
+  local title="$1"
+  local body="$2"
+  local dnd_val
+  dnd_val=$(cat "${XDG_RUNTIME_DIR}/x64-shell/dnd" 2>/dev/null || echo "0")
+  if [ "$dnd_val" != "1" ] && command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Pantalla X64" "$title" "$body" 2>/dev/null || true
+  fi
+}
 
 get_focused_info() {
   export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
@@ -62,6 +76,7 @@ case "$1" in
       sed -i -E 's/scale\s*=\s*("auto"|[0-9.]+)/scale    = "auto"/' "/etc/skel/.config/hypr/hyprland.lua"
     fi
 
+    notify_scale "Escalado Automático (AUTO)" "Monitor ${name} sincronizado por densidad EDID"
     echo "auto"
     ;;
   *)
@@ -98,6 +113,8 @@ case "$1" in
       fi
     fi
 
+    pct_label=$(awk -v s="$final_scale" 'BEGIN { printf "%.0f%%", s * 100 }')
+    notify_scale "Escala de Monitor: ${pct_label}" "Aplicada en vivo sobre ${name}"
     echo "$final_scale"
     ;;
 esac
