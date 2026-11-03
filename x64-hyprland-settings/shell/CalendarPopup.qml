@@ -173,9 +173,13 @@ PanelWindow {
 
                     Component.onCompleted: {
                         var now = new Date();
-                        var days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-                        var months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-                        heroDate.text = days[now.getDay()] + ", " + now.getDate() + " de " + months[now.getMonth()] + " de " + now.getFullYear();
+                        var dName = I18n.dayFullNames[now.getDay()];
+                        var mName = I18n.monthFullNames[now.getMonth()];
+                        if (I18n.isEs) {
+                            heroDate.text = dName + ", " + now.getDate() + " de " + mName + " de " + now.getFullYear();
+                        } else {
+                            heroDate.text = dName + ", " + mName + " " + now.getDate() + ", " + now.getFullYear();
+                        }
                     }
                 }
 
@@ -283,12 +287,7 @@ PanelWindow {
                     font.bold: true
                     color: Theme.textPrimary
 
-                    property var monthNames: [
-                        "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-                        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
-                    ]
-
-                    text: monthNames[calWindow.viewMonth] + " " + calWindow.viewYear
+                    text: I18n.monthFullNames[calWindow.viewMonth].toUpperCase() + " " + calWindow.viewYear
                 }
 
                 // "Today" Reset Pill (Visible only if viewing another month)
@@ -303,7 +302,7 @@ PanelWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "HOY"
+                        text: I18n.calTodayPill
                         font.family: Theme.fontMono
                         font.pixelSize: 9
                         font.bold: true
@@ -364,7 +363,7 @@ PanelWindow {
                 spacing: 0
 
                 Repeater {
-                    model: ["LU", "MA", "MI", "JU", "VI", "SÁ", "DO"]
+                    model: I18n.isEs ? ["LU", "MA", "MI", "JU", "VI", "SÁ", "DO"] : ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
                     Text {
                         required property string modelData
@@ -374,7 +373,7 @@ PanelWindow {
                         font.family: Theme.fontMono
                         font.pixelSize: 10
                         font.bold: true
-                        color: (modelData === "SÁ" || modelData === "DO") ? Theme.accentLight : Theme.textMuted
+                        color: (modelData === "SÁ" || modelData === "DO" || modelData === "SA" || modelData === "SU") ? Theme.accentLight : Theme.textMuted
                     }
                 }
             }

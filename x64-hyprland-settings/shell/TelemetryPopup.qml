@@ -179,7 +179,7 @@ PanelWindow {
                 ColumnLayout {
                     spacing: 1
                     Text {
-                        text: "󰻠 TELEMETRÍA X64"
+                        text: I18n.teleTitle
                         font.family: Theme.fontMono
                         font.pixelSize: 12
                         font.bold: true
@@ -250,7 +250,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰻠 Procesador (CPU)"
+                            text: I18n.teleCpu
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -357,7 +357,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰍛 Memoria RAM"
+                            text: I18n.teleRam
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -383,7 +383,7 @@ PanelWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: "Caché: " + teleWindow.ramCached + "G"
+                            text: (I18n.isEs ? "Caché: " : "Cache: ") + teleWindow.ramCached + "G"
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             color: Theme.textMuted
@@ -426,7 +426,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰋊 Disco del Sistema (/)"
+                            text: I18n.teleDisk
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -445,14 +445,14 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "Sistema: " + teleWindow.diskFs
+                            text: (I18n.isEs ? "Sistema: " : "System: ") + teleWindow.diskFs
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             color: Theme.textMuted
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: teleWindow.diskFree + " disponibles"
+                            text: teleWindow.diskFree + " " + I18n.teleAvailable
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             color: Theme.textSecondary
@@ -495,7 +495,7 @@ PanelWindow {
                     ColumnLayout {
                         spacing: 1
                         Text {
-                            text: "󰈀 Red (" + teleWindow.netIface + ")"
+                            text: I18n.teleNet + " (" + teleWindow.netIface + ")"
                             font.family: Theme.fontSans
                             font.pixelSize: 10
                             font.bold: true
@@ -566,7 +566,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "PROCESOS ACTIVOS (TOP RECURSOS)"
+                            text: I18n.teleActiveProcesses
                             font.family: Theme.fontMono
                             font.pixelSize: 8
                             font.bold: true
@@ -649,7 +649,7 @@ PanelWindow {
                         color: btopArea.containsMouse ? "#ffffff" : Theme.accent
                     }
                     Text {
-                        text: "Abrir Monitor Completo (Btop)"
+                        text: I18n.teleOpenBtop
                         font.family: Theme.fontSans
                         font.pixelSize: 11
                         font.bold: true

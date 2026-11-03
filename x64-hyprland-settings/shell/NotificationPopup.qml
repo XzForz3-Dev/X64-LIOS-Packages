@@ -21,7 +21,7 @@ PanelWindow {
         var cleanBod = bod || "";
 
         // Block all notifications while DND is active EXCEPT the DND toggle confirmation itself
-        if (notifWindow.dndEnabled && cleanApp !== "No Molestar") {
+        if (notifWindow.dndEnabled && cleanApp !== "No Molestar" && cleanApp !== "Do Not Disturb") {
             return;
         }
 
@@ -71,7 +71,8 @@ PanelWindow {
     onDndEnabledChanged: {
         if (dndEnabled) {
             for (var i = toastModel.count - 1; i >= 0; i--) {
-                if (toastModel.get(i).appName !== "No Molestar") {
+                var a = toastModel.get(i).appName;
+                if (a !== "No Molestar" && a !== "Do Not Disturb") {
                     toastModel.remove(i);
                 }
             }
@@ -119,7 +120,7 @@ PanelWindow {
         Repeater {
             model: toastModel
             delegate: Rectangle {
-                readonly property bool isDndToast: model.appName === "No Molestar"
+                readonly property bool isDndToast: model.appName === "No Molestar" || model.appName === "Do Not Disturb"
                 readonly property color toastAccent: isDndToast ? "#c084fc" : Theme.accent
 
                 Layout.fillWidth: true

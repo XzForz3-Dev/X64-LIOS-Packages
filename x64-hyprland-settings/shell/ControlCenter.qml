@@ -165,7 +165,7 @@ PanelWindow {
                 Layout.fillWidth: true
 
                 Text {
-                    text: "CENTRO DE CONTROL"
+                    text: I18n.controlCenterTitle
                     font.family: Theme.fontMono
                     font.pixelSize: 12
                     font.bold: true
@@ -220,7 +220,7 @@ PanelWindow {
                             color: controlWindow.caffeineActive ? "#ffffff" : Theme.accent
                         }
                         Text {
-                            text: "Modo Café"
+                            text: I18n.caffeine
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: controlWindow.caffeineActive
@@ -260,7 +260,7 @@ PanelWindow {
                             color: controlWindow.nightlightActive ? "#ffffff" : "#ffaa00"
                         }
                         Text {
-                            text: "Luz Noche"
+                            text: I18n.nightLight
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: controlWindow.nightlightActive
@@ -301,7 +301,7 @@ PanelWindow {
                             color: controlWindow.dndActive ? "#ffffff" : "#c084fc"
                         }
                         Text {
-                            text: "No Molestar"
+                            text: I18n.dnd
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: controlWindow.dndActive
@@ -343,7 +343,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 5
                         Text { text: "󰆞"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: "Recortar"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.crop; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -372,7 +372,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 5
                         Text { text: "󰄀"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: "Pantalla"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.screen; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -407,7 +407,7 @@ PanelWindow {
                             color: (controlWindow.isRecording || controlWindow.recMenuOpen) ? "#ffffff" : Theme.accent
                         }
                         Text {
-                            text: controlWindow.isRecording ? ("Fin " + controlWindow.recTime) : (controlWindow.recMenuOpen ? "Grabar ▴" : "Grabar ▾")
+                            text: controlWindow.isRecording ? (I18n.recordStop + controlWindow.recTime) : (controlWindow.recMenuOpen ? (I18n.record + " ▴") : (I18n.record + " ▾"))
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: controlWindow.isRecording || controlWindow.recMenuOpen
@@ -462,8 +462,8 @@ PanelWindow {
 
                         Repeater {
                             model: [
-                                { id: "fullscreen", label: "󰍹 Pantalla Completa" },
-                                { id: "region",     label: "󰆞 Seleccionar Región" }
+                                { id: "fullscreen", label: I18n.scopeFullscreen },
+                                { id: "region",     label: I18n.scopeRegion }
                             ]
 
                             Rectangle {
@@ -503,9 +503,9 @@ PanelWindow {
 
                         Repeater {
                             model: [
-                                { id: "none",    label: "󰝟 Sin Audio" },
-                                { id: "desktop", label: "󰕾 Audio PC" },
-                                { id: "both",    label: "󰍬 PC + Mic" }
+                                { id: "none",    label: I18n.audioNone },
+                                { id: "desktop", label: I18n.audioDesktop },
+                                { id: "both",    label: I18n.audioBoth }
                             ]
 
                             Rectangle {
@@ -557,7 +557,7 @@ PanelWindow {
                                 color: "#ffffff"
                             }
                             Text {
-                                text: "Iniciar Grabación Ahora"
+                                text: I18n.startRecordingNow
                                 font.family: Theme.fontSans
                                 font.pixelSize: 11
                                 font.bold: true
@@ -604,7 +604,7 @@ PanelWindow {
                         anchors.margins: 8
                         spacing: 8
                         Text { text: "󰄛"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: "Terminal Kitty"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.termKitty; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -633,7 +633,7 @@ PanelWindow {
                         anchors.margins: 8
                         spacing: 8
                         Text { text: "󰉋"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: "Archivos"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.filesDolphin; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -662,7 +662,7 @@ PanelWindow {
                         anchors.margins: 8
                         spacing: 8
                         Text { text: "󰍜"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: "X64 Hello"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.x64Hello; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -691,7 +691,7 @@ PanelWindow {
                         anchors.margins: 8
                         spacing: 8
                         Text { text: "󰍛"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: "Monitor Btop"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.monitorBtop; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -732,7 +732,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: slidersCard.isMuted ? "󰝟 Audio Silenciado" : "󰕾 Volumen Principal"
+                            text: slidersCard.isMuted ? I18n.audioMuted : I18n.masterVolume
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -765,7 +765,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰃠 Brillo de Pantalla"
+                            text: I18n.displayBrightness
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -828,7 +828,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰾅 Perfil de Energía"
+                            text: I18n.powerProfile
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -836,7 +836,7 @@ PanelWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: controlWindow.hasBattery ? ("󰁹 " + controlWindow.batPct + "% (" + controlWindow.batStatus + ")") : "󰚥 AC Directo"
+                            text: controlWindow.hasBattery ? ("󰁹 " + controlWindow.batPct + "% (" + controlWindow.batStatus + ")") : I18n.acDirect
                             font.family: Theme.fontMono
                             font.pixelSize: 10
                             font.bold: true
@@ -850,9 +850,9 @@ PanelWindow {
 
                         Repeater {
                             model: [
-                                { id: "performance", label: "󰓅 Rendimiento" },
-                                { id: "balanced",    label: "󰾅 Equilibrado" },
-                                { id: "power-saver", label: "󰌪 Ahorro" }
+                                { id: "performance", label: I18n.profilePerformance },
+                                { id: "balanced",    label: I18n.profileBalanced },
+                                { id: "power-saver", label: I18n.profilePowerSaver }
                             ]
 
                             Rectangle {
@@ -961,7 +961,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "󰍹 Pantalla & Escalado"
+                            text: I18n.displayScaling
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -1048,7 +1048,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 6
                         Text { text: "󰌾"; font.family: Theme.fontMono; font.pixelSize: 13; color: Theme.textPrimary }
-                        Text { text: "Bloquear"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.lock; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -1076,7 +1076,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 6
                         Text { text: "󰑓"; font.family: Theme.fontMono; font.pixelSize: 13; color: Theme.textPrimary }
-                        Text { text: "Reiniciar"; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
+                        Text { text: I18n.reboot; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
                     }
 
                     MouseArea {
@@ -1104,7 +1104,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 6
                         Text { text: "󰐥"; font.family: Theme.fontMono; font.pixelSize: 13; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
-                        Text { text: "Apagar"; font.family: Theme.fontSans; font.pixelSize: 11; font.bold: true; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
+                        Text { text: I18n.powerOff; font.family: Theme.fontSans; font.pixelSize: 11; font.bold: true; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
                     }
 
                     MouseArea {

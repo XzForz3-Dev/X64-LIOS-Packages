@@ -10,6 +10,11 @@
 # =============================================================================
 
 set -u
+RAW_LANG="${LC_ALL:-${LANG:-${LC_MESSAGES:-en_US.UTF-8}}}"
+IS_ES=0
+if [[ "$RAW_LANG" =~ ^es ]]; then
+    IS_ES=1
+fi
 export LC_ALL=C.UTF-8
 export LC_NUMERIC=C
 
@@ -98,7 +103,11 @@ cmd_caffeine() {
             kill "$(cat "${STATE_DIR}/caffeine.pid" 2>/dev/null)" 2>/dev/null || true
         fi
         setsid -f sh -c 'echo $$ > "'"${STATE_DIR}/caffeine.pid"'"; exec systemd-inhibit --what=idle --who="X64 LIOS" --why="Modo Cafe Activo" sleep infinity 2>/dev/null || exec sleep infinity' >/dev/null 2>&1 < /dev/null
-        notify_user "Modo Café Activado" "Inhibidor Wayland activo • Pantalla sin suspensión" "Modo Café"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Modo Café Activado" "Inhibidor Wayland activo • Pantalla sin suspensión" "Modo Café"
+        else
+            notify_user "Caffeine Mode Enabled" "Wayland inhibitor active • Display won't sleep" "Caffeine Mode"
+        fi
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/caffeine"
         if [ -f "${STATE_DIR}/caffeine.pid" ]; then
@@ -106,7 +115,11 @@ cmd_caffeine() {
             rm -f "${STATE_DIR}/caffeine.pid"
         fi
         pkill -f "Modo Cafe Activo" 2>/dev/null || true
-        notify_user "Modo Café Desactivado" "Suspensión automática e inactividad restauradas" "Modo Café"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Modo Café Desactivado" "Suspensión automática e inactividad restauradas" "Modo Café"
+        else
+            notify_user "Caffeine Mode Disabled" "Automatic sleep and idle restored" "Caffeine Mode"
+        fi
     fi
 }
 
@@ -125,11 +138,19 @@ cmd_nightlight() {
     if [ "$action" = "on" ]; then
         echo "1" > "${STATE_DIR}/nightlight"
         apply_ctm_state
-        notify_user "Luz Nocturna Activada" "Filtro ocular cálido (4800K) aplicado" "Luz Nocturna"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Luz Nocturna Activada" "Filtro ocular cálido (4800K) aplicado" "Luz Nocturna"
+        else
+            notify_user "Night Light Enabled" "Warm eye filter (4800K) applied" "Night Light"
+        fi
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/nightlight"
         apply_ctm_state
-        notify_user "Luz Nocturna Desactivada" "Temperatura de color original (6500K) restaurada" "Luz Nocturna"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Luz Nocturna Desactivada" "Temperatura de color original (6500K) restaurada" "Luz Nocturna"
+        else
+            notify_user "Night Light Disabled" "Original color temperature (6500K) restored" "Night Light"
+        fi
     fi
 }
 
@@ -148,12 +169,20 @@ cmd_dnd() {
     if [ "$action" = "on" ]; then
         echo "1" > "${STATE_DIR}/dnd"
         if command -v notify-send >/dev/null 2>&1; then
-            notify-send -a "No Molestar" "Modo No Molestar Activado" "Las notificaciones emergentes han sido silenciadas" 2>/dev/null || true
+            if [ "$IS_ES" -eq 1 ]; then
+                notify-send -a "No Molestar" "Modo No Molestar Activado" "Las notificaciones emergentes han sido silenciadas" 2>/dev/null || true
+            else
+                notify-send -a "Do Not Disturb" "Do Not Disturb Enabled" "Popup notifications have been silenced" 2>/dev/null || true
+            fi
         fi
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/dnd"
         if command -v notify-send >/dev/null 2>&1; then
-            notify-send -a "No Molestar" "Modo No Molestar Desactivado" "Notificaciones de escritorio nuevamente activas" 2>/dev/null || true
+            if [ "$IS_ES" -eq 1 ]; then
+                notify-send -a "No Molestar" "Modo No Molestar Desactivado" "Notificaciones de escritorio nuevamente activas" 2>/dev/null || true
+            else
+                notify-send -a "Do Not Disturb" "Do Not Disturb Disabled" "Desktop notifications active again" 2>/dev/null || true
+            fi
         fi
     fi
 }
@@ -216,17 +245,29 @@ cmd_power() {
             performance)
                 echo "$prof" > "${STATE_DIR}/power_profile"
                 powerprofilesctl set "$prof" >/dev/null 2>&1 || true
-                notify_user "Perfil de Energía: Rendimiento" "Frecuencia máxima de CPU activada" "Energía X64"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Perfil de Energía: Rendimiento" "Frecuencia máxima de CPU activada" "Energía X64"
+                else
+                    notify_user "Power Profile: Performance" "Maximum CPU clock enabled" "X64 Power"
+                fi
                 ;;
             balanced)
                 echo "$prof" > "${STATE_DIR}/power_profile"
                 powerprofilesctl set "$prof" >/dev/null 2>&1 || true
-                notify_user "Perfil de Energía: Equilibrado" "Balance dinámico entre potencia y consumo" "Energía X64"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Perfil de Energía: Equilibrado" "Balance dinámico entre potencia y consumo" "Energía X64"
+                else
+                    notify_user "Power Profile: Balanced" "Dynamic balance between performance and power" "X64 Power"
+                fi
                 ;;
             power-saver)
                 echo "$prof" > "${STATE_DIR}/power_profile"
                 powerprofilesctl set "$prof" >/dev/null 2>&1 || true
-                notify_user "Perfil de Energía: Ahorro" "Modo eficiencia energética activado" "Energía X64"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Perfil de Energía: Ahorro" "Modo eficiencia energética activado" "Energía X64"
+                else
+                    notify_user "Power Profile: Power Saver" "Power efficiency mode enabled" "X64 Power"
+                fi
                 ;;
         esac
     else
@@ -330,17 +371,33 @@ cmd_record_worker() {
         fi
     fi
 
-    local scope_lbl="Pantalla"
-    [ "$scope" = "region" ] && scope_lbl="Región"
-    local audio_lbl="Audio PC"
-    [ "$audio_mode" = "none" ] && audio_lbl="Sin Audio"
-    [ "$audio_mode" = "both" ] && audio_lbl="PC + Mic"
+    local scope_lbl="Screen"
+    [ "$IS_ES" -eq 1 ] && scope_lbl="Pantalla"
+    if [ "$scope" = "region" ]; then
+        [ "$IS_ES" -eq 1 ] && scope_lbl="Región" || scope_lbl="Region"
+    fi
+
+    local audio_lbl="Desktop Audio"
+    [ "$IS_ES" -eq 1 ] && audio_lbl="Audio PC"
+    if [ "$audio_mode" = "none" ]; then
+        [ "$IS_ES" -eq 1 ] && audio_lbl="Sin Audio" || audio_lbl="No Audio"
+    elif [ "$audio_mode" = "both" ]; then
+        [ "$IS_ES" -eq 1 ] && audio_lbl="PC + Mic" || audio_lbl="Desktop + Mic"
+    fi
 
     if [ -n "$engine_used" ]; then
-        notify_user "Grabación Iniciada (${scope_lbl})" "${audio_lbl} • ${engine_used} • Clic en REC para detener" "Grabadora X64"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Grabación Iniciada (${scope_lbl})" "${audio_lbl} • ${engine_used} • Clic en REC para detener" "Grabadora X64"
+        else
+            notify_user "Recording Started (${scope_lbl})" "${audio_lbl} • ${engine_used} • Click REC to stop" "X64 Recorder"
+        fi
     else
         rm -f "${STATE_DIR}/record.start"
-        notify_user "Error de Grabación" "No se pudo iniciar el motor de captura de video" "Grabadora X64"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Error de Grabación" "No se pudo iniciar el motor de captura de video" "Grabadora X64"
+        else
+            notify_user "Recording Error" "Could not start video capture engine" "X64 Recorder"
+        fi
     fi
 }
 
@@ -363,7 +420,11 @@ cmd_record() {
         rm -f "${STATE_DIR}/record.start" "${STATE_DIR}/record.engine"
         local saved_file
         saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "${HOME}/Videos")
-        notify_user "Grabación Guardada" "Video MP4 guardado: $(basename "$saved_file")" "Grabadora X64"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "Grabación Guardada" "Video MP4 guardado: $(basename "$saved_file")" "Grabadora X64"
+        else
+            notify_user "Recording Saved" "MP4 video saved: $(basename "$saved_file")" "X64 Recorder"
+        fi
     fi
 }
 
@@ -383,7 +444,11 @@ cmd_screenshot_worker() {
         if grim -g "$geom" "$out_file"; then
             quickshell ipc call filter show >/dev/null 2>&1 || true
             setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
-            notify_user "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")" "Captura X64"
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")" "Captura X64"
+            else
+                notify_user "Snapshot Saved" "Copied to clipboard • $(basename "$out_file")" "X64 Capture"
+            fi
         else
             quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
@@ -394,7 +459,11 @@ cmd_screenshot_worker() {
         if grim "$out_file"; then
             quickshell ipc call filter show >/dev/null 2>&1 || true
             setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
-            notify_user "Captura de Pantalla" "Copiada al portapapeles • $(basename "$out_file")" "Captura X64"
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Captura de Pantalla" "Copiada al portapapeles • $(basename "$out_file")" "Captura X64"
+            else
+                notify_user "Screenshot Captured" "Copied to clipboard • $(basename "$out_file")" "X64 Capture"
+            fi
         else
             quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
@@ -624,9 +693,17 @@ cmd_net() {
             fi
             nmcli radio wifi "$mode" >/dev/null 2>&1 || true
             if [ "$mode" = "on" ]; then
-                notify_user "Wi-Fi Activado" "Escaneando redes inalámbricas disponibles..."
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Wi-Fi Activado" "Escaneando redes inalámbricas disponibles..."
+                else
+                    notify_user "Wi-Fi Enabled" "Scanning for available wireless networks..."
+                fi
             else
-                notify_user "Wi-Fi Desactivado" "Radio inalámbrico apagado"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Wi-Fi Desactivado" "Radio inalámbrico apagado"
+                else
+                    notify_user "Wi-Fi Disabled" "Wireless radio turned off"
+                fi
             fi
             ;;
         connect)
@@ -636,17 +713,29 @@ cmd_net() {
             local out
             if [ -n "$pass" ]; then
                 if out=$(nmcli dev wifi connect "$ssid" password "$pass" 2>&1); then
-                    notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    if [ "$IS_ES" -eq 1 ]; then
+                        notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    else
+                        notify_user "Wi-Fi Connected" "Successfully connected to ${ssid}"
+                    fi
                     echo "OK"
                     return 0
                 else
-                    notify_user "Error de Conexión Wi-Fi" "Verifica la contraseña de ${ssid}"
+                    if [ "$IS_ES" -eq 1 ]; then
+                        notify_user "Error de Conexión Wi-Fi" "Verifica la contraseña de ${ssid}"
+                    else
+                        notify_user "Wi-Fi Connection Error" "Verify password for ${ssid}"
+                    fi
                     echo "ERR: $out"
                     return 1
                 fi
             else
                 if out=$(nmcli connection up "$ssid" 2>&1 || nmcli dev wifi connect "$ssid" 2>&1); then
-                    notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    if [ "$IS_ES" -eq 1 ]; then
+                        notify_user "Wi-Fi Conectado" "Conectado exitosamente a ${ssid}"
+                    else
+                        notify_user "Wi-Fi Connected" "Successfully connected to ${ssid}"
+                    fi
                     echo "OK"
                     return 0
                 else
@@ -659,7 +748,11 @@ cmd_net() {
             local target="${2:-}"
             [ -z "$target" ] && return 1
             nmcli connection down "$target" >/dev/null 2>&1 || nmcli dev disconnect "$target" >/dev/null 2>&1 || true
-            notify_user "Red Desconectada" "Se desconectó ${target}"
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Red Desconectada" "Se desconectó ${target}"
+            else
+                notify_user "Network Disconnected" "Disconnected ${target}"
+            fi
             ;;
         eth-toggle)
             local dev="${2:-}"
@@ -668,10 +761,18 @@ cmd_net() {
             st=$(cat "/sys/class/net/${dev}/operstate" 2>/dev/null || echo "down")
             if [ "$st" = "up" ]; then
                 nmcli dev disconnect "$dev" >/dev/null 2>&1 || true
-                notify_user "Ethernet Desconectado" "Interfaz ${dev} desconectada"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Ethernet Desconectado" "Interfaz ${dev} desconectada"
+                else
+                    notify_user "Ethernet Disconnected" "Interface ${dev} disconnected"
+                fi
             else
                 nmcli dev connect "$dev" >/dev/null 2>&1 || true
-                notify_user "Ethernet Conectado" "Interfaz ${dev} reconectada"
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Ethernet Conectado" "Interfaz ${dev} reconectada"
+                else
+                    notify_user "Ethernet Connected" "Interface ${dev} reconnected"
+                fi
             fi
             ;;
         scan|status|*)
@@ -713,9 +814,9 @@ cmd_net() {
             [ "$radio_st" = "enabled" ] && wifi_enabled="true"
 
             # 2. IP, Gateway & DNS
-            local ip_addr="Desconectado" gw_addr="--" dns_addr="--"
+            local ip_addr="--" gw_addr="--" dns_addr="--"
             ip_addr=$(ip -4 -o addr show scope global 2>/dev/null | awk 'NR==1 {split($4,a,"/"); print a[1]}')
-            [ -z "$ip_addr" ] && ip_addr="Desconectado"
+            [ -z "$ip_addr" ] && { [ "$IS_ES" -eq 1 ] && ip_addr="Desconectado" || ip_addr="Disconnected"; }
             gw_addr=$(ip route show default 2>/dev/null | awk 'NR==1 {print $3}')
             [ -z "$gw_addr" ] && gw_addr="--"
             dns_addr=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
@@ -726,7 +827,7 @@ cmd_net() {
             if [ "$has_wifi_hw" = "true" ] && [ "$wifi_enabled" = "true" ]; then
                 local saved_list
                 saved_list=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2 ~ /wireless|wifi/ {print $1}')
-                nets_json=$(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan no 2>/dev/null | awk -F: -v saved="$saved_list" '
+                nets_json=$(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan no 2>/dev/null | awk -F: -v saved="$saved_list" -v is_es="$IS_ES" '
                     BEGIN {
                         n = split(saved, s_arr, "\n");
                         for (i=1; i<=n; i++) if (s_arr[i] != "") is_saved[s_arr[i]] = 1;
@@ -743,7 +844,7 @@ cmd_net() {
                         gsub(/\\:/, ":", ssid);
                         gsub(/"/, "\\\"", ssid);
                         gsub(/"/, "", sec);
-                        if (sec == "" || sec == "--") sec = "Abierta";
+                        if (sec == "" || sec == "--") sec = (is_es == 1 ? "Abierta" : "Open");
                         sv = ( (ssid in is_saved) || in_use == "true" ) ? "true" : "false";
                         if (count > 0) printf ",";
                         printf "{\"ssid\":\"%s\",\"signal\":%d,\"security\":\"%s\",\"connected\":%s,\"saved\":%s}", ssid, sig, sec, in_use, sv;

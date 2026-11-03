@@ -8,7 +8,7 @@ import "."
 Scope {
     id: root
     property bool isLocked: false
-    property string statusText: "Introduce tu contraseña para desbloquear"
+    property string statusText: I18n.lockStatusReady
     property bool isError: false
     property bool isVerifying: false
 
@@ -16,7 +16,7 @@ Scope {
         if (root.isLocked) return;
         root.isError = false;
         root.isVerifying = false;
-        root.statusText = "Introduce tu contraseña para desbloquear";
+        root.statusText = I18n.lockStatusReady;
         root.isLocked = true;
     }
 
@@ -43,18 +43,18 @@ Scope {
             root.isVerifying = false;
             if (result === PamResult.Success) {
                 root.isError = false;
-                root.statusText = "Acceso concedido";
+                root.statusText = I18n.isEs ? "Acceso concedido" : "Access granted";
                 root.isLocked = false;
             } else {
                 root.isError = true;
-                root.statusText = "󰀦 Contraseña incorrecta — intenta de nuevo";
+                root.statusText = I18n.lockStatusError;
             }
         }
 
         onError: (err) => {
             root.isVerifying = false;
             root.isError = true;
-            root.statusText = "󰀦 Error de autenticación PAM";
+            root.statusText = I18n.isEs ? "󰀦 Error de autenticación PAM" : "󰀦 PAM Authentication Error";
         }
     }
 
@@ -64,7 +64,7 @@ Scope {
         if (!pass || pass.length === 0 || root.isVerifying) return;
         root.isError = false;
         root.isVerifying = true;
-        root.statusText = "󰄬 Verificando credenciales PAM...";
+        root.statusText = I18n.lockStatusVerifying;
         root.pendingPassword = pass;
         if (pam.active) {
             if (pam.responseRequired) {
@@ -93,12 +93,14 @@ Scope {
             function updateClock() {
                 var now = new Date();
                 lockSurface.clockTime = Qt.formatDateTime(now, "HH:mm");
-                var days = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
-                var months = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-                var dName = days[now.getDay()];
+                var dName = I18n.dayFullNames[now.getDay()].toUpperCase();
                 var dNum = ("0" + now.getDate()).slice(-2);
-                var mName = months[now.getMonth()];
-                lockSurface.clockDate = dName + ", " + dNum + " DE " + mName;
+                var mName = I18n.monthFullNames[now.getMonth()].toUpperCase();
+                if (I18n.isEs) {
+                    lockSurface.clockDate = dName + ", " + dNum + " DE " + mName;
+                } else {
+                    lockSurface.clockDate = dName + ", " + mName + " " + dNum;
+                }
             }
 
             Component.onCompleted: {
@@ -243,7 +245,7 @@ Scope {
                                 spacing: 2
 
                                 Text {
-                                    text: "SESIÓN BLOQUEADA"
+                                    text: I18n.lockSessionLocked
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
                                     font.weight: Font.Bold
@@ -319,7 +321,7 @@ Scope {
                                     Text {
                                         anchors.fill: parent
                                         verticalAlignment: Text.AlignVCenter
-                                        text: "Contraseña del sistema..."
+                                        text: I18n.lockPasswordPrompt
                                         font.family: Theme.fontMono
                                         font.pixelSize: 12
                                         color: Theme.textMuted

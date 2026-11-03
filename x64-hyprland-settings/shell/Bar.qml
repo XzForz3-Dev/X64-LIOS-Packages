@@ -226,8 +226,8 @@ PanelWindow {
             var m = String(now.getMinutes()).padStart(2, '0');
             barWindow.timeStr = h + ":" + m;
 
-            var days = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
-            var months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+            var days = I18n.dayShortNames;
+            var months = I18n.monthShortNames;
             var dName = days[now.getDay()];
             var dNum = String(now.getDate()).padStart(2, '0');
             var mName = months[now.getMonth()];

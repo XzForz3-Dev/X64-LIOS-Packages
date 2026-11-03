@@ -182,7 +182,7 @@ PanelWindow {
                 ColumnLayout {
                     spacing: 1
                     Text {
-                        text: "󰖩 CENTRO DE RED X64"
+                        text: I18n.netTitle
                         font.family: Theme.fontMono
                         font.pixelSize: 12
                         font.bold: true
@@ -192,8 +192,8 @@ PanelWindow {
                         text: {
                             if (netWindow.statusMsg !== "") return netWindow.statusMsg;
                             if (netWindow.wifiConnected) return "󰤨 Wi-Fi: " + netWindow.wifiSsid;
-                            if (netWindow.ethConnected) return "󰈀 Ethernet Activo (" + netWindow.ethDevice + ")";
-                            return "󰤮 Sin conexión activa";
+                            if (netWindow.ethConnected) return "󰈀 Ethernet " + (I18n.isEs ? "Activo (" : "Active (") + netWindow.ethDevice + ")";
+                            return I18n.isEs ? "󰤮 Sin conexión activa" : "󰤮 No active connection";
                         }
                         font.family: Theme.fontMono
                         font.pixelSize: 9
@@ -293,14 +293,14 @@ PanelWindow {
                             spacing: 1
                             Layout.fillWidth: true
                             Text {
-                                text: "Red Cableada (LAN)"
+                                text: I18n.netLanWired
                                 font.family: Theme.fontSans
                                 font.pixelSize: 11
                                 font.bold: true
                                 color: Theme.textPrimary
                             }
                             Text {
-                                text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? "Conectado (1 Gbps)" : "Cable desconectado")
+                                text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? (I18n.isEs ? "Conectado (1 Gbps)" : "Connected (1 Gbps)") : I18n.netCableDisconnected)
                                 font.family: Theme.fontMono
                                 font.pixelSize: 9
                                 color: netWindow.ethConnected ? "#10b981" : Theme.textMuted
@@ -319,7 +319,7 @@ PanelWindow {
                             Text {
                                 id: ethBtnText
                                 anchors.centerIn: parent
-                                text: netWindow.ethConnected ? "Activo" : "Conectar"
+                                text: netWindow.ethConnected ? I18n.netActive : I18n.netConnect
                                 font.family: Theme.fontMono
                                 font.pixelSize: 9
                                 font.bold: true
@@ -350,21 +350,21 @@ PanelWindow {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
-                            Text { text: "DIRECCIÓN IP"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                            Text { text: I18n.netIpAddress; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                             Text { text: netWindow.ipAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#00e5ff" }
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
-                            Text { text: "GATEWAY"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                            Text { text: I18n.netGateway; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                             Text { text: netWindow.gwAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
-                            Text { text: "DNS PRIMARIO"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                            Text { text: I18n.netDnsPrimary; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                             Text { text: netWindow.dnsAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#a855f7" }
                         }
                     }
@@ -393,7 +393,7 @@ PanelWindow {
                         Layout.fillWidth: true
 
                         Text {
-                            text: "󰤨 Redes Inalámbricas (Wi-Fi)"
+                            text: I18n.netWireless
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: true
@@ -455,7 +455,7 @@ PanelWindow {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: "Estación conectada por Ethernet LAN directo. Si conectas un adaptador Wi-Fi USB/PCIe aparecerán aquí las redes inalámbricas."
+                                text: I18n.netEthernetOnlyNotice
                                 font.family: Theme.fontSans
                                 font.pixelSize: 9
                                 color: Theme.textSecondary
@@ -468,7 +468,7 @@ PanelWindow {
                     Text {
                         visible: netWindow.hasWifiHw && !netWindow.wifiEnabled
                         Layout.fillWidth: true
-                        text: "󰤮 El radio Wi-Fi está apagado. Actívalo arriba para buscar redes."
+                        text: I18n.netWifiOffNotice
                         font.family: Theme.fontMono
                         font.pixelSize: 9
                         color: Theme.textMuted
@@ -517,7 +517,7 @@ PanelWindow {
                                         }
 
                                         Text {
-                                            text: (modelData.security !== "Abierta" ? "󰌾 " : "") + modelData.security + " • " + modelData.signal + "%"
+                                            text: ((modelData.security !== "Abierta" && modelData.security !== "Open") ? "󰌾 " : "") + ((modelData.security === "Abierta" || modelData.security === "Open") ? (I18n.isEs ? "Abierta" : "Open") : modelData.security) + " • " + modelData.signal + "%"
                                             font.family: Theme.fontMono
                                             font.pixelSize: 8
                                             color: Theme.textMuted
@@ -531,7 +531,7 @@ PanelWindow {
                                             Text {
                                                 id: actTxt
                                                 anchors.centerIn: parent
-                                                text: modelData.connected ? "Conectado" : "Conectar"
+                                                text: modelData.connected ? I18n.netConnected : I18n.netConnect
                                                 font.family: Theme.fontMono
                                                 font.pixelSize: 8
                                                 font.bold: true
@@ -550,7 +550,7 @@ PanelWindow {
                                             id: passField
                                             Layout.fillWidth: true
                                             implicitHeight: 24
-                                            placeholderText: "Contraseña de " + modelData.ssid
+                                            placeholderText: I18n.netPasswordPrompt + modelData.ssid
                                             placeholderTextColor: Theme.textMuted
                                             echoMode: TextInput.Password
                                             font.family: Theme.fontMono
@@ -573,7 +573,7 @@ PanelWindow {
                                             color: Theme.accent
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: "Entrar"
+                                                text: I18n.netEnter
                                                 font.family: Theme.fontMono
                                                 font.pixelSize: 9
                                                 font.bold: true
@@ -599,7 +599,7 @@ PanelWindow {
                                     onClicked: {
                                         if (modelData.connected) {
                                             netWindow.runNetCmd(["disconnect", modelData.ssid]);
-                                        } else if (modelData.saved || modelData.security === "Abierta") {
+                                        } else if (modelData.saved || modelData.security === "Abierta" || modelData.security === "Open") {
                                             netWindow.runNetCmd(["connect", modelData.ssid]);
                                         } else {
                                             if (netWindow.passwordSsid === modelData.ssid) {
@@ -639,7 +639,7 @@ PanelWindow {
                         color: advArea.containsMouse ? "#ffffff" : Theme.accent
                     }
                     Text {
-                        text: "Ajustes Avanzados de Red / VPN"
+                        text: I18n.netAdvancedSettings
                         font.family: Theme.fontSans
                         font.pixelSize: 11
                         font.bold: true
