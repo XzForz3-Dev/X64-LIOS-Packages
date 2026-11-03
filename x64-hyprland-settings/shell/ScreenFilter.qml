@@ -8,7 +8,7 @@ PanelWindow {
     property bool nightlightActive: false
     property int brightnessVal: 100
 
-    readonly property double nightAlpha: nightlightActive ? 0.20 : 0.0
+    readonly property double nightAlpha: nightlightActive ? 0.07 : 0.0
     readonly property double dimAlpha: Math.max(0.0, Math.min(0.72, (100 - brightnessVal) * 0.0085))
 
     visible: nightlightActive || brightnessVal < 100
@@ -37,10 +37,10 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-filter"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    // 1. Warm 4200K Nightlight Filter (Universal fallback for QEMU/VMs without DRM CTM)
+    // 1. Warm 4800K Nightlight Filter (Subtle 7% golden warmth for QEMU/VMs without DRM CTM)
     Rectangle {
         anchors.fill: parent
-        color: "#ff7700"
+        color: "#ff9329"
         opacity: filterWindow.nightAlpha
         Behavior on opacity { NumberAnimation { duration: 220 } }
     }
@@ -53,3 +53,4 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: 100 } }
     }
 }
+

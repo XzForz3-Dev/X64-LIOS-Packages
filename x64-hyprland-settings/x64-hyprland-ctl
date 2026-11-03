@@ -67,7 +67,7 @@ apply_ctm_state() {
 
     ensure_hyprsunset
     if [ "$nl_val" = "1" ]; then
-        hyprctl hyprsunset temperature 4200 >/dev/null 2>&1 || true
+        hyprctl hyprsunset temperature 4800 >/dev/null 2>&1 || true
     else
         hyprctl hyprsunset identity >/dev/null 2>&1 || true
     fi
@@ -125,7 +125,7 @@ cmd_nightlight() {
     if [ "$action" = "on" ]; then
         echo "1" > "${STATE_DIR}/nightlight"
         apply_ctm_state
-        notify_user "Luz Nocturna Activada" "Filtro ocular cálido (4200K) aplicado" "Luz Nocturna"
+        notify_user "Luz Nocturna Activada" "Filtro ocular cálido (4800K) aplicado" "Luz Nocturna"
     elif [ "$action" = "off" ]; then
         echo "0" > "${STATE_DIR}/nightlight"
         apply_ctm_state
