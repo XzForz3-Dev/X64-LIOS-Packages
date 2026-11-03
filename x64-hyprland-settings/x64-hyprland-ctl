@@ -297,16 +297,51 @@ cmd_status() {
         echo "${total} ${idle_all}" > "${STATE_DIR}/cpu_stat"
     fi
 
-    # 2. RAM Usage
-    local ram_used="0.0" ram_total="0.0" ram_pct=0
-    eval "$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{
-        if(t>0) {
-            u=(t-a)/1048576;
-            tot=t/1048576;
-            pct=((t-a)*100)/t;
-            printf "ram_used=\"%.1f\"; ram_total=\"%.1f\"; ram_pct=%.0f;", u, tot, pct
-        }
-    }' /proc/meminfo 2>/dev/null)"
+    # 1B. Static System Identity (Cached once per session for zero overhead)
+    local cpu_model="X64 Processor" cpu_cores=4 kernel_ver="Linux"
+    if [ ! -f "${STATE_DIR}/static_hw" ]; then
+        cpu_model=$(awk -F': ' '/model name/{m=$2; exit} END{
+            gsub(/\(R\)|\(TM\)|\(tm\)|Processor|CPU|@.*|[0-9]+-Core/,"",m);
+            gsub(/  +/," ",m);
+            sub(/^ +/,"",m); sub(/ +$/,"",m);
+            print (m != "" ? m : "X64 Processor")
+        }' /proc/cpuinfo 2>/dev/null)
+        cpu_cores=$(nproc 2>/dev/null || echo 4)
+        kernel_ver=$(uname -r 2>/dev/null | cut -d'-' -f1-2)
+        printf 'cpu_model="%s"\ncpu_cores=%d\nkernel_ver="%s"\n' "$cpu_model" "$cpu_cores" "$kernel_ver" > "${STATE_DIR}/static_hw"
+    fi
+    # shellcheck disable=SC1090
+    source "${STATE_DIR}/static_hw" 2>/dev/null || true
+
+    # 1C. Live CPU Frequency (GHz) & Load Average
+    local cpu_freq="0.0 GHz" load_avg="0.00"
+    if [ -r /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq ]; then
+        cpu_freq=$(awk '{printf "%.2f GHz", $1/1000000}' /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
+    else
+        cpu_freq=$(awk -F': ' '/cpu MHz/{printf "%.2f GHz", $2/1000; exit}' /proc/cpuinfo 2>/dev/null)
+    fi
+    [ -z "$cpu_freq" ] && cpu_freq="3.60 GHz"
+    load_avg=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo "0.00")
+
+    # 2. RAM, Swap/ZRAM & Cached Usage
+    local ram_used="0.0" ram_total="0.0" ram_pct=0 swap_used="0.0" swap_total="0.0" ram_cached="0.0"
+    eval "$(awk '
+        /MemTotal/{mt=$2}
+        /MemAvailable/{ma=$2}
+        /^Cached:/{mc=$2}
+        /SwapTotal/{st=$2}
+        /SwapFree/{sf=$2}
+        END {
+            if(mt>0) {
+                ru=(mt-ma)/1048576;
+                rt=mt/1048576;
+                rp=((mt-ma)*100)/mt;
+                rc=mc/1048576;
+                su=(st-sf)/1048576;
+                stot=st/1048576;
+                printf "ram_used=\"%.1f\"; ram_total=\"%.1f\"; ram_pct=%.0f; ram_cached=\"%.1f\"; swap_used=\"%.1f\"; swap_total=\"%.1f\";", ru, rt, rp, rc, su, stot
+            }
+        }' /proc/meminfo 2>/dev/null)"
 
     # 3. CPU Temperature (°C)
     local temp_c=""
@@ -325,12 +360,35 @@ cmd_status() {
         temp_c=$(( 38 + (cpu_pct * 35) / 100 ))
     fi
 
-    # 4. Root Disk Usage (/)
-    local disk_used="0G" disk_total="0G" disk_pct=0
-    eval "$(df -BG / 2>/dev/null | awk 'NR==2 {
-        gsub(/%/,"",$5);
-        printf "disk_used=\"%s\"; disk_total=\"%s\"; disk_pct=%d;", $3, $2, $5
+    # 4. Root Disk Usage (/), Free Space & Filesystem Type
+    local disk_used="0G" disk_total="0G" disk_free="0G" disk_fs="ext4" disk_pct=0
+    eval "$(df -PT -BG / 2>/dev/null | awk 'NR==2 {
+        gsub(/%/,"",$6);
+        printf "disk_fs=\"%s\"; disk_total=\"%s\"; disk_used=\"%s\"; disk_free=\"%s\"; disk_pct=%d;", toupper($2), $3, $4, $5, $6
     }')"
+
+    # 4B. Live Network Throughput (RX / TX) & Local IP
+    local net_down="0 KB/s" net_up="0 KB/s" net_ip="Sin Red" net_iface="eth0"
+    local now_ms rx_now tx_now
+    now_ms=$(date +%s%3N 2>/dev/null || echo $(($(date +%s)*1000)))
+    read -r rx_now tx_now <<< "$(awk 'NR>2 && $1 !~ /^lo:/ {rx+=$2; tx+=$10} END {printf "%.0f %.0f", rx, tx}' /proc/net/dev 2>/dev/null)"
+    if [ -f "${STATE_DIR}/net_stat" ] && [ -n "$rx_now" ]; then
+        local prev_ms prev_rx prev_tx dt_ms
+        read -r prev_ms prev_rx prev_tx < "${STATE_DIR}/net_stat"
+        dt_ms=$(( now_ms - prev_ms ))
+        if [ "$dt_ms" -gt 100 ]; then
+            local rx_bps=$(( ((rx_now - prev_rx) * 1000) / dt_ms ))
+            local tx_bps=$(( ((tx_now - prev_tx) * 1000) / dt_ms ))
+            [ "$rx_bps" -lt 0 ] && rx_bps=0
+            [ "$tx_bps" -lt 0 ] && tx_bps=0
+            net_down=$(awk -v b="$rx_bps" 'BEGIN { if (b>=1048576) printf "%.1f MB/s", b/1048576; else printf "%.0f KB/s", b/1024 }')
+            net_up=$(awk -v b="$tx_bps" 'BEGIN { if (b>=1048576) printf "%.1f MB/s", b/1048576; else printf "%.0f KB/s", b/1024 }')
+        fi
+    fi
+    echo "${now_ms} ${rx_now:-0} ${tx_now:-0}" > "${STATE_DIR}/net_stat"
+    read -r net_iface net_ip <<< "$(ip -4 -o addr show scope global 2>/dev/null | awk 'NR==1 {split($4,a,"/"); print $2, a[1]}')"
+    [ -z "$net_ip" ] && net_ip="Desconectado"
+    [ -z "$net_iface" ] && net_iface="LAN"
 
     # 5. Uptime
     local uptime_str="0m"
@@ -346,10 +404,16 @@ cmd_status() {
         }' /proc/uptime 2>/dev/null)
     fi
 
-    # 6. Top 3 Processes by CPU
-    local top_procs
-    top_procs=$(ps -eo comm,%cpu --sort=-%cpu 2>/dev/null | awk 'NR>1 && NR<=4 {printf "%s%s (%.0f%%)", (NR>2?" • ":""), $1, $2}')
+    # 6. Top 3 Processes by CPU + Memory (Structured JSON Array & Legacy String)
+    local top_procs top_list_json
+    top_procs=$(ps -eo comm,%cpu --sort=-%cpu,-rss 2>/dev/null | awk 'NR>1 && $1 !~ /^(ps|awk|sh|bash|x64-hyprland)/ && c<3 {c++; printf "%s%s (%.1f%%)", (c>1?" • ":""), $1, $2}')
     [ -z "$top_procs" ] && top_procs="Hyprland • quickshell"
+    top_list_json=$(ps -eo comm,%cpu,rss --sort=-%cpu,-rss 2>/dev/null | awk 'BEGIN{printf "["} NR>1 && $1 !~ /^(ps|awk|sh|bash|x64-hyprland)/ && c<3 {
+        c++;
+        gsub(/"/,"",$1);
+        printf "%s{\"name\":\"%s\",\"cpu\":\"%.1f%%\",\"mem\":\"%.0f MB\"}", (c>1?",":""), $1, $2, $3/1024
+    } END{printf "]"}')
+    [ -z "$top_list_json" ] && top_list_json="[]"
 
     # 7. Toggles State
     local caf_val nl_val dnd_val
@@ -402,9 +466,12 @@ cmd_status() {
         IFS='|' read -r osd_br_ts _ < "${STATE_DIR}/osd_brightness"
     fi
 
-    printf '{"cpu":%d,"ramUsed":"%s","ramTotal":"%s","ramPct":%d,"temp":%d,"diskUsed":"%s","diskTotal":"%s","diskPct":%d,"uptime":"%s","topProcs":"%s","caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s}\n' \
-        "$cpu_pct" "$ram_used" "$ram_total" "$ram_pct" "$temp_c" \
-        "$disk_used" "$disk_total" "$disk_pct" "$uptime_str" "$top_procs" \
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s}\n' \
+        "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" \
+        "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
+        "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
+        "$net_down" "$net_up" "$net_ip" "$net_iface" "$kernel_ver" \
+        "$uptime_str" "$top_procs" "$top_list_json" \
         "$([ "$caf_val" = "1" ] && echo true || echo false)" \
         "$([ "$nl_val" = "1" ] && echo true || echo false)" \
         "$([ "$dnd_val" = "1" ] && echo true || echo false)" \
