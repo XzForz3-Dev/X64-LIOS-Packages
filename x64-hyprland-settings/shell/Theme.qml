@@ -1,6 +1,12 @@
 pragma Singleton
 import QtQuick
 
+// =============================================================================
+// X64 LIOS - Quickshell Global Theme & Color Palette (Theme.qml)
+// Puedes personalizar libremente los colores, bordes y tipografías aquí.
+// Si modificas el color 'accent', el instalador conservará tu Theme.qml intacto
+// durante futuras actualizaciones del sistema.
+// =============================================================================
 QtObject {
     // Cyberpunk OLED Color Palette (Qt6 #AARRGGBB format)
     readonly property color bgDark: "#08080a"

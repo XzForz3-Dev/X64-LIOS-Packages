@@ -223,3 +223,11 @@ hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("x64-hyprland-ctl brightness do
 hl.bind("Print",                 hl.dsp.exec_cmd("x64-hyprland-ctl screenshot full"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("x64-hyprland-ctl screenshot region"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("x64-hyprland-ctl record toggle"))
+
+-----------------------------------------
+---- USER CUSTOMIZATION (custom.lua) ----
+-----------------------------------------
+-- Personal overrides in ~/.config/hypr/custom.lua are loaded automatically
+-- and preserved across all package updates.
+local custom_cfg = (os.getenv("HOME") or "") .. "/.config/hypr/custom.lua"
+pcall(dofile, custom_cfg)

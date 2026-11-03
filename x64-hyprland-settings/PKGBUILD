@@ -1,6 +1,6 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=23
+pkgrel=24
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
@@ -8,13 +8,14 @@ depends=('hyprland' 'hyprlock' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'
+    'custom.lua'
     'hyprland.conf'
     'hyprlock.conf'
     '01-monolith.jpg'
     'x64-hyprland-scale'
     'x64-hyprland-ctl'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
@@ -28,6 +29,8 @@ package() {
     # Install skeleton and system-wide default configuration
     install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/skel/.config/hypr/hyprland.lua"
     install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/xdg/hypr/hyprland.lua"
+    install -Dm644 "${srcdir}/custom.lua" "${pkgdir}/etc/skel/.config/hypr/custom.lua"
+    install -Dm644 "${srcdir}/custom.lua" "${pkgdir}/etc/xdg/hypr/custom.lua"
     install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/skel/.config/hypr/hyprland.conf"
     install -Dm644 "${srcdir}/hyprland.conf" "${pkgdir}/etc/xdg/hypr/hyprland.conf"
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/skel/.config/hypr/hyprlock.conf"

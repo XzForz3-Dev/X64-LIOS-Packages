@@ -1,5 +1,6 @@
-post_install() {
-    # Propagar configuraciones soberanas de Hyprland y Quickshell a usuarios existentes en /home/*
+sync_user_configs() {
+    local mode="${1:-install}"
+
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
             u=$(basename "$user_dir")
@@ -10,13 +11,42 @@ post_install() {
             mkdir -p "$target_hypr"
             mkdir -p "$target_qs"
 
-            # Copiar configs de skeleton
+            # 1. Hyprland Configurations (~/.config/hypr)
             if [ -d /etc/skel/.config/hypr ]; then
-                cp -f /etc/skel/.config/hypr/* "$target_hypr/" 2>/dev/null || true
+                # Si el usuario eliminó/deshabilitó hyprland.lua en upgrade para usar su propio hyprland.conf, respetarlo
+                if [ "$mode" = "upgrade" ] && [ ! -f "$target_hypr/hyprland.lua" ] && [ -f "$target_hypr/hyprland.conf" ]; then
+                    cp -f /etc/skel/.config/hypr/hyprland.lua "$target_hypr/hyprland.lua.pacnew" 2>/dev/null || true
+                else
+                    cp -f /etc/skel/.config/hypr/hyprland.lua "$target_hypr/hyprland.lua" 2>/dev/null || true
+                    cp -f /etc/skel/.config/hypr/hyprlock.conf "$target_hypr/hyprlock.conf" 2>/dev/null || true
+                    if [ ! -f "$target_hypr/hyprland.conf" ] || grep -q "X64 LIOS - Official Hyprland Desktop Configuration" "$target_hypr/hyprland.conf" 2>/dev/null; then
+                        cp -f /etc/skel/.config/hypr/hyprland.conf "$target_hypr/hyprland.conf" 2>/dev/null || true
+                    fi
+                fi
+
+                # NUNCA sobrescribir custom.lua si el usuario ya lo tiene
+                if [ ! -f "$target_hypr/custom.lua" ]; then
+                    cp -f /etc/skel/.config/hypr/custom.lua "$target_hypr/custom.lua" 2>/dev/null || true
+                fi
             fi
 
+            # 2. Quickshell QML Shell (~/.config/quickshell)
             if [ -d /etc/skel/.config/quickshell ]; then
+                # Si el usuario personalizó Theme.qml (cambió el color accent #ff2b2b), preservar su Theme.qml
+                local preserve_theme=0
+                if [ "$mode" = "upgrade" ] && [ -f "$target_qs/Theme.qml" ]; then
+                    if ! grep -q 'accent: "#ff2b2b"' "$target_qs/Theme.qml" 2>/dev/null; then
+                        preserve_theme=1
+                        cp -f "$target_qs/Theme.qml" "$target_qs/Theme.qml.user_keep" 2>/dev/null || true
+                    fi
+                fi
+
                 cp -rf /etc/skel/.config/quickshell/* "$target_qs/" 2>/dev/null || true
+
+                if [ "$preserve_theme" -eq 1 ] && [ -f "$target_qs/Theme.qml.user_keep" ]; then
+                    cp -f /etc/skel/.config/quickshell/Theme.qml "$target_qs/Theme.qml.pacnew" 2>/dev/null || true
+                    mv -f "$target_qs/Theme.qml.user_keep" "$target_qs/Theme.qml" 2>/dev/null || true
+                fi
             fi
 
             chown -R "$u:$g" "$target_hypr" "$target_qs" 2>/dev/null || true
@@ -24,7 +54,10 @@ post_install() {
     done
 }
 
-post_upgrade() {
-    post_install
+post_install() {
+    sync_user_configs "install"
 }
 
+post_upgrade() {
+    sync_user_configs "upgrade"
+}
