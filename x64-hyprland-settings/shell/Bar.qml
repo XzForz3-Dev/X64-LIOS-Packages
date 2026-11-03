@@ -204,7 +204,7 @@ PanelWindow {
     Rectangle {
         id: barBackground
         anchors.fill: parent
-        color: "#0a0b10e6" // Deep obsidian OLED glass
+        color: "#f20a0b10" // Deep obsidian OLED glass (Qt #AARRGGBB)
 
         // Top 1px specular highlight line
         Rectangle {
@@ -239,7 +239,7 @@ PanelWindow {
             implicitHeight: 24
             implicitWidth: navRow.implicitWidth + 8
             radius: 12
-            color: "#12131add"
+            color: "#f512131a"
             border.color: "#1affffff"
             border.width: 1
 
@@ -470,7 +470,7 @@ PanelWindow {
                     implicitHeight: 24
                     implicitWidth: Math.min(200, mprisRow.implicitWidth + 12)
                     radius: 12
-                    color: mprisArea.containsMouse ? "#1c1d26dd" : "#12131add"
+                    color: mprisArea.containsMouse ? "#fa1c1d26" : "#f512131a"
                     border.color: mprisArea.containsMouse ? Theme.accent : "#1affffff"
                     border.width: 1
 
@@ -527,7 +527,7 @@ PanelWindow {
                     implicitHeight: 24
                     implicitWidth: clockRow.implicitWidth + 16
                     radius: 12
-                    color: clockArea.containsMouse ? "#1e1f2bdd" : "#12131add"
+                    color: clockArea.containsMouse ? "#fa1e1f2b" : "#f512131a"
                     border.color: clockArea.containsMouse ? Theme.accent : "#1affffff"
                     border.width: 1
 
@@ -587,7 +587,7 @@ PanelWindow {
                     implicitHeight: 24
                     implicitWidth: recRow.implicitWidth + 14
                     radius: 12
-                    color: recArea.containsMouse ? Theme.accent : "#2a0b0fdd"
+                    color: recArea.containsMouse ? Theme.accent : "#f52a0b0f"
                     border.color: Theme.accent
                     border.width: 1
 
@@ -650,7 +650,7 @@ PanelWindow {
                     implicitHeight: 24
                     implicitWidth: telemetryRow.implicitWidth + 12
                     radius: 12
-                    color: teleArea.containsMouse ? "#1c1d26dd" : "#12131add"
+                    color: teleArea.containsMouse ? "#fa1c1d26" : "#f512131a"
                     border.color: teleArea.containsMouse ? Theme.borderAccent : "#1affffff"
                     border.width: 1
 
@@ -744,7 +744,7 @@ PanelWindow {
                     implicitHeight: 24
                     implicitWidth: systemRow.implicitWidth + 10
                     radius: 12
-                    color: "#12131add"
+                    color: "#f512131a"
                     border.color: "#1affffff"
                     border.width: 1
 

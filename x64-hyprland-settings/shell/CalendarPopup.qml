@@ -25,6 +25,7 @@ PanelWindow {
 
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-popup"
 
     // State for viewing month/year
     property date today: new Date()

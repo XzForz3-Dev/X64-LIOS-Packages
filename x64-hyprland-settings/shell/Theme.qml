@@ -2,12 +2,12 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    // Cyberpunk OLED Color Palette
+    // Cyberpunk OLED Color Palette (Qt6 #AARRGGBB format)
     readonly property color bgDark: "#08080a"
-    readonly property color bgGlass: "#0e0e13ee"
-    readonly property color bgCard: "#16161ecc"
-    readonly property color bgHover: "#252532dd"
-    readonly property color bgActive: "#323242ee"
+    readonly property color bgGlass: "#f50b0b10"
+    readonly property color bgCard: "#fa15151e"
+    readonly property color bgHover: "#ff222230"
+    readonly property color bgActive: "#ff2e2e40"
 
     // Accents (Crimson Neon)
     readonly property color accent: "#ff2b2b"
@@ -18,8 +18,8 @@ QtObject {
     readonly property color accentBorder: "#88ff2b2b"
 
     // Borders & Dividers
-    readonly property color borderGlass: "#22ffffff"
-    readonly property color borderSubtle: "#15ffffff"
+    readonly property color borderGlass: "#2affffff"
+    readonly property color borderSubtle: "#1cffffff"
     readonly property color borderAccent: "#88ff2b2b"
 
     // Text & Foregrounds
