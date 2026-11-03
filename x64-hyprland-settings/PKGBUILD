@@ -1,6 +1,6 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
@@ -10,13 +10,17 @@ source=(
     'hyprland.lua'
     'hyprland.conf'
     '01-monolith.jpg'
+    'x64-hyprland-scale'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
     echo "X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua)" > "${pkgdir}/usr/share/doc/${pkgname}/README"
+
+    # Install monitor scaling CLI engine
+    install -Dm755 "${srcdir}/x64-hyprland-scale" "${pkgdir}/usr/bin/x64-hyprland-scale"
 
     # Install skeleton and system-wide default configuration
     install -Dm644 "${srcdir}/hyprland.lua" "${pkgdir}/etc/skel/.config/hypr/hyprland.lua"

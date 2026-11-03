@@ -23,7 +23,7 @@ PanelWindow {
     }
 
     implicitWidth: 360
-    implicitHeight: 460
+    implicitHeight: 560
     color: "transparent"
 
     exclusionMode: ExclusionMode.Ignore
@@ -38,6 +38,16 @@ PanelWindow {
         }
     }
 
+    onVisibleChanged: {
+        if (visible) {
+            displayCard.refreshScale();
+        }
+    }
+
+    Component.onCompleted: {
+        displayCard.refreshScale();
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: Theme.radiusLg
@@ -48,7 +58,7 @@ PanelWindow {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 18
-            spacing: 14
+            spacing: 12
 
             // Header
             RowLayout {
@@ -113,7 +123,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec kitty");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("kitty")');
                             controlWindow.closeRequested();
                         }
                     }
@@ -142,7 +152,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec dolphin");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("dolphin")');
                             controlWindow.closeRequested();
                         }
                     }
@@ -161,7 +171,7 @@ PanelWindow {
                         anchors.fill: parent
                         anchors.margins: 10
                         spacing: 8
-                        Text { text: "󰍉"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
+                        Text { text: "󰍜"; font.family: Theme.fontMono; font.pixelSize: 16; color: Theme.accent }
                         Text { text: "X64 Hello"; font.family: Theme.fontSans; font.pixelSize: 12; color: Theme.textPrimary }
                     }
 
@@ -171,13 +181,13 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec x64-hello");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("x64-hello")');
                             controlWindow.closeRequested();
                         }
                     }
                 }
 
-                // Monitor / btop
+                // Btop System Monitor
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: 44
@@ -200,7 +210,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec kitty -e btop");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")');
                             controlWindow.closeRequested();
                         }
                     }
@@ -211,7 +221,7 @@ PanelWindow {
             Rectangle {
                 id: audioCard
                 Layout.fillWidth: true
-                implicitHeight: 80
+                implicitHeight: 76
                 radius: Theme.radiusSm
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
@@ -258,6 +268,132 @@ PanelWindow {
                 }
             }
 
+            // Display & Monitor Scaling Card (Sovereign Scaling Engine)
+            Rectangle {
+                id: displayCard
+                Layout.fillWidth: true
+                implicitHeight: 88
+                radius: Theme.radiusSm
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                property real currentScale: 1.0
+                property string currentMonitor: "Virtual-1"
+
+                Process {
+                    id: scaleQueryProc
+                    command: ["x64-hyprland-scale", "current"]
+                    stdout: StdioCollector {
+                        id: scaleCollector
+                        onStreamFinished: {
+                            if (!scaleCollector.text) return;
+                            var s = parseFloat(scaleCollector.text.trim());
+                            if (!isNaN(s) && s > 0) displayCard.currentScale = s;
+                        }
+                    }
+                }
+
+                Process {
+                    id: monQueryProc
+                    command: ["x64-hyprland-scale", "monitor"]
+                    stdout: StdioCollector {
+                        id: monCollector
+                        onStreamFinished: {
+                            if (!monCollector.text) return;
+                            var m = monCollector.text.trim();
+                            if (m !== "") displayCard.currentMonitor = m;
+                        }
+                    }
+                }
+
+                Process {
+                    id: scaleApplyProc
+                }
+
+                function refreshScale() {
+                    if (!scaleQueryProc.running) scaleQueryProc.running = true;
+                    if (!monQueryProc.running) monQueryProc.running = true;
+                }
+
+                function applyScale(sVal) {
+                    displayCard.currentScale = sVal;
+                    scaleApplyProc.command = ["x64-hyprland-scale", String(sVal)];
+                    scaleApplyProc.running = true;
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: "󰍹 Pantalla & Escalado"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: displayCard.currentMonitor + " (" + Math.round(displayCard.currentScale * 100) + "%)"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.accent
+                        }
+                    }
+
+                    // Quick Scale Preset Pills
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Repeater {
+                            model: [
+                                { label: "100%", val: 1.0 },
+                                { label: "125%", val: 1.25 },
+                                { label: "150%", val: 1.5 },
+                                { label: "200%", val: 2.0 }
+                            ]
+
+                            Rectangle {
+                                id: scaleBtn
+                                Layout.fillWidth: true
+                                implicitHeight: 28
+                                radius: Theme.radiusSm
+                                readonly property bool isActive: Math.abs(displayCard.currentScale - modelData.val) < 0.05
+                                color: isActive ? Theme.accentDim : (scaleBtnArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
+                                border.color: isActive ? Theme.accent : (scaleBtnArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
+                                border.width: 1
+
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: scaleBtn.isActive ? Theme.textPrimary : (scaleBtnArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
+                                }
+
+                                MouseArea {
+                                    id: scaleBtnArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: displayCard.applyScale(modelData.val)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Item { Layout.fillHeight: true }
 
             // Session / Power Buttons
@@ -287,7 +423,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec loginctl lock-session");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("loginctl lock-session")');
                             controlWindow.closeRequested();
                         }
                     }
@@ -315,7 +451,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec systemctl reboot");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl reboot")');
                             controlWindow.closeRequested();
                         }
                     }
@@ -343,7 +479,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("exec systemctl poweroff");
+                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl poweroff")');
                             controlWindow.closeRequested();
                         }
                     }
