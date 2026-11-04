@@ -11,20 +11,16 @@ PanelWindow {
 
     signal closeRequested()
 
-    property real morphProgress: 0.0
-    property real cardY: 14
-    property real cardScale: 0.2
-
     anchors {
         top: true
     }
 
     margins {
-        top: 4
+        top: 36
     }
 
     implicitWidth: 350
-    implicitHeight: cardLayout.implicitHeight + 32 + 38
+    implicitHeight: cardLayout.implicitHeight + 32
 
     color: "transparent"
 
@@ -47,31 +43,22 @@ PanelWindow {
         id: openAnim
         running: false
         NumberAnimation {
-            target: calWindow
-            property: "morphProgress"
-            from: 0.0
+            target: card
+            property: "scale"
+            from: 0.82
             to: 1.0
-            duration: 320
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
+            easing.overshoot: 1.4
         }
         NumberAnimation {
-            target: calWindow
-            property: "cardY"
-            from: 14
-            to: 34
-            duration: 320
+            target: card
+            property: "y"
+            from: -20
+            to: 0
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
-        }
-        NumberAnimation {
-            target: calWindow
-            property: "cardScale"
-            from: 0.2
-            to: 1.0
-            duration: 300
-            easing.type: Easing.OutBack
-            easing.overshoot: 1.3
+            easing.overshoot: 1.25
         }
         NumberAnimation {
             target: card
@@ -87,32 +74,25 @@ PanelWindow {
         id: closeAnim
         running: false
         NumberAnimation {
-            target: calWindow
-            property: "morphProgress"
-            to: 0.0
-            duration: 180
+            target: card
+            property: "scale"
+            to: 0.86
+            duration: 150
             easing.type: Easing.InBack
             easing.overshoot: 1.15
         }
         NumberAnimation {
-            target: calWindow
-            property: "cardY"
-            to: 14
-            duration: 180
+            target: card
+            property: "y"
+            to: -16
+            duration: 150
             easing.type: Easing.InQuad
-        }
-        NumberAnimation {
-            target: calWindow
-            property: "cardScale"
-            to: 0.2
-            duration: 180
-            easing.type: Easing.InBack
         }
         NumberAnimation {
             target: card
             property: "opacity"
             to: 0.0
-            duration: 140
+            duration: 130
             easing.type: Easing.InQuad
         }
         onFinished: calWindow.closeRequested()
@@ -180,42 +160,24 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) {
             calWindow.updateCalendar();
-            calWindow.morphProgress = 0.0;
-            calWindow.cardScale = 0.2;
-            calWindow.cardY = 14;
+            card.scale = 0.82;
+            card.y = -20;
             card.opacity = 0.0;
             openAnim.restart();
         } else {
-            calWindow.morphProgress = 0.0;
-            calWindow.cardScale = 1.0;
-            calWindow.cardY = 34;
+            card.scale = 1.0;
+            card.y = 0;
             card.opacity = 1.0;
         }
-    }
-
-    // Gooey liquid neck connecting the center clock pill to the calendar card
-    GooeyBridge {
-        id: bridge
-        anchors.fill: parent
-        originX: card.width / 2
-        originY: 24
-        botY: card.y + 4
-        topHalfW: 36
-        botHalfW: 64
-        morphProgress: calWindow.morphProgress
-        visible: calWindow.visible && card.opacity > 0.01
     }
 
     // Centered Cyberpunk Calendar Card with Jelly / Elastic Physics
     Rectangle {
         id: card
-        x: 0
-        y: calWindow.cardY
-        width: parent.width
-        height: parent.height - 38
+        anchors.fill: parent
         transformOrigin: Item.Top
-        scale: calWindow.cardScale
-        opacity: 0.0
+        scale: 1.0
+        opacity: 1.0
         radius: Theme.radiusMd
         color: Theme.bgGlass
         border.color: Theme.borderGlass

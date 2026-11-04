@@ -30,22 +30,18 @@ PanelWindow {
     property string statusMsg: ""
     property bool isBusy: false
 
-    property real morphProgress: 0.0
-    property real cardY: 14
-    property real cardScale: 0.2
-
     anchors {
         top: true
         right: true
     }
 
     margins {
-        top: 4
+        top: 36
         right: 96
     }
 
     implicitWidth: 356
-    implicitHeight: Math.min(cardLayout.implicitHeight + 30 + 38, (screen ? screen.height : 1080) - 20)
+    implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 50)
 
     color: "transparent"
 
@@ -72,31 +68,22 @@ PanelWindow {
         id: openAnim
         running: false
         NumberAnimation {
-            target: netWindow
-            property: "morphProgress"
-            from: 0.0
+            target: card
+            property: "scale"
+            from: 0.82
             to: 1.0
-            duration: 320
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
+            easing.overshoot: 1.4
         }
         NumberAnimation {
-            target: netWindow
-            property: "cardY"
-            from: 14
-            to: 34
-            duration: 320
+            target: card
+            property: "y"
+            from: -24
+            to: 0
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
-        }
-        NumberAnimation {
-            target: netWindow
-            property: "cardScale"
-            from: 0.2
-            to: 1.0
-            duration: 300
-            easing.type: Easing.OutBack
-            easing.overshoot: 1.3
+            easing.overshoot: 1.25
         }
         NumberAnimation {
             target: card
@@ -112,32 +99,25 @@ PanelWindow {
         id: closeAnim
         running: false
         NumberAnimation {
-            target: netWindow
-            property: "morphProgress"
-            to: 0.0
-            duration: 180
+            target: card
+            property: "scale"
+            to: 0.86
+            duration: 150
             easing.type: Easing.InBack
             easing.overshoot: 1.15
         }
         NumberAnimation {
-            target: netWindow
-            property: "cardY"
-            to: 14
-            duration: 180
+            target: card
+            property: "y"
+            to: -18
+            duration: 150
             easing.type: Easing.InQuad
-        }
-        NumberAnimation {
-            target: netWindow
-            property: "cardScale"
-            to: 0.2
-            duration: 180
-            easing.type: Easing.InBack
         }
         NumberAnimation {
             target: card
             property: "opacity"
             to: 0.0
-            duration: 140
+            duration: 130
             easing.type: Easing.InQuad
         }
         onFinished: {
@@ -223,42 +203,24 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) {
             netWindow.refreshNet(false);
-            netWindow.morphProgress = 0.0;
-            netWindow.cardScale = 0.2;
-            netWindow.cardY = 14;
+            card.scale = 0.82;
+            card.y = -24;
             card.opacity = 0.0;
             openAnim.restart();
         } else {
-            netWindow.morphProgress = 0.0;
-            netWindow.cardScale = 1.0;
-            netWindow.cardY = 34;
+            card.scale = 1.0;
+            card.y = 0;
             card.opacity = 1.0;
         }
-    }
-
-    // Gooey liquid neck connecting Island 3B network indicator to card
-    GooeyBridge {
-        id: bridge
-        anchors.fill: parent
-        originX: card.width - 40
-        originY: 24
-        botY: card.y + 4
-        topHalfW: 24
-        botHalfW: 48
-        morphProgress: netWindow.morphProgress
-        visible: netWindow.visible && card.opacity > 0.01
     }
 
     // Network Popup Card anchored below Island 3B Network Indicator with Jelly / Elastic Physics
     Rectangle {
         id: card
-        x: 0
-        y: netWindow.cardY
-        width: parent.width
-        height: parent.height - 38
+        anchors.fill: parent
         transformOrigin: Item.TopRight
-        scale: netWindow.cardScale
-        opacity: 0.0
+        scale: 1.0
+        opacity: 1.0
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass

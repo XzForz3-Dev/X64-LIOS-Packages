@@ -45,22 +45,18 @@ PanelWindow {
         { "name": "systemd",    "cpu": "0.1%", "mem": "24 MB" }
     ]
 
-    property real morphProgress: 0.0
-    property real cardY: 14
-    property real cardScale: 0.2
-
     anchors {
         top: true
         right: true
     }
 
     margins {
-        top: 4
+        top: 36
         right: 175
     }
 
     implicitWidth: 370
-    implicitHeight: cardLayout.implicitHeight + 30 + 38
+    implicitHeight: cardLayout.implicitHeight + 30
 
     color: "transparent"
 
@@ -83,31 +79,22 @@ PanelWindow {
         id: openAnim
         running: false
         NumberAnimation {
-            target: teleWindow
-            property: "morphProgress"
-            from: 0.0
+            target: card
+            property: "scale"
+            from: 0.82
             to: 1.0
-            duration: 320
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
+            easing.overshoot: 1.4
         }
         NumberAnimation {
-            target: teleWindow
-            property: "cardY"
-            from: 14
-            to: 34
-            duration: 320
+            target: card
+            property: "y"
+            from: -24
+            to: 0
+            duration: 270
             easing.type: Easing.OutBack
-            easing.overshoot: 1.35
-        }
-        NumberAnimation {
-            target: teleWindow
-            property: "cardScale"
-            from: 0.2
-            to: 1.0
-            duration: 300
-            easing.type: Easing.OutBack
-            easing.overshoot: 1.3
+            easing.overshoot: 1.25
         }
         NumberAnimation {
             target: card
@@ -123,32 +110,25 @@ PanelWindow {
         id: closeAnim
         running: false
         NumberAnimation {
-            target: teleWindow
-            property: "morphProgress"
-            to: 0.0
-            duration: 180
+            target: card
+            property: "scale"
+            to: 0.86
+            duration: 150
             easing.type: Easing.InBack
             easing.overshoot: 1.15
         }
         NumberAnimation {
-            target: teleWindow
-            property: "cardY"
-            to: 14
-            duration: 180
+            target: card
+            property: "y"
+            to: -18
+            duration: 150
             easing.type: Easing.InQuad
-        }
-        NumberAnimation {
-            target: teleWindow
-            property: "cardScale"
-            to: 0.2
-            duration: 180
-            easing.type: Easing.InBack
         }
         NumberAnimation {
             target: card
             property: "opacity"
             to: 0.0
-            duration: 140
+            duration: 130
             easing.type: Easing.InQuad
         }
         onFinished: teleWindow.closeRequested()
@@ -217,42 +197,24 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) {
             if (!statusProc.running) statusProc.running = true;
-            teleWindow.morphProgress = 0.0;
-            teleWindow.cardScale = 0.2;
-            teleWindow.cardY = 14;
+            card.scale = 0.82;
+            card.y = -24;
             card.opacity = 0.0;
             openAnim.restart();
         } else {
-            teleWindow.morphProgress = 0.0;
-            teleWindow.cardScale = 1.0;
-            teleWindow.cardY = 34;
+            card.scale = 1.0;
+            card.y = 0;
             card.opacity = 1.0;
         }
-    }
-
-    // Gooey liquid neck connecting Island 3A to telemetry card
-    GooeyBridge {
-        id: bridge
-        anchors.fill: parent
-        originX: card.width / 2
-        originY: 24
-        botY: card.y + 4
-        topHalfW: 30
-        botHalfW: 55
-        morphProgress: teleWindow.morphProgress
-        visible: teleWindow.visible && card.opacity > 0.01
     }
 
     // Telemetry Cockpit Card pinned below Island 3A with Jelly / Elastic Physics
     Rectangle {
         id: card
-        x: 0
-        y: teleWindow.cardY
-        width: parent.width
-        height: parent.height - 38
-        transformOrigin: Item.Top
-        scale: teleWindow.cardScale
-        opacity: 0.0
+        anchors.fill: parent
+        transformOrigin: Item.TopRight
+        scale: 1.0
+        opacity: 1.0
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass

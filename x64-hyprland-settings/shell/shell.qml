@@ -155,11 +155,6 @@ ShellRoot {
     Bar {
         id: mainBar
 
-        controlOpen: controlCenter.visible
-        calendarOpen: calendarPopup.visible
-        telemetryOpen: telemetryPopup.visible
-        networkOpen: networkPopup.visible
-
         onToggleLauncher: {
             launcher.visible = !launcher.visible;
             if (launcher.visible) root.closeAllExcept("launcher");

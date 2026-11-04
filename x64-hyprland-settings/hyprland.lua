@@ -31,7 +31,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1 &")
 
     -- Monolith 4K Wallpaper Daemon
-    hl.exec_cmd("killall swaybg 2>/dev/null; WP=$(cat ~/.config/x64-lios/wallpaper 2>/dev/null || echo '/usr/share/backgrounds/x64-lios/01-monolith.jpg'); swaybg -i \"$WP\" -m fill &")
+    hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
 
     -- Quickshell Cyberpunk Desktop Shell (Top Bar, App Launcher, Control Center, OSD)
     hl.exec_cmd("killall quickshell 2>/dev/null; QT_QUICK_BACKEND=software quickshell -n &")
@@ -168,12 +168,11 @@ hl.window_rule({
     center = true,
 })
 
--- Quickshell Surface Frosted Glass Blur
+-- Quickshell Surface Blur
 hl.layer_rule({
-    name         = "quickshell-blur",
-    match        = { namespace = "^quickshell.*" },
-    blur         = true,
-    ignore_alpha = 0.05,
+    name  = "quickshell-blur",
+    match = { namespace = "^quickshell$" },
+    blur  = true,
 })
 
 ---------------------

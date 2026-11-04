@@ -81,12 +81,6 @@ QtObject {
     readonly property string audioMuted: isEs ? "󰝟 Audio Silenciado" : "󰝟 Audio Muted"
     readonly property string displayBrightness: isEs ? "󰃠 Brillo de Pantalla" : "󰃠 Display Brightness"
 
-    // Media Player & Wallpapers
-    readonly property string mediaNowPlaying: isEs ? "󰎆 REPRODUCTOR MULTIMEDIA" : "󰎆 MEDIA PLAYER"
-    readonly property string mediaNoActive: isEs ? "Sin reproducción activa" : "No active playback"
-    readonly property string wallpapersTitle: isEs ? "󰸉 FONDOS Y ESTILO" : "󰸉 WALLPAPERS & STYLE"
-    readonly property string wallpaperApplied: isEs ? "Fondo aplicado" : "Wallpaper applied"
-
     // Power Profiles & Smart Battery
     readonly property string powerProfile: isEs ? "󰾅 Perfil de Energía" : "󰾅 Power Profile"
     readonly property string acDirect: isEs ? "󰚥 AC Directo" : "󰚥 Direct AC"

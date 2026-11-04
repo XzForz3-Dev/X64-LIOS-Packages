@@ -20,10 +20,6 @@ PanelWindow {
     signal brightnessChangedOsd(int val)
 
     property bool trayExpanded: true
-    property bool controlOpen: false
-    property bool calendarOpen: false
-    property bool telemetryOpen: false
-    property bool networkOpen: false
 
     anchors {
         top: true
@@ -1296,17 +1292,16 @@ PanelWindow {
                             implicitWidth: 20
                             implicitHeight: 18
                             radius: 9
-                            color: (barWindow.controlOpen || ctrlArea.containsMouse) ? "#33ff2b2b" : "transparent"
+                            color: ctrlArea.containsMouse ? "#25ffffff" : "transparent"
                             scale: ctrlArea.pressed ? 0.84 : (ctrlArea.containsMouse ? 1.15 : 1.0)
                             Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
-                            Behavior on color { ColorAnimation { duration: 150 } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰍜"
                                 font.family: Theme.fontMono
                                 font.pixelSize: 11
-                                color: (barWindow.controlOpen || ctrlArea.containsMouse) ? Theme.accent : Theme.textPrimary
+                                color: ctrlArea.containsMouse ? Theme.accent : Theme.textPrimary
                             }
 
                             MouseArea {

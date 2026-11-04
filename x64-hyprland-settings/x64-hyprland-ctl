@@ -867,66 +867,6 @@ cmd_net() {
     esac
 }
 
-# -----------------------------------------------------------------------------
-# 6. DYNAMIC WALLPAPER SELECTION (SWAYBG ENGINE)
-# -----------------------------------------------------------------------------
-cmd_wallpaper() {
-    local action="${1:-get}"
-    local cfg_dir="${HOME}/.config/x64-lios"
-    local wp_file="${cfg_dir}/wallpaper"
-    local default_wp="/usr/share/backgrounds/x64-lios/01-monolith.jpg"
-
-    case "$action" in
-        get)
-            if [ -f "$wp_file" ]; then
-                cat "$wp_file"
-            else
-                echo "$default_wp"
-            fi
-            ;;
-        set)
-            local target="${2:-}"
-            if [ -z "$target" ]; then
-                echo "$default_wp"
-                return
-            fi
-            if [[ "$target" != /* ]]; then
-                target="/usr/share/backgrounds/x64-lios/${target}"
-            fi
-            if [ -f "$target" ]; then
-                mkdir -p "$cfg_dir"
-                echo "$target" > "$wp_file"
-                killall swaybg 2>/dev/null || true
-                nohup swaybg -i "$target" -m fill </dev/null >/dev/null 2>&1 &
-                disown
-                local base_name
-                base_name=$(basename "$target")
-                if [ "$IS_ES" -eq 1 ]; then
-                    notify_user "Fondo de Pantalla" "Fondo aplicado: ${base_name}" "Fondo de Pantalla"
-                else
-                    notify_user "Wallpaper Updated" "Applied wallpaper: ${base_name}" "Wallpaper Updated"
-                fi
-                echo "$target"
-            else
-                echo "Error: file not found: $target" >&2
-                return 1
-            fi
-            ;;
-        list)
-            cat << 'EOF'
-[
-  {"id":"01-monolith","name":"01 Monolith","file":"01-monolith.jpg","path":"/usr/share/backgrounds/x64-lios/01-monolith.jpg"},
-  {"id":"02-v3-carbon","name":"02 Carbon","file":"02-v3-carbon.jpg","path":"/usr/share/backgrounds/x64-lios/02-v3-carbon.jpg"},
-  {"id":"03-v2-shield","name":"03 Shield","file":"03-v2-shield.jpg","path":"/usr/share/backgrounds/x64-lios/03-v2-shield.jpg"},
-  {"id":"04-hybrid-plate","name":"04 Hybrid","file":"04-hybrid-plate.jpg","path":"/usr/share/backgrounds/x64-lios/04-hybrid-plate.jpg"},
-  {"id":"05-faceted-armor","name":"05 Armor","file":"05-faceted-armor.jpg","path":"/usr/share/backgrounds/x64-lios/05-faceted-armor.jpg"},
-  {"id":"06-stealth-dark","name":"06 Stealth","file":"06-stealth-dark.jpg","path":"/usr/share/backgrounds/x64-lios/06-stealth-dark.jpg"}
-]
-EOF
-            ;;
-    esac
-}
-
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -938,7 +878,6 @@ case "${1:-status}" in
     record-worker)     cmd_record_worker "${2:-fullscreen}" "${3:-desktop}" ;;
     screenshot)        cmd_screenshot "${2:-full}" ;;
     screenshot-worker) cmd_screenshot_worker "${2:-full}" ;;
-    wallpaper)  shift; cmd_wallpaper "$@" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac
