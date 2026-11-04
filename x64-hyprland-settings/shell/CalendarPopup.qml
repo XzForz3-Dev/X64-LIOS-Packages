@@ -11,16 +11,20 @@ PanelWindow {
 
     signal closeRequested()
 
+    property real morphProgress: 0.0
+    property real cardY: 14
+    property real cardScale: 0.2
+
     anchors {
         top: true
     }
 
     margins {
-        top: 36
+        top: 4
     }
 
     implicitWidth: 350
-    implicitHeight: cardLayout.implicitHeight + 32
+    implicitHeight: cardLayout.implicitHeight + 32 + 38
 
     color: "transparent"
 
@@ -43,22 +47,31 @@ PanelWindow {
         id: openAnim
         running: false
         NumberAnimation {
-            target: card
-            property: "scale"
-            from: 0.82
+            target: calWindow
+            property: "morphProgress"
+            from: 0.0
             to: 1.0
-            duration: 270
+            duration: 320
             easing.type: Easing.OutBack
-            easing.overshoot: 1.4
+            easing.overshoot: 1.35
         }
         NumberAnimation {
-            target: card
-            property: "y"
-            from: -20
-            to: 0
-            duration: 270
+            target: calWindow
+            property: "cardY"
+            from: 14
+            to: 34
+            duration: 320
             easing.type: Easing.OutBack
-            easing.overshoot: 1.25
+            easing.overshoot: 1.35
+        }
+        NumberAnimation {
+            target: calWindow
+            property: "cardScale"
+            from: 0.2
+            to: 1.0
+            duration: 300
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.3
         }
         NumberAnimation {
             target: card
@@ -74,25 +87,32 @@ PanelWindow {
         id: closeAnim
         running: false
         NumberAnimation {
-            target: card
-            property: "scale"
-            to: 0.86
-            duration: 150
+            target: calWindow
+            property: "morphProgress"
+            to: 0.0
+            duration: 180
             easing.type: Easing.InBack
             easing.overshoot: 1.15
         }
         NumberAnimation {
-            target: card
-            property: "y"
-            to: -16
-            duration: 150
+            target: calWindow
+            property: "cardY"
+            to: 14
+            duration: 180
             easing.type: Easing.InQuad
+        }
+        NumberAnimation {
+            target: calWindow
+            property: "cardScale"
+            to: 0.2
+            duration: 180
+            easing.type: Easing.InBack
         }
         NumberAnimation {
             target: card
             property: "opacity"
             to: 0.0
-            duration: 130
+            duration: 140
             easing.type: Easing.InQuad
         }
         onFinished: calWindow.closeRequested()
@@ -160,24 +180,42 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) {
             calWindow.updateCalendar();
-            card.scale = 0.82;
-            card.y = -20;
+            calWindow.morphProgress = 0.0;
+            calWindow.cardScale = 0.2;
+            calWindow.cardY = 14;
             card.opacity = 0.0;
             openAnim.restart();
         } else {
-            card.scale = 1.0;
-            card.y = 0;
+            calWindow.morphProgress = 0.0;
+            calWindow.cardScale = 1.0;
+            calWindow.cardY = 34;
             card.opacity = 1.0;
         }
+    }
+
+    // Gooey liquid neck connecting the center clock pill to the calendar card
+    GooeyBridge {
+        id: bridge
+        anchors.fill: parent
+        originX: card.width / 2
+        originY: 24
+        botY: card.y + 4
+        topHalfW: 36
+        botHalfW: 64
+        morphProgress: calWindow.morphProgress
+        visible: calWindow.visible && card.opacity > 0.01
     }
 
     // Centered Cyberpunk Calendar Card with Jelly / Elastic Physics
     Rectangle {
         id: card
-        anchors.fill: parent
+        x: 0
+        y: calWindow.cardY
+        width: parent.width
+        height: parent.height - 38
         transformOrigin: Item.Top
-        scale: 1.0
-        opacity: 1.0
+        scale: calWindow.cardScale
+        opacity: 0.0
         radius: Theme.radiusMd
         color: Theme.bgGlass
         border.color: Theme.borderGlass

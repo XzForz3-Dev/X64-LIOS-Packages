@@ -31,18 +31,22 @@ PanelWindow {
     property string powerProfile: "balanced"
     property int brightnessVal: 100
 
+    property real morphProgress: 0.0
+    property real cardY: 14
+    property real cardScale: 0.2
+
     anchors {
         top: true
         right: true
     }
 
     margins {
-        top: 36
-        right: 8
+        top: 4
+        right: 6
     }
 
     implicitWidth: 388
-    implicitHeight: Math.min((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 790 : 730, (screen ? screen.height : 1080) - 50)
+    implicitHeight: Math.min(((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 790 : 730) + 38, (screen ? screen.height : 1080) - 20)
 
     color: "transparent"
 
@@ -65,22 +69,31 @@ PanelWindow {
         id: openAnim
         running: false
         NumberAnimation {
-            target: card
-            property: "scale"
-            from: 0.82
+            target: controlWindow
+            property: "morphProgress"
+            from: 0.0
             to: 1.0
-            duration: 270
+            duration: 320
             easing.type: Easing.OutBack
-            easing.overshoot: 1.4
+            easing.overshoot: 1.35
         }
         NumberAnimation {
-            target: card
-            property: "y"
-            from: -24
-            to: 0
-            duration: 270
+            target: controlWindow
+            property: "cardY"
+            from: 14
+            to: 34
+            duration: 320
             easing.type: Easing.OutBack
-            easing.overshoot: 1.25
+            easing.overshoot: 1.35
+        }
+        NumberAnimation {
+            target: controlWindow
+            property: "cardScale"
+            from: 0.2
+            to: 1.0
+            duration: 300
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.3
         }
         NumberAnimation {
             target: card
@@ -96,25 +109,32 @@ PanelWindow {
         id: closeAnim
         running: false
         NumberAnimation {
-            target: card
-            property: "scale"
-            to: 0.86
-            duration: 150
+            target: controlWindow
+            property: "morphProgress"
+            to: 0.0
+            duration: 180
             easing.type: Easing.InBack
             easing.overshoot: 1.15
         }
         NumberAnimation {
-            target: card
-            property: "y"
-            to: -18
-            duration: 150
+            target: controlWindow
+            property: "cardY"
+            to: 14
+            duration: 180
             easing.type: Easing.InQuad
+        }
+        NumberAnimation {
+            target: controlWindow
+            property: "cardScale"
+            to: 0.2
+            duration: 180
+            easing.type: Easing.InBack
         }
         NumberAnimation {
             target: card
             property: "opacity"
             to: 0.0
-            duration: 130
+            duration: 140
             easing.type: Easing.InQuad
         }
         onFinished: {
@@ -196,13 +216,15 @@ PanelWindow {
     onVisibleChanged: {
         if (visible) {
             controlWindow.refreshAll();
-            card.scale = 0.82;
-            card.y = -24;
+            controlWindow.morphProgress = 0.0;
+            controlWindow.cardScale = 0.2;
+            controlWindow.cardY = 14;
             card.opacity = 0.0;
             openAnim.restart();
         } else {
-            card.scale = 1.0;
-            card.y = 0;
+            controlWindow.morphProgress = 0.0;
+            controlWindow.cardScale = 1.0;
+            controlWindow.cardY = 34;
             card.opacity = 1.0;
         }
     }
@@ -310,13 +332,29 @@ PanelWindow {
         }
     }
 
+    // Gooey liquid neck connecting the bar capsule to the card
+    GooeyBridge {
+        id: bridge
+        anchors.fill: parent
+        originX: card.width - 42
+        originY: 24
+        botY: card.y + 4
+        topHalfW: 24
+        botHalfW: 48
+        morphProgress: controlWindow.morphProgress
+        visible: controlWindow.visible && card.opacity > 0.01
+    }
+
     // Control Center Card pinned to top right with Frosted Glass & Elastic Physics
     Rectangle {
         id: card
-        anchors.fill: parent
+        x: 0
+        y: controlWindow.cardY
+        width: parent.width
+        height: parent.height - 38
         transformOrigin: Item.TopRight
-        scale: 1.0
-        opacity: 1.0
+        scale: controlWindow.cardScale
+        opacity: 0.0
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass

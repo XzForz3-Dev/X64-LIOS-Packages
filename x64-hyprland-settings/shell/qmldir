@@ -1,5 +1,6 @@
 singleton Theme 1.0 Theme.qml
 singleton I18n 1.0 I18n.qml
+GooeyBridge 1.0 GooeyBridge.qml
 Bar 1.0 Bar.qml
 AppLauncher 1.0 AppLauncher.qml
 ControlCenter 1.0 ControlCenter.qml
