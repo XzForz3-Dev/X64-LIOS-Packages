@@ -31,7 +31,71 @@ PanelWindow {
     HyprlandFocusGrab {
         active: calWindow.visible
         windows: [calWindow]
-        onCleared: calWindow.closeRequested()
+        onCleared: calWindow.closeAnimated()
+    }
+
+    function closeAnimated() {
+        if (closeAnim.running) return;
+        closeAnim.restart();
+    }
+
+    ParallelAnimation {
+        id: openAnim
+        running: false
+        NumberAnimation {
+            target: card
+            property: "scale"
+            from: 0.82
+            to: 1.0
+            duration: 270
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.4
+        }
+        NumberAnimation {
+            target: card
+            property: "y"
+            from: -20
+            to: 0
+            duration: 270
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.25
+        }
+        NumberAnimation {
+            target: card
+            property: "opacity"
+            from: 0.0
+            to: 1.0
+            duration: 180
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    ParallelAnimation {
+        id: closeAnim
+        running: false
+        NumberAnimation {
+            target: card
+            property: "scale"
+            to: 0.86
+            duration: 150
+            easing.type: Easing.InBack
+            easing.overshoot: 1.15
+        }
+        NumberAnimation {
+            target: card
+            property: "y"
+            to: -16
+            duration: 150
+            easing.type: Easing.InQuad
+        }
+        NumberAnimation {
+            target: card
+            property: "opacity"
+            to: 0.0
+            duration: 130
+            easing.type: Easing.InQuad
+        }
+        onFinished: calWindow.closeRequested()
     }
 
     // State for viewing month/year
@@ -93,10 +157,27 @@ PanelWindow {
     onViewMonthChanged: updateCalendar()
     onViewYearChanged: updateCalendar()
 
-    // Centered Cyberpunk Calendar Card
+    onVisibleChanged: {
+        if (visible) {
+            calWindow.updateCalendar();
+            card.scale = 0.82;
+            card.y = -20;
+            card.opacity = 0.0;
+            openAnim.restart();
+        } else {
+            card.scale = 1.0;
+            card.y = 0;
+            card.opacity = 1.0;
+        }
+    }
+
+    // Centered Cyberpunk Calendar Card with Jelly / Elastic Physics
     Rectangle {
         id: card
         anchors.fill: parent
+        transformOrigin: Item.Top
+        scale: 1.0
+        opacity: 1.0
         radius: Theme.radiusMd
         color: Theme.bgGlass
         border.color: Theme.borderGlass

@@ -55,6 +55,73 @@ PanelWindow {
         windows: [netWindow]
         onCleared: {
             netWindow.passwordSsid = "";
+            netWindow.closeAnimated();
+        }
+    }
+
+    function closeAnimated() {
+        if (closeAnim.running) return;
+        closeAnim.restart();
+    }
+
+    ParallelAnimation {
+        id: openAnim
+        running: false
+        NumberAnimation {
+            target: card
+            property: "scale"
+            from: 0.82
+            to: 1.0
+            duration: 270
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.4
+        }
+        NumberAnimation {
+            target: card
+            property: "y"
+            from: -24
+            to: 0
+            duration: 270
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.25
+        }
+        NumberAnimation {
+            target: card
+            property: "opacity"
+            from: 0.0
+            to: 1.0
+            duration: 180
+            easing.type: Easing.OutCubic
+        }
+    }
+
+    ParallelAnimation {
+        id: closeAnim
+        running: false
+        NumberAnimation {
+            target: card
+            property: "scale"
+            to: 0.86
+            duration: 150
+            easing.type: Easing.InBack
+            easing.overshoot: 1.15
+        }
+        NumberAnimation {
+            target: card
+            property: "y"
+            to: -18
+            duration: 150
+            easing.type: Easing.InQuad
+        }
+        NumberAnimation {
+            target: card
+            property: "opacity"
+            to: 0.0
+            duration: 130
+            easing.type: Easing.InQuad
+        }
+        onFinished: {
+            netWindow.passwordSsid = "";
             netWindow.closeRequested();
         }
     }
@@ -133,10 +200,27 @@ PanelWindow {
         onTriggered: netWindow.refreshNet(false)
     }
 
-    // Network Popup Card anchored below Island 3B Network Indicator
+    onVisibleChanged: {
+        if (visible) {
+            netWindow.refreshNet(false);
+            card.scale = 0.82;
+            card.y = -24;
+            card.opacity = 0.0;
+            openAnim.restart();
+        } else {
+            card.scale = 1.0;
+            card.y = 0;
+            card.opacity = 1.0;
+        }
+    }
+
+    // Network Popup Card anchored below Island 3B Network Indicator with Jelly / Elastic Physics
     Rectangle {
         id: card
         anchors.fill: parent
+        transformOrigin: Item.TopRight
+        scale: 1.0
+        opacity: 1.0
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
@@ -230,7 +314,7 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             netWindow.passwordSsid = "";
-                            netWindow.closeRequested();
+                            netWindow.closeAnimated();
                         }
                     }
                 }

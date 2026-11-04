@@ -293,6 +293,8 @@ PanelWindow {
                         implicitHeight: 20
                         radius: 10
                         color: brandArea.containsMouse ? "#22ff2b2b" : "transparent"
+                        scale: brandArea.pressed ? 0.90 : (brandArea.containsMouse ? 1.05 : 1.0)
+                        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
                         Behavior on color { ColorAnimation { duration: 150 } }
 
                         RowLayout {
@@ -568,6 +570,8 @@ PanelWindow {
                     color: clockArea.containsMouse ? "#fa1e1f2b" : "#f512131a"
                     border.color: clockArea.containsMouse ? Theme.accent : "#1affffff"
                     border.width: 1
+                    scale: clockArea.pressed ? 0.92 : (clockArea.containsMouse ? 1.03 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
 
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -691,6 +695,8 @@ PanelWindow {
                     color: teleArea.containsMouse ? "#fa1c1d26" : "#f512131a"
                     border.color: teleArea.containsMouse ? Theme.borderAccent : "#1affffff"
                     border.width: 1
+                    scale: teleArea.pressed ? 0.92 : (teleArea.containsMouse ? 1.03 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
 
                     RowLayout {
                         id: telemetryRow
@@ -934,6 +940,8 @@ PanelWindow {
                             implicitHeight: 18
                             radius: 9
                             color: netArea.containsMouse ? "#20ffffff" : "transparent"
+                            scale: netArea.pressed ? 0.88 : (netArea.containsMouse ? 1.08 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
 
                             RowLayout {
                                 id: netRow
@@ -1285,6 +1293,8 @@ PanelWindow {
                             implicitHeight: 18
                             radius: 9
                             color: ctrlArea.containsMouse ? "#25ffffff" : "transparent"
+                            scale: ctrlArea.pressed ? 0.84 : (ctrlArea.containsMouse ? 1.15 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
 
                             Text {
                                 anchors.centerIn: parent
@@ -1313,6 +1323,8 @@ PanelWindow {
                             implicitHeight: 18
                             radius: 9
                             color: pwrArea.containsMouse ? Theme.accent : "transparent"
+                            scale: pwrArea.pressed ? 0.84 : (pwrArea.containsMouse ? 1.15 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
                             Behavior on color { ColorAnimation { duration: 150 } }
 
                             Text {

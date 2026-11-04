@@ -36,8 +36,12 @@ ShellRoot {
         target: "calendar"
 
         function toggle() {
-            calendarPopup.visible = !calendarPopup.visible;
-            if (calendarPopup.visible) root.closeAllExcept("calendar");
+            if (calendarPopup.visible) {
+                calendarPopup.closeAnimated();
+            } else {
+                calendarPopup.visible = true;
+                root.closeAllExcept("calendar");
+            }
         }
 
         function open() {
@@ -46,7 +50,7 @@ ShellRoot {
         }
 
         function close() {
-            calendarPopup.visible = false;
+            calendarPopup.closeAnimated();
         }
     }
 
@@ -54,8 +58,12 @@ ShellRoot {
         target: "control"
 
         function toggle() {
-            controlCenter.visible = !controlCenter.visible;
-            if (controlCenter.visible) root.closeAllExcept("control");
+            if (controlCenter.visible) {
+                controlCenter.closeAnimated();
+            } else {
+                controlCenter.visible = true;
+                root.closeAllExcept("control");
+            }
         }
 
         function open() {
@@ -64,7 +72,7 @@ ShellRoot {
         }
 
         function close() {
-            controlCenter.visible = false;
+            controlCenter.closeAnimated();
         }
 
         function recordMenu() {
@@ -78,8 +86,12 @@ ShellRoot {
         target: "telemetry"
 
         function toggle() {
-            telemetryPopup.visible = !telemetryPopup.visible;
-            if (telemetryPopup.visible) root.closeAllExcept("telemetry");
+            if (telemetryPopup.visible) {
+                telemetryPopup.closeAnimated();
+            } else {
+                telemetryPopup.visible = true;
+                root.closeAllExcept("telemetry");
+            }
         }
 
         function open() {
@@ -88,7 +100,7 @@ ShellRoot {
         }
 
         function close() {
-            telemetryPopup.visible = false;
+            telemetryPopup.closeAnimated();
         }
     }
 
@@ -96,8 +108,12 @@ ShellRoot {
         target: "network"
 
         function toggle() {
-            networkPopup.visible = !networkPopup.visible;
-            if (networkPopup.visible) root.closeAllExcept("network");
+            if (networkPopup.visible) {
+                networkPopup.closeAnimated();
+            } else {
+                networkPopup.visible = true;
+                root.closeAllExcept("network");
+            }
         }
 
         function open() {
@@ -106,7 +122,7 @@ ShellRoot {
         }
 
         function close() {
-            networkPopup.visible = false;
+            networkPopup.closeAnimated();
         }
     }
 
@@ -145,28 +161,48 @@ ShellRoot {
         }
 
         onToggleCalendar: {
-            calendarPopup.visible = !calendarPopup.visible;
-            if (calendarPopup.visible) root.closeAllExcept("calendar");
+            if (calendarPopup.visible) {
+                calendarPopup.closeAnimated();
+            } else {
+                calendarPopup.visible = true;
+                root.closeAllExcept("calendar");
+            }
         }
 
         onToggleControl: {
-            controlCenter.visible = !controlCenter.visible;
-            if (controlCenter.visible) root.closeAllExcept("control");
+            if (controlCenter.visible) {
+                controlCenter.closeAnimated();
+            } else {
+                controlCenter.visible = true;
+                root.closeAllExcept("control");
+            }
         }
 
         onTogglePower: {
-            controlCenter.visible = !controlCenter.visible;
-            if (controlCenter.visible) root.closeAllExcept("control");
+            if (controlCenter.visible) {
+                controlCenter.closeAnimated();
+            } else {
+                controlCenter.visible = true;
+                root.closeAllExcept("control");
+            }
         }
 
         onToggleTelemetry: {
-            telemetryPopup.visible = !telemetryPopup.visible;
-            if (telemetryPopup.visible) root.closeAllExcept("telemetry");
+            if (telemetryPopup.visible) {
+                telemetryPopup.closeAnimated();
+            } else {
+                telemetryPopup.visible = true;
+                root.closeAllExcept("telemetry");
+            }
         }
 
         onToggleNetwork: {
-            networkPopup.visible = !networkPopup.visible;
-            if (networkPopup.visible) root.closeAllExcept("network");
+            if (networkPopup.visible) {
+                networkPopup.closeAnimated();
+            } else {
+                networkPopup.visible = true;
+                root.closeAllExcept("network");
+            }
         }
 
         onBrightnessChangedOsd: (val) => {
