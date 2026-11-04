@@ -1,6 +1,6 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=28
+pkgrel=29
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
@@ -12,10 +12,15 @@ source=(
     'hyprland.conf'
     'hyprlock.conf'
     '01-monolith.jpg'
+    '02-v3-carbon.jpg'
+    '03-v2-shield.jpg'
+    '04-hybrid-plate.jpg'
+    '05-faceted-armor.jpg'
+    '06-stealth-dark.jpg'
     'x64-hyprland-scale'
     'x64-hyprland-ctl'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
@@ -36,8 +41,12 @@ package() {
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/skel/.config/hypr/hyprlock.conf"
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/xdg/hypr/hyprlock.conf"
 
-    # Install 4K Monolith Wallpaper
-    install -Dm644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
+    # Install Official 4K Wallpapers
+    local wp_dir="${pkgdir}/usr/share/backgrounds/x64-lios"
+    mkdir -p "${wp_dir}"
+    for wp in 01-monolith.jpg 02-v3-carbon.jpg 03-v2-shield.jpg 04-hybrid-plate.jpg 05-faceted-armor.jpg 06-stealth-dark.jpg; do
+        install -Dm644 "${srcdir}/${wp}" "${wp_dir}/${wp}"
+    done
 
     # Install Quickshell Desktop Shell to /usr/share and /etc/skel
     local qs_dir="${pkgdir}/usr/share/x64-hyprland/shell"

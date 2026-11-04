@@ -9,8 +9,11 @@ import QtQuick
 QtObject {
     // Cyberpunk OLED Color Palette (Qt6 #AARRGGBB format)
     readonly property color bgDark: "#08080a"
-    readonly property color bgGlass: "#f50b0b10"
-    readonly property color bgCard: "#fa15151e"
+    readonly property color bgGlass: "#cc0b0b12"         // ~80% opacity dark obsidian frosted glass
+    readonly property color bgCard: "#22ffffff"          // translucent surface container
+    readonly property color bgCardSolid: "#15161e"
+    readonly property color bgContainer: "#101117"
+    readonly property color bgPillTrack: "#1a1b24"
     readonly property color bgHover: "#ff222230"
     readonly property color bgActive: "#ff2e2e40"
 
@@ -23,19 +26,20 @@ QtObject {
     readonly property color accentBorder: "#88ff2b2b"
 
     // Borders & Dividers
-    readonly property color borderGlass: "#2affffff"
-    readonly property color borderSubtle: "#1cffffff"
+    readonly property color borderGlass: "#28ffffff"     // delicate 1px translucent border
+    readonly property color borderSubtle: "#16ffffff"
     readonly property color borderAccent: "#88ff2b2b"
 
     // Text & Foregrounds
     readonly property color textPrimary: "#ffffff"
-    readonly property color textSecondary: "#a2a2b4"
-    readonly property color textMuted: "#666678"
+    readonly property color textSecondary: "#b0b0c2"
+    readonly property color textMuted: "#6b6b80"
 
     // Metrics & Radius
-    readonly property int radiusSm: 6
-    readonly property int radiusMd: 10
-    readonly property int radiusLg: 14
+    readonly property int radiusSm: 8
+    readonly property int radiusMd: 12
+    readonly property int radiusLg: 16
+    readonly property int radiusXl: 20
     readonly property int radiusPill: 999
 
     // Typography
