@@ -42,6 +42,7 @@ fi
 [ -f "${STATE_DIR}/nightlight" ]    || echo "0" > "${STATE_DIR}/nightlight"
 [ -f "${STATE_DIR}/dnd" ]           || echo "0" > "${STATE_DIR}/dnd"
 [ -f "${STATE_DIR}/brightness" ]    || echo "100" > "${STATE_DIR}/brightness"
+[ -f "${STATE_DIR}/gaming_mode" ]   || echo "0" > "${STATE_DIR}/gaming_mode"
 [ -f "${STATE_DIR}/power_profile" ] || {
     prof=$(powerprofilesctl get 2>/dev/null || echo "balanced")
     echo "${prof:-balanced}" > "${STATE_DIR}/power_profile"
@@ -767,7 +768,7 @@ cmd_status() {
     pwr_prof=$(get_effective_power_profile)
 
     # 10. Brightness, OSD Event, AI Scratchpad Engine & Live Zoom State
-    local br_val osd_br_ts=0 ai_eng="opencode" zoom_en="0" zoom_fac="1.0"
+    local br_val osd_br_ts=0 ai_eng="opencode" zoom_en="0" zoom_fac="1.0" game_en="0"
     br_val=$(cat "${STATE_DIR}/brightness" 2>/dev/null || echo "100")
     if [ -f "${STATE_DIR}/osd_brightness" ]; then
         IFS='|' read -r osd_br_ts _ < "${STATE_DIR}/osd_brightness"
@@ -775,8 +776,9 @@ cmd_status() {
     ai_eng=$(get_effective_ai_engine)
     zoom_en=$(get_effective_zoom_enabled)
     zoom_fac=$(cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
+    game_en=$(get_effective_gaming_mode)
 
-    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s"}\n' \
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s}\n' \
         "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" \
         "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
         "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
@@ -787,7 +789,8 @@ cmd_status() {
         "$([ "$dnd_val" = "1" ] && echo true || echo false)" \
         "$rec_active" "$rec_time" \
         "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}" "$ai_eng" \
-        "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac"
+        "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
+        "$([ "$game_en" = "1" ] && echo true || echo false)"
 }
 
 # -----------------------------------------------------------------------------
@@ -1171,6 +1174,75 @@ cmd_zoom() {
     esac
 }
 
+# -----------------------------------------------------------------------------
+# 11. GAMING MODE / ZERO LATENCY (SUPER + G)
+# Strips compositor overhead (blur, shadows, animations, gaps, rounding),
+# locks CPU governor to performance, and optimizes Wayland direct scanout.
+# -----------------------------------------------------------------------------
+get_effective_gaming_mode() {
+    cat "${STATE_DIR}/gaming_mode" 2>/dev/null || echo "0"
+}
+
+cmd_gamemode() {
+    local action="${1:-toggle}"
+    local cur
+    cur=$(get_effective_gaming_mode)
+
+    if [ "$action" = "toggle" ]; then
+        [ "$cur" = "1" ] && action="off" || action="on"
+    fi
+
+    case "$action" in
+        on)
+            echo "1" > "${STATE_DIR}/gaming_mode"
+            # Backup current power profile to restore later
+            cat "${STATE_DIR}/power_profile" 2>/dev/null > "${STATE_DIR}/pre_game_power_profile"
+            apply_kernel_power_profile "performance"
+            
+            # Disable compositor eye-candy via hyprctl batch
+            hyprctl --batch "\
+                keyword decoration:blur:enabled 0;\
+                keyword decoration:shadow:enabled 0;\
+                keyword animations:enabled 0;\
+                keyword general:gaps_in 0;\
+                keyword general:gaps_out 0;\
+                keyword decoration:rounding 0" >/dev/null 2>&1 || true
+
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Modo Gaming: Activado" "Rendimiento máximo • Blur y animaciones desactivados" "Gaming X64"
+            else
+                notify_user "Gaming Mode: Enabled" "Maximum performance • Blur & animations disabled" "X64 Gaming"
+            fi
+            ;;
+        off)
+            echo "0" > "${STATE_DIR}/gaming_mode"
+            local prev_pwr
+            prev_pwr=$(cat "${STATE_DIR}/pre_game_power_profile" 2>/dev/null || echo "balanced")
+            [ -z "$prev_pwr" ] && prev_pwr="balanced"
+            apply_kernel_power_profile "$prev_pwr"
+            echo "$prev_pwr" > "${STATE_DIR}/power_profile"
+
+            # Restore Obsidian & Crimson visual effects
+            hyprctl --batch "\
+                keyword decoration:blur:enabled 1;\
+                keyword decoration:shadow:enabled 1;\
+                keyword animations:enabled 1;\
+                keyword general:gaps_in 5;\
+                keyword general:gaps_out 10;\
+                keyword decoration:rounding 10" >/dev/null 2>&1 || true
+
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Modo Gaming: Desactivado" "Efectos visuales y perfil de energía restaurados" "Gaming X64"
+            else
+                notify_user "Gaming Mode: Disabled" "Visual effects and power profile restored" "X64 Gaming"
+            fi
+            ;;
+        get)
+            get_effective_gaming_mode
+            ;;
+    esac
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -1185,6 +1257,7 @@ case "${1:-status}" in
     scratchpad)        cmd_scratchpad ;;
     ai-engine)         cmd_ai_engine "${2:-get}" "${3:-opencode}" ;;
     zoom)              cmd_zoom "${2:-toggle}" ;;
+    gamemode|gaming)   cmd_gamemode "${2:-toggle}" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

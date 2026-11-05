@@ -73,7 +73,7 @@ hl.config({
         },
 
         resize_on_border = false,
-        allow_tearing    = false,
+        allow_tearing    = true,
         layout           = "dwindle",
     },
 
@@ -115,6 +115,7 @@ hl.config({
         force_default_wallpaper = 0,
         disable_hyprland_logo   = true,
         disable_splash_rendering = true,
+        vrr                     = 1,
     },
 
     input = {
@@ -187,6 +188,13 @@ hl.layer_rule({
     blur  = true,
 })
 
+-- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games
+hl.window_rule({
+    name      = "x64-gaming-immediate",
+    match     = { class = "(steam_app_.*|gamescope|cs2|dota2|heroic|lutris|osu!|retroarch|wine|Proton).*" },
+    immediate = true,
+})
+
 ---------------------
 ---- KEYBINDINGS ----
 ---------------------
@@ -205,6 +213,7 @@ hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + S",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 hl.bind(mainMod .. " + A",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
+hl.bind(mainMod .. " + G",      hl.dsp.exec_cmd("x64-hyprland-ctl gamemode toggle"))
 
 -- Navigation focus
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))

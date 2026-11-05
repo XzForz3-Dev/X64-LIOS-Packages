@@ -32,6 +32,7 @@ PanelWindow {
     property string aiEngine: "opencode"
     property bool zoomEnabled: false
     property string zoomFactor: "1.0"
+    property bool gamingModeActive: false
 
     anchors {
         top: true
@@ -177,6 +178,7 @@ PanelWindow {
                         if (d.aiEngine) controlWindow.aiEngine = d.aiEngine;
                         if (d.zoomEnabled !== undefined) controlWindow.zoomEnabled = Boolean(d.zoomEnabled);
                         if (d.zoomFactor) controlWindow.zoomFactor = String(d.zoomFactor);
+                        if (d.gamingMode !== undefined) controlWindow.gamingModeActive = Boolean(d.gamingMode);
                     }
                     controlWindow.isRecording = Boolean(d.recording);
                     controlWindow.recTime = d.recTime || "00:00";
@@ -1159,6 +1161,93 @@ PanelWindow {
                         onTriggered: {
                             controlWindow.runCtl(["brightness", "set", String(controlWindow.brightnessVal)]);
                         }
+                    }
+                }
+            }
+
+            // =================================================================
+            // 3B. MODO GAMING / LATENCIA CERO (SUPER + G)
+            // =================================================================
+            Rectangle {
+                id: gamingCard
+                Layout.fillWidth: true
+                implicitHeight: 46
+                radius: Theme.radiusMd
+                color: controlWindow.gamingModeActive ? Theme.accentDim : Theme.bgCard
+                border.color: controlWindow.gamingModeActive ? Theme.accentBorder : Theme.borderSubtle
+                border.width: 1
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    Rectangle {
+                        implicitWidth: 26
+                        implicitHeight: 26
+                        radius: 7
+                        color: controlWindow.gamingModeActive ? "#33ff2b2b" : "#0fffffff"
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰊴"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 15
+                            color: controlWindow.gamingModeActive ? Theme.accent : Theme.textSecondary
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Text {
+                            text: I18n.isEs ? "MODO GAMING • LATENCIA CERO" : "GAMING MODE • ZERO LATENCY"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 0.6
+                            color: controlWindow.gamingModeActive ? Theme.accent : Theme.textSecondary
+                        }
+
+                        Text {
+                            text: controlWindow.gamingModeActive
+                                ? (I18n.isEs ? "Activo (Sin blur/gaps • CPU Max • Tearing ON)" : "Active (No blur/gaps • Max CPU • Tearing ON)")
+                                : (I18n.isEs ? "Apagado (SUPER + G para activar)" : "Off (SUPER + G to toggle)")
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            color: controlWindow.gamingModeActive ? "#ff9494" : Theme.textMuted
+                        }
+                    }
+
+                    Rectangle {
+                        implicitWidth: 32
+                        implicitHeight: 18
+                        radius: 9
+                        color: controlWindow.gamingModeActive ? Theme.accent : "#22ffffff"
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        Rectangle {
+                            implicitWidth: 14
+                            implicitHeight: 14
+                            radius: 7
+                            color: "#ffffff"
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: controlWindow.gamingModeActive ? parent.width - width - 2 : 2
+                            Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        controlWindow.gamingModeActive = !controlWindow.gamingModeActive;
+                        controlWindow.runCtl(["gamemode", controlWindow.gamingModeActive ? "on" : "off"]);
                     }
                 }
             }
