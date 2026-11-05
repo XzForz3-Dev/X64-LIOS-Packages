@@ -88,7 +88,7 @@ PanelWindow {
         // 2. MOSAICO Y CONTROL DE VENTANAS (TILING & WINDOWS)
         // ---------------------------------------------------------------------
         {
-            keys: ["SUPER", "V"],
+            keys: ["SUPER", "W"],
             title: I18n.isEs ? "Ventana Flotante" : "Toggle Floating",
             desc: I18n.isEs ? "Alterna la ventana entre mosaico y flotante" : "Switch window between tiled and floating",
             category: "tiling",
@@ -197,6 +197,13 @@ PanelWindow {
             keys: ["ALT", "0"],
             title: I18n.isEs ? "Resetear Zoom a 1.0x" : "Reset Zoom 1.0x",
             desc: I18n.isEs ? "Restaura la escala instantáneamente a 1.0x" : "Instantly resets compositor zoom to 1.0x",
+            category: "x64",
+            catLabel: "X64 Suite"
+        },
+        {
+            keys: ["SUPER", "V"],
+            title: I18n.isEs ? "Historial del Portapapeles" : "Clipboard History",
+            desc: I18n.isEs ? "Abre el gestor visual de textos y enlaces copiados" : "Open visual history of copied text and links",
             category: "x64",
             catLabel: "X64 Suite"
         },

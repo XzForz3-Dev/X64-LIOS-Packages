@@ -1246,6 +1246,48 @@ cmd_gamemode() {
     esac
 }
 
+# -----------------------------------------------------------------------------
+# 11. CLIPBOARD HISTORY (CLIPHIST ENGINE)
+# -----------------------------------------------------------------------------
+cmd_clipboard() {
+    local action="${1:-toggle}"
+    case "$action" in
+        toggle|open|close|reload)
+            quickshell ipc call clipboard "$action" 2>/dev/null || true
+            ;;
+        paste)
+            local item_id="$2"
+            if [ -n "$item_id" ] && command -v cliphist >/dev/null 2>&1 && command -v wl-copy >/dev/null 2>&1; then
+                cliphist decode "$item_id" 2>/dev/null | wl-copy
+            fi
+            ;;
+        delete)
+            local query="$2"
+            if [ -n "$query" ] && command -v cliphist >/dev/null 2>&1; then
+                cliphist delete-query "$query" 2>/dev/null || true
+                quickshell ipc call clipboard reload 2>/dev/null || true
+            fi
+            ;;
+        clear|wipe)
+            if command -v cliphist >/dev/null 2>&1; then
+                cliphist wipe 2>/dev/null || true
+                quickshell ipc call clipboard reload 2>/dev/null || true
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Portapapeles Limpiado" "El historial se ha vaciado por completo" "Portapapeles X64"
+                else
+                    notify_user "Clipboard Cleared" "History has been completely wiped" "X64 Clipboard"
+                fi
+            fi
+            ;;
+        start-watch)
+            if command -v cliphist >/dev/null 2>&1 && command -v wl-paste >/dev/null 2>&1; then
+                pgrep -f "wl-paste --type text --watch cliphist" >/dev/null 2>&1 || (wl-paste --type text --watch cliphist store >/dev/null 2>&1 &)
+                pgrep -f "wl-paste --type image --watch cliphist" >/dev/null 2>&1 || (wl-paste --type image --watch cliphist store >/dev/null 2>&1 &)
+            fi
+            ;;
+    esac
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -1262,6 +1304,7 @@ case "${1:-status}" in
     zoom)              cmd_zoom "${2:-toggle}" ;;
     gamemode|gaming)   cmd_gamemode "${2:-toggle}" ;;
     shortcuts|guide)   quickshell ipc call shortcuts "${2:-toggle}" 2>/dev/null || true ;;
+    clipboard|clip)    shift; cmd_clipboard "$@" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

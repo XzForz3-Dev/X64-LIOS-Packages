@@ -42,6 +42,9 @@ hl.on("hyprland.start", function ()
 
     -- X64 Hello Welcome Center (Floating Centered)
     hl.exec_cmd("x64-hello &")
+
+    -- X64 Clipboard History Daemon (cliphist + wl-paste)
+    hl.exec_cmd("x64-hyprland-ctl clipboard start-watch &")
 end)
 
 -------------------------------
@@ -209,7 +212,8 @@ hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("quickshell ipc call menu toggle
 hl.bind(mainMod .. " + C",      hl.dsp.exec_cmd("quickshell ipc call control toggle"))
 hl.bind(mainMod .. " + CTRL + N", hl.dsp.exec_cmd("quickshell ipc call network toggle"))
 hl.bind(mainMod .. " + L",      hl.dsp.exec_cmd("quickshell ipc call lock lock"))
-hl.bind(mainMod .. " + V",      hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("quickshell ipc call clipboard toggle"))
+hl.bind(mainMod .. " + W",      hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + S",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
