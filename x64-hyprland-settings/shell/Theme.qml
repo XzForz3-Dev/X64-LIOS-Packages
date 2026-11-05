@@ -7,35 +7,40 @@ import QtQuick
 // Modifying 'accent' ensures this Theme.qml is preserved across system updates.
 // =============================================================================
 QtObject {
-    // Cyberpunk OLED Color Palette (Qt6 #AARRGGBB format)
-    readonly property color bgDark: "#08080a"
-    readonly property color bgGlass: "#f50b0b10"
-    readonly property color bgCard: "#fa15151e"
-    readonly property color bgHover: "#ff222230"
-    readonly property color bgActive: "#ff2e2e40"
+    // Obsidian & Crimson Monochromatic Palette (Qt6 #AARRGGBB format)
+    readonly property color bgDark: "#0b0c10"
+    readonly property color bgGlass: "#f70b0c10"
+    readonly property color bgCard: "#fa13151c"
+    readonly property color bgElevated: "#ff1a1d26"
+    readonly property color bgHover: "#ff222530"
+    readonly property color bgActive: "#ff2c303e"
 
-    // Accents (Crimson Neon)
+    // Accents (Crimson X64 — used strictly for active state & alerts)
     readonly property color accent: "#ff2b2b"
-    readonly property color accentHover: "#ff4d4d"
-    readonly property color accentLight: "#ff4d4d"
-    readonly property color accentDim: "#991818"
-    readonly property color accentGlow: "#55ff2b2b"
-    readonly property color accentBorder: "#88ff2b2b"
+    readonly property color accentHover: "#ff4747"
+    readonly property color accentLight: "#ff4747"
+    readonly property color accentDim: "#2eff2b2b"
+    readonly property color accentGlow: "#4dff2b2b"
+    readonly property color accentBorder: "#73ff2b2b"
+
+    // Semantic Status Colors (Threshold-only)
+    readonly property color statusOk: "#34d399"
+    readonly property color statusWarn: "#f5a524"
 
     // Borders & Dividers
-    readonly property color borderGlass: "#2affffff"
-    readonly property color borderSubtle: "#1cffffff"
-    readonly property color borderAccent: "#88ff2b2b"
+    readonly property color borderGlass: "#17ffffff"
+    readonly property color borderSubtle: "#12ffffff"
+    readonly property color borderAccent: "#73ff2b2b"
 
-    // Text & Foregrounds
-    readonly property color textPrimary: "#ffffff"
-    readonly property color textSecondary: "#a2a2b4"
-    readonly property color textMuted: "#666678"
+    // Text & Foregrounds (Bone White & Neutral Silver)
+    readonly property color textPrimary: "#ebe8e3"
+    readonly property color textSecondary: "#8e909a"
+    readonly property color textMuted: "#565863"
 
     // Metrics & Radius
-    readonly property int radiusSm: 6
-    readonly property int radiusMd: 10
-    readonly property int radiusLg: 14
+    readonly property int radiusSm: 8
+    readonly property int radiusMd: 12
+    readonly property int radiusLg: 16
     readonly property int radiusPill: 999
 
     // Typography

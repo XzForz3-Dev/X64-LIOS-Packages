@@ -226,20 +226,6 @@ PanelWindow {
         border.color: Theme.borderGlass
         border.width: 1
 
-        // Top Neon Crimson Glow Bar
-        Rectangle {
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                leftMargin: 24
-                rightMargin: 24
-            }
-            height: 2
-            radius: 1
-            color: Theme.accent
-        }
-
         ColumnLayout {
             id: cardLayout
             anchors.fill: parent
@@ -247,35 +233,43 @@ PanelWindow {
             spacing: 10
 
             // =========================================================
-            // 1. HEADER: TITLE, STATUS SUBTITLE, SCAN & CLOSE
+            // 1. HEADER: TITLE, STATUS SUBTITLE & SCAN
             // =========================================================
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
 
-                ColumnLayout {
-                    spacing: 1
-                    Text {
-                        text: I18n.netTitle
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Theme.accent
+                RowLayout {
+                    spacing: 6
+                    Rectangle {
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: (netWindow.ethConnected || netWindow.wifiConnected) ? Theme.statusOk : Theme.accent
                     }
                     Text {
-                        text: {
-                            if (netWindow.statusMsg !== "") return netWindow.statusMsg;
-                            if (netWindow.wifiConnected) return "󰤨 Wi-Fi: " + netWindow.wifiSsid;
-                            if (netWindow.ethConnected) return "󰈀 Ethernet " + (I18n.isEs ? "Activo (" : "Active (") + netWindow.ethDevice + ")";
-                            return I18n.isEs ? "󰤮 Sin conexión activa" : "󰤮 No active connection";
-                        }
+                        text: I18n.isEs ? "CONECTIVIDAD" : "CONNECTIVITY"
                         font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        color: (netWindow.ethConnected || netWindow.wifiConnected) ? "#10b981" : Theme.textMuted
+                        font.pixelSize: 11
+                        font.bold: true
+                        font.letterSpacing: 1.1
+                        color: Theme.textSecondary
                     }
                 }
 
                 Item { Layout.fillWidth: true }
+
+                Text {
+                    text: {
+                        if (netWindow.statusMsg !== "") return netWindow.statusMsg;
+                        if (netWindow.wifiConnected) return "Wi-Fi: " + netWindow.wifiSsid;
+                        if (netWindow.ethConnected) return I18n.isEs ? "Ethernet Activo" : "Ethernet Active";
+                        return I18n.isEs ? "Sin conexión" : "Disconnected";
+                    }
+                    font.family: Theme.fontMono
+                    font.pixelSize: 9
+                    color: Theme.textSecondary
+                }
 
                 // Rescan Button
                 Rectangle {
@@ -292,7 +286,7 @@ PanelWindow {
                         text: "󰑐"
                         font.family: Theme.fontMono
                         font.pixelSize: 11
-                        color: scanArea.containsMouse ? Theme.accent : Theme.textSecondary
+                        color: scanArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                     }
 
                     MouseArea {
@@ -303,63 +297,42 @@ PanelWindow {
                         onClicked: netWindow.refreshNet(true)
                     }
                 }
-
-                Text {
-                    text: "󰅖"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 14
-                    color: Theme.textMuted
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            netWindow.passwordSsid = "";
-                            netWindow.closeAnimated();
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.borderSubtle
             }
 
             // =========================================================
-            // 2. ETHERNET (LAN) & IP / GATEWAY / DNS CARD
+            // 2. ETHERNET (LAN) & UNIFORM 3-COLUMN IP / GATEWAY / DNS GRID
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 92
-                radius: Theme.radiusSm
+                implicitHeight: 104
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 6
+                    anchors.margins: 11
+                    spacing: 8
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 8
+                        spacing: 9
 
                         Rectangle {
-                            implicitWidth: 26
-                            implicitHeight: 26
-                            radius: 7
-                            color: netWindow.ethConnected ? "#1f10b981" : "#1affffff"
-                            border.color: netWindow.ethConnected ? "#4410b981" : Theme.borderSubtle
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            radius: 9
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
                             border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰈀"
                                 font.family: Theme.fontMono
-                                font.pixelSize: 13
-                                color: netWindow.ethConnected ? "#10b981" : Theme.textMuted
+                                font.pixelSize: 14
+                                color: netWindow.ethConnected ? Theme.textPrimary : Theme.textMuted
                             }
                         }
 
@@ -374,30 +347,39 @@ PanelWindow {
                                 color: Theme.textPrimary
                             }
                             Text {
-                                text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? (I18n.isEs ? "Conectado (1 Gbps)" : "Connected (1 Gbps)") : I18n.netCableDisconnected)
+                                text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? (I18n.isEs ? "1 Gbps Full Duplex" : "1 Gbps Full Duplex") : I18n.netCableDisconnected)
                                 font.family: Theme.fontMono
                                 font.pixelSize: 9
-                                color: netWindow.ethConnected ? "#10b981" : Theme.textMuted
+                                color: Theme.textSecondary
                             }
                         }
 
-                        // Toggle Ethernet Interface Button
+                        // Toggle Ethernet Interface Badge
                         Rectangle {
                             implicitHeight: 22
-                            implicitWidth: ethBtnText.implicitWidth + 14
-                            radius: 6
-                            color: ethBtnArea.containsMouse ? (netWindow.ethConnected ? "#33ff2b2b" : Theme.accent) : "#18ffffff"
-                            border.color: ethBtnArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                            implicitWidth: ethBtnRow.implicitWidth + 14
+                            radius: 11
+                            color: ethBtnArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            border.color: Theme.borderSubtle
                             border.width: 1
 
-                            Text {
-                                id: ethBtnText
+                            RowLayout {
+                                id: ethBtnRow
                                 anchors.centerIn: parent
-                                text: netWindow.ethConnected ? I18n.netActive : I18n.netConnect
-                                font.family: Theme.fontMono
-                                font.pixelSize: 9
-                                font.bold: true
-                                color: netWindow.ethConnected ? "#10b981" : Theme.textPrimary
+                                spacing: 5
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: netWindow.ethConnected ? Theme.statusOk : Theme.textMuted
+                                }
+                                Text {
+                                    text: netWindow.ethConnected ? I18n.netConnected : I18n.netConnect
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 9
+                                    font.weight: Font.DemiBold
+                                    color: Theme.textPrimary
+                                }
                             }
 
                             MouseArea {
@@ -410,48 +392,113 @@ PanelWindow {
                         }
                     }
 
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: "#14ffffff"
-                    }
-
-                    // IP / Gateway / DNS Strip
+                    // Uniform 3-Column IP / Gateway / DNS Grid (Bone White Monospace)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        ColumnLayout {
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 1
-                            Text { text: I18n.netIpAddress; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
-                            Text { text: netWindow.ipAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#00e5ff" }
+                            implicitHeight: 36
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: "#0affffff"
+                            border.width: 1
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 1
+                                Text { text: "IP LOCAL"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                                Text { text: netWindow.ipAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
+                            }
                         }
 
-                        ColumnLayout {
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 1
-                            Text { text: I18n.netGateway; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
-                            Text { text: netWindow.gwAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
+                            implicitHeight: 36
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: "#0affffff"
+                            border.width: 1
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 1
+                                Text { text: "GATEWAY"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                                Text { text: netWindow.gwAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
+                            }
                         }
 
-                        ColumnLayout {
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 1
-                            Text { text: I18n.netDnsPrimary; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
-                            Text { text: netWindow.dnsAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#a855f7" }
+                            implicitHeight: 36
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: "#0affffff"
+                            border.width: 1
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 1
+                                Text { text: "DNS"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
+                                Text { text: netWindow.dnsAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
+                            }
                         }
                     }
                 }
             }
 
             // =========================================================
-            // 3. WI-FI SECTION (RADIO TOGGLE + SCANNER + PASSWORD INPUT)
+            // 3A. COMPACT WI-FI NOTICE (When no physical Wi-Fi adapter)
             // =========================================================
             Rectangle {
+                visible: !netWindow.hasWifiHw
+                Layout.fillWidth: true
+                implicitHeight: 34
+                radius: 9
+                color: "#08ffffff"
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 11
+                    anchors.rightMargin: 11
+                    spacing: 7
+
+                    Text {
+                        text: "󰖪"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: Theme.textMuted
+                    }
+
+                    Text {
+                        text: I18n.isEs ? "Redes Inalámbricas (Wi-Fi)" : "Wireless Networks (Wi-Fi)"
+                        font.family: Theme.fontSans
+                        font.pixelSize: 10
+                        color: Theme.textSecondary
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        text: I18n.isEs ? "Sin adaptador" : "No adapter"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 9
+                        color: Theme.textMuted
+                    }
+                }
+            }
+
+            // =========================================================
+            // 3B. WI-FI SECTION (Only shown when Wi-Fi hardware exists)
+            // =========================================================
+            Rectangle {
+                visible: netWindow.hasWifiHw
                 Layout.fillWidth: true
                 implicitHeight: wifiCol.implicitHeight + 20
-                radius: Theme.radiusSm
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
@@ -477,12 +524,11 @@ PanelWindow {
                         Item { Layout.fillWidth: true }
 
                         Rectangle {
-                            visible: netWindow.hasWifiHw
                             implicitHeight: 20
                             implicitWidth: 44
                             radius: 10
-                            color: netWindow.wifiEnabled ? Theme.accent : "#252534"
-                            border.color: netWindow.wifiEnabled ? Theme.accentLight : Theme.borderSubtle
+                            color: netWindow.wifiEnabled ? Theme.accentDim : Theme.bgElevated
+                            border.color: netWindow.wifiEnabled ? Theme.accentBorder : Theme.borderSubtle
                             border.width: 1
 
                             Text {
@@ -491,7 +537,7 @@ PanelWindow {
                                 font.family: Theme.fontMono
                                 font.pixelSize: 8
                                 font.bold: true
-                                color: "#ffffff"
+                                color: netWindow.wifiEnabled ? Theme.textPrimary : Theme.textSecondary
                             }
 
                             MouseArea {
@@ -505,42 +551,9 @@ PanelWindow {
                         }
                     }
 
-                    // Case A: No physical Wi-Fi adapter (Desktop PC / VM)
-                    Rectangle {
-                        visible: !netWindow.hasWifiHw
-                        Layout.fillWidth: true
-                        implicitHeight: 48
-                        radius: 6
-                        color: "#12ffffff"
-                        border.color: "#1affffff"
-                        border.width: 1
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 8
-
-                            Text {
-                                text: "󰈀"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 16
-                                color: Theme.accent
-                            }
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: I18n.netEthernetOnlyNotice
-                                font.family: Theme.fontSans
-                                font.pixelSize: 9
-                                color: Theme.textSecondary
-                                wrapMode: Text.WordWrap
-                            }
-                        }
-                    }
-
-                    // Case B: Wi-Fi Hardware exists, but Radio is OFF
+                    // Wi-Fi Hardware exists, but Radio is OFF
                     Text {
-                        visible: netWindow.hasWifiHw && !netWindow.wifiEnabled
+                        visible: !netWindow.wifiEnabled
                         Layout.fillWidth: true
                         text: I18n.netWifiOffNotice
                         font.family: Theme.fontMono
@@ -548,9 +561,9 @@ PanelWindow {
                         color: Theme.textMuted
                     }
 
-                    // Case C: Wi-Fi Networks List
+                    // Wi-Fi Networks List
                     ColumnLayout {
-                        visible: netWindow.hasWifiHw && netWindow.wifiEnabled
+                        visible: netWindow.wifiEnabled
                         Layout.fillWidth: true
                         spacing: 5
 
@@ -559,9 +572,9 @@ PanelWindow {
                             delegate: Rectangle {
                                 Layout.fillWidth: true
                                 implicitHeight: (netWindow.passwordSsid === modelData.ssid) ? 74 : 36
-                                radius: 6
-                                color: modelData.connected ? "#1c10b981" : (netRowArea.containsMouse ? Theme.bgHover : "#14ffffff")
-                                border.color: modelData.connected ? "#4410b981" : (netWindow.passwordSsid === modelData.ssid ? Theme.accent : "#1affffff")
+                                radius: 7
+                                color: modelData.connected ? Theme.bgElevated : (netRowArea.containsMouse ? Theme.bgHover : "#0cffffff")
+                                border.color: (netWindow.passwordSsid === modelData.ssid) ? Theme.accentBorder : Theme.borderSubtle
                                 border.width: 1
 
                                 ColumnLayout {
@@ -577,7 +590,7 @@ PanelWindow {
                                             text: modelData.signal >= 75 ? "󰤨" : (modelData.signal >= 50 ? "󰤥" : (modelData.signal >= 25 ? "󰤢" : "󰤟"))
                                             font.family: Theme.fontMono
                                             font.pixelSize: 12
-                                            color: modelData.connected ? "#10b981" : Theme.textPrimary
+                                            color: modelData.connected ? Theme.textPrimary : Theme.textSecondary
                                         }
 
                                         Text {
@@ -601,7 +614,9 @@ PanelWindow {
                                             implicitHeight: 20
                                             implicitWidth: actTxt.implicitWidth + 12
                                             radius: 5
-                                            color: modelData.connected ? "#2810b981" : Theme.accent
+                                            color: modelData.connected ? "#18ffffff" : Theme.accentDim
+                                            border.color: modelData.connected ? Theme.borderSubtle : Theme.accentBorder
+                                            border.width: 1
                                             Text {
                                                 id: actTxt
                                                 anchors.centerIn: parent
@@ -609,7 +624,7 @@ PanelWindow {
                                                 font.family: Theme.fontMono
                                                 font.pixelSize: 8
                                                 font.bold: true
-                                                color: modelData.connected ? "#10b981" : "#ffffff"
+                                                color: Theme.textPrimary
                                             }
                                         }
                                     }
@@ -697,11 +712,11 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 34
-                radius: Theme.radiusSm
-                color: advArea.containsMouse ? Theme.accent : Theme.bgCard
-                border.color: advArea.containsMouse ? Theme.accentLight : Theme.borderAccent
+                radius: 10
+                color: advArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                border.color: advArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
                 border.width: 1
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: 140 } }
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -710,14 +725,14 @@ PanelWindow {
                         text: "󰒓"
                         font.family: Theme.fontMono
                         font.pixelSize: 12
-                        color: advArea.containsMouse ? "#ffffff" : Theme.accent
+                        color: advArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                     }
                     Text {
                         text: I18n.netAdvancedSettings
                         font.family: Theme.fontSans
                         font.pixelSize: 11
-                        font.bold: true
-                        color: Theme.textPrimary
+                        font.weight: Font.DemiBold
+                        color: advArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                     }
                 }
 

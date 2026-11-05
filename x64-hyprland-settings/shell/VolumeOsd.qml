@@ -77,9 +77,9 @@ PanelWindow {
 
     Rectangle {
         anchors.fill: parent
-        radius: Theme.radiusPill
+        radius: 14
         color: Theme.bgGlass
-        border.color: Theme.borderAccent
+        border.color: Theme.borderGlass
         border.width: 1
 
         RowLayout {
@@ -94,23 +94,23 @@ PanelWindow {
                     return osdWindow.currentMuted ? "󰝟" : (osdWindow.currentVol > 0.66 ? "󰕾" : (osdWindow.currentVol > 0.33 ? "󰖀" : "󰕿"));
                 }
                 font.family: Theme.fontMono
-                font.pixelSize: 16
-                color: osdWindow.mode === "brightness" ? "#ffaa00" : (osdWindow.currentMuted ? Theme.accent : Theme.textPrimary)
+                font.pixelSize: 15
+                color: (osdWindow.mode === "volume" && osdWindow.currentMuted) ? Theme.accent : Theme.textPrimary
             }
 
             Rectangle {
                 Layout.fillWidth: true
                 height: 6
                 radius: 3
-                color: "#1c1d26"
+                color: Theme.bgElevated
 
                 Rectangle {
                     readonly property real progress: osdWindow.mode === "brightness" ? (osdWindow.brightnessVal / 100.0) : (osdWindow.currentMuted ? 0.0 : Math.min(1.0, osdWindow.currentVol))
                     width: Math.max(4, parent.width * progress)
                     height: parent.height
                     radius: 3
-                    color: osdWindow.mode === "brightness" ? "#ffaa00" : Theme.accent
-                    Behavior on width { NumberAnimation { duration: 100 } }
+                    color: osdWindow.mode === "brightness" ? "#d8d6d0" : Theme.accent
+                    Behavior on width { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
                 }
             }
 
@@ -122,7 +122,7 @@ PanelWindow {
                 font.family: Theme.fontMono
                 font.pixelSize: 11
                 font.bold: true
-                color: osdWindow.mode === "brightness" ? "#ffaa00" : (osdWindow.currentMuted ? Theme.accent : Theme.textPrimary)
+                color: (osdWindow.mode === "volume" && osdWindow.currentMuted) ? Theme.accent : Theme.textPrimary
             }
         }
     }

@@ -25,16 +25,45 @@ PanelWindow {
             var name = app.name || "";
             var comment = app.comment || app.genericName || "";
             var exec = app.execString || "";
+            var execLow = exec.toLowerCase();
+            var nameLow = name.toLowerCase();
+
+            // Filter out low-level hardware debuggers, CLI-only wrappers, and dev clutter
+            if (execLow.indexOf("qv4l2") !== -1 ||
+                execLow.indexOf("qvidcap") !== -1 ||
+                execLow.indexOf("lstopo") !== -1 ||
+                execLow.indexOf("cmake-gui") !== -1 ||
+                execLow.indexOf("localhost:631") !== -1 ||
+                execLow.indexOf("avahi-discover") !== -1 ||
+                execLow.indexOf("bssh") !== -1 ||
+                execLow.indexOf("bvnc") !== -1 ||
+                execLow.indexOf("blueman-adapters") !== -1 ||
+                nameLow === "vim" ||
+                nameLow === "micro") {
+                continue;
+            }
 
             if (query === "" || 
-                name.toLowerCase().indexOf(query) !== -1 || 
+                nameLow.indexOf(query) !== -1 || 
                 comment.toLowerCase().indexOf(query) !== -1 ||
-                exec.toLowerCase().indexOf(query) !== -1) {
+                execLow.indexOf(query) !== -1) {
                 
-                var iconPath = Quickshell.iconPath(app.icon, true);
-                if (!iconPath || iconPath.length === 0) iconPath = Quickshell.iconPath("application-x-executable", true);
-                if (iconPath && iconPath.length > 0 && iconPath.charAt(0) === "/") {
-                    iconPath = "file://" + iconPath;
+                var iconName = app.icon || "";
+                var iconPath = "";
+                if (iconName === "preferences-system-network") {
+                    iconPath = "file:///usr/share/icons/Papirus/48x48/apps/preferences-system-network-connection.svg";
+                } else if (iconName === "audio-speakers") {
+                    iconPath = "file:///usr/share/icons/Papirus/48x48/apps/org.pipewire.Helvum.svg";
+                } else if (iconName === "dev.lizardbyte.app.Sunshine") {
+                    iconPath = "file:///usr/share/pixmaps/x64-sunshine.svg";
+                } else if (iconName.length > 0 && iconName.charAt(0) === "/") {
+                    iconPath = "file://" + iconName;
+                } else {
+                    iconPath = Quickshell.iconPath(iconName, true);
+                    if (!iconPath || iconPath.length === 0) iconPath = Quickshell.iconPath("application-x-executable", true);
+                    if (iconPath && iconPath.length > 0 && iconPath.charAt(0) === "/") {
+                        iconPath = "file://" + iconPath;
+                    }
                 }
 
                 list.push({
@@ -71,7 +100,7 @@ PanelWindow {
         onClicked: launcherWindow.closeRequested()
     }
 
-    // Centered Cyberpunk Dashboard Card
+    // Centered Obsidian & Crimson 2026 Dashboard Card
     Rectangle {
         id: card
         width: Math.min(parent.width - 40, 780)
@@ -79,7 +108,7 @@ PanelWindow {
         anchors.centerIn: parent
         radius: Theme.radiusLg
         color: Theme.bgGlass
-        border.color: Theme.borderAccent
+        border.color: Theme.borderGlass
         border.width: 1
 
         // Consume clicks inside the card

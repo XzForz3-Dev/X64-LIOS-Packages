@@ -19,7 +19,7 @@ PanelWindow {
     signal toggleNetwork()
     signal brightnessChangedOsd(int val)
 
-    property bool trayExpanded: true
+    property bool trayExpanded: false
 
     anchors {
         top: true
@@ -300,22 +300,27 @@ PanelWindow {
                         RowLayout {
                             id: brandRow
                             anchors.centerIn: parent
-                            spacing: 4
+                            spacing: 5
 
-                            Text {
-                                text: "󰣇"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
-                                color: Theme.accent
+                            Image {
+                                source: Qt.resolvedUrl("x64-logo-bar.png")
+                                width: 15
+                                height: 15
+                                Layout.preferredWidth: 15
+                                Layout.preferredHeight: 15
+                                smooth: true
+                                fillMode: Image.PreserveAspectFit
+                                Layout.alignment: Qt.AlignVCenter
                             }
 
                             Text {
-                                text: "X64"
+                                text: "X64 LIOS"
                                 font.family: Theme.fontSans
                                 font.pixelSize: 10
                                 font.bold: true
-                                font.letterSpacing: 1.0
+                                font.letterSpacing: 0.8
                                 color: Theme.textPrimary
+                                Layout.alignment: Qt.AlignVCenter
                             }
                         }
 
@@ -402,7 +407,7 @@ PanelWindow {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: Hyprland.dispatch("workspace " + wsItem.modelData)
+                                        onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsItem.modelData + " })")
                                     }
                                 }
                             }
@@ -414,9 +419,9 @@ PanelWindow {
                             acceptedButtons: Qt.NoButton
                             onWheel: (wheel) => {
                                 if (wheel.angleDelta.y > 0) {
-                                    Hyprland.dispatch("workspace e-1");
+                                    Hyprland.dispatch('hl.dsp.focus({ workspace = "r-1" })');
                                 } else if (wheel.angleDelta.y < 0) {
-                                    Hyprland.dispatch("workspace e+1");
+                                    Hyprland.dispatch('hl.dsp.focus({ workspace = "r+1" })');
                                 }
                             }
                         }
@@ -565,50 +570,42 @@ PanelWindow {
                 Rectangle {
                     id: clockCapsule
                     implicitHeight: 24
-                    implicitWidth: clockRow.implicitWidth + 16
+                    implicitWidth: clockRow.implicitWidth + 20
                     radius: 12
-                    color: clockArea.containsMouse ? "#fa1e1f2b" : "#f512131a"
-                    border.color: clockArea.containsMouse ? Theme.accent : "#1affffff"
+                    color: clockArea.containsMouse ? Theme.bgHover : "#f512131a"
+                    border.color: clockArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
                     border.width: 1
-                    scale: clockArea.pressed ? 0.92 : (clockArea.containsMouse ? 1.03 : 1.0)
-                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
-
+                    scale: clockArea.pressed ? 0.94 : (clockArea.containsMouse ? 1.02 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.4 } }
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Behavior on border.color { ColorAnimation { duration: 150 } }
 
                     RowLayout {
                         id: clockRow
                         anchors.centerIn: parent
-                        spacing: 6
-
-                        Text {
-                            text: "󰸗"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            color: clockArea.containsMouse ? Theme.accentLight : Theme.accent
-                        }
+                        spacing: 7
 
                         Text {
                             text: barWindow.timeStr
-                            font.family: Theme.fontSans
+                            font.family: Theme.fontMono
                             font.pixelSize: 11
-                            font.weight: Font.DemiBold
+                            font.bold: true
                             color: Theme.textPrimary
                         }
 
                         Rectangle {
-                            implicitWidth: 3
-                            implicitHeight: 3
-                            radius: 1.5
+                            implicitWidth: 4
+                            implicitHeight: 4
+                            radius: 2
                             color: Theme.accent
                         }
 
                         Text {
                             text: barWindow.dateStr
                             font.family: Theme.fontSans
-                            font.pixelSize: 9
-                            font.weight: Font.Medium
-                            font.letterSpacing: 0.5
+                            font.pixelSize: 10
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 0.4
                             color: Theme.textSecondary
                         }
                     }
@@ -676,7 +673,7 @@ PanelWindow {
             }
 
             // -----------------------------------------------------------------
-            // 3. RIGHT SECTION: TWO STREAMLINED LUXURY ISLANDS
+            // 3. RIGHT SECTION: MONOCHROMATIC LUXURY CAPSULES (Color = State)
             // Anchored to right bezel (Zero Drift)
             // -----------------------------------------------------------------
             RowLayout {
@@ -690,54 +687,56 @@ PanelWindow {
                 Rectangle {
                     id: telemetryCapsule
                     implicitHeight: 24
-                    implicitWidth: telemetryRow.implicitWidth + 12
+                    implicitWidth: telemetryRow.implicitWidth + 16
                     radius: 12
-                    color: teleArea.containsMouse ? "#fa1c1d26" : "#f512131a"
-                    border.color: teleArea.containsMouse ? Theme.borderAccent : "#1affffff"
+                    color: teleArea.containsMouse ? Theme.bgHover : "#f512131a"
+                    border.color: teleArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
                     border.width: 1
-                    scale: teleArea.pressed ? 0.92 : (teleArea.containsMouse ? 1.03 : 1.0)
-                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
+                    scale: teleArea.pressed ? 0.94 : (teleArea.containsMouse ? 1.02 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.4 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
                     RowLayout {
                         id: telemetryRow
                         anchors.centerIn: parent
                         spacing: 5
 
-                        // CPU
+                        // CPU (Threshold-aware: neutral silver at rest, amber >=65%, crimson >=85%)
                         Text {
                             text: "󰻠"
                             font.family: Theme.fontMono
                             font.pixelSize: 11
-                            color: Theme.accent
+                            color: barWindow.cpuUsage >= 85 ? Theme.accent : (barWindow.cpuUsage >= 65 ? Theme.statusWarn : Theme.textSecondary)
                         }
 
                         Text {
                             text: barWindow.cpuUsage + "%"
                             font.family: Theme.fontMono
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.bold: true
-                            color: Theme.textPrimary
+                            color: barWindow.cpuUsage >= 85 ? Theme.accent : (barWindow.cpuUsage >= 65 ? Theme.statusWarn : Theme.textPrimary)
                         }
 
                         // Divider
                         Rectangle {
                             implicitWidth: 1
                             implicitHeight: 10
-                            color: "#1affffff"
+                            color: "#16ffffff"
                         }
 
-                        // RAM
+                        // RAM (Monochromatic neutral silver icon + bone white text)
                         Text {
                             text: "󰍛"
                             font.family: Theme.fontMono
                             font.pixelSize: 11
-                            color: "#00e5ff"
+                            color: Theme.textSecondary
                         }
 
                         Text {
                             text: barWindow.ramUsage + "G"
                             font.family: Theme.fontMono
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.bold: true
                             color: Theme.textPrimary
                         }
@@ -746,23 +745,23 @@ PanelWindow {
                         Rectangle {
                             implicitWidth: 1
                             implicitHeight: 10
-                            color: "#1affffff"
+                            color: "#16ffffff"
                         }
 
-                        // CPU Temperature
+                        // CPU Temperature (Threshold-aware: neutral silver <65°C, amber >=65°C, crimson >=78°C)
                         Text {
                             text: "󰔏"
                             font.family: Theme.fontMono
                             font.pixelSize: 10
-                            color: barWindow.cpuTemp >= 78 ? "#ff2b2b" : (barWindow.cpuTemp >= 65 ? "#ffaa00" : "#ff7744")
+                            color: barWindow.cpuTemp >= 78 ? Theme.accent : (barWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textSecondary)
                         }
 
                         Text {
                             text: barWindow.cpuTemp + "°C"
                             font.family: Theme.fontMono
-                            font.pixelSize: 9
+                            font.pixelSize: 10
                             font.bold: true
-                            color: barWindow.cpuTemp >= 78 ? "#ff2b2b" : Theme.textPrimary
+                            color: barWindow.cpuTemp >= 78 ? Theme.accent : (barWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textPrimary)
                         }
                     }
 
@@ -782,14 +781,14 @@ PanelWindow {
                     }
                 }
 
-                // Island 3B: Unified System Status & Control Suite (One Continuous Capsule)
+                // Island 3B: System Status Capsule (KB, Network, Audio, Brightness, Battery, Tray)
                 Rectangle {
                     id: systemCapsule
                     implicitHeight: 24
-                    implicitWidth: systemRow.implicitWidth + 10
+                    implicitWidth: systemRow.implicitWidth + 14
                     radius: 12
                     color: "#f512131a"
-                    border.color: "#1affffff"
+                    border.color: Theme.borderGlass
                     border.width: 1
 
                     readonly property var defaultSink: Pipewire.defaultAudioSink
@@ -805,13 +804,13 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 5
 
-                        // [0] Active Quick-Toggle Indicators (Caffeine / Nightlight / DND)
+                        // [0] Active Quick-Toggle Indicators (Unified Crimson State Badges)
                         Rectangle {
                             visible: barWindow.caffeineActive
                             implicitWidth: 18
                             implicitHeight: 18
                             radius: 9
-                            color: cafBarArea.containsMouse ? Theme.accent : "#33ff2b2b"
+                            color: cafBarArea.containsMouse ? Theme.accent : Theme.accentDim
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰅶"
@@ -836,13 +835,13 @@ PanelWindow {
                             implicitWidth: 18
                             implicitHeight: 18
                             radius: 9
-                            color: nlBarArea.containsMouse ? "#ffaa00" : "#33ffaa00"
+                            color: nlBarArea.containsMouse ? Theme.accent : Theme.accentDim
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰖔"
                                 font.family: Theme.fontMono
                                 font.pixelSize: 10
-                                color: nlBarArea.containsMouse ? "#08080a" : "#ffaa00"
+                                color: nlBarArea.containsMouse ? "#ffffff" : Theme.accent
                             }
                             MouseArea {
                                 id: nlBarArea
@@ -861,13 +860,13 @@ PanelWindow {
                             implicitWidth: 18
                             implicitHeight: 18
                             radius: 9
-                            color: dndBarArea.containsMouse ? "#a855f7" : "#33a855f7"
+                            color: dndBarArea.containsMouse ? Theme.accent : Theme.accentDim
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰂛"
                                 font.family: Theme.fontMono
                                 font.pixelSize: 10
-                                color: dndBarArea.containsMouse ? "#ffffff" : "#c084fc"
+                                color: dndBarArea.containsMouse ? "#ffffff" : Theme.accent
                             }
                             MouseArea {
                                 id: dndBarArea
@@ -885,36 +884,25 @@ PanelWindow {
                             visible: barWindow.caffeineActive || barWindow.nightlightActive || barWindow.dndActive
                             implicitWidth: 1
                             implicitHeight: 10
-                            color: "#1affffff"
+                            color: "#16ffffff"
                         }
 
-                        // [A] Keyboard Layout Indicator (0ms instant switch US <-> ES)
+                        // [A] Keyboard Layout Indicator (Clean Monospace Code US <-> ES)
                         Rectangle {
                             id: kbItem
-                            implicitWidth: kbRow.implicitWidth + 4
+                            implicitWidth: kbLabel.implicitWidth + 8
                             implicitHeight: 18
                             radius: 9
-                            color: kbArea.containsMouse ? "#20ffffff" : "transparent"
+                            color: kbArea.containsMouse ? "#1affffff" : "transparent"
 
-                            RowLayout {
-                                id: kbRow
+                            Text {
+                                id: kbLabel
                                 anchors.centerIn: parent
-                                spacing: 3
-
-                                Text {
-                                    text: "󰌌"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 10
-                                    color: barWindow.kbLayout === "ES" ? Theme.accent : "#a6adc8"
-                                }
-
-                                Text {
-                                    text: barWindow.kbLayout
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    color: Theme.textPrimary
-                                }
+                                text: barWindow.kbLayout
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                font.bold: true
+                                color: kbArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                             }
 
                             MouseArea {
@@ -931,37 +919,38 @@ PanelWindow {
                         }
 
                         // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#16ffffff" }
 
-                        // [B] Network Indicator (Left click: nm-connection-editor, Right click: Telemetry Cockpit)
+                        // [B] Network Indicator (Clean Icon in Monochromatic Bone/Silver; Crimson only if offline)
                         Rectangle {
                             id: netItem
-                            implicitWidth: netRow.implicitWidth + 4
+                            implicitWidth: netRow.implicitWidth + 8
                             implicitHeight: 18
                             radius: 9
-                            color: netArea.containsMouse ? "#20ffffff" : "transparent"
-                            scale: netArea.pressed ? 0.88 : (netArea.containsMouse ? 1.08 : 1.0)
-                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
+                            color: netArea.containsMouse ? "#1affffff" : "transparent"
+                            scale: netArea.pressed ? 0.90 : (netArea.containsMouse ? 1.06 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.4 } }
 
                             RowLayout {
                                 id: netRow
                                 anchors.centerIn: parent
-                                spacing: 3
+                                spacing: 4
 
                                 Text {
-                                    text: barWindow.netType === "WIFI" ? "󰤨" : "󰈀"
+                                    text: barWindow.netType === "WIFI" ? "󰤨" : (barWindow.netType === "NONE" ? "󰤮" : "󰈀")
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 10
-                                    color: barWindow.netType === "NONE" ? "#ff4d4d" : "#10b981"
+                                    font.pixelSize: 11
+                                    color: barWindow.netType === "NONE" ? Theme.accent : (netArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
                                 }
 
                                 Text {
-                                    text: barWindow.netType === "WIFI" ? barWindow.netName : "LAN"
+                                    visible: barWindow.netType === "WIFI"
+                                    text: barWindow.netName
                                     font.family: Theme.fontMono
                                     font.pixelSize: 9
                                     font.bold: true
                                     color: Theme.textPrimary
-                                    Layout.maximumWidth: 60
+                                    Layout.maximumWidth: 56
                                     elide: Text.ElideRight
                                 }
                             }
@@ -987,17 +976,17 @@ PanelWindow {
                             visible: systemCapsule.defaultSource !== null
                             implicitWidth: 1
                             implicitHeight: 10
-                            color: "#1affffff"
+                            color: "#16ffffff"
                         }
 
-                        // [C] Smart Microphone Control (Auto-shows only when physical mic exists; Click mutes, Wheel changes gain)
+                        // [C] Smart Microphone Control
                         Rectangle {
                             id: micItem
                             visible: systemCapsule.defaultSource !== null
-                            implicitWidth: micRow.implicitWidth + 4
+                            implicitWidth: micRow.implicitWidth + 6
                             implicitHeight: 18
                             radius: 9
-                            color: micArea.containsMouse ? "#20ffffff" : "transparent"
+                            color: micArea.containsMouse ? "#1affffff" : "transparent"
 
                             RowLayout {
                                 id: micRow
@@ -1008,7 +997,7 @@ PanelWindow {
                                     text: systemCapsule.micMuted ? "󰍭" : "󰍬"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
-                                    color: systemCapsule.micMuted ? Theme.accent : "#10b981"
+                                    color: systemCapsule.micMuted ? Theme.accent : Theme.textSecondary
                                 }
 
                                 Text {
@@ -1040,32 +1029,32 @@ PanelWindow {
                         }
 
                         // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#16ffffff" }
 
-                        // [D] Master Volume Control (Click mutes, Wheel changes volume, Right click opens Control Center)
+                        // [D] Master Volume Control
                         Rectangle {
                             id: volItem
-                            implicitWidth: volRow.implicitWidth + 4
+                            implicitWidth: volRow.implicitWidth + 6
                             implicitHeight: 18
                             radius: 9
-                            color: volArea.containsMouse ? "#20ffffff" : "transparent"
+                            color: volArea.containsMouse ? "#1affffff" : "transparent"
 
                             RowLayout {
                                 id: volRow
                                 anchors.centerIn: parent
-                                spacing: 3
+                                spacing: 4
 
                                 Text {
                                     text: systemCapsule.sinkMuted ? "󰝟" : (systemCapsule.sinkVol <= 0.01 ? "󰕿" : (systemCapsule.sinkVol < 0.5 ? "󰖀" : "󰕾"))
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 10
-                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textPrimary
+                                    font.pixelSize: 11
+                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textSecondary
                                 }
 
                                 Text {
                                     text: systemCapsule.sinkMuted ? "MUT" : Math.round(systemCapsule.sinkVol * 100) + "%"
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.bold: true
                                     color: systemCapsule.sinkMuted ? Theme.accent : Theme.textPrimary
                                 }
@@ -1096,32 +1085,32 @@ PanelWindow {
                         }
 
                         // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#16ffffff" }
 
-                        // [D2] Display Brightness Control (Debounce-guarded Wheel + OSD, Click opens Control Center)
+                        // [D2] Display Brightness Control (Neutral silver icon, bone-white text)
                         Rectangle {
                             id: brItem
-                            implicitWidth: brRow.implicitWidth + 4
+                            implicitWidth: brRow.implicitWidth + 6
                             implicitHeight: 18
                             radius: 9
-                            color: brArea.containsMouse ? "#20ffffff" : "transparent"
+                            color: brArea.containsMouse ? "#1affffff" : "transparent"
 
                             RowLayout {
                                 id: brRow
                                 anchors.centerIn: parent
-                                spacing: 3
+                                spacing: 4
 
                                 Text {
                                     text: "󰃠"
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 10
-                                    color: "#ffaa00"
+                                    font.pixelSize: 11
+                                    color: Theme.textSecondary
                                 }
 
                                 Text {
                                     text: barWindow.brightnessVal + "%"
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.bold: true
                                     color: Theme.textPrimary
                                 }
@@ -1149,16 +1138,16 @@ PanelWindow {
                             visible: barWindow.hasBattery
                             implicitWidth: 1
                             implicitHeight: 10
-                            color: "#1affffff"
+                            color: "#16ffffff"
                         }
 
                         Rectangle {
                             id: batItem
                             visible: barWindow.hasBattery
-                            implicitWidth: batRow.implicitWidth + 4
+                            implicitWidth: batRow.implicitWidth + 6
                             implicitHeight: 18
                             radius: 9
-                            color: batArea.containsMouse ? "#20ffffff" : "transparent"
+                            color: batArea.containsMouse ? "#1affffff" : "transparent"
 
                             RowLayout {
                                 id: batRow
@@ -1176,13 +1165,13 @@ PanelWindow {
                                     }
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
-                                    color: (barWindow.batStatus === "Charging" || barWindow.batStatus === "Full") ? "#4ade80" : (barWindow.batPct <= 15 ? Theme.accent : Theme.textPrimary)
+                                    color: barWindow.batPct <= 15 ? Theme.accent : Theme.textSecondary
                                 }
 
                                 Text {
                                     text: barWindow.batPct + "%"
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 9
+                                    font.pixelSize: 10
                                     font.bold: true
                                     color: barWindow.batPct <= 15 ? Theme.accent : Theme.textPrimary
                                 }
@@ -1197,25 +1186,30 @@ PanelWindow {
                             }
                         }
 
-                        // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                        // [E] System Tray Collapsible Drawer (Only shown if tray items exist)
+                        Rectangle {
+                            visible: trayRepeater.count > 0
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#16ffffff"
+                        }
 
-                        // [E] System Tray Collapsible Drawer (Chevron toggle)
                         RowLayout {
-                            spacing: 1
+                            visible: trayRepeater.count > 0
+                            spacing: 2
 
                             Rectangle {
                                 implicitWidth: 14
                                 implicitHeight: 18
                                 radius: 7
-                                color: trayToggleArea.containsMouse ? "#20ffffff" : "transparent"
+                                color: trayToggleArea.containsMouse ? "#1affffff" : "transparent"
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: barWindow.trayExpanded ? "❯" : "❮"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 9
-                                    color: trayToggleArea.containsMouse ? Theme.accent : Theme.textMuted
+                                    color: trayToggleArea.containsMouse ? Theme.textPrimary : Theme.textMuted
                                 }
 
                                 MouseArea {
@@ -1243,6 +1237,7 @@ PanelWindow {
                                     spacing: 3
 
                                     Repeater {
+                                        id: trayRepeater
                                         model: SystemTray.items
 
                                         Rectangle {
@@ -1282,67 +1277,66 @@ PanelWindow {
                                 }
                             }
                         }
+                    }
+                }
 
-                        // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                // [F] Standalone Control Center Pill Button (Sliders Icon)
+                Rectangle {
+                    id: ctrlBtn
+                    implicitWidth: 26
+                    implicitHeight: 24
+                    radius: 12
+                    color: ctrlArea.containsMouse ? Theme.accentDim : "#f512131a"
+                    border.color: ctrlArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
+                    border.width: 1
+                    scale: ctrlArea.pressed ? 0.90 : (ctrlArea.containsMouse ? 1.06 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                        // [F] Control Center Trigger Button
-                        Rectangle {
-                            id: ctrlBtn
-                            implicitWidth: 20
-                            implicitHeight: 18
-                            radius: 9
-                            color: ctrlArea.containsMouse ? "#25ffffff" : "transparent"
-                            scale: ctrlArea.pressed ? 0.84 : (ctrlArea.containsMouse ? 1.15 : 1.0)
-                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰒓"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: ctrlArea.containsMouse ? Theme.accent : Theme.textPrimary
+                    }
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: "󰍜"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
-                                color: ctrlArea.containsMouse ? Theme.accent : Theme.textPrimary
-                            }
+                    MouseArea {
+                        id: ctrlArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: barWindow.toggleControl()
+                    }
+                }
 
-                            MouseArea {
-                                id: ctrlArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: barWindow.toggleControl()
-                            }
-                        }
+                // [G] Standalone Power / Fast Exit Pill Button
+                Rectangle {
+                    id: pwrBtn
+                    implicitWidth: 26
+                    implicitHeight: 24
+                    radius: 12
+                    color: pwrArea.containsMouse ? Theme.accent : "#f512131a"
+                    border.color: pwrArea.containsMouse ? Theme.accentLight : Theme.borderGlass
+                    border.width: 1
+                    scale: pwrArea.pressed ? 0.90 : (pwrArea.containsMouse ? 1.06 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                        // Divider
-                        Rectangle { implicitWidth: 1; implicitHeight: 10; color: "#1affffff" }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰐥"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 11
+                        color: pwrArea.containsMouse ? "#ffffff" : Theme.accent
+                    }
 
-                        // [G] Power / Fast Exit Trigger Button
-                        Rectangle {
-                            id: pwrBtn
-                            implicitWidth: 20
-                            implicitHeight: 18
-                            radius: 9
-                            color: pwrArea.containsMouse ? Theme.accent : "transparent"
-                            scale: pwrArea.pressed ? 0.84 : (pwrArea.containsMouse ? 1.15 : 1.0)
-                            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
-                            Behavior on color { ColorAnimation { duration: 150 } }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "󰐥"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
-                                color: pwrArea.containsMouse ? "#ffffff" : Theme.accent
-                            }
-
-                            MouseArea {
-                                id: pwrArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: barWindow.togglePower()
-                            }
-                        }
+                    MouseArea {
+                        id: pwrArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: barWindow.togglePower()
                     }
                 }
             }

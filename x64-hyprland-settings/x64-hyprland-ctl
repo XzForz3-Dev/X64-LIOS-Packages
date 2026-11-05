@@ -234,17 +234,130 @@ cmd_brightness() {
 }
 
 # -----------------------------------------------------------------------------
-# 5. POWER PROFILES
+# 5. POWER PROFILES (power-profiles-daemon + Kernel cpufreq / EPP / ACPI)
 # -----------------------------------------------------------------------------
+apply_kernel_power_profile() {
+    local prof="${1:-balanced}"
+    local avail_govs=""
+    if [ -r /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors ]; then
+        avail_govs=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null || echo "")
+    fi
+
+    case "$prof" in
+        performance)
+            if command -v powerprofilesctl >/dev/null 2>&1; then
+                powerprofilesctl set performance >/dev/null 2>&1 || powerprofilesctl set balanced >/dev/null 2>&1 || true
+            fi
+            [ -w /sys/firmware/acpi/platform_profile ] && echo "performance" > /sys/firmware/acpi/platform_profile 2>/dev/null || true
+            [ -w /sys/devices/system/cpu/intel_pstate/no_turbo ] && echo "0" > /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+            [ -w /sys/devices/system/cpu/cpufreq/boost ] && echo "1" > /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || true
+
+            for gov_file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+                [ -w "$gov_file" ] && echo "performance" > "$gov_file" 2>/dev/null || true
+            done
+            for epp_file in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
+                [ -w "$epp_file" ] && echo "performance" > "$epp_file" 2>/dev/null || true
+            done
+            if [ -n "$avail_govs" ] && [ ! -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ] && command -v cpupower >/dev/null 2>&1; then
+                sudo -n cpupower frequency-set -g performance >/dev/null 2>&1 || true
+            fi
+            ;;
+
+        balanced)
+            if command -v powerprofilesctl >/dev/null 2>&1; then
+                powerprofilesctl set balanced >/dev/null 2>&1 || true
+            fi
+            [ -w /sys/firmware/acpi/platform_profile ] && echo "balanced" > /sys/firmware/acpi/platform_profile 2>/dev/null || true
+            [ -w /sys/devices/system/cpu/intel_pstate/no_turbo ] && echo "0" > /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+            [ -w /sys/devices/system/cpu/cpufreq/boost ] && echo "1" > /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || true
+
+            local target_gov="powersave"
+            case " $avail_govs " in
+                *" schedutil "*) target_gov="schedutil" ;;
+                *" ondemand "*)  target_gov="ondemand" ;;
+            esac
+            for gov_file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+                [ -w "$gov_file" ] && echo "$target_gov" > "$gov_file" 2>/dev/null || true
+            done
+            for epp_file in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
+                [ -w "$epp_file" ] && echo "balance_performance" > "$epp_file" 2>/dev/null || true
+            done
+            if [ -n "$avail_govs" ] && [ ! -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ] && command -v cpupower >/dev/null 2>&1; then
+                sudo -n cpupower frequency-set -g "$target_gov" >/dev/null 2>&1 || true
+            fi
+            ;;
+
+        power-saver)
+            if command -v powerprofilesctl >/dev/null 2>&1; then
+                powerprofilesctl set power-saver >/dev/null 2>&1 || true
+            fi
+            if [ -w /sys/firmware/acpi/platform_profile ]; then
+                echo "low-power" > /sys/firmware/acpi/platform_profile 2>/dev/null || echo "quiet" > /sys/firmware/acpi/platform_profile 2>/dev/null || true
+            fi
+
+            for gov_file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+                [ -w "$gov_file" ] && echo "powersave" > "$gov_file" 2>/dev/null || true
+            done
+            for epp_file in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
+                [ -w "$epp_file" ] && echo "power" > "$epp_file" 2>/dev/null || true
+            done
+            if [ -n "$avail_govs" ] && [ ! -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ] && command -v cpupower >/dev/null 2>&1; then
+                sudo -n cpupower frequency-set -g powersave >/dev/null 2>&1 || true
+            fi
+            ;;
+    esac
+}
+
+get_effective_power_profile() {
+    if [ -s "${STATE_DIR}/power_profile" ]; then
+        cat "${STATE_DIR}/power_profile" 2>/dev/null
+        return 0
+    fi
+
+    local detected=""
+    if [ -s "${HOME}/.config/hypr/power_profile" ]; then
+        detected=$(cat "${HOME}/.config/hypr/power_profile" 2>/dev/null | tr -d '[:space:]')
+        if [ -n "$detected" ]; then
+            echo "$detected" > "${STATE_DIR}/power_profile"
+            apply_kernel_power_profile "$detected"
+            echo "$detected"
+            return 0
+        fi
+    fi
+
+    if command -v powerprofilesctl >/dev/null 2>&1; then
+        detected=$(powerprofilesctl get 2>/dev/null | tr -d '[:space:]')
+    fi
+    if [ -z "$detected" ] && [ -r /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
+        local g
+        g=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo "")
+        case "$g" in
+            performance) detected="performance" ;;
+            powersave)   detected="power-saver" ;;
+            *)           detected="balanced" ;;
+        esac
+    fi
+    [ -z "$detected" ] && detected="balanced"
+    echo "$detected" > "${STATE_DIR}/power_profile"
+    echo "$detected"
+}
+
 cmd_power() {
     local sub="${1:-get}"
     local prof="${2:-balanced}"
 
     if [ "$sub" = "set" ]; then
         case "$prof" in
-            performance)
+            performance|balanced|power-saver)
                 echo "$prof" > "${STATE_DIR}/power_profile"
-                powerprofilesctl set "$prof" >/dev/null 2>&1 || true
+                mkdir -p "${HOME}/.config/hypr" 2>/dev/null || true
+                echo "$prof" > "${HOME}/.config/hypr/power_profile" 2>/dev/null || true
+                apply_kernel_power_profile "$prof"
+                ;;
+        esac
+
+        case "$prof" in
+            performance)
                 if [ "$IS_ES" -eq 1 ]; then
                     notify_user "Perfil de Energía: Rendimiento" "Frecuencia máxima de CPU activada" "Energía X64"
                 else
@@ -252,8 +365,6 @@ cmd_power() {
                 fi
                 ;;
             balanced)
-                echo "$prof" > "${STATE_DIR}/power_profile"
-                powerprofilesctl set "$prof" >/dev/null 2>&1 || true
                 if [ "$IS_ES" -eq 1 ]; then
                     notify_user "Perfil de Energía: Equilibrado" "Balance dinámico entre potencia y consumo" "Energía X64"
                 else
@@ -261,8 +372,6 @@ cmd_power() {
                 fi
                 ;;
             power-saver)
-                echo "$prof" > "${STATE_DIR}/power_profile"
-                powerprofilesctl set "$prof" >/dev/null 2>&1 || true
                 if [ "$IS_ES" -eq 1 ]; then
                     notify_user "Perfil de Energía: Ahorro" "Modo eficiencia energética activado" "Energía X64"
                 else
@@ -271,7 +380,7 @@ cmd_power() {
                 ;;
         esac
     else
-        cat "${STATE_DIR}/power_profile" 2>/dev/null || echo "balanced"
+        get_effective_power_profile
     fi
 }
 
@@ -655,16 +764,19 @@ cmd_status() {
         fi
     done
     local pwr_prof
-    pwr_prof=$(cat "${STATE_DIR}/power_profile" 2>/dev/null || echo "balanced")
+    pwr_prof=$(get_effective_power_profile)
 
-    # 10. Brightness & OSD Event
-    local br_val osd_br_ts=0
+    # 10. Brightness, OSD Event, AI Scratchpad Engine & Live Zoom State
+    local br_val osd_br_ts=0 ai_eng="opencode" zoom_en="0" zoom_fac="1.0"
     br_val=$(cat "${STATE_DIR}/brightness" 2>/dev/null || echo "100")
     if [ -f "${STATE_DIR}/osd_brightness" ]; then
         IFS='|' read -r osd_br_ts _ < "${STATE_DIR}/osd_brightness"
     fi
+    ai_eng=$(get_effective_ai_engine)
+    zoom_en=$(get_effective_zoom_enabled)
+    zoom_fac=$(cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
 
-    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s}\n' \
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s"}\n' \
         "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" \
         "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
         "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
@@ -674,7 +786,8 @@ cmd_status() {
         "$([ "$nl_val" = "1" ] && echo true || echo false)" \
         "$([ "$dnd_val" = "1" ] && echo true || echo false)" \
         "$rec_active" "$rec_time" \
-        "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}"
+        "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}" "$ai_eng" \
+        "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac"
 }
 
 # -----------------------------------------------------------------------------
@@ -867,6 +980,197 @@ cmd_net() {
     esac
 }
 
+# -----------------------------------------------------------------------------
+# 9. X64 AI HUB & DROPDOWN SCRATCHPAD (SUPER + S / SUPER + A / F12)
+# -----------------------------------------------------------------------------
+get_effective_ai_engine() {
+    if [ -s "${STATE_DIR}/ai_engine" ]; then
+        cat "${STATE_DIR}/ai_engine" 2>/dev/null | tr -d '[:space:]'
+        return 0
+    fi
+    if [ -s "${HOME}/.config/hypr/ai_engine" ]; then
+        local saved
+        saved=$(cat "${HOME}/.config/hypr/ai_engine" 2>/dev/null | tr -d '[:space:]')
+        if [ -n "$saved" ]; then
+            echo "$saved" > "${STATE_DIR}/ai_engine"
+            echo "$saved"
+            return 0
+        fi
+    fi
+    echo "opencode" > "${STATE_DIR}/ai_engine"
+    echo "opencode"
+}
+
+spawn_scratchpad_engine() {
+    local eng="${1:-opencode}"
+    case "$eng" in
+        opencode)
+            if command -v opencode >/dev/null 2>&1; then
+                hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class x64-scratchpad --title \"X64 AI • OpenCode\" -e opencode")' >/dev/null 2>&1 || true
+            else
+                hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class x64-scratchpad --title \"X64 Scratchpad\"")' >/dev/null 2>&1 || true
+            fi
+            ;;
+        chatgpt)
+            hyprctl dispatch 'hl.dsp.exec_cmd("chromium --app=https://chatgpt.com --class=x64-scratchpad")' >/dev/null 2>&1 || true
+            ;;
+        claude)
+            hyprctl dispatch 'hl.dsp.exec_cmd("chromium --app=https://claude.ai --class=x64-scratchpad")' >/dev/null 2>&1 || true
+            ;;
+        gemini)
+            hyprctl dispatch 'hl.dsp.exec_cmd("chromium --app=https://gemini.google.com --class=x64-scratchpad")' >/dev/null 2>&1 || true
+            ;;
+        deepseek)
+            hyprctl dispatch 'hl.dsp.exec_cmd("chromium --app=https://chat.deepseek.com --class=x64-scratchpad")' >/dev/null 2>&1 || true
+            ;;
+        terminal|*)
+            hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class x64-scratchpad --title \"X64 Scratchpad\"")' >/dev/null 2>&1 || true
+            ;;
+    esac
+}
+
+cmd_ai_engine() {
+    local sub="${1:-get}"
+    local eng="${2:-opencode}"
+
+    if [ "$sub" = "set" ]; then
+        case "$eng" in
+            opencode|chatgpt|claude|gemini|deepseek|terminal)
+                echo "$eng" > "${STATE_DIR}/ai_engine"
+                mkdir -p "${HOME}/.config/hypr" 2>/dev/null || true
+                echo "$eng" > "${HOME}/.config/hypr/ai_engine" 2>/dev/null || true
+
+                # Close previous scratchpad instance so the new engine spawns cleanly next time
+                local prev_pids
+                prev_pids=$(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class == "x64-scratchpad" or .workspace.name == "special:scratchpad") | .pid' 2>/dev/null || echo "")
+                for p in $prev_pids; do
+                    [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null && kill -TERM "$p" 2>/dev/null || true
+                done
+
+                local label="OpenCode (Modelos Gratis)"
+                case "$eng" in
+                    chatgpt)  label="ChatGPT Web App" ;;
+                    claude)   label="Claude AI Web App" ;;
+                    gemini)   label="Google Gemini Web App" ;;
+                    deepseek) label="DeepSeek AI Web App" ;;
+                    terminal) label="Terminal Kitty" ;;
+                esac
+
+                if [ "$IS_ES" -eq 1 ]; then
+                    notify_user "Motor Scratchpad: ${label}" "Pulsa SUPER + S o F12 para desplegar" "X64 AI Hub"
+                else
+                    notify_user "Scratchpad Engine: ${label}" "Press SUPER + S or F12 to toggle" "X64 AI Hub"
+                fi
+                ;;
+        esac
+    else
+        get_effective_ai_engine
+    fi
+}
+
+cmd_scratchpad() {
+    local eng
+    eng=$(get_effective_ai_engine)
+    local has_scratch
+    has_scratch=$(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class == "x64-scratchpad" or .workspace.name == "special:scratchpad") | .address' 2>/dev/null | head -n1)
+
+    if [ -z "$has_scratch" ]; then
+        local active_sp
+        active_sp=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].specialWorkspace.name // ""' 2>/dev/null || echo "")
+        if [ "$active_sp" != "special:scratchpad" ]; then
+            hyprctl dispatch 'hl.dsp.workspace.toggle_special("scratchpad")' >/dev/null 2>&1 || hyprctl dispatch togglespecialworkspace scratchpad >/dev/null 2>&1 || true
+        fi
+        spawn_scratchpad_engine "$eng"
+    else
+        hyprctl dispatch 'hl.dsp.workspace.toggle_special("scratchpad")' >/dev/null 2>&1 || hyprctl dispatch togglespecialworkspace scratchpad >/dev/null 2>&1 || true
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# 10. LIVE CINEMATIC MAGNIFIER / ZOOM (SUPER + CTRL + Wheel + Control Center)
+# -----------------------------------------------------------------------------
+get_effective_zoom_enabled() {
+    if [ -s "${STATE_DIR}/zoom_enabled" ]; then
+        cat "${STATE_DIR}/zoom_enabled" 2>/dev/null | tr -d '[:space:]'
+        return 0
+    fi
+    if [ -s "${HOME}/.config/hypr/zoom_enabled" ]; then
+        local saved
+        saved=$(cat "${HOME}/.config/hypr/zoom_enabled" 2>/dev/null | tr -d '[:space:]')
+        if [ -n "$saved" ]; then
+            echo "$saved" > "${STATE_DIR}/zoom_enabled"
+            echo "$saved"
+            return 0
+        fi
+    fi
+    echo "0" > "${STATE_DIR}/zoom_enabled"
+    echo "0"
+}
+
+apply_zoom_factor() {
+    local z="${1:-1.0}"
+    echo "$z" > "${STATE_DIR}/zoom_factor"
+    hyprctl eval "hl.config({ cursor = { zoom_factor = ${z} } })" >/dev/null 2>&1 || \
+        hyprctl keyword cursor:zoom_factor "${z}" >/dev/null 2>&1 || true
+}
+
+cmd_zoom() {
+    local action="${1:-toggle}"
+    local en
+    en=$(get_effective_zoom_enabled)
+
+    if [ "$action" = "toggle" ]; then
+        [ "$en" = "1" ] && action="off" || action="on"
+    fi
+
+    case "$action" in
+        on)
+            echo "1" > "${STATE_DIR}/zoom_enabled"
+            mkdir -p "${HOME}/.config/hypr" 2>/dev/null || true
+            echo "1" > "${HOME}/.config/hypr/zoom_enabled" 2>/dev/null || true
+            [ -f "${STATE_DIR}/zoom_factor" ] || echo "1.0" > "${STATE_DIR}/zoom_factor"
+            hyprctl eval "_G.x64_set_zoom_binds(true)" >/dev/null 2>&1 || true
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Lupa / Zoom Activada" "Usa ALT + Rueda para acercar o alejar" "Lupa X64"
+            else
+                notify_user "Live Zoom Enabled" "Use ALT + Wheel to zoom in or out" "X64 Magnifier"
+            fi
+            ;;
+        off)
+            echo "0" > "${STATE_DIR}/zoom_enabled"
+            mkdir -p "${HOME}/.config/hypr" 2>/dev/null || true
+            echo "0" > "${HOME}/.config/hypr/zoom_enabled" 2>/dev/null || true
+            hyprctl eval "_G.x64_set_zoom_binds(false)" >/dev/null 2>&1 || true
+            apply_zoom_factor "1.0"
+            if [ "$IS_ES" -eq 1 ]; then
+                notify_user "Lupa / Zoom Desactivada" "Vista restaurada a 1.0x" "Lupa X64"
+            else
+                notify_user "Live Zoom Disabled" "View restored to 1.0x" "X64 Magnifier"
+            fi
+            ;;
+        in)
+            [ "$en" != "1" ] && return 0
+            local cur new_z
+            cur=$(hyprctl getoption cursor:zoom_factor -j 2>/dev/null | jq -r '.float // 1.0' 2>/dev/null || cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
+            new_z=$(awk -v c="${cur:-1.0}" 'BEGIN { n = c + 0.25; if (n > 3.0) n = 3.0; printf "%.2f", n }')
+            apply_zoom_factor "$new_z"
+            ;;
+        out)
+            [ "$en" != "1" ] && return 0
+            local cur new_z
+            cur=$(hyprctl getoption cursor:zoom_factor -j 2>/dev/null | jq -r '.float // 1.0' 2>/dev/null || cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
+            new_z=$(awk -v c="${cur:-1.0}" 'BEGIN { n = c - 0.25; if (n < 1.0) n = 1.0; printf "%.2f", n }')
+            apply_zoom_factor "$new_z"
+            ;;
+        reset)
+            apply_zoom_factor "1.0"
+            ;;
+        get)
+            get_effective_zoom_enabled
+            ;;
+    esac
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -878,6 +1182,9 @@ case "${1:-status}" in
     record-worker)     cmd_record_worker "${2:-fullscreen}" "${3:-desktop}" ;;
     screenshot)        cmd_screenshot "${2:-full}" ;;
     screenshot-worker) cmd_screenshot_worker "${2:-full}" ;;
+    scratchpad)        cmd_scratchpad ;;
+    ai-engine)         cmd_ai_engine "${2:-get}" "${3:-opencode}" ;;
+    zoom)              cmd_zoom "${2:-toggle}" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

@@ -1,10 +1,10 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=28
+pkgrel=37
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'hyprlock' 'quickshell' 'swaybg' 'kitty' 'dolphin' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'hyprsunset' 'libnotify')
+depends=('hyprland' 'hyprlock' 'hypridle' 'hyprpolkitagent' 'hyprpwcenter' 'hyprpicker' 'hyprsunset' 'quickshell' 'swaybg' 'kitty' 'opencode' 'dolphin' 'ark' 'ffmpegthumbs' 'kdegraphics-thumbnailers' 'loupe' 'papers' 'gnome-text-editor' 'qalculate-gtk' 'blueman' 'gnome-disk-utility' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'libnotify')
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'
@@ -36,7 +36,7 @@ package() {
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/skel/.config/hypr/hyprlock.conf"
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/xdg/hypr/hyprlock.conf"
 
-    # Install 4K Monolith Wallpaper
+    # Install 4K Monolith Wallpaper (opencode.desktop & opencode.svg are provided system-wide by x64-terminal-settings)
     install -Dm644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
 
     # Install Quickshell Desktop Shell to /usr/share and /etc/skel

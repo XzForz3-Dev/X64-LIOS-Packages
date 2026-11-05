@@ -120,104 +120,157 @@ PanelWindow {
         Repeater {
             model: toastModel
             delegate: Rectangle {
-                readonly property bool isDndToast: model.appName === "No Molestar" || model.appName === "Do Not Disturb"
-                readonly property color toastAccent: isDndToast ? "#c084fc" : Theme.accent
-
-                Layout.fillWidth: true
-                implicitHeight: cardInner.implicitHeight + 22
-                radius: Theme.radiusMd
-                color: Theme.bgGlass
-                border.color: isDndToast ? "#88a855f7" : Theme.borderAccent
-                border.width: 1
-
-                // Top Neon Accent Glow Line
-                Rectangle {
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                        right: parent.right
-                        leftMargin: 18
-                        rightMargin: 18
-                    }
-                    height: 2
-                    radius: 1
-                    color: parent.toastAccent
+                id: toastCard
+                readonly property string lowerSum: (model.summary || "").toLowerCase()
+                readonly property string lowerApp: (model.appName || "").toLowerCase()
+                readonly property string toastIcon: {
+                    if (lowerApp.indexOf("molestar") !== -1 || lowerApp.indexOf("disturb") !== -1 || lowerSum.indexOf("molestar") !== -1) return "󰂛";
+                    if (lowerSum.indexOf("noche") !== -1 || lowerSum.indexOf("nocturna") !== -1 || lowerSum.indexOf("night") !== -1) return "󰖔";
+                    if (lowerSum.indexOf("café") !== -1 || lowerSum.indexOf("cafe") !== -1 || lowerSum.indexOf("caffeine") !== -1) return "󰅶";
+                    if (lowerSum.indexOf("captura") !== -1 || lowerSum.indexOf("screen") !== -1 || lowerSum.indexOf("grab") !== -1) return "󰄀";
+                    if (lowerSum.indexOf("energía") !== -1 || lowerSum.indexOf("power") !== -1 || lowerSum.indexOf("perfil") !== -1) return "󰾅";
+                    if (lowerSum.indexOf("red") !== -1 || lowerSum.indexOf("wi-fi") !== -1 || lowerSum.indexOf("ethernet") !== -1) return "󰈀";
+                    return "󰂚";
                 }
 
-                ColumnLayout {
+                Layout.fillWidth: true
+                implicitHeight: cardInner.implicitHeight + 24
+                radius: Theme.radiusLg
+                color: toastArea.containsMouse ? Theme.bgCard : Theme.bgGlass
+                border.color: toastArea.containsMouse ? "#28ffffff" : Theme.borderGlass
+                border.width: 1
+                clip: true
+
+                // Smooth entry animation
+                opacity: 0.0
+                scale: 0.95
+                transform: Translate { id: slideTrans; x: 24 }
+                transformOrigin: Item.TopRight
+
+                Component.onCompleted: {
+                    enterAnim.start();
+                }
+
+                ParallelAnimation {
+                    id: enterAnim
+                    NumberAnimation { target: toastCard; property: "opacity"; from: 0.0; to: 1.0; duration: 200; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: toastCard; property: "scale"; from: 0.95; to: 1.0; duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
+                    NumberAnimation { target: slideTrans; property: "x"; from: 24; to: 0; duration: 220; easing.type: Easing.OutCubic }
+                }
+
+                RowLayout {
                     id: cardInner
-                    anchors.fill: parent
-                    anchors.margins: 11
-                    spacing: 4
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.margins: 12
+                    spacing: 11
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-
-                        Text {
-                            text: isDndToast ? "󰂛" : "󰂚"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            color: toastAccent
-                        }
-
-                        Text {
-                            text: model.appName.toUpperCase()
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            font.bold: true
-                            color: toastAccent
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            text: "󰅖"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            color: Theme.textMuted
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: model.summary
-                        font.family: Theme.fontSans
-                        font.pixelSize: 11
-                        font.bold: true
-                        color: Theme.textPrimary
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Text {
-                        visible: model.body !== ""
-                        Layout.fillWidth: true
-                        text: model.body
-                        font.family: Theme.fontSans
-                        font.pixelSize: 10
-                        color: Theme.textSecondary
-                        wrapMode: Text.WordWrap
-                    }
-
-                    // Auto-expire countdown bar
+                    // Left Monochromatic Icon Badge with Subtle Crimson Dot
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.topMargin: 3
-                        height: 2
-                        radius: 1
-                        color: "#1affffff"
+                        Layout.alignment: Qt.AlignTop
+                        implicitWidth: 34
+                        implicitHeight: 34
+                        radius: 10
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: toastCard.toastIcon
+                            font.family: Theme.fontMono
+                            font.pixelSize: 14
+                            color: Theme.textPrimary
+                        }
 
                         Rectangle {
-                            width: parent.width * Math.max(0.0, model.ticks / 45.0)
-                            height: parent.height
-                            radius: 1
-                            color: toastAccent
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.topMargin: 5
+                            anchors.rightMargin: 5
+                            width: 5
+                            height: 5
+                            radius: 2.5
+                            color: Theme.accent
                         }
+                    }
+
+                    // Right Text Column
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                text: model.appName.toUpperCase()
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.8
+                                color: Theme.textMuted
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                text: "󰅖"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                color: toastArea.containsMouse ? Theme.textSecondary : Theme.textMuted
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: model.summary
+                            font.family: Theme.fontSans
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: Theme.textPrimary
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            visible: model.body !== ""
+                            Layout.fillWidth: true
+                            text: model.body
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            color: Theme.textSecondary
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                // Subtle Bottom Countdown Line
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+                    anchors.bottomMargin: 1
+                    height: 2
+                    radius: 1
+                    color: "#0fffffff"
+
+                    Rectangle {
+                        width: parent.width * Math.max(0.0, model.ticks / 45.0)
+                        height: parent.height
+                        radius: 1
+                        color: "#55ffffff"
+                        Behavior on width { NumberAnimation { duration: 110; easing.type: Easing.Linear } }
                     }
                 }
 
                 MouseArea {
+                    id: toastArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: toastModel.remove(index)
                 }

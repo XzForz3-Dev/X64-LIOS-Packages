@@ -1,6 +1,6 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=21
+pkgrel=22
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
@@ -10,11 +10,13 @@ source=('x64-hello'
         'x64-waydroid-launcher'
         'x64-sunshine-launcher'
         'x64-sunshine.desktop'
+        'x64-sunshine.svg'
         'x64-hello.desktop'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
         'x64-cube.png')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -41,6 +43,8 @@ package() {
     # Instalar los iconos (PNG pixmap y SVG vectorial para temas de escritorio)
     install -Dm644 "${srcdir}/x64-hello-icon.png" "${pkgdir}/usr/share/pixmaps/x64-hello-icon.png"
     install -Dm644 "${srcdir}/x64-hello-icon.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-hello-icon.svg"
+    install -Dm644 "${srcdir}/x64-sunshine.svg" "${pkgdir}/usr/share/pixmaps/x64-sunshine.svg"
+    install -Dm644 "${srcdir}/x64-sunshine.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/dev.lizardbyte.app.Sunshine.svg"
     
     # Instalar el logo del cubo 3D
     install -Dm644 "${srcdir}/x64-cube.png" "${pkgdir}/usr/share/pixmaps/x64-cube.png"

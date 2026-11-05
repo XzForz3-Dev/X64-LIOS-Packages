@@ -29,6 +29,9 @@ PanelWindow {
     property string batStatus: "AC"
     property string powerProfile: "balanced"
     property int brightnessVal: 100
+    property string aiEngine: "opencode"
+    property bool zoomEnabled: false
+    property string zoomFactor: "1.0"
 
     anchors {
         top: true
@@ -40,8 +43,8 @@ PanelWindow {
         right: 8
     }
 
-    implicitWidth: 372
-    implicitHeight: Math.min((controlWindow.recMenuOpen && !controlWindow.isRecording) ? 692 : 586, (screen ? screen.height : 1080) - 50)
+    implicitWidth: 368
+    implicitHeight: Math.min(735, (screen ? screen.height : 1080) - 44)
 
     color: "transparent"
 
@@ -132,7 +135,10 @@ PanelWindow {
 
     function runCtl(args) {
         ctlGuardTimer.restart();
-        ctlExecProc.command = ["x64-hyprland-ctl"].concat(args);
+        if (ctlExecProc.running) {
+            ctlExecProc.running = false;
+        }
+        ctlExecProc.command = ["/usr/bin/x64-hyprland-ctl"].concat(args);
         ctlExecProc.running = true;
     }
 
@@ -168,6 +174,9 @@ PanelWindow {
                         controlWindow.nightlightActive = Boolean(d.nightlight);
                         controlWindow.dndActive = Boolean(d.dnd);
                         controlWindow.powerProfile = d.powerProfile || "balanced";
+                        if (d.aiEngine) controlWindow.aiEngine = d.aiEngine;
+                        if (d.zoomEnabled !== undefined) controlWindow.zoomEnabled = Boolean(d.zoomEnabled);
+                        if (d.zoomFactor) controlWindow.zoomFactor = String(d.zoomFactor);
                     }
                     controlWindow.isRecording = Boolean(d.recording);
                     controlWindow.recTime = d.recTime || "00:00";
@@ -212,7 +221,10 @@ PanelWindow {
     // Control Center Card pinned to top right with Jelly / Elastic Physics
     Rectangle {
         id: card
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: mainCol.implicitHeight + 30
         transformOrigin: Item.TopRight
         scale: 1.0
         opacity: 1.0
@@ -222,46 +234,141 @@ PanelWindow {
         border.width: 1
 
         ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 8
+            id: mainCol
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: 15
+            spacing: 10
 
-            // Header
+            // =================================================================
+            // HEADER: TITLE, SUBTITLE & TOP-RIGHT CIRCULAR SESSION ACTIONS
+            // =================================================================
             RowLayout {
                 Layout.fillWidth: true
+                spacing: 6
 
-                Text {
-                    text: I18n.controlCenterTitle
-                    font.family: Theme.fontMono
-                    font.pixelSize: 12
-                    font.bold: true
-                    color: Theme.accent
+                ColumnLayout {
+                    spacing: 1
+                    RowLayout {
+                        spacing: 6
+                        Rectangle {
+                            width: 6
+                            height: 6
+                            radius: 3
+                            color: Theme.accent
+                        }
+                        Text {
+                            text: I18n.controlCenterTitle
+                            font.family: Theme.fontMono
+                            font.pixelSize: 11
+                            font.bold: true
+                            font.letterSpacing: 1.1
+                            color: Theme.textSecondary
+                        }
+                    }
+                    Text {
+                        text: I18n.isEs ? "X64 LIOS v28 • Sesión activa" : "X64 LIOS v28 • Active session"
+                        font.family: Theme.fontSans
+                        font.pixelSize: 10
+                        color: Theme.textMuted
+                    }
                 }
 
                 Item { Layout.fillWidth: true }
 
-                Text {
-                    text: "󰅖"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 14
-                    color: Theme.textMuted
+                // Top-Right Circular Session Buttons (Lock, Reboot, Power Off)
+                Rectangle {
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    radius: 14
+                    color: lockArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: lockArea.containsMouse ? "#33ffffff" : Theme.borderSubtle
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 130 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰌾"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: lockArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                    }
+
                     MouseArea {
+                        id: lockArea
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: controlWindow.closeAnimated()
+                        onClicked: {
+                            controlWindow.closeRequested();
+                            controlWindow.lockRequested();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    radius: 14
+                    color: rebootArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                    border.color: rebootArea.containsMouse ? "#33ffffff" : Theme.borderSubtle
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 130 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰑓"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: rebootArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                    }
+
+                    MouseArea {
+                        id: rebootArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl reboot")');
+                            controlWindow.closeRequested();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    radius: 14
+                    color: offArea.containsMouse ? Theme.accent : "#1fff2b2b"
+                    border.color: offArea.containsMouse ? Theme.accentLight : Theme.borderAccent
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 130 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰐥"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: offArea.containsMouse ? "#ffffff" : Theme.accent
+                    }
+
+                    MouseArea {
+                        id: offArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl poweroff")');
+                            controlWindow.closeRequested();
+                        }
                     }
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.borderSubtle
-            }
-
-            // -----------------------------------------------------------------
-            // 1. OMARCHY-STYLE QUICK SYSTEM TOGGLES (Caffeine, Nightlight, DND)
-            // -----------------------------------------------------------------
+            // =================================================================
+            // 1. STATE TOGGLE TILES (Color = State: Crimson ONLY when Active)
+            // =================================================================
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6
@@ -269,28 +376,49 @@ PanelWindow {
                 // Modo Café (Idle Inhibitor)
                 Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
+                    implicitHeight: 74
+                    radius: Theme.radiusMd
                     color: controlWindow.caffeineActive ? Theme.accentDim : (cafArea.containsMouse ? Theme.bgHover : Theme.bgCard)
-                    border.color: controlWindow.caffeineActive ? Theme.accent : (cafArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
+                    border.color: controlWindow.caffeineActive ? Theme.accentBorder : (cafArea.containsMouse ? "#28ffffff" : Theme.borderSubtle)
                     border.width: 1
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text {
-                            text: "󰅶"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 13
-                            color: controlWindow.caffeineActive ? "#ffffff" : Theme.accent
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 2
+
+                        Rectangle {
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            radius: 6
+                            color: controlWindow.caffeineActive ? "#28ff2b2b" : "#0fffffff"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰅶"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 12
+                                color: controlWindow.caffeineActive ? Theme.accent : Theme.textSecondary
+                            }
                         }
+
+                        Item { Layout.fillHeight: true }
+
                         Text {
                             text: I18n.caffeine
                             font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: controlWindow.caffeineActive
+                            font.pixelSize: 10
+                            font.bold: true
                             color: Theme.textPrimary
+                        }
+
+                        Text {
+                            text: controlWindow.caffeineActive ? (I18n.isEs ? "Activo" : "Active") : (I18n.isEs ? "Apagado" : "Off")
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            color: controlWindow.caffeineActive ? "#ff9494" : Theme.textMuted
                         }
                     }
 
@@ -306,31 +434,52 @@ PanelWindow {
                     }
                 }
 
-                // Luz Nocturna (4200K Filter)
+                // Luz Noche (4200K Filter — Unified Crimson State)
                 Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: controlWindow.nightlightActive ? "#55ffaa00" : (nlArea.containsMouse ? Theme.bgHover : Theme.bgCard)
-                    border.color: controlWindow.nightlightActive ? "#ffaa00" : (nlArea.containsMouse ? "#88ffaa00" : Theme.borderSubtle)
+                    implicitHeight: 74
+                    radius: Theme.radiusMd
+                    color: controlWindow.nightlightActive ? Theme.accentDim : (nlArea.containsMouse ? Theme.bgHover : Theme.bgCard)
+                    border.color: controlWindow.nightlightActive ? Theme.accentBorder : (nlArea.containsMouse ? "#28ffffff" : Theme.borderSubtle)
                     border.width: 1
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text {
-                            text: "󰖔"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 13
-                            color: controlWindow.nightlightActive ? "#ffffff" : "#ffaa00"
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 2
+
+                        Rectangle {
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            radius: 6
+                            color: controlWindow.nightlightActive ? "#28ff2b2b" : "#0fffffff"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰖔"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 12
+                                color: controlWindow.nightlightActive ? Theme.accent : Theme.textSecondary
+                            }
                         }
+
+                        Item { Layout.fillHeight: true }
+
                         Text {
                             text: I18n.nightLight
                             font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: controlWindow.nightlightActive
+                            font.pixelSize: 10
+                            font.bold: true
                             color: Theme.textPrimary
+                        }
+
+                        Text {
+                            text: controlWindow.nightlightActive ? "4200K" : (I18n.isEs ? "Apagado" : "Off")
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            color: controlWindow.nightlightActive ? "#ff9494" : Theme.textMuted
                         }
                     }
 
@@ -347,31 +496,52 @@ PanelWindow {
                     }
                 }
 
-                // Modo No Molestar (DND)
+                // No Molestar (DND — Unified Crimson State)
                 Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: controlWindow.dndActive ? "#44a855f7" : (dndArea.containsMouse ? Theme.bgHover : Theme.bgCard)
-                    border.color: controlWindow.dndActive ? "#a855f7" : (dndArea.containsMouse ? "#88a855f7" : Theme.borderSubtle)
+                    implicitHeight: 74
+                    radius: Theme.radiusMd
+                    color: controlWindow.dndActive ? Theme.accentDim : (dndArea.containsMouse ? Theme.bgHover : Theme.bgCard)
+                    border.color: controlWindow.dndActive ? Theme.accentBorder : (dndArea.containsMouse ? "#28ffffff" : Theme.borderSubtle)
                     border.width: 1
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text {
-                            text: "󰂛"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 13
-                            color: controlWindow.dndActive ? "#ffffff" : "#c084fc"
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 9
+                        spacing: 2
+
+                        Rectangle {
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            radius: 6
+                            color: controlWindow.dndActive ? "#28ff2b2b" : "#0fffffff"
+                            Text {
+                                anchors.centerIn: parent
+                                text: "󰂛"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 12
+                                color: controlWindow.dndActive ? Theme.accent : Theme.textSecondary
+                            }
                         }
+
+                        Item { Layout.fillHeight: true }
+
                         Text {
                             text: I18n.dnd
                             font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: controlWindow.dndActive
+                            font.pixelSize: 10
+                            font.bold: true
                             color: Theme.textPrimary
+                        }
+
+                        Text {
+                            text: controlWindow.dndActive ? (I18n.isEs ? "Activo" : "Active") : (I18n.isEs ? "Apagado" : "Off")
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            color: controlWindow.dndActive ? "#ff9494" : Theme.textMuted
                         }
                     }
 
@@ -387,400 +557,387 @@ PanelWindow {
                         }
                     }
                 }
-            }
 
-            // -----------------------------------------------------------------
-            // 2. SCREEN CAPTURE & LIVE SCREEN RECORDING SUITE (DUAL ENGINE)
-            // -----------------------------------------------------------------
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
-                // Capture Region (Recortar)
+                // Lupa Zoom (Live Magnifier On/Off — SUPER + CTRL + Wheel)
                 Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: shotRegArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: shotRegArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    implicitHeight: 74
+                    radius: Theme.radiusMd
+                    color: controlWindow.zoomEnabled ? Theme.accentDim : (zoomArea.containsMouse ? Theme.bgHover : Theme.bgCard)
+                    border.color: controlWindow.zoomEnabled ? Theme.accentBorder : (zoomArea.containsMouse ? "#28ffffff" : Theme.borderSubtle)
                     border.width: 1
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text { text: "󰆞"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: I18n.crop; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
-
-                    MouseArea {
-                        id: shotRegArea
+                    ColumnLayout {
                         anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.recMenuOpen = false;
-                            controlWindow.closeRequested();
-                            controlWindow.runCtl(["screenshot", "region"]);
-                        }
-                    }
-                }
+                        anchors.margins: 9
+                        spacing: 2
 
-                // Capture Fullscreen (Pantalla)
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: shotFullArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: shotFullArea.containsMouse ? Theme.accent : Theme.borderSubtle
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text { text: "󰄀"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.accent }
-                        Text { text: I18n.screen; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
-
-                    MouseArea {
-                        id: shotFullArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.recMenuOpen = false;
-                            controlWindow.closeRequested();
-                            controlWindow.runCtl(["screenshot", "full"]);
-                        }
-                    }
-                }
-
-                // Screen Record Button (Opens Options Sub-Panel or Stops Active Recording)
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: controlWindow.isRecording ? Theme.accent : (controlWindow.recMenuOpen ? Theme.accentDim : (recBtnArea.containsMouse ? Theme.bgHover : Theme.bgCard))
-                    border.color: controlWindow.isRecording ? Theme.accentLight : ((controlWindow.recMenuOpen || recBtnArea.containsMouse) ? Theme.accent : Theme.borderSubtle)
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text {
-                            text: controlWindow.isRecording ? "󰓛" : "󰑊"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 12
-                            color: (controlWindow.isRecording || controlWindow.recMenuOpen) ? "#ffffff" : Theme.accent
-                        }
-                        Text {
-                            text: controlWindow.isRecording ? (I18n.recordStop + controlWindow.recTime) : (controlWindow.recMenuOpen ? (I18n.record + " ▴") : (I18n.record + " ▾"))
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: controlWindow.isRecording || controlWindow.recMenuOpen
-                            color: Theme.textPrimary
-                        }
-                    }
-
-                    MouseArea {
-                        id: recBtnArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: (mouse) => {
-                            if (controlWindow.isRecording) {
-                                controlWindow.isRecording = false;
-                                controlWindow.recMenuOpen = false;
-                                controlWindow.runCtl(["record", "stop"]);
-                            } else if (mouse.button === Qt.RightButton) {
-                                controlWindow.recMenuOpen = false;
-                                controlWindow.isRecording = true;
-                                controlWindow.closeRequested();
-                                controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
-                            } else {
-                                controlWindow.recMenuOpen = !controlWindow.recMenuOpen;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Expandable Omarchy-Style Recording Options Drawer (Area + Audio + Start)
-            Rectangle {
-                id: recDrawer
-                visible: controlWindow.recMenuOpen && !controlWindow.isRecording
-                Layout.fillWidth: true
-                implicitHeight: 98
-                radius: Theme.radiusSm
-                color: Theme.bgCard
-                border.color: Theme.borderAccent
-                border.width: 1
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 5
-
-                    // Row 1: Scope Selector (Pantalla vs Región)
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 5
-
-                        Repeater {
-                            model: [
-                                { id: "fullscreen", label: I18n.scopeFullscreen },
-                                { id: "region",     label: I18n.scopeRegion }
-                            ]
-
-                            Rectangle {
-                                id: scopePill
-                                Layout.fillWidth: true
-                                implicitHeight: 24
-                                radius: Theme.radiusSm
-                                readonly property bool isSel: controlWindow.recScope === modelData.id
-                                color: isSel ? Theme.accentDim : (scopeArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
-                                border.color: isSel ? Theme.accent : (scopeArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    color: scopePill.isSel ? "#ffffff" : Theme.textSecondary
-                                }
-
-                                MouseArea {
-                                    id: scopeArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: controlWindow.recScope = modelData.id
-                                }
-                            }
-                        }
-                    }
-
-                    // Row 2: Audio Source Selector (Sin Audio | Audio PC | PC + Mic)
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 5
-
-                        Repeater {
-                            model: [
-                                { id: "none",    label: I18n.audioNone },
-                                { id: "desktop", label: I18n.audioDesktop },
-                                { id: "both",    label: I18n.audioBoth }
-                            ]
-
-                            Rectangle {
-                                id: audPill
-                                Layout.fillWidth: true
-                                implicitHeight: 24
-                                radius: Theme.radiusSm
-                                readonly property bool isSel: controlWindow.recAudio === modelData.id
-                                color: isSel ? Theme.accentDim : (audArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
-                                border.color: isSel ? Theme.accent : (audArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    color: audPill.isSel ? "#ffffff" : Theme.textSecondary
-                                }
-
-                                MouseArea {
-                                    id: audArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: controlWindow.recAudio = modelData.id
-                                }
-                            }
-                        }
-                    }
-
-                    // Row 3: Start Recording Action Button
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: 26
-                        radius: Theme.radiusSm
-                        color: startRecArea.containsMouse ? Theme.accentLight : Theme.accent
-                        border.color: Theme.accentLight
-                        border.width: 1
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 6
+                        Rectangle {
+                            implicitWidth: 22
+                            implicitHeight: 22
+                            radius: 6
+                            color: controlWindow.zoomEnabled ? "#28ff2b2b" : "#0fffffff"
                             Text {
-                                text: "󰑊"
+                                anchors.centerIn: parent
+                                text: "󰍉"
                                 font.family: Theme.fontMono
                                 font.pixelSize: 12
-                                color: "#ffffff"
-                            }
-                            Text {
-                                text: I18n.startRecordingNow
-                                font.family: Theme.fontSans
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: "#ffffff"
+                                color: controlWindow.zoomEnabled ? Theme.accent : Theme.textSecondary
                             }
                         }
 
-                        MouseArea {
-                            id: startRecArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                controlWindow.recMenuOpen = false;
-                                controlWindow.isRecording = true;
-                                controlWindow.closeRequested();
-                                controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
+                        Item { Layout.fillHeight: true }
+
+                        Text {
+                            text: I18n.isEs ? "Lupa Zoom" : "Live Zoom"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+
+                        Text {
+                            text: controlWindow.zoomEnabled
+                                ? ((controlWindow.zoomFactor !== "1.0" && controlWindow.zoomFactor !== "1.00") ? (controlWindow.zoomFactor + "x") : (I18n.isEs ? "ALT+Rueda" : "ALT+Wheel"))
+                                : (I18n.isEs ? "Apagado" : "Off")
+                            font.family: Theme.fontSans
+                            font.pixelSize: 9
+                            font.weight: Font.Medium
+                            color: controlWindow.zoomEnabled ? "#ff9494" : Theme.textMuted
+                        }
+                    }
+
+                    MouseArea {
+                        id: zoomArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                controlWindow.zoomFactor = "1.0";
+                                controlWindow.runCtl(["zoom", "reset"]);
+                            } else {
+                                controlWindow.zoomEnabled = !controlWindow.zoomEnabled;
+                                if (!controlWindow.zoomEnabled) controlWindow.zoomFactor = "1.0";
+                                controlWindow.runCtl(["zoom", controlWindow.zoomEnabled ? "on" : "off"]);
                             }
                         }
                     }
                 }
             }
 
-            // -----------------------------------------------------------------
-            // 3. QUICK APP ACTIONS (2x2 Grid)
-            // -----------------------------------------------------------------
-            GridLayout {
+            // =================================================================
+            // 2. UNIFIED 3-SEGMENT SCREEN CAPTURE & SMOOTH ACCORDION RECORDING
+            // =================================================================
+            Column {
                 Layout.fillWidth: true
-                columns: 2
-                columnSpacing: 8
-                rowSpacing: 6
+                spacing: 0
 
-                // Kitty Terminal
                 Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: termArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: termArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                    width: parent.width
+                    height: 36
+                    radius: 10
+                    color: Theme.bgCard
+                    border.color: Theme.borderSubtle
                     border.width: 1
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 8
-                        Text { text: "󰄛"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: I18n.termKitty; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
+                        anchors.margins: 3
+                        spacing: 2
 
-                    MouseArea {
-                        id: termArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("kitty")');
-                            controlWindow.closeRequested();
+                        // Segment 1: Crop Region (Recortar)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: 7
+                            color: shotRegArea.containsMouse ? Theme.bgHover : "transparent"
+                            Behavior on color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Text { text: "󰆞"; font.family: Theme.fontMono; font.pixelSize: 12; color: shotRegArea.containsMouse ? Theme.textPrimary : Theme.textSecondary }
+                                Text { text: I18n.crop; font.family: Theme.fontSans; font.pixelSize: 11; font.weight: Font.Medium; color: shotRegArea.containsMouse ? Theme.textPrimary : Theme.textSecondary }
+                            }
+
+                            MouseArea {
+                                id: shotRegArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    controlWindow.recMenuOpen = false;
+                                    controlWindow.closeRequested();
+                                    controlWindow.runCtl(["screenshot", "region"]);
+                                }
+                            }
+                        }
+
+                        Rectangle { implicitWidth: 1; implicitHeight: 16; color: Theme.borderSubtle }
+
+                        // Segment 2: Fullscreen Capture (Pantalla)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: 7
+                            color: shotFullArea.containsMouse ? Theme.bgHover : "transparent"
+                            Behavior on color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Text { text: "󰄀"; font.family: Theme.fontMono; font.pixelSize: 12; color: shotFullArea.containsMouse ? Theme.textPrimary : Theme.textSecondary }
+                                Text { text: I18n.screen; font.family: Theme.fontSans; font.pixelSize: 11; font.weight: Font.Medium; color: shotFullArea.containsMouse ? Theme.textPrimary : Theme.textSecondary }
+                            }
+
+                            MouseArea {
+                                id: shotFullArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    controlWindow.recMenuOpen = false;
+                                    controlWindow.closeRequested();
+                                    controlWindow.runCtl(["screenshot", "full"]);
+                                }
+                            }
+                        }
+
+                        Rectangle { implicitWidth: 1; implicitHeight: 16; color: Theme.borderSubtle }
+
+                        // Segment 3: Screen Record (Grabar)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: 7
+                            color: controlWindow.isRecording ? Theme.accent : (controlWindow.recMenuOpen ? Theme.accentDim : (recBtnArea.containsMouse ? Theme.bgHover : "transparent"))
+                            Behavior on color { ColorAnimation { duration: 160 } }
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    text: controlWindow.isRecording ? "󰓛" : "󰑊"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 11
+                                    color: controlWindow.isRecording ? "#ffffff" : Theme.accent
+                                }
+                                Text {
+                                    text: controlWindow.isRecording ? (I18n.recordStop + controlWindow.recTime) : I18n.record
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 11
+                                    font.weight: (controlWindow.isRecording || controlWindow.recMenuOpen) ? Font.Bold : Font.Medium
+                                    color: (controlWindow.isRecording || controlWindow.recMenuOpen || recBtnArea.containsMouse) ? Theme.textPrimary : Theme.textSecondary
+                                }
+                                Text {
+                                    visible: !controlWindow.isRecording
+                                    text: "󰅀"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 11
+                                    color: (controlWindow.recMenuOpen || recBtnArea.containsMouse) ? Theme.textPrimary : Theme.textMuted
+                                    rotation: controlWindow.recMenuOpen ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                                }
+                            }
+
+                            MouseArea {
+                                id: recBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: (mouse) => {
+                                    if (controlWindow.isRecording) {
+                                        controlWindow.isRecording = false;
+                                        controlWindow.recMenuOpen = false;
+                                        controlWindow.runCtl(["record", "stop"]);
+                                    } else if (mouse.button === Qt.RightButton) {
+                                        controlWindow.recMenuOpen = false;
+                                        controlWindow.isRecording = true;
+                                        controlWindow.closeRequested();
+                                        controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
+                                    } else {
+                                        controlWindow.recMenuOpen = !controlWindow.recMenuOpen;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                // Dolphin File Manager
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: dolphArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: dolphArea.containsMouse ? Theme.accent : Theme.borderSubtle
-                    border.width: 1
+                // Smooth Accordion Container for Recording Options Drawer
+                Item {
+                    id: recDrawerClip
+                    readonly property bool isOpen: controlWindow.recMenuOpen && !controlWindow.isRecording
+                    width: parent.width
+                    height: isOpen ? 106 : 0
+                    clip: true
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 8
-                        Text { text: "󰉋"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: I18n.filesDolphin; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
-
-                    MouseArea {
-                        id: dolphArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("dolphin")');
-                            controlWindow.closeRequested();
+                    Behavior on height {
+                        NumberAnimation {
+                            duration: 250
+                            easing.type: Easing.OutCubic
                         }
                     }
-                }
 
-                // X64 Hello
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: helloArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: helloArea.containsMouse ? Theme.accent : Theme.borderSubtle
-                    border.width: 1
+                    Rectangle {
+                        id: recDrawer
+                        width: parent.width
+                        height: 98
+                        y: recDrawerClip.isOpen ? 8 : -12
+                        opacity: recDrawerClip.isOpen ? 1.0 : 0.0
+                        scale: recDrawerClip.isOpen ? 1.0 : 0.96
+                        transformOrigin: Item.Top
+                        radius: Theme.radiusMd
+                        color: Theme.bgCard
+                        border.color: Theme.borderAccent
+                        border.width: 1
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 8
-                        Text { text: "󰍜"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: I18n.x64Hello; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
-
-                    MouseArea {
-                        id: helloArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("x64-hello")');
-                            controlWindow.closeRequested();
+                        Behavior on y {
+                            NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
                         }
-                    }
-                }
+                        Behavior on opacity {
+                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
+                        }
 
-                // Btop System Monitor
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: Theme.radiusSm
-                    color: monArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: monArea.containsMouse ? Theme.accent : Theme.borderSubtle
-                    border.width: 1
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 5
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 8
-                        Text { text: "󰍛"; font.family: Theme.fontMono; font.pixelSize: 14; color: Theme.accent }
-                        Text { text: I18n.monitorBtop; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
+                            // Row 1: Scope Selector
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
 
-                    MouseArea {
-                        id: monArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")');
-                            controlWindow.closeRequested();
+                                Repeater {
+                                    model: [
+                                        { id: "fullscreen", label: I18n.scopeFullscreen },
+                                        { id: "region",     label: I18n.scopeRegion }
+                                    ]
+
+                                    Rectangle {
+                                        id: scopePill
+                                        Layout.fillWidth: true
+                                        implicitHeight: 24
+                                        radius: 6
+                                        readonly property bool isSel: controlWindow.recScope === modelData.id
+                                        color: isSel ? Theme.accentDim : (scopeArea.containsMouse ? Theme.bgHover : Theme.bgElevated)
+                                        border.color: isSel ? Theme.accentBorder : Theme.borderSubtle
+                                        border.width: 1
+                                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: scopePill.isSel ? Theme.textPrimary : Theme.textSecondary
+                                        }
+
+                                        MouseArea {
+                                            id: scopeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: controlWindow.recScope = modelData.id
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Row 2: Audio Source Selector
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
+
+                                Repeater {
+                                    model: [
+                                        { id: "none",    label: I18n.audioNone },
+                                        { id: "desktop", label: I18n.audioDesktop },
+                                        { id: "both",    label: I18n.audioBoth }
+                                    ]
+
+                                    Rectangle {
+                                        id: audPill
+                                        Layout.fillWidth: true
+                                        implicitHeight: 24
+                                        radius: 6
+                                        readonly property bool isSel: controlWindow.recAudio === modelData.id
+                                        color: isSel ? Theme.accentDim : (audArea.containsMouse ? Theme.bgHover : Theme.bgElevated)
+                                        border.color: isSel ? Theme.accentBorder : Theme.borderSubtle
+                                        border.width: 1
+                                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: audPill.isSel ? Theme.textPrimary : Theme.textSecondary
+                                        }
+
+                                        MouseArea {
+                                            id: audArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: controlWindow.recAudio = modelData.id
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Row 3: Start Recording Action Button
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 26
+                                radius: 6
+                                color: startRecArea.containsMouse ? Theme.accentLight : Theme.accent
+                                Behavior on color { ColorAnimation { duration: 140 } }
+
+                                RowLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Text { text: "󰑊"; font.family: Theme.fontMono; font.pixelSize: 12; color: "#ffffff" }
+                                    Text { text: I18n.startRecordingNow; font.family: Theme.fontSans; font.pixelSize: 11; font.bold: true; color: "#ffffff" }
+                                }
+
+                                MouseArea {
+                                    id: startRecArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        controlWindow.recMenuOpen = false;
+                                        controlWindow.isRecording = true;
+                                        controlWindow.closeRequested();
+                                        controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // -----------------------------------------------------------------
-            // 4. UNIFIED AUDIO & DISPLAY BRIGHTNESS SLIDERS CARD
-            // -----------------------------------------------------------------
+            // =================================================================
+            // 3. TACTILE PILL SLIDERS CARD (Master Volume & Display Brightness)
+            // =================================================================
             Rectangle {
                 id: slidersCard
                 Layout.fillWidth: true
-                implicitHeight: 110
-                radius: Theme.radiusSm
+                implicitHeight: 102
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
@@ -792,74 +949,206 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 4
+                    spacing: 8
 
-                    // Master Volume Row
-                    RowLayout {
+                    // --- Pill 1: Master Volume ---
+                    Rectangle {
+                        id: volPillTrack
                         Layout.fillWidth: true
-                        Text {
-                            text: slidersCard.isMuted ? I18n.audioMuted : I18n.masterVolume
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: slidersCard.isMuted ? Theme.accent : Theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: slidersCard.isMuted ? "MUTE" : Math.round(slidersCard.vol * 100) + "%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.accent
-                        }
-                    }
+                        implicitHeight: 38
+                        radius: 10
+                        color: Theme.bgElevated
+                        border.color: volDragArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
+                        border.width: 1
+                        clip: true
 
-                    Slider {
-                        Layout.fillWidth: true
-                        implicitHeight: 22
-                        from: 0.0
-                        to: 1.0
-                        value: slidersCard.vol
-                        onMoved: {
-                            if (slidersCard.sink && slidersCard.sink.audio) {
-                                slidersCard.sink.audio.volume = value;
+                        // Filled Volume Progress Bar
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: Math.max(0, Math.min(parent.width, parent.width * Math.min(1.0, slidersCard.vol)))
+                            radius: 10
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: slidersCard.isMuted ? "#14ffffff" : "#38ff2b2b" }
+                                GradientStop { position: 1.0; color: slidersCard.isMuted ? "#24ffffff" : "#80ff2b2b" }
+                            }
+
+                            // Subtle vertical thumb line at right edge of fill
+                            Rectangle {
+                                visible: slidersCard.vol > 0.03
+                                anchors.right: parent.right
+                                anchors.rightMargin: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 3
+                                height: 18
+                                radius: 1.5
+                                color: slidersCard.isMuted ? Theme.textMuted : "#ccffffff"
+                            }
+                        }
+
+                        // Foreground Content (Icon + Label + Value)
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 16
+                            spacing: 8
+
+                            Text {
+                                text: slidersCard.isMuted ? "󰝟" : (slidersCard.vol <= 0.01 ? "󰕿" : (slidersCard.vol < 0.5 ? "󰖀" : "󰕾"))
+                                font.family: Theme.fontMono
+                                font.pixelSize: 14
+                                color: slidersCard.isMuted ? Theme.accent : Theme.textPrimary
+                            }
+
+                            Text {
+                                text: I18n.isEs ? "Volumen" : "Volume"
+                                font.family: Theme.fontSans
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                color: slidersCard.isMuted ? Theme.textSecondary : Theme.textPrimary
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                text: slidersCard.isMuted ? "MUTE" : Math.round(slidersCard.vol * 100) + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: slidersCard.isMuted ? Theme.accent : Theme.textPrimary
+                            }
+                        }
+
+                        // Drag / Click / Wheel Handler
+                        MouseArea {
+                            id: volDragArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            function setVolFromX(mx) {
+                                if (!slidersCard.sink || !slidersCard.sink.audio) return;
+                                var ratio = Math.max(0.0, Math.min(1.0, mx / volPillTrack.width));
+                                slidersCard.sink.audio.volume = ratio;
+                                if (slidersCard.sink.audio.muted && ratio > 0.01) {
+                                    slidersCard.sink.audio.muted = false;
+                                }
+                            }
+                            onPressed: (mouse) => {
+                                if (mouse.x < 34) {
+                                    if (slidersCard.sink && slidersCard.sink.audio) {
+                                        slidersCard.sink.audio.muted = !slidersCard.sink.audio.muted;
+                                    }
+                                } else {
+                                    setVolFromX(mouse.x);
+                                }
+                            }
+                            onPositionChanged: (mouse) => {
+                                if (pressed && mouse.x >= 34) {
+                                    setVolFromX(mouse.x);
+                                }
+                            }
+                            onWheel: (wheel) => {
+                                if (slidersCard.sink && slidersCard.sink.audio) {
+                                    var step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                    slidersCard.sink.audio.volume = Math.max(0.0, Math.min(1.0, slidersCard.sink.audio.volume + step));
+                                }
                             }
                         }
                     }
 
-                    // Display Brightness Row
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: I18n.displayBrightness
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: controlWindow.brightnessVal + "%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: "#ffaa00"
-                        }
-                    }
-
-                    Slider {
+                    // --- Pill 2: Display Brightness ---
+                    Rectangle {
                         id: brSlider
+                        property bool pressed: brDragArea.pressed
                         Layout.fillWidth: true
-                        implicitHeight: 22
-                        from: 15
-                        to: 100
-                        stepSize: 1
-                        value: controlWindow.brightnessVal
-                        onMoved: {
-                            var v = Math.round(value);
-                            controlWindow.brightnessVal = v;
-                            controlWindow.brightnessChangedOsd(v);
-                            brApplyDebounce.restart();
+                        implicitHeight: 38
+                        radius: 10
+                        color: Theme.bgElevated
+                        border.color: brDragArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
+                        border.width: 1
+                        clip: true
+
+                        // Filled Brightness Progress Bar (Warm Pearl / Silver)
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: Math.max(0, Math.min(parent.width, parent.width * (controlWindow.brightnessVal / 100.0)))
+                            radius: 10
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: "#18ffffff" }
+                                GradientStop { position: 1.0; color: "#36ffffff" }
+                            }
+
+                            Rectangle {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 3
+                                height: 18
+                                radius: 1.5
+                                color: "#ccffffff"
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 16
+                            spacing: 8
+
+                            Text {
+                                text: "󰃠"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 14
+                                color: Theme.textPrimary
+                            }
+
+                            Text {
+                                text: I18n.isEs ? "Brillo" : "Brightness"
+                                font.family: Theme.fontSans
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                color: Theme.textPrimary
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                text: controlWindow.brightnessVal + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: Theme.textPrimary
+                            }
+                        }
+
+                        MouseArea {
+                            id: brDragArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            function setBrFromX(mx) {
+                                var ratio = Math.max(0.15, Math.min(1.0, mx / brSlider.width));
+                                var v = Math.round(ratio * 100);
+                                controlWindow.brightnessVal = v;
+                                controlWindow.brightnessChangedOsd(v);
+                                brApplyDebounce.restart();
+                            }
+                            onPressed: (mouse) => setBrFromX(mouse.x)
+                            onPositionChanged: (mouse) => {
+                                if (pressed) setBrFromX(mouse.x);
+                            }
+                            onWheel: (wheel) => {
+                                var step = wheel.angleDelta.y > 0 ? 5 : -5;
+                                var v = Math.max(15, Math.min(100, controlWindow.brightnessVal + step));
+                                controlWindow.brightnessVal = v;
+                                controlWindow.brightnessChangedOsd(v);
+                                brApplyDebounce.restart();
+                            }
                         }
                     }
 
@@ -874,14 +1163,14 @@ PanelWindow {
                 }
             }
 
-            // -----------------------------------------------------------------
-            // 5. POWER PROFILES & SMART BATTERY CARD
-            // -----------------------------------------------------------------
+            // =================================================================
+            // 4. POWER PROFILES & SMART BATTERY SEGMENTED CARD
+            // =================================================================
             Rectangle {
                 id: powerProfileCard
                 Layout.fillWidth: true
                 implicitHeight: 68
-                radius: Theme.radiusSm
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
@@ -894,60 +1183,72 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: I18n.powerProfile
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
+                            text: I18n.isEs ? "󰾅 PERFIL DE ENERGÍA" : "󰾅 POWER PROFILE"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
                             font.bold: true
-                            color: Theme.textPrimary
+                            font.letterSpacing: 0.6
+                            color: Theme.textSecondary
                         }
                         Item { Layout.fillWidth: true }
                         Text {
                             text: controlWindow.hasBattery ? ("󰁹 " + controlWindow.batPct + "% (" + controlWindow.batStatus + ")") : I18n.acDirect
                             font.family: Theme.fontMono
-                            font.pixelSize: 10
+                            font.pixelSize: 9
                             font.bold: true
                             color: controlWindow.hasBattery && controlWindow.batPct <= 15 ? Theme.accent : Theme.textSecondary
                         }
                     }
 
-                    RowLayout {
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: 6
+                        implicitHeight: 28
+                        radius: 8
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
 
-                        Repeater {
-                            model: [
-                                { id: "performance", label: I18n.profilePerformance },
-                                { id: "balanced",    label: I18n.profileBalanced },
-                                { id: "power-saver", label: I18n.profilePowerSaver }
-                            ]
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 2
 
-                            Rectangle {
-                                id: profBtn
-                                Layout.fillWidth: true
-                                implicitHeight: 24
-                                radius: Theme.radiusSm
-                                readonly property bool isActive: controlWindow.powerProfile === modelData.id
-                                color: isActive ? Theme.accentDim : (profArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
-                                border.color: isActive ? Theme.accent : (profArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
-                                border.width: 1
+                            Repeater {
+                                model: [
+                                    { id: "performance", label: I18n.isEs ? "Rendimiento" : "Performance" },
+                                    { id: "balanced",    label: I18n.isEs ? "Equilibrado" : "Balanced" },
+                                    { id: "power-saver", label: I18n.isEs ? "Ahorro" : "Power Saver" }
+                                ]
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    color: profBtn.isActive ? Theme.textPrimary : Theme.textSecondary
-                                }
+                                Rectangle {
+                                    id: profBtn
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 6
+                                    readonly property bool isActive: controlWindow.powerProfile === modelData.id
+                                    color: isActive ? Theme.accentDim : (profArea.containsMouse ? Theme.bgHover : "transparent")
+                                    border.color: isActive ? Theme.accentBorder : "transparent"
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 140 } }
 
-                                MouseArea {
-                                    id: profArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        controlWindow.powerProfile = modelData.id;
-                                        controlWindow.runCtl(["power", "set", modelData.id]);
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: 10
+                                        font.bold: profBtn.isActive
+                                        color: profBtn.isActive ? Theme.textPrimary : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: profArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            controlWindow.powerProfile = modelData.id;
+                                            controlWindow.runCtl(["power", "set", modelData.id]);
+                                        }
                                     }
                                 }
                             }
@@ -956,14 +1257,14 @@ PanelWindow {
                 }
             }
 
-            // -----------------------------------------------------------------
-            // 6. DISPLAY & MONITOR SCALING CARD (Sovereign Scaling Engine)
-            // -----------------------------------------------------------------
+            // =================================================================
+            // 5. DISPLAY & MONITOR SCALING SEGMENTED CARD
+            // =================================================================
             Rectangle {
                 id: displayCard
                 Layout.fillWidth: true
                 implicitHeight: 68
-                radius: Theme.radiusSm
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
@@ -1027,64 +1328,72 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: I18n.displayScaling
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
+                            text: I18n.isEs ? "󰍹 PANTALLA & ESCALADO" : "󰍹 DISPLAY & SCALING"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
                             font.bold: true
-                            color: Theme.textPrimary
+                            font.letterSpacing: 0.6
+                            color: Theme.textSecondary
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: displayCard.currentMonitor + (displayCard.isAutoScale ? (" (AUTO • " + Math.round(displayCard.currentScale * 100) + "%)") : (" (" + Math.round(displayCard.currentScale * 100) + "%)"))
+                            text: displayCard.currentMonitor + " • " + Math.round(displayCard.currentScale * 100) + "%"
                             font.family: Theme.fontMono
-                            font.pixelSize: 10
+                            font.pixelSize: 9
                             font.bold: true
-                            color: Theme.accent
+                            color: Theme.textSecondary
                         }
                     }
 
-                    // Quick Scale Preset Pills (AUTO + Manual Fractional Presets)
-                    RowLayout {
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: 5
+                        implicitHeight: 28
+                        radius: 8
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
 
-                        Repeater {
-                            model: [
-                                { label: "AUTO", val: 0.0,  isAuto: true },
-                                { label: "100%", val: 1.0,  isAuto: false },
-                                { label: "125%", val: 1.25, isAuto: false },
-                                { label: "150%", val: 1.5,  isAuto: false },
-                                { label: "200%", val: 2.0,  isAuto: false }
-                            ]
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 2
 
-                            Rectangle {
-                                id: scaleBtn
-                                Layout.fillWidth: true
-                                implicitHeight: 24
-                                radius: Theme.radiusSm
-                                readonly property bool isActive: modelData.isAuto ? displayCard.isAutoScale : (!displayCard.isAutoScale && Math.abs(displayCard.currentScale - modelData.val) < 0.05)
-                                color: isActive ? Theme.accentDim : (scaleBtnArea.containsMouse ? Theme.bgHover : Theme.bgGlass)
-                                border.color: isActive ? Theme.accent : (scaleBtnArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle)
-                                border.width: 1
+                            Repeater {
+                                model: [
+                                    { label: "AUTO", val: 0.0,  isAuto: true },
+                                    { label: "100%", val: 1.0,  isAuto: false },
+                                    { label: "125%", val: 1.25, isAuto: false },
+                                    { label: "150%", val: 1.5,  isAuto: false },
+                                    { label: "200%", val: 2.0,  isAuto: false }
+                                ]
 
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                                Behavior on border.color { ColorAnimation { duration: 150 } }
+                                Rectangle {
+                                    id: scaleBtn
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 6
+                                    readonly property bool isActive: modelData.isAuto ? displayCard.isAutoScale : (!displayCard.isAutoScale && Math.abs(displayCard.currentScale - modelData.val) < 0.05)
+                                    color: isActive ? Theme.accentDim : (scaleBtnArea.containsMouse ? Theme.bgHover : "transparent")
+                                    border.color: isActive ? Theme.accentBorder : "transparent"
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 140 } }
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                    color: scaleBtn.isActive ? Theme.textPrimary : (scaleBtnArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
-                                }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 9
+                                        font.bold: true
+                                        color: scaleBtn.isActive ? Theme.textPrimary : Theme.textSecondary
+                                    }
 
-                                MouseArea {
-                                    id: scaleBtnArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: displayCard.applyScale(modelData.val, modelData.isAuto)
+                                    MouseArea {
+                                        id: scaleBtnArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: displayCard.applyScale(modelData.val, modelData.isAuto)
+                                    }
                                 }
                             }
                         }
@@ -1092,95 +1401,178 @@ PanelWindow {
                 }
             }
 
-            Item { Layout.fillHeight: true }
+            // =================================================================
+            // 5B. X64 AI HUB & SCRATCHPAD ENGINE SELECTOR (SUPER + S / F12)
+            // =================================================================
+            Rectangle {
+                id: aiEngineCard
+                Layout.fillWidth: true
+                implicitHeight: 68
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
 
-            // -----------------------------------------------------------------
-            // 7. SESSION / POWER BUTTONS
-            // -----------------------------------------------------------------
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 6
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: I18n.isEs ? "󰚩 AGENTE IA SCRATCHPAD" : "󰚩 AI SCRATCHPAD AGENT"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 0.6
+                            color: Theme.textSecondary
+                        }
+                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            implicitWidth: openAiLbl.implicitWidth + 10
+                            implicitHeight: 16
+                            radius: 5
+                            color: openAiArea.containsMouse ? Theme.accentDim : Theme.bgElevated
+                            border.color: openAiArea.containsMouse ? Theme.accentBorder : Theme.borderSubtle
+                            border.width: 1
+
+                            Text {
+                                id: openAiLbl
+                                anchors.centerIn: parent
+                                text: I18n.isEs ? "Abrir (SUPER+S) 󰁔" : "Open (SUPER+S) 󰁔"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 8
+                                font.bold: true
+                                color: openAiArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: openAiArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    controlWindow.closeRequested();
+                                    controlWindow.runCtl(["scratchpad"]);
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 28
+                        radius: 8
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 2
+
+                            Repeater {
+                                model: [
+                                    { id: "opencode", label: "OpenCode" },
+                                    { id: "chatgpt",  label: "ChatGPT" },
+                                    { id: "claude",   label: "Claude" },
+                                    { id: "gemini",   label: "Gemini" },
+                                    { id: "deepseek", label: "DeepSeek" },
+                                    { id: "terminal", label: "Kitty" }
+                                ]
+
+                                Rectangle {
+                                    id: aiBtn
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 6
+                                    readonly property bool isActive: controlWindow.aiEngine === modelData.id
+                                    color: isActive ? Theme.accentDim : (aiBtnArea.containsMouse ? Theme.bgHover : "transparent")
+                                    border.color: isActive ? Theme.accentBorder : "transparent"
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 140 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.label
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: 9
+                                        font.bold: aiBtn.isActive
+                                        color: aiBtn.isActive ? Theme.textPrimary : Theme.textSecondary
+                                    }
+
+                                    MouseArea {
+                                        id: aiBtnArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            controlWindow.aiEngine = modelData.id;
+                                            controlWindow.runCtl(["ai-engine", "set", modelData.id]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =================================================================
+            // 6. COMPACT 4-COLUMN QUICK APP LAUNCHER ROW
+            // =================================================================
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: 6
 
-                // Lock
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: lockArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: Theme.borderSubtle
-                    border.width: 1
+                Repeater {
+                    model: [
+                        { icon: "󰄛", label: "Terminal", cmd: "kitty" },
+                        { icon: "󰉋", label: I18n.filesDolphin, cmd: "dolphin" },
+                        { icon: "󰍛", label: "Btop", cmd: "kitty -e btop" },
+                        { icon: "󰍜", label: "Hello", cmd: "x64-hello" }
+                    ]
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text { text: "󰌾"; font.family: Theme.fontMono; font.pixelSize: 13; color: Theme.textPrimary }
-                        Text { text: I18n.lock; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 46
+                        radius: 10
+                        color: appArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                        border.color: appArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 130 } }
 
-                    MouseArea {
-                        id: lockArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.closeRequested();
-                            controlWindow.lockRequested();
+                        ColumnLayout {
+                            anchors.centerIn: parent
+                            spacing: 2
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: modelData.icon
+                                font.family: Theme.fontMono
+                                font.pixelSize: 14
+                                color: appArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: modelData.label
+                                font.family: Theme.fontSans
+                                font.pixelSize: 10
+                                font.weight: Font.Medium
+                                color: appArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                            }
                         }
-                    }
-                }
 
-                // Reboot
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: rebootArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: Theme.borderSubtle
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text { text: "󰑓"; font.family: Theme.fontMono; font.pixelSize: 13; color: Theme.textPrimary }
-                        Text { text: I18n.reboot; font.family: Theme.fontSans; font.pixelSize: 11; color: Theme.textPrimary }
-                    }
-
-                    MouseArea {
-                        id: rebootArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl reboot")');
-                            controlWindow.closeRequested();
-                        }
-                    }
-                }
-
-                // Power Off
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: Theme.radiusSm
-                    color: offArea.containsMouse ? Theme.accent : Theme.bgCard
-                    border.color: offArea.containsMouse ? Theme.accentLight : Theme.borderSubtle
-                    border.width: 1
-
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text { text: "󰐥"; font.family: Theme.fontMono; font.pixelSize: 13; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
-                        Text { text: I18n.powerOff; font.family: Theme.fontSans; font.pixelSize: 11; font.bold: true; color: offArea.containsMouse ? Theme.textPrimary : Theme.accent }
-                    }
-
-                    MouseArea {
-                        id: offArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl poweroff")');
-                            controlWindow.closeRequested();
+                        MouseArea {
+                            id: appArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                Hyprland.dispatch('hl.dsp.exec_cmd("' + modelData.cmd + '")');
+                                controlWindow.closeRequested();
+                            }
                         }
                     }
                 }

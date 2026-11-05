@@ -54,10 +54,28 @@ sync_user_configs() {
     done
 }
 
+setup_cpufreq_permissions() {
+    mkdir -p /etc/tmpfiles.d 2>/dev/null || true
+    cat << 'EOF' > /etc/tmpfiles.d/x64-cpufreq.conf
+-z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 0666 root root - -
+-z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 0666 root root - -
+-z /sys/devices/system/cpu/intel_pstate/no_turbo 0666 root root - -
+-z /sys/devices/system/cpu/cpufreq/boost 0666 root root - -
+-z /sys/firmware/acpi/platform_profile 0666 root root - -
+EOF
+    chmod 0666 /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
+    chmod 0666 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null || true
+    chmod 0666 /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+    chmod 0666 /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || true
+    chmod 0666 /sys/firmware/acpi/platform_profile 2>/dev/null || true
+}
+
 post_install() {
+    setup_cpufreq_permissions
     sync_user_configs "install"
 }
 
 post_upgrade() {
+    setup_cpufreq_permissions
     sync_user_configs "upgrade"
 }

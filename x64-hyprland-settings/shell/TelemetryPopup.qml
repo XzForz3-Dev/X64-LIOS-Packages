@@ -220,20 +220,6 @@ PanelWindow {
         border.color: Theme.borderGlass
         border.width: 1
 
-        // Top Neon Crimson Accent Line
-        Rectangle {
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                leftMargin: 24
-                rightMargin: 24
-            }
-            height: 2
-            radius: 1
-            color: Theme.accent
-        }
-
         ColumnLayout {
             id: cardLayout
             anchors.fill: parent
@@ -249,15 +235,25 @@ PanelWindow {
 
                 ColumnLayout {
                     spacing: 1
-                    Text {
-                        text: I18n.teleTitle
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: Theme.accent
+                    RowLayout {
+                        spacing: 6
+                        Rectangle {
+                            width: 6
+                            height: 6
+                            radius: 3
+                            color: Theme.accent
+                        }
+                        Text {
+                            text: I18n.isEs ? "TELEMETRÍA" : "TELEMETRY"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 11
+                            font.bold: true
+                            font.letterSpacing: 1.1
+                            color: Theme.textSecondary
+                        }
                     }
                     Text {
-                        text: "󰣇 Kernel " + teleWindow.kernelVer
+                        text: "Kernel " + teleWindow.kernelVer
                         font.family: Theme.fontMono
                         font.pixelSize: 9
                         color: Theme.textMuted
@@ -278,37 +274,258 @@ PanelWindow {
                         id: upRow
                         anchors.centerIn: parent
                         spacing: 5
-                        Text { text: "󰅐"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.accent }
+                        Text { text: "󰅐"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
                         Text { text: teleWindow.uptimeStr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
                     }
                 }
+            }
 
-                Text {
-                    text: "󰅖"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 14
-                    color: Theme.textMuted
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: teleWindow.closeAnimated()
+            // =========================================================
+            // 1. THREE CIRCULAR RING GAUGES (CPU, RAM, DISCO)
+            // Monochromatic Silver at rest; Amber/Crimson only on high load
+            // =========================================================
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                // --- Ring 1: CPU ---
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 106
+                    radius: Theme.radiusMd
+                    color: Theme.bgCard
+                    border.color: teleWindow.cpuUsage >= 85 ? Theme.borderAccent : Theme.borderSubtle
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Item {
+                            Layout.alignment: Qt.AlignHCenter
+                            width: 54
+                            height: 54
+
+                            Canvas {
+                                id: cpuGaugeCanvas
+                                anchors.fill: parent
+                                property int val: teleWindow.cpuUsage
+                                onValChanged: requestPaint()
+                                onPaint: {
+                                    var ctx = getContext("2d");
+                                    ctx.reset();
+                                    var cx = width / 2;
+                                    var cy = height / 2;
+                                    var r = 22;
+                                    ctx.lineWidth = 4.5;
+                                    ctx.lineCap = "round";
+
+                                    // Background ring
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                                    ctx.stroke();
+
+                                    // Value arc
+                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
+                                    var startAngle = -Math.PI / 2;
+                                    var endAngle = startAngle + (Math.PI * 2 * pct);
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, startAngle, endAngle);
+                                    ctx.strokeStyle = val >= 85 ? "#ff2b2b" : (val >= 65 ? "#f5a524" : "#d8d6d0");
+                                    ctx.stroke();
+                                }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: teleWindow.cpuUsage + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: teleWindow.cpuUsage >= 85 ? Theme.accent : (teleWindow.cpuUsage >= 65 ? Theme.statusWarn : Theme.textPrimary)
+                            }
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "CPU"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: teleWindow.cpuTemp + "°C"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: teleWindow.cpuTemp >= 78 ? Theme.accent : (teleWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textMuted)
+                        }
+                    }
+                }
+
+                // --- Ring 2: RAM ---
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 106
+                    radius: Theme.radiusMd
+                    color: Theme.bgCard
+                    border.color: teleWindow.ramPct >= 85 ? Theme.borderAccent : Theme.borderSubtle
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Item {
+                            Layout.alignment: Qt.AlignHCenter
+                            width: 54
+                            height: 54
+
+                            Canvas {
+                                id: ramGaugeCanvas
+                                anchors.fill: parent
+                                property int val: teleWindow.ramPct
+                                onValChanged: requestPaint()
+                                onPaint: {
+                                    var ctx = getContext("2d");
+                                    ctx.reset();
+                                    var cx = width / 2;
+                                    var cy = height / 2;
+                                    var r = 22;
+                                    ctx.lineWidth = 4.5;
+                                    ctx.lineCap = "round";
+
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                                    ctx.stroke();
+
+                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
+                                    var startAngle = -Math.PI / 2;
+                                    var endAngle = startAngle + (Math.PI * 2 * pct);
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, startAngle, endAngle);
+                                    ctx.strokeStyle = val >= 85 ? "#ff2b2b" : (val >= 70 ? "#f5a524" : "#d8d6d0");
+                                    ctx.stroke();
+                                }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: teleWindow.ramPct + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: teleWindow.ramPct >= 85 ? Theme.accent : (teleWindow.ramPct >= 70 ? Theme.statusWarn : Theme.textPrimary)
+                            }
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "RAM"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: teleWindow.ramUsed + " / " + teleWindow.ramTotal + "G"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: Theme.textMuted
+                        }
+                    }
+                }
+
+                // --- Ring 3: DISCO ---
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 106
+                    radius: Theme.radiusMd
+                    color: Theme.bgCard
+                    border.color: teleWindow.diskPct >= 90 ? Theme.borderAccent : Theme.borderSubtle
+                    border.width: 1
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Item {
+                            Layout.alignment: Qt.AlignHCenter
+                            width: 54
+                            height: 54
+
+                            Canvas {
+                                id: diskGaugeCanvas
+                                anchors.fill: parent
+                                property int val: teleWindow.diskPct
+                                onValChanged: requestPaint()
+                                onPaint: {
+                                    var ctx = getContext("2d");
+                                    ctx.reset();
+                                    var cx = width / 2;
+                                    var cy = height / 2;
+                                    var r = 22;
+                                    ctx.lineWidth = 4.5;
+                                    ctx.lineCap = "round";
+
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                                    ctx.stroke();
+
+                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
+                                    var startAngle = -Math.PI / 2;
+                                    var endAngle = startAngle + (Math.PI * 2 * pct);
+                                    ctx.beginPath();
+                                    ctx.arc(cx, cy, r, startAngle, endAngle);
+                                    ctx.strokeStyle = val >= 90 ? "#ff2b2b" : (val >= 75 ? "#f5a524" : "#d8d6d0");
+                                    ctx.stroke();
+                                }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: teleWindow.diskPct + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: teleWindow.diskPct >= 90 ? Theme.accent : (teleWindow.diskPct >= 75 ? Theme.statusWarn : Theme.textPrimary)
+                            }
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: I18n.isEs ? "DISCO" : "DISK"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: teleWindow.diskUsed + " / " + teleWindow.diskTotal
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: Theme.textMuted
+                        }
                     }
                 }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.borderSubtle
-            }
-
             // =========================================================
-            // 1. CPU, CORES/FREQ, TEMPERATURE & LIVE SPARKLINE
+            // 2. PROCESSOR DETAIL & LIVE SPARKLINE CARD
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 84
-                radius: Theme.radiusSm
+                implicitHeight: 74
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
@@ -316,41 +533,16 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: I18n.teleCpu
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: "󰔏 " + teleWindow.cpuTemp + "°C"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: teleWindow.cpuTemp >= 78 ? "#ff2b2b" : (teleWindow.cpuTemp >= 65 ? "#ffaa00" : "#ff7744")
-                        }
-                        Text {
-                            text: " • " + teleWindow.cpuUsage + "%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.accent
-                        }
-                    }
+                    spacing: 5
 
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
                             text: teleWindow.cpuModel
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textSecondary
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -362,46 +554,25 @@ PanelWindow {
                         }
                     }
 
+                    // 20-Sample Live History Sparkline Bars (Full Width)
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 10
+                        spacing: 3
+                        Repeater {
+                            model: teleWindow.cpuHistory
+                            delegate: Rectangle {
+                                Layout.fillWidth: true
+                                height: 26
+                                radius: 2
+                                color: Theme.bgElevated
 
-                        // Main CPU progress bar
-                        Rectangle {
-                            Layout.fillWidth: true
-                            height: 6
-                            radius: 3
-                            color: "#1a1b24"
-
-                            Rectangle {
-                                width: Math.max(4, parent.width * Math.min(1.0, teleWindow.cpuUsage / 100.0))
-                                height: parent.height
-                                radius: 3
-                                color: Theme.accent
-                                Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                            }
-                        }
-
-                        // 20-Sample Live History Sparkline Bars
-                        Row {
-                            spacing: 2
-                            Layout.alignment: Qt.AlignVCenter
-                            Repeater {
-                                model: teleWindow.cpuHistory
-                                delegate: Rectangle {
-                                    width: 3
-                                    height: 14
-                                    radius: 1
-                                    color: "#1a1b24"
-
-                                    Rectangle {
-                                        width: parent.width
-                                        height: Math.max(2, parent.height * (modelData / 100.0))
-                                        anchors.bottom: parent.bottom
-                                        radius: 1
-                                        color: modelData > 75 ? "#ff2b2b" : Theme.accent
-                                        opacity: 0.45 + 0.55 * (index / 20.0)
-                                    }
+                                Rectangle {
+                                    width: parent.width
+                                    height: Math.max(3, parent.height * (modelData / 100.0))
+                                    anchors.bottom: parent.bottom
+                                    radius: 2
+                                    color: modelData >= 80 ? Theme.accent : (modelData >= 60 ? Theme.statusWarn : "#c8c6c0")
+                                    opacity: 0.35 + 0.65 * (index / 20.0)
                                 }
                             }
                         }
@@ -410,228 +581,89 @@ PanelWindow {
             }
 
             // =========================================================
-            // 2. RAM MEMORY + ZRAM / SWAP & CACHE
+            // 3. LIVE NETWORK THROUGHPUT (RX / TX) & IP ADDRESS
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 74
-                radius: Theme.radiusSm
-                color: Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: I18n.teleRam
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: teleWindow.ramUsed + "G / " + teleWindow.ramTotal + "G (" + teleWindow.ramPct + "%)"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: "#00e5ff"
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: "ZRAM / Swap: " + teleWindow.swapUsed + "G / " + teleWindow.swapTotal + "G"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textMuted
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: (I18n.isEs ? "Caché: " : "Cache: ") + teleWindow.ramCached + "G"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textMuted
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: "#1a1b24"
-
-                        Rectangle {
-                            width: Math.max(4, parent.width * Math.min(1.0, teleWindow.ramPct / 100.0))
-                            height: parent.height
-                            radius: 3
-                            color: "#00e5ff"
-                            Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                        }
-                    }
-                }
-            }
-
-            // =========================================================
-            // 3. NVMe ROOT STORAGE + FILESYSTEM & FREE SPACE
-            // =========================================================
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 74
-                radius: Theme.radiusSm
-                color: Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: I18n.teleDisk
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: teleWindow.diskUsed + " / " + teleWindow.diskTotal + " (" + teleWindow.diskPct + "%)"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: "#a855f7"
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: (I18n.isEs ? "Sistema: " : "System: ") + teleWindow.diskFs
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textMuted
-                        }
-                        Item { Layout.fillWidth: true }
-                        Text {
-                            text: teleWindow.diskFree + " " + I18n.teleAvailable
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textSecondary
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: "#1a1b24"
-
-                        Rectangle {
-                            width: Math.max(4, parent.width * Math.min(1.0, teleWindow.diskPct / 100.0))
-                            height: parent.height
-                            radius: 3
-                            color: "#a855f7"
-                            Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                        }
-                    }
-                }
-            }
-
-            // =========================================================
-            // 4. LIVE NETWORK THROUGHPUT (RX / TX) & IP ADDRESS
-            // =========================================================
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 46
-                radius: Theme.radiusSm
+                implicitHeight: 42
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
                     spacing: 8
 
-                    ColumnLayout {
-                        spacing: 1
-                        Text {
-                            text: I18n.teleNet + " (" + teleWindow.netIface + ")"
-                            font.family: Theme.fontSans
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: Theme.textPrimary
-                        }
-                        Text {
-                            text: "IP: " + teleWindow.netIp
-                            font.family: Theme.fontMono
-                            font.pixelSize: 9
-                            color: Theme.textMuted
-                        }
+                    Text {
+                        text: "󰈀"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: Theme.textSecondary
+                    }
+
+                    Text {
+                        text: teleWindow.netIface + " • " + teleWindow.netIp
+                        font.family: Theme.fontMono
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: Theme.textPrimary
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    // Download Pill
+                    // Download Badge (Monochromatic)
                     Rectangle {
                         implicitHeight: 22
                         implicitWidth: rxRow.implicitWidth + 12
                         radius: 6
-                        color: "#1410b981"
-                        border.color: "#3310b981"
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
                         border.width: 1
                         RowLayout {
                             id: rxRow
                             anchors.centerIn: parent
                             spacing: 4
-                            Text { text: "󰇚"; font.family: Theme.fontMono; font.pixelSize: 10; color: "#10b981" }
-                            Text { text: teleWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#10b981" }
+                            Text { text: "↓"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
+                            Text { text: teleWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary }
                         }
                     }
 
-                    // Upload Pill
+                    // Upload Badge (Monochromatic)
                     Rectangle {
                         implicitHeight: 22
                         implicitWidth: txRow.implicitWidth + 12
                         radius: 6
-                        color: "#1438bdf8"
-                        border.color: "#3338bdf8"
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
                         border.width: 1
                         RowLayout {
                             id: txRow
                             anchors.centerIn: parent
                             spacing: 4
-                            Text { text: "󰕒"; font.family: Theme.fontMono; font.pixelSize: 10; color: "#38bdf8" }
-                            Text { text: teleWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: "#38bdf8" }
+                            Text { text: "↑"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textMuted }
+                            Text { text: teleWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
                         }
                     }
                 }
             }
 
             // =========================================================
-            // 5. TOP 3 ACTIVE PROCESSES TABLE (CPU % + RAM MB)
+            // 4. TOP 3 ACTIVE PROCESSES TABLE (Clean Monochromatic)
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 86
-                radius: Theme.radiusSm
+                implicitHeight: 88
+                radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 9
+                    anchors.margins: 10
                     spacing: 4
 
                     RowLayout {
@@ -639,7 +671,7 @@ PanelWindow {
                         Text {
                             text: I18n.teleActiveProcesses
                             font.family: Theme.fontMono
-                            font.pixelSize: 8
+                            font.pixelSize: 9
                             font.bold: true
                             color: Theme.textMuted
                         }
@@ -647,7 +679,7 @@ PanelWindow {
                         Text {
                             text: "RAM   •   CPU"
                             font.family: Theme.fontMono
-                            font.pixelSize: 8
+                            font.pixelSize: 9
                             font.bold: true
                             color: Theme.textMuted
                         }
@@ -662,15 +694,14 @@ PanelWindow {
                             Text {
                                 text: (index + 1) + "."
                                 font.family: Theme.fontMono
-                                font.pixelSize: 9
-                                font.bold: true
-                                color: Theme.accent
+                                font.pixelSize: 10
+                                color: Theme.textMuted
                             }
 
                             Text {
                                 text: modelData.name || "proc"
                                 font.family: Theme.fontMono
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 font.bold: true
                                 color: Theme.textPrimary
                                 Layout.fillWidth: true
@@ -680,17 +711,17 @@ PanelWindow {
                             Text {
                                 text: modelData.mem || "0 MB"
                                 font.family: Theme.fontMono
-                                font.pixelSize: 9
-                                color: "#00e5ff"
+                                font.pixelSize: 10
+                                color: Theme.textSecondary
                             }
 
                             Text {
                                 text: modelData.cpu || "0.0%"
                                 font.family: Theme.fontMono
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 font.bold: true
-                                color: Theme.accent
-                                Layout.preferredWidth: 38
+                                color: Theme.textPrimary
+                                Layout.preferredWidth: 42
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
@@ -699,16 +730,16 @@ PanelWindow {
             }
 
             // =========================================================
-            // 6. LAUNCH BTOP BUTTON
+            // 5. LAUNCH BTOP BUTTON
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 34
-                radius: Theme.radiusSm
-                color: btopArea.containsMouse ? Theme.accent : Theme.bgCard
-                border.color: btopArea.containsMouse ? Theme.accentLight : Theme.borderAccent
+                radius: 10
+                color: btopArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                border.color: btopArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
                 border.width: 1
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: 140 } }
 
                 RowLayout {
                     anchors.centerIn: parent
@@ -717,14 +748,14 @@ PanelWindow {
                         text: "󰍛"
                         font.family: Theme.fontMono
                         font.pixelSize: 13
-                        color: btopArea.containsMouse ? "#ffffff" : Theme.accent
+                        color: btopArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                     }
                     Text {
                         text: I18n.teleOpenBtop
                         font.family: Theme.fontSans
                         font.pixelSize: 11
-                        font.bold: true
-                        color: Theme.textPrimary
+                        font.weight: Font.DemiBold
+                        color: btopArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                     }
                 }
 

@@ -231,12 +231,13 @@ Scope {
                                 border.color: Theme.accent
                                 border.width: 1
 
-                                Text {
+                                Image {
                                     anchors.centerIn: parent
-                                    text: "󰣇"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 20
-                                    color: Theme.accent
+                                    source: Qt.resolvedUrl("x64-logo.png")
+                                    width: 24
+                                    height: 24
+                                    smooth: true
+                                    fillMode: Image.PreserveAspectFit
                                 }
                             }
 

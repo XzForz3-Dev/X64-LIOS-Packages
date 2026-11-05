@@ -276,7 +276,7 @@ function clean_previous_desktops -a target_id
         else
             echo -e "  \e[0;37m-> Uninstalling Hyprland and components (Quickshell, Dolphin)...\e[0m"
         end
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg hyprlock xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
+        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
         end
@@ -571,7 +571,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Hyprland (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin kitty quickshell swaybg hyprlock gpu-screen-recorder xdg-desktop-portal-hyprland x64-hyprland-settings chromium
+            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=OpenCode AI
+GenericName=AI Coding Agent
+GenericName[es]=Agente de IA para Código y Sistema
+Comment=Terminal AI agent with built-in free models
+Comment[es]=Agente de IA en terminal con modelos gratuitos integrados
+Exec=kitty --title "OpenCode AI" -e opencode
+Icon=/usr/share/pixmaps/opencode.svg
+Terminal=false
+Categories=Development;Utility;
+Keywords=ai;opencode;agent;code;llm;assistant;
+StartupNotify=true
+

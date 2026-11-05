@@ -171,336 +171,399 @@ PanelWindow {
         }
     }
 
-    // Centered Cyberpunk Calendar Card with Jelly / Elastic Physics
+    // Centered Obsidian & Crimson Calendar Card with Jelly / Elastic Physics
     Rectangle {
         id: card
         anchors.fill: parent
         transformOrigin: Item.Top
         scale: 1.0
         opacity: 1.0
-        radius: Theme.radiusMd
+        radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass
         border.width: 1
-
-        // Top Neon Glow Bar
-        Rectangle {
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                leftMargin: 20
-                rightMargin: 20
-            }
-            height: 2
-            radius: 1
-            color: Theme.accent
-        }
 
         ColumnLayout {
             id: cardLayout
             anchors.fill: parent
             anchors.margins: 16
-            spacing: 12
+            spacing: 10
+
+            readonly property int dayOfYear: {
+                var start = new Date(calWindow.today.getFullYear(), 0, 0);
+                var diff = calWindow.today - start;
+                return Math.floor(diff / (1000 * 60 * 60 * 24));
+            }
+            readonly property int isoWeek: Math.max(1, Math.ceil(dayOfYear / 7.0))
+            readonly property real yearProgressVal: Math.min(1.0, dayOfYear / 365.0)
 
             // =========================================================
-            // HERO: DIGITAL CLOCK & FULL DATE
+            // HERO: DIGITAL CLOCK, FULL DATE & ISO WEEK / DAY BADGES
             // =========================================================
-            ColumnLayout {
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 2
+                spacing: 8
 
-                Text {
-                    id: heroClock
-                    Layout.alignment: Qt.AlignHCenter
-                    font.family: Theme.fontMono
-                    font.pixelSize: 26
-                    font.bold: true
-                    color: Theme.textPrimary
+                ColumnLayout {
+                    spacing: 2
 
-                    Timer {
-                        interval: 1000
-                        running: true
-                        repeat: true
-                        triggeredOnStart: true
-                        onTriggered: {
+                    RowLayout {
+                        spacing: 2
+                        Text {
+                            id: heroHm
+                            font.family: Theme.fontMono
+                            font.pixelSize: 28
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+                        Text {
+                            id: heroSec
+                            font.family: Theme.fontMono
+                            font.pixelSize: 15
+                            font.bold: true
+                            color: Theme.accent
+                            Layout.alignment: Qt.AlignBottom
+                            Layout.bottomMargin: 4
+                        }
+
+                        Timer {
+                            interval: 1000
+                            running: true
+                            repeat: true
+                            triggeredOnStart: true
+                            onTriggered: {
+                                var now = new Date();
+                                var h = String(now.getHours()).padStart(2, "0");
+                                var m = String(now.getMinutes()).padStart(2, "0");
+                                var s = String(now.getSeconds()).padStart(2, "0");
+                                heroHm.text = h + ":" + m;
+                                heroSec.text = ":" + s;
+                                calWindow.today = now;
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: heroDate
+                        font.family: Theme.fontSans
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                        color: Theme.textSecondary
+
+                        Component.onCompleted: {
                             var now = new Date();
-                            var h = String(now.getHours()).padStart(2, "0");
-                            var m = String(now.getMinutes()).padStart(2, "0");
-                            var s = String(now.getSeconds()).padStart(2, "0");
-                            heroClock.text = h + ":" + m + ":" + s;
-                            calWindow.today = now;
+                            var dName = I18n.dayFullNames[now.getDay()];
+                            var mName = I18n.monthFullNames[now.getMonth()];
+                            if (I18n.isEs) {
+                                heroDate.text = dName + ", " + now.getDate() + " de " + mName + " de " + now.getFullYear();
+                            } else {
+                                heroDate.text = dName + ", " + mName + " " + now.getDate() + ", " + now.getFullYear();
+                            }
                         }
                     }
                 }
 
-                Text {
-                    id: heroDate
-                    Layout.alignment: Qt.AlignHCenter
-                    font.family: Theme.fontMono
-                    font.pixelSize: 11
-                    color: Theme.textSecondary
+                Item { Layout.fillWidth: true }
 
-                    Component.onCompleted: {
-                        var now = new Date();
-                        var dName = I18n.dayFullNames[now.getDay()];
-                        var mName = I18n.monthFullNames[now.getMonth()];
-                        if (I18n.isEs) {
-                            heroDate.text = dName + ", " + now.getDate() + " de " + mName + " de " + now.getFullYear();
-                        } else {
-                            heroDate.text = dName + ", " + mName + " " + now.getDate() + ", " + now.getFullYear();
+                ColumnLayout {
+                    spacing: 4
+                    Layout.alignment: Qt.AlignRight | Qt.AlignTop
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignRight
+                        implicitHeight: 20
+                        implicitWidth: wkTxt.implicitWidth + 14
+                        radius: 6
+                        color: Theme.bgCard
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+                        Text {
+                            id: wkTxt
+                            anchors.centerIn: parent
+                            text: (I18n.isEs ? "Sem " : "Wk ") + cardLayout.isoWeek
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Theme.textSecondary
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignRight
+                        implicitHeight: 20
+                        implicitWidth: doyTxt.implicitWidth + 14
+                        radius: 6
+                        color: Theme.bgCard
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+                        Text {
+                            id: doyTxt
+                            anchors.centerIn: parent
+                            text: (I18n.isEs ? "Día " : "Day ") + cardLayout.dayOfYear + "/365"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: Theme.textMuted
                         }
                     }
                 }
+            }
 
-                // Year Progress Micro-Indicator
-                RowLayout {
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 4
+            // =========================================================
+            // 12-MONTH SEGMENTED YEAR PROGRESS CARD
+            // =========================================================
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 46
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 5
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: (I18n.isEs ? "PROGRESO ANUAL " : "YEAR PROGRESS ") + calWindow.today.getFullYear()
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Theme.textSecondary
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: Math.round(cardLayout.yearProgressVal * 100) + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 3
+                        Repeater {
+                            model: 12
+                            delegate: Rectangle {
+                                Layout.fillWidth: true
+                                height: 5
+                                radius: 2.5
+                                color: index === calWindow.currentMonth ? Theme.accent : (index < calWindow.currentMonth ? "#70ffffff" : Theme.bgElevated)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =========================================================
+            // CALENDAR CARD: NAVIGATION + 42-DAY GRID
+            // =========================================================
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: calGridCol.implicitHeight + 22
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                ColumnLayout {
+                    id: calGridCol
+                    anchors.fill: parent
+                    anchors.margins: 11
                     spacing: 8
 
-                    readonly property int dayOfYear: {
-                        var start = new Date(calWindow.today.getFullYear(), 0, 0);
-                        var diff = calWindow.today - start;
-                        var oneDay = 1000 * 60 * 60 * 24;
-                        return Math.floor(diff / oneDay);
-                    }
-                    readonly property real yearProgressVal: Math.min(1.0, dayOfYear / 365.0)
-
-                    Text {
-                        text: "Progreso " + calWindow.today.getFullYear() + ":"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        color: Theme.textMuted
-                    }
-
-                    // Progress bar track
-                    Rectangle {
-                        implicitWidth: 100
-                        implicitHeight: 4
-                        radius: 2
-                        color: "#22ffffff"
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            anchors.bottom: parent.bottom
-                            width: parent.width * parent.parent.yearProgressVal
-                            radius: 2
-                            color: Theme.accent
-                        }
-                    }
-
-                    Text {
-                        text: Math.round(parent.yearProgressVal * 100) + "%"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: Theme.accent
-                    }
-                }
-            }
-
-            // Divider
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.borderSubtle
-            }
-
-            // =========================================================
-            // CALENDAR MONTH NAVIGATION
-            // =========================================================
-            RowLayout {
-                Layout.fillWidth: true
-
-                // Prev Month Button
-                Rectangle {
-                    implicitWidth: 26
-                    implicitHeight: 24
-                    radius: Theme.radiusSm
-                    color: prevArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: prevArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "❮"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: Theme.textPrimary
-                    }
-
-                    MouseArea {
-                        id: prevArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (calWindow.viewMonth === 0) {
-                                calWindow.viewMonth = 11;
-                                calWindow.viewYear--;
-                            } else {
-                                calWindow.viewMonth--;
-                            }
-                        }
-                    }
-                }
-
-                // Month / Year Label
-                Text {
-                    id: monthYearLabel
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    font.family: Theme.fontMono
-                    font.pixelSize: 13
-                    font.bold: true
-                    color: Theme.textPrimary
-
-                    text: I18n.monthFullNames[calWindow.viewMonth].toUpperCase() + " " + calWindow.viewYear
-                }
-
-                // "Today" Reset Pill (Visible only if viewing another month)
-                Rectangle {
-                    visible: (calWindow.viewMonth !== calWindow.currentMonth || calWindow.viewYear !== calWindow.currentYear)
-                    implicitWidth: 42
-                    implicitHeight: 24
-                    radius: Theme.radiusSm
-                    color: todayResetArea.containsMouse ? Theme.accent : Theme.bgCard
-                    border.color: Theme.borderAccent
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: I18n.calTodayPill
-                        font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        font.bold: true
-                        color: todayResetArea.containsMouse ? "#ffffff" : Theme.accent
-                    }
-
-                    MouseArea {
-                        id: todayResetArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            calWindow.viewYear = calWindow.currentYear;
-                            calWindow.viewMonth = calWindow.currentMonth;
-                        }
-                    }
-                }
-
-                // Next Month Button
-                Rectangle {
-                    implicitWidth: 26
-                    implicitHeight: 24
-                    radius: Theme.radiusSm
-                    color: nextArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: nextArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "❯"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
-                        color: Theme.textPrimary
-                    }
-
-                    MouseArea {
-                        id: nextArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (calWindow.viewMonth === 11) {
-                                calWindow.viewMonth = 0;
-                                calWindow.viewYear++;
-                            } else {
-                                calWindow.viewMonth++;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // =========================================================
-            // CALENDAR GRID: WEEKDAY HEADERS
-            // =========================================================
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 0
-
-                Repeater {
-                    model: I18n.isEs ? ["LU", "MA", "MI", "JU", "VI", "SÁ", "DO"] : ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
-
-                    Text {
-                        required property string modelData
+                    RowLayout {
                         Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                        text: modelData
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: (modelData === "SÁ" || modelData === "DO" || modelData === "SA" || modelData === "SU") ? Theme.accentLight : Theme.textMuted
-                    }
-                }
-            }
-
-            // =========================================================
-            // CALENDAR GRID: 42 DAYS REPEATER
-            // =========================================================
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 7
-                rowSpacing: 4
-                columnSpacing: 4
-
-                Repeater {
-                    model: calWindow.daysModel
-
-                    Rectangle {
-                        id: dayCell
-                        required property var modelData
-
-                        Layout.fillWidth: true
-                        implicitHeight: 28
-                        radius: Theme.radiusSm
-
-                        readonly property bool isCurrent: modelData.isCurrentMonth
-                        readonly property bool isToday: modelData.isToday
-
-                        color: isToday ? Theme.accent : (dayArea.containsMouse && isCurrent ? Theme.bgHover : "transparent")
-                        border.color: isToday ? Theme.accentLight : (dayArea.containsMouse && isCurrent ? Theme.borderSubtle : "transparent")
-                        border.width: 1
+                        spacing: 6
 
                         Text {
-                            anchors.centerIn: parent
-                            text: String(dayCell.modelData.day)
-                            font.family: Theme.fontMono
-                            font.pixelSize: 11
-                            font.bold: dayCell.isToday
-                            color: dayCell.isToday ? "#ffffff" : (dayCell.isCurrent ? Theme.textPrimary : Theme.textMuted)
-                            opacity: dayCell.isToday ? 1.0 : (dayCell.isCurrent ? 0.95 : 0.35)
+                            id: monthYearLabel
+                            font.family: Theme.fontSans
+                            font.pixelSize: 13
+                            font.bold: true
+                            color: Theme.textPrimary
+                            text: I18n.monthFullNames[calWindow.viewMonth] + " " + calWindow.viewYear
                         }
 
-                        MouseArea {
-                            id: dayArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: dayCell.isCurrent ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        Item { Layout.fillWidth: true }
+
+                        // "Today" Reset Pill (Visible only if viewing another month)
+                        Rectangle {
+                            visible: (calWindow.viewMonth !== calWindow.currentMonth || calWindow.viewYear !== calWindow.currentYear)
+                            implicitWidth: 38
+                            implicitHeight: 22
+                            radius: 6
+                            color: todayResetArea.containsMouse ? Theme.accent : Theme.bgElevated
+                            border.color: Theme.borderAccent
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: I18n.calTodayPill
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.bold: true
+                                color: todayResetArea.containsMouse ? "#ffffff" : Theme.accent
+                            }
+
+                            MouseArea {
+                                id: todayResetArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    calWindow.viewYear = calWindow.currentYear;
+                                    calWindow.viewMonth = calWindow.currentMonth;
+                                }
+                            }
+                        }
+
+                        // Prev Month Button
+                        Rectangle {
+                            implicitWidth: 24
+                            implicitHeight: 22
+                            radius: 6
+                            color: prevArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "❮"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: prevArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: prevArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (calWindow.viewMonth === 0) {
+                                        calWindow.viewMonth = 11;
+                                        calWindow.viewYear--;
+                                    } else {
+                                        calWindow.viewMonth--;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Next Month Button
+                        Rectangle {
+                            implicitWidth: 24
+                            implicitHeight: 22
+                            radius: 6
+                            color: nextArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "❯"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 10
+                                color: nextArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: nextArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (calWindow.viewMonth === 11) {
+                                        calWindow.viewMonth = 0;
+                                        calWindow.viewYear++;
+                                    } else {
+                                        calWindow.viewMonth++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Weekday Headers (Clean Monochromatic)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        Repeater {
+                            model: I18n.isEs ? ["LU", "MA", "MI", "JU", "VI", "SÁ", "DO"] : ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+
+                            Text {
+                                required property string modelData
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                text: modelData
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.bold: true
+                                color: Theme.textMuted
+                            }
+                        }
+                    }
+
+                    // 42-Day Calendar Grid with Radial Glow on Today
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 7
+                        rowSpacing: 4
+                        columnSpacing: 4
+
+                        Repeater {
+                            model: calWindow.daysModel
+
+                            Rectangle {
+                                id: dayCell
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                implicitHeight: 28
+                                radius: 8
+
+                                readonly property bool isCurrent: modelData.isCurrentMonth
+                                readonly property bool isToday: modelData.isToday
+
+                                // Outer glow halo for today's date
+                                Rectangle {
+                                    visible: dayCell.isToday
+                                    anchors.fill: parent
+                                    anchors.margins: -2
+                                    radius: 10
+                                    color: "#2dff2b2b"
+                                }
+
+                                color: isToday ? Theme.accent : (dayArea.containsMouse && isCurrent ? Theme.bgHover : "transparent")
+                                border.color: isToday ? "#99ff7a7a" : (dayArea.containsMouse && isCurrent ? Theme.borderSubtle : "transparent")
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: String(dayCell.modelData.day)
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 11
+                                    font.bold: dayCell.isToday
+                                    color: dayCell.isToday ? "#ffffff" : (dayCell.isCurrent ? Theme.textPrimary : Theme.textMuted)
+                                    opacity: dayCell.isToday ? 1.0 : (dayCell.isCurrent ? 0.92 : 0.28)
+                                }
+
+                                MouseArea {
+                                    id: dayArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: dayCell.isCurrent ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
                         }
                     }
                 }
-            }
-
-            // Divider
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Theme.borderSubtle
             }
 
             // =========================================================
@@ -509,22 +572,19 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
 
-                // Uptime
                 RowLayout {
-                    spacing: 4
-
+                    spacing: 5
                     Text {
                         text: "󰔛"
                         font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: Theme.accent
+                        font.pixelSize: 11
+                        color: Theme.textMuted
                     }
-
                     Text {
                         id: uptimeLabel
                         text: "Uptime: ..."
                         font.family: Theme.fontMono
-                        font.pixelSize: 10
+                        font.pixelSize: 9
                         color: Theme.textSecondary
 
                         Process {
@@ -547,11 +607,10 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Timezone
                 Text {
                     id: tzLabel
                     font.family: Theme.fontMono
-                    font.pixelSize: 10
+                    font.pixelSize: 9
                     color: Theme.textMuted
 
                     Component.onCompleted: {

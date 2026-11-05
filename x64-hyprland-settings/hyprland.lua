@@ -27,8 +27,9 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
     hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
 
-    -- Polkit Authentication Agent
-    hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1 &")
+    -- Official Hyprland Polkit Authentication Agent (Qt6/QML) + Dark Theme Enforcement
+    hl.exec_cmd("(/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
+    hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null &")
 
     -- Monolith 4K Wallpaper Daemon
     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
@@ -134,12 +135,13 @@ hl.curve("easeOutQuint",   { type = "bezier", points = { {0.23, 1},    {0.32, 1}
 hl.curve("easeInOutCubic", { type = "bezier", points = { {0.65, 0.05}, {0.36, 1} } })
 hl.curve("linear",         { type = "bezier", points = { {0, 0},       {1, 1}    } })
 
-hl.animation({ leaf = "global",     enabled = true, speed = 8,   bezier = "default" })
-hl.animation({ leaf = "windows",    enabled = true, speed = 5,   bezier = "easeOutQuint" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 4,   bezier = "linear", style = "popin 80%" })
-hl.animation({ leaf = "border",     enabled = true, speed = 6,   bezier = "default" })
-hl.animation({ leaf = "fade",       enabled = true, speed = 4,   bezier = "default" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 4,   bezier = "easeOutQuint", style = "fade" })
+hl.animation({ leaf = "global",           enabled = true, speed = 8,   bezier = "default" })
+hl.animation({ leaf = "windows",          enabled = true, speed = 5,   bezier = "easeOutQuint" })
+hl.animation({ leaf = "windowsOut",       enabled = true, speed = 4,   bezier = "linear", style = "popin 80%" })
+hl.animation({ leaf = "border",           enabled = true, speed = 6,   bezier = "default" })
+hl.animation({ leaf = "fade",             enabled = true, speed = 4,   bezier = "default" })
+hl.animation({ leaf = "workspaces",       enabled = true, speed = 4,   bezier = "easeOutQuint", style = "fade" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 5,   bezier = "easeOutQuint", style = "slidefadevert -35%" })
 
 --------------------------------
 ---- WINDOWS AND WORKSPACES ----
@@ -158,6 +160,16 @@ hl.window_rule({
     float  = true,
     center = true,
     size   = "1100 680",
+})
+
+-- X64 AI Hub & Dropdown Scratchpad (SUPER + S / SUPER + A / F12)
+hl.window_rule({
+    name      = "x64-scratchpad-float",
+    match     = { class = "(x64-scratchpad|chrome-chatgpt\\.com.*|chrome-claude\\.ai.*|chrome-gemini\\.google\\.com.*|chrome-chat\\.deepseek\\.com.*)" },
+    workspace = "special:scratchpad",
+    float     = true,
+    center    = true,
+    size      = "1120 660",
 })
 
 -- Floating Dialogs & System Management Tools
@@ -191,6 +203,9 @@ hl.bind(mainMod .. " + L",      hl.dsp.exec_cmd("quickshell ipc call lock lock")
 hl.bind(mainMod .. " + V",      hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
+hl.bind(mainMod .. " + S",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
+hl.bind(mainMod .. " + A",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
+hl.bind("F12",                  hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 
 -- Navigation focus
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
@@ -205,9 +220,69 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
--- Scroll through workspaces with mouse wheel
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
+-- Scroll through workspaces 1..6 with mouse wheel (works on empty workspaces & wraps 1 <-> 6)
+local function cycle_workspace(delta)
+    local ws = hl.get_active_workspace()
+    local cur = (ws and ws.id) or 1
+    if cur < 1 or cur > 6 then cur = 1 end
+    local nxt = cur + delta
+    if nxt > 6 then nxt = 1 end
+    if nxt < 1 then nxt = 6 end
+    hl.dispatch(hl.dsp.focus({ workspace = nxt }))
+end
+hl.bind(mainMod .. " + mouse_down", function() cycle_workspace(1) end)
+hl.bind(mainMod .. " + mouse_up",   function() cycle_workspace(-1) end)
+
+-- Live Cinematic Magnifier / Zoom (On/Off in Control Center + ALT + Wheel)
+_G.X64_ZOOM_FACTOR = 1.0
+
+function _G.x64_zoom_step(delta)
+    if delta == 0 then
+        _G.X64_ZOOM_FACTOR = 1.0
+    else
+        _G.X64_ZOOM_FACTOR = math.max(1.0, math.min(3.0, (_G.X64_ZOOM_FACTOR or 1.0) + delta))
+    end
+    hl.config({ cursor = { zoom_factor = _G.X64_ZOOM_FACTOR } })
+    local rt = os.getenv("XDG_RUNTIME_DIR") or "/run/user/1000"
+    local f = io.open(rt .. "/x64-shell/zoom_factor", "w")
+    if f then
+        f:write(string.format("%.2f\n", _G.X64_ZOOM_FACTOR))
+        f:close()
+    end
+end
+
+function _G.x64_set_zoom_binds(enabled)
+    for _, prefix in ipairs({ "ALT", mainMod .. " + ALT", mainMod .. " + CTRL" }) do
+        hl.unbind(prefix .. " + mouse_down")
+        hl.unbind(prefix .. " + mouse_up")
+        hl.unbind(prefix .. " + mouse:274")
+        hl.unbind(prefix .. " + 0")
+        hl.unbind(prefix .. " + equal")
+        hl.unbind(prefix .. " + minus")
+        if enabled then
+            hl.bind(prefix .. " + mouse_down", function() _G.x64_zoom_step(0.25) end)
+            hl.bind(prefix .. " + mouse_up",   function() _G.x64_zoom_step(-0.25) end)
+            hl.bind(prefix .. " + mouse:274",  function() _G.x64_zoom_step(0) end)
+            hl.bind(prefix .. " + 0",          function() _G.x64_zoom_step(0) end)
+            hl.bind(prefix .. " + equal",      function() _G.x64_zoom_step(0.25) end)
+            hl.bind(prefix .. " + minus",      function() _G.x64_zoom_step(-0.25) end)
+        end
+    end
+    if not enabled then
+        _G.x64_zoom_step(0)
+    end
+end
+
+do
+    local zf = io.open((os.getenv("HOME") or "") .. "/.config/hypr/zoom_enabled", "r")
+    local z_en = false
+    if zf then
+        local v = zf:read("*l")
+        zf:close()
+        if v and v:match("1") then z_en = true end
+    end
+    _G.x64_set_zoom_binds(z_en)
+end
 
 -- Mouse window dragging and resizing
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })

@@ -1,13 +1,13 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=45
+pkgrel=46
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
 license=('GPL3')
 install='x64-terminal-settings.install'
-depends=('fish' 'starship' 'fastfetch' 'ttf-jetbrains-mono-nerd')
+depends=('fish' 'starship' 'fastfetch' 'ttf-jetbrains-mono-nerd' 'opencode')
 optdepends=('kitty: GPU-accelerated terminal emulator'
             'btop: Resource monitor for x64-dashboard')
 source=(
@@ -34,8 +34,10 @@ source=(
     '99-x64-branding.hook'
     'x64-dashboard'
     'issue'
+    'opencode.svg'
+    'opencode.desktop'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
@@ -138,5 +140,10 @@ package() {
     # Official Pre-Login Issue Banner
     install -d "${pkgdir}/usr/share/x64-lios"
     install -m644 "${srcdir}/issue" "${pkgdir}/usr/share/x64-lios/issue"
+
+    # Official OpenCode AI Desktop Launcher & Icon across all Desktop Environments
+    install -Dm644 "${srcdir}/opencode.svg" "${pkgdir}/usr/share/pixmaps/opencode.svg"
+    install -Dm644 "${srcdir}/opencode.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/opencode.svg"
+    install -Dm644 "${srcdir}/opencode.desktop" "${pkgdir}/usr/share/applications/opencode.desktop"
 }
 
