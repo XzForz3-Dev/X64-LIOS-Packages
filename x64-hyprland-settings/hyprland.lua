@@ -162,7 +162,7 @@ hl.window_rule({
     size   = "1100 680",
 })
 
--- X64 AI Hub & Dropdown Scratchpad (SUPER + S / SUPER + A / F12)
+-- X64 AI Hub & Dropdown Scratchpad (SUPER + S / SUPER + A)
 hl.window_rule({
     name      = "x64-scratchpad-float",
     match     = { class = "(x64-scratchpad|chrome-chatgpt\\.com.*|chrome-claude\\.ai.*|chrome-gemini\\.google\\.com.*|chrome-chat\\.deepseek\\.com.*)" },
@@ -205,7 +205,6 @@ hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({ action = "toggle" }))
 hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + S",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 hl.bind(mainMod .. " + A",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
-hl.bind("F12",                  hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 
 -- Navigation focus
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))

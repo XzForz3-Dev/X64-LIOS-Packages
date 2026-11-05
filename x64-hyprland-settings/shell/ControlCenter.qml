@@ -1402,7 +1402,7 @@ PanelWindow {
             }
 
             // =================================================================
-            // 5B. X64 AI HUB & SCRATCHPAD ENGINE SELECTOR (SUPER + S / F12)
+            // 5B. X64 AI HUB & SCRATCHPAD ENGINE SELECTOR (SUPER + S / SUPER + A)
             // =================================================================
             Rectangle {
                 id: aiEngineCard

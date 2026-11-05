@@ -981,7 +981,7 @@ cmd_net() {
 }
 
 # -----------------------------------------------------------------------------
-# 9. X64 AI HUB & DROPDOWN SCRATCHPAD (SUPER + S / SUPER + A / F12)
+# 9. X64 AI HUB & DROPDOWN SCRATCHPAD (SUPER + S / SUPER + A)
 # -----------------------------------------------------------------------------
 get_effective_ai_engine() {
     if [ -s "${STATE_DIR}/ai_engine" ]; then
@@ -1057,9 +1057,9 @@ cmd_ai_engine() {
                 esac
 
                 if [ "$IS_ES" -eq 1 ]; then
-                    notify_user "Motor Scratchpad: ${label}" "Pulsa SUPER + S o F12 para desplegar" "X64 AI Hub"
+                    notify_user "Motor Scratchpad: ${label}" "Pulsa SUPER + S o SUPER + A para desplegar" "X64 AI Hub"
                 else
-                    notify_user "Scratchpad Engine: ${label}" "Press SUPER + S or F12 to toggle" "X64 AI Hub"
+                    notify_user "Scratchpad Engine: ${label}" "Press SUPER + S or SUPER + A to toggle" "X64 AI Hub"
                 fi
                 ;;
         esac
