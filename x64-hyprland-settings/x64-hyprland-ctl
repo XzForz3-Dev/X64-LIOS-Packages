@@ -1195,11 +1195,14 @@ cmd_gamemode() {
     case "$action" in
         on)
             echo "1" > "${STATE_DIR}/gaming_mode"
-            # Backup current power profile to restore later
-            cat "${STATE_DIR}/power_profile" 2>/dev/null > "${STATE_DIR}/pre_game_power_profile"
-            apply_kernel_power_profile "performance"
+            # Backup current power profile to restore later, then switch to performance
+            local cur_pwr
+            cur_pwr=$(get_effective_power_profile)
+            echo "${cur_pwr:-balanced}" > "${STATE_DIR}/pre_game_power_profile"
+            cmd_power set "performance"
             
-            # Disable compositor eye-candy via hyprctl batch
+            # Disable compositor overhead via native Lua engine (with legacy keyword fallback)
+            hyprctl eval "hl.config({ decoration = { blur = { enabled = false }, rounding = 0 }, general = { gaps_in = 0, gaps_out = 0 }, animations = { enabled = false } })" >/dev/null 2>&1 || \
             hyprctl --batch "\
                 keyword decoration:blur:enabled 0;\
                 keyword decoration:shadow:enabled 0;\
@@ -1219,10 +1222,10 @@ cmd_gamemode() {
             local prev_pwr
             prev_pwr=$(cat "${STATE_DIR}/pre_game_power_profile" 2>/dev/null || echo "balanced")
             [ -z "$prev_pwr" ] && prev_pwr="balanced"
-            apply_kernel_power_profile "$prev_pwr"
-            echo "$prev_pwr" > "${STATE_DIR}/power_profile"
+            cmd_power set "$prev_pwr"
 
-            # Restore Obsidian & Crimson visual effects
+            # Restore Obsidian & Crimson visual effects via native Lua engine (with legacy keyword fallback)
+            hyprctl eval "hl.config({ decoration = { blur = { enabled = true }, rounding = 10 }, general = { gaps_in = 5, gaps_out = 10 }, animations = { enabled = true } })" >/dev/null 2>&1 || \
             hyprctl --batch "\
                 keyword decoration:blur:enabled 1;\
                 keyword decoration:shadow:enabled 1;\
