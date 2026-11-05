@@ -11,6 +11,7 @@ ShellRoot {
         if (targetName !== "control") controlCenter.visible = false;
         if (targetName !== "telemetry") telemetryPopup.visible = false;
         if (targetName !== "network") networkPopup.visible = false;
+        if (targetName !== "shortcuts") shortcutsPopup.visible = false;
     }
 
     // IPC Handlers for Hyprland Keybindings & Scripts
@@ -151,6 +152,24 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "shortcuts"
+
+        function toggle() {
+            shortcutsPopup.visible = !shortcutsPopup.visible;
+            if (shortcutsPopup.visible) root.closeAllExcept("shortcuts");
+        }
+
+        function open() {
+            shortcutsPopup.visible = true;
+            root.closeAllExcept("shortcuts");
+        }
+
+        function close() {
+            shortcutsPopup.visible = false;
+        }
+    }
+
     // Top Bar Floating Island
     Bar {
         id: mainBar
@@ -276,6 +295,13 @@ ShellRoot {
         id: notifPopup
         dndEnabled: mainBar.dndActive
         sidePanelOpen: controlCenter.visible || networkPopup.visible
+    }
+
+    // Native Interactive Shortcuts Guide & HUD (SUPER + F1)
+    ShortcutsPopup {
+        id: shortcutsPopup
+        visible: false
+        onCloseRequested: shortcutsPopup.visible = false
     }
 
     // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)

@@ -204,6 +204,7 @@ local mainMod = "SUPER"
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + Q",      hl.dsp.window.close())
 hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
+hl.bind(mainMod .. " + Space",  hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + C",      hl.dsp.exec_cmd("quickshell ipc call control toggle"))
 hl.bind(mainMod .. " + CTRL + N", hl.dsp.exec_cmd("quickshell ipc call network toggle"))
@@ -214,12 +215,21 @@ hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + S",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 hl.bind(mainMod .. " + A",      hl.dsp.exec_cmd("x64-hyprland-ctl scratchpad"))
 hl.bind(mainMod .. " + G",      hl.dsp.exec_cmd("x64-hyprland-ctl gamemode toggle"))
+hl.bind(mainMod .. " + F1",     hl.dsp.exec_cmd("quickshell ipc call shortcuts toggle"))
+hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("kitty --title Btop -e btop"))
+hl.bind(mainMod .. " + H",      hl.dsp.exec_cmd("x64-hello"))
 
 -- Navigation focus
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
+
+-- Move window position
+hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ direction = "l" }))
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ direction = "r" }))
+hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "u" }))
+hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "d" }))
 
 -- Workspaces 1..10
 for i = 1, 10 do

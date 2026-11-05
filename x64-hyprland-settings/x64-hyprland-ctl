@@ -1261,6 +1261,7 @@ case "${1:-status}" in
     ai-engine)         cmd_ai_engine "${2:-get}" "${3:-opencode}" ;;
     zoom)              cmd_zoom "${2:-toggle}" ;;
     gamemode|gaming)   cmd_gamemode "${2:-toggle}" ;;
+    shortcuts|guide)   quickshell ipc call shortcuts "${2:-toggle}" 2>/dev/null || true ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

@@ -10,3 +10,4 @@ NetworkPopup 1.0 NetworkPopup.qml
 NotificationPopup 1.0 NotificationPopup.qml
 LockScreen 1.0 LockScreen.qml
 ScreenFilter 1.0 ScreenFilter.qml
+ShortcutsPopup 1.0 ShortcutsPopup.qml

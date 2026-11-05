@@ -279,7 +279,37 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Top-Right Circular Session Buttons (Lock, Reboot, Power Off)
+                // Top-Right Circular Session Buttons (Shortcuts Help, Lock, Reboot, Power Off)
+                Rectangle {
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    radius: 14
+                    color: helpArea.containsMouse ? Theme.accentDim : Theme.bgCard
+                    border.color: helpArea.containsMouse ? Theme.accentBorder : Theme.borderSubtle
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 130 } }
+                    Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰌌"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: helpArea.containsMouse ? Theme.accent : Theme.textSecondary
+                    }
+
+                    MouseArea {
+                        id: helpArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            controlWindow.closeRequested();
+                            Hyprland.dispatch('hl.dsp.exec_cmd("quickshell ipc call shortcuts toggle")');
+                        }
+                    }
+                }
+
                 Rectangle {
                     implicitWidth: 28
                     implicitHeight: 28
