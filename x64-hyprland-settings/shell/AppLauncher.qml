@@ -170,7 +170,7 @@ PanelWindow {
         right: true
     }
 
-    color: "#d805060b"
+    color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
@@ -179,6 +179,16 @@ PanelWindow {
     MouseArea {
         anchors.fill: parent
         onClicked: launcherWindow.closeRequested()
+    }
+
+    // Outer Ambient Shadow for floating depth
+    Rectangle {
+        anchors.centerIn: card
+        width: card.width + 16
+        height: card.height + 16
+        radius: card.radius + 6
+        color: "#70000000"
+        z: -1
     }
 
     // =========================================================================
