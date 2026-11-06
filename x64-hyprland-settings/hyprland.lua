@@ -33,12 +33,12 @@ local fileManager = "dolphin"
 -------------------
 hl.on("hyprland.start", function ()
     -- Export Wayland & Desktop session variables to DBus / Systemd
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
-    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
 
     -- Official Hyprland Polkit Authentication Agent (Qt6/QML) + Dark Theme Enforcement
     hl.exec_cmd("(/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
-    hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null &")
+    hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null &")
 
     -- Monolith 4K Wallpaper Daemon
     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
@@ -64,6 +64,7 @@ hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 hl.env("QT_QPA_PLATFORMTHEME", "kde")
 hl.env("KDE_SESSION_VERSION", "6")
+hl.env("GTK_THEME", "adw-gtk3-dark")
 hl.env("GDK_BACKEND", "wayland,x11,*")
 hl.env("SDL_VIDEODRIVER", "wayland")
 hl.env("CLUTTER_BACKEND", "wayland")

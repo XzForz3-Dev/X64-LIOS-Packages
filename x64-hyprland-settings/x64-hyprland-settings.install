@@ -55,11 +55,28 @@ sync_user_configs() {
                 chown "$u:$g" "$user_dir/.config/kdeglobals" 2>/dev/null || true
             fi
 
+            # 4. GTK 3 & GTK 4 Global Dark Theme (~/.config/gtk-3.0 and ~/.config/gtk-4.0)
+            mkdir -p "$user_dir/.config/gtk-3.0" "$user_dir/.config/gtk-4.0" 2>/dev/null || true
+            if [ -f /etc/skel/.config/gtk-3.0/settings.ini ]; then
+                cp -f /etc/skel/.config/gtk-3.0/settings.ini "$user_dir/.config/gtk-3.0/settings.ini" 2>/dev/null || true
+                cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
+                chown -R "$u:$g" "$user_dir/.config/gtk-3.0" 2>/dev/null || true
+            fi
+            if [ -f /etc/skel/.config/gtk-4.0/settings.ini ]; then
+                cp -f /etc/skel/.config/gtk-4.0/settings.ini "$user_dir/.config/gtk-4.0/settings.ini" 2>/dev/null || true
+                cp -f /etc/skel/.config/gtk-4.0/gtk.css "$user_dir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
+                chown -R "$u:$g" "$user_dir/.config/gtk-4.0" 2>/dev/null || true
+            fi
+            if [ -f "$user_dir/.config/xsettingsd/xsettingsd.conf" ]; then
+                sed -i 's/Net\/ThemeName .*/Net\/ThemeName "adw-gtk3-dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+                sed -i 's/Net\/IconThemeName .*/Net\/IconThemeName "Papirus-Dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+            fi
+
             chown -R "$u:$g" "$target_hypr" "$target_qs" 2>/dev/null || true
         fi
     done
 
-    # 4. Enforce Crimson Red Papirus Folders Globally
+    # 5. Enforce Crimson Red Papirus Folders Globally
     if [ -x /usr/bin/papirus-folders ]; then
         /usr/bin/papirus-folders -C red -t Papirus-Dark 2>/dev/null || true
     fi
