@@ -149,6 +149,19 @@ PanelWindow {
         repeat: false
     }
 
+    Process {
+        id: appLauncherProc
+    }
+
+    function launchApp(cmdStr) {
+        controlWindow.closeRequested();
+        if (appLauncherProc.running) {
+            appLauncherProc.running = false;
+        }
+        appLauncherProc.command = ["bash", "-c", "nohup " + cmdStr + " >/dev/null 2>&1 &"];
+        appLauncherProc.running = true;
+    }
+
     function refreshAll() {
         displayCard.refreshScale();
         if (!ctlStatusProc.running) ctlStatusProc.running = true;
@@ -1719,8 +1732,7 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                Hyprland.dispatch('hl.dsp.exec_cmd("' + modelData.cmd + '")');
-                                controlWindow.closeRequested();
+                                controlWindow.launchApp(modelData.cmd);
                             }
                         }
                     }

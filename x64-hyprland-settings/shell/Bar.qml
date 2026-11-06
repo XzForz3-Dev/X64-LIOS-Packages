@@ -86,6 +86,18 @@ PanelWindow {
     }
 
     Process {
+        id: appSpawnProc
+    }
+
+    function spawnApp(cmdStr) {
+        if (appSpawnProc.running) {
+            appSpawnProc.running = false;
+        }
+        appSpawnProc.command = ["bash", "-c", "nohup " + cmdStr + " >/dev/null 2>&1 &"];
+        appSpawnProc.running = true;
+    }
+
+    Process {
         id: ctlActionProc
         onExited: {
             if (!teleProcess.running) teleProcess.running = true;
@@ -334,7 +346,7 @@ PanelWindow {
                                 if (mouse.button === Qt.LeftButton) {
                                     barWindow.toggleLauncher();
                                 } else if (mouse.button === Qt.RightButton) {
-                                    Hyprland.dispatch('hl.dsp.exec_cmd("kitty")');
+                                    barWindow.spawnApp("kitty");
                                 }
                             }
                         }
@@ -773,7 +785,7 @@ PanelWindow {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: (mouse) => {
                             if (mouse.button === Qt.RightButton) {
-                                Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")');
+                                barWindow.spawnApp("kitty -e btop");
                             } else {
                                 barWindow.toggleTelemetry();
                             }
@@ -963,7 +975,7 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 onClicked: (mouse) => {
                                     if (mouse.button === Qt.RightButton) {
-                                        Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")');
+                                        barWindow.spawnApp("nm-connection-editor");
                                     } else {
                                         barWindow.toggleNetwork();
                                     }
