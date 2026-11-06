@@ -123,7 +123,7 @@ PanelWindow {
             catLabel: I18n.isEs ? "Mosaico" : "Tiling"
         },
         {
-            keys: ["SUPER", "Tab"],
+            keys: ["ALT", "Tab"],
             title: I18n.isEs ? "Ciclar Siguiente Ventana" : "Cycle Next Window",
             desc: I18n.isEs ? "Pasa el foco en bucle a la siguiente ventana" : "Cycle window focus in active workspace",
             category: "tiling",
@@ -278,6 +278,13 @@ PanelWindow {
             keys: ["SUPER", "Rueda Ratón"],
             title: I18n.isEs ? "Ciclar Escritorios" : "Cycle Workspaces Key+Scroll",
             desc: I18n.isEs ? "Recorre en bucle 1 ↔ 6 sin saltar escritorios vacíos" : "Cycle workspaces 1..6 without skipping empty ones",
+            category: "workspaces",
+            catLabel: I18n.isEs ? "Escritorios" : "Workspaces"
+        },
+        {
+            keys: ["SUPER", "Tab"],
+            title: I18n.isEs ? "Vista General (Overview)" : "Workspaces Overview",
+            desc: I18n.isEs ? "Mission Control de escritorios y ventanas activas" : "Interactive mission control of workspaces and active windows",
             category: "workspaces",
             catLabel: I18n.isEs ? "Escritorios" : "Workspaces"
         }

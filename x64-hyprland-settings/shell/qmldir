@@ -12,3 +12,4 @@ LockScreen 1.0 LockScreen.qml
 ScreenFilter 1.0 ScreenFilter.qml
 ShortcutsPopup 1.0 ShortcutsPopup.qml
 ClipboardPopup 1.0 ClipboardPopup.qml
+OverviewPopup 1.0 OverviewPopup.qml

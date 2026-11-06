@@ -1288,6 +1288,28 @@ cmd_clipboard() {
     esac
 }
 
+# -----------------------------------------------------------------------------
+# 12. MISSION CONTROL / WORKSPACES OVERVIEW ENGINE
+# -----------------------------------------------------------------------------
+cmd_overview_data() {
+    local active clients
+    active=$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // 1' 2>/dev/null || echo "1")
+    clients=$(hyprctl clients -j 2>/dev/null || echo "[]")
+    echo "{\"active\": ${active:-1}, \"clients\": ${clients:-[]}}"
+}
+
+cmd_focus_workspace() {
+    local ws="$1"
+    [ -z "$ws" ] && return 0
+    hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = ${ws} }))" >/dev/null 2>&1 || hyprctl dispatch workspace "${ws}" >/dev/null 2>&1 || true
+}
+
+cmd_focus_window() {
+    local addr="$1"
+    [ -z "$addr" ] && return 0
+    hyprctl eval "hl.dispatch(hl.dsp.focus({ window = 'address:${addr}' }))" >/dev/null 2>&1 || hyprctl dispatch focuswindow "address:${addr}" >/dev/null 2>&1 || true
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -1305,6 +1327,10 @@ case "${1:-status}" in
     gamemode|gaming)   cmd_gamemode "${2:-toggle}" ;;
     shortcuts|guide)   quickshell ipc call shortcuts "${2:-toggle}" 2>/dev/null || true ;;
     clipboard|clip)    shift; cmd_clipboard "$@" ;;
+    overview)          quickshell ipc call overview "${2:-toggle}" 2>/dev/null || true ;;
+    overview-data)     cmd_overview_data ;;
+    focus-workspace)   cmd_focus_workspace "$2" ;;
+    focus-window)      cmd_focus_window "$2" ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac

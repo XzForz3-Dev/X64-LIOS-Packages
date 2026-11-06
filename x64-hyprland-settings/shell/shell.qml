@@ -13,6 +13,7 @@ ShellRoot {
         if (targetName !== "network") networkPopup.visible = false;
         if (targetName !== "shortcuts") shortcutsPopup.visible = false;
         if (targetName !== "clipboard") clipboardPopup.visible = false;
+        if (targetName !== "overview") overviewPopup.visible = false;
     }
 
     // IPC Handlers for Hyprland Keybindings & Scripts
@@ -199,6 +200,34 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "overview"
+
+        function toggle() {
+            overviewPopup.visible = !overviewPopup.visible;
+            if (overviewPopup.visible) {
+                root.closeAllExcept("overview");
+                overviewPopup.reload();
+            }
+        }
+
+        function open() {
+            overviewPopup.visible = true;
+            root.closeAllExcept("overview");
+            overviewPopup.reload();
+        }
+
+        function close() {
+            overviewPopup.visible = false;
+        }
+
+        function reload() {
+            if (overviewPopup.visible) {
+                overviewPopup.reload();
+            }
+        }
+    }
+
     // Top Bar Floating Island
     Bar {
         id: mainBar
@@ -338,6 +367,13 @@ ShellRoot {
         id: clipboardPopup
         visible: false
         onCloseRequested: clipboardPopup.visible = false
+    }
+
+    // Native Wayland Workspaces Overview / Mission Control (SUPER + TAB)
+    OverviewPopup {
+        id: overviewPopup
+        visible: false
+        onCloseRequested: overviewPopup.visible = false
     }
 
     // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)

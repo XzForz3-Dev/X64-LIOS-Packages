@@ -222,6 +222,8 @@ hl.bind(mainMod .. " + G",      hl.dsp.exec_cmd("x64-hyprland-ctl gamemode toggl
 hl.bind(mainMod .. " + F1",     hl.dsp.exec_cmd("quickshell ipc call shortcuts toggle"))
 hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("kitty --title Btop -e btop"))
 hl.bind(mainMod .. " + H",      hl.dsp.exec_cmd("x64-hello"))
+hl.bind(mainMod .. " + Tab",    hl.dsp.exec_cmd("quickshell ipc call overview toggle"))
+hl.bind("ALT + Tab",            hl.dsp.window.cycle_next())
 
 -- Navigation focus
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
