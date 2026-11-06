@@ -24,8 +24,8 @@ local fileManager = "dolphin"
 -------------------
 hl.on("hyprland.start", function ()
     -- Export Wayland & Desktop session variables to DBus / Systemd
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
-    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE")
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
 
     -- Official Hyprland Polkit Authentication Agent (Qt6/QML) + Dark Theme Enforcement
     hl.exec_cmd("(/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
@@ -35,7 +35,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
 
     -- Quickshell Cyberpunk Desktop Shell (Top Bar, App Launcher, Control Center, OSD)
-    hl.exec_cmd("killall quickshell 2>/dev/null; QT_QUICK_BACKEND=software quickshell -n &")
+    hl.exec_cmd("killall quickshell 2>/dev/null; QT_QPA_PLATFORMTHEME=kde KDE_SESSION_VERSION=6 QT_QUICK_BACKEND=software quickshell -n &")
 
     -- X64 System Update Tray Monitor (SNI)
     hl.exec_cmd("x64-update-tray &")

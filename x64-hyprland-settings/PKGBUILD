@@ -1,6 +1,6 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=46
+pkgrel=47
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
@@ -16,8 +16,9 @@ source=(
     'x64-hyprland-ctl'
     'kdeglobals'
     'papirus-folders'
+    '10-qt.conf'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
@@ -40,6 +41,8 @@ package() {
     install -Dm644 "${srcdir}/hyprlock.conf" "${pkgdir}/etc/xdg/hypr/hyprlock.conf"
     install -Dm644 "${srcdir}/kdeglobals" "${pkgdir}/etc/skel/.config/kdeglobals"
     install -Dm644 "${srcdir}/kdeglobals" "${pkgdir}/etc/xdg/kdeglobals"
+    install -Dm644 "${srcdir}/10-qt.conf" "${pkgdir}/etc/environment.d/10-qt.conf"
+    install -Dm644 "${srcdir}/10-qt.conf" "${pkgdir}/usr/lib/environment.d/10-qt.conf"
 
     # Install 4K Monolith Wallpaper (opencode.desktop & opencode.svg are provided system-wide by x64-terminal-settings)
     install -Dm644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"

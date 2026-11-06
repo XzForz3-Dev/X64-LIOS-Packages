@@ -81,12 +81,24 @@ EOF
     chmod 0666 /sys/firmware/acpi/platform_profile 2>/dev/null || true
 }
 
+setup_qt_environment() {
+    touch /etc/environment 2>/dev/null || true
+    if ! grep -q "QT_QPA_PLATFORMTHEME=kde" /etc/environment 2>/dev/null; then
+        echo "QT_QPA_PLATFORMTHEME=kde" >> /etc/environment
+    fi
+    if ! grep -q "KDE_SESSION_VERSION=6" /etc/environment 2>/dev/null; then
+        echo "KDE_SESSION_VERSION=6" >> /etc/environment
+    fi
+}
+
 post_install() {
     setup_cpufreq_permissions
+    setup_qt_environment
     sync_user_configs "install"
 }
 
 post_upgrade() {
     setup_cpufreq_permissions
+    setup_qt_environment
     sync_user_configs "upgrade"
 }
