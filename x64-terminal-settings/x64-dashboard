@@ -11,6 +11,12 @@ if string match -qr '^es' "$LANG"; or string match -qr '^es' "$LC_ALL"; or strin
     set -g is_es 1
 end
 
+# Detection helper: KDE Plasma 6 desktop environment
+# (plasma-workspace provides plasmashell and startplasma-wayland for portals, but only plasma-desktop provides the actual full desktop environment)
+function is_kde_installed
+    test -d /usr/share/plasma/shells/org.kde.plasma.desktop; or pacman -Q plasma-desktop >/dev/null 2>&1
+end
+
 function draw_dashboard
     clear
     # Breathing room for header
@@ -103,7 +109,7 @@ function draw_dashboard
         set -a desktop_names "GNOME (X64 Stealth Edition - Wayland)"
         set -a desktop_dms "gdm"
     end
-    if type -q plasmashell
+    if is_kde_installed
         set -a desktop_names "KDE Plasma 6 (X64 Gaming Edition - Wayland)"
         set -a desktop_dms "sddm"
     end
@@ -295,7 +301,7 @@ function clean_previous_desktops -a target_id
         sudo rm -f /usr/share/gnome-shell/gnome-shell-theme.gresource* 2>/dev/null
     end
 
-    if test "$target_id" != "3"; and type -q plasmashell
+    if test "$target_id" != "3"; and is_kde_installed
         if test $is_es -eq 1
             echo -e "  \e[0;37m-> Desinstalando suite completa de KDE Plasma 6...\e[0m"
         else
@@ -396,7 +402,7 @@ function install_desktop_menu
     set -l active_lbl (test $is_es -eq 1; and echo " \e[1;32m[ACTIVO]\e[0m"; or echo " \e[1;32m[ACTIVE]\e[0m")
     type -q Hyprland; and set hypr_tag "$active_lbl"
     type -q gnome-shell; and set gnome_tag "$active_lbl"
-    type -q plasmashell; and set kde_tag "$active_lbl"
+    is_kde_installed; and set kde_tag "$active_lbl"
     type -q cosmic-session; and set cosmic_tag "$active_lbl"
     type -q niri-session; and set niri_tag "$active_lbl"
     type -q cinnamon-session; and set cinnamon_tag "$active_lbl"
@@ -478,7 +484,7 @@ function install_desktop_menu
     set -l is_current 0
     if test "$d_choice" = "1"; and type -q Hyprland; set is_current 1; end
     if test "$d_choice" = "2"; and type -q gnome-shell; set is_current 1; end
-    if test "$d_choice" = "3"; and type -q plasmashell; set is_current 1; end
+    if test "$d_choice" = "3"; and is_kde_installed; set is_current 1; end
     if test "$d_choice" = "4"; and type -q cosmic-session; set is_current 1; end
     if test "$d_choice" = "5"; and type -q niri-session; set is_current 1; end
     if test "$d_choice" = "6"; and type -q cinnamon-session; set is_current 1; end
@@ -973,6 +979,7 @@ while true
                     echo -e "\n    \e[1;32mSystem update completed successfully!\e[0m"
                     read -l -P "  Press Enter to return..." dummy
                 end
+                exec x64-dashboard
             end
         case 5 'n' 'N'
             clear
