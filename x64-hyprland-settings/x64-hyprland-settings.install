@@ -49,19 +49,30 @@ sync_user_configs() {
                 fi
             fi
 
+            # 3. KDE & Qt6 Global Theme (~/.config/kdeglobals)
+            if [ -f /etc/skel/.config/kdeglobals ]; then
+                cp -f /etc/skel/.config/kdeglobals "$user_dir/.config/kdeglobals" 2>/dev/null || true
+                chown "$u:$g" "$user_dir/.config/kdeglobals" 2>/dev/null || true
+            fi
+
             chown -R "$u:$g" "$target_hypr" "$target_qs" 2>/dev/null || true
         fi
     done
+
+    # 4. Enforce Crimson Red Papirus Folders Globally
+    if [ -x /usr/bin/papirus-folders ]; then
+        /usr/bin/papirus-folders -C red -t Papirus-Dark 2>/dev/null || true
+    fi
 }
 
 setup_cpufreq_permissions() {
     mkdir -p /etc/tmpfiles.d 2>/dev/null || true
     cat << 'EOF' > /etc/tmpfiles.d/x64-cpufreq.conf
--z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 0666 root root - -
--z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 0666 root root - -
--z /sys/devices/system/cpu/intel_pstate/no_turbo 0666 root root - -
--z /sys/devices/system/cpu/cpufreq/boost 0666 root root - -
--z /sys/firmware/acpi/platform_profile 0666 root root - -
+z /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 0666 root root - -
+z /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 0666 root root - -
+z /sys/devices/system/cpu/intel_pstate/no_turbo 0666 root root - -
+z /sys/devices/system/cpu/cpufreq/boost 0666 root root - -
+z /sys/firmware/acpi/platform_profile 0666 root root - -
 EOF
     chmod 0666 /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
     chmod 0666 /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null || true
