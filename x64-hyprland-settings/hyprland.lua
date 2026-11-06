@@ -36,8 +36,8 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
     hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
 
-    -- Official Hyprland Polkit Authentication Agent (Qt6/QML) + Dark Theme Enforcement
-    hl.exec_cmd("(/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
+    -- Official Hyprland Polkit Authentication Agent (Qt6/QML) via systemd user service + fallback
+    hl.exec_cmd("systemctl --user start hyprpolkitagent.service 2>/dev/null || (/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null &")
 
     -- Monolith 4K Wallpaper Daemon

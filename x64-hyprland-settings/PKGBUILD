@@ -1,6 +1,6 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=54
+pkgrel=55
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
@@ -20,8 +20,9 @@ source=(
     'gtk-settings.ini'
     'gtk.css'
     'chromium-flags.conf'
+    '90-x64-polkit.preset'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
@@ -57,6 +58,11 @@ package() {
 
     # Install Chromium Wayland Hardware Acceleration Flags
     install -Dm644 "${srcdir}/chromium-flags.conf" "${pkgdir}/etc/chromium-flags.conf"
+
+    # Install Systemd User Preset for Polkit Agent & Skeleton Session Wants
+    install -Dm644 "${srcdir}/90-x64-polkit.preset" "${pkgdir}/usr/lib/systemd/user-preset/90-x64-polkit.preset"
+    mkdir -p "${pkgdir}/etc/skel/.config/systemd/user/graphical-session.target.wants"
+    ln -sf /usr/lib/systemd/user/hyprpolkitagent.service "${pkgdir}/etc/skel/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service"
 
     # Install 4K Monolith Wallpaper (opencode.desktop & opencode.svg are provided system-wide by x64-terminal-settings)
     install -Dm644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"

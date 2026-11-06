@@ -72,6 +72,11 @@ sync_user_configs() {
                 sed -i 's/Net\/IconThemeName .*/Net\/IconThemeName "Papirus-Dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
             fi
 
+            # 5. Enable Hyprland Polkit Agent in systemd user session
+            mkdir -p "$user_dir/.config/systemd/user/graphical-session.target.wants" 2>/dev/null || true
+            ln -sf /usr/lib/systemd/user/hyprpolkitagent.service "$user_dir/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service" 2>/dev/null || true
+            chown -R "$u:$g" "$user_dir/.config/systemd" 2>/dev/null || true
+
             chown -R "$u:$g" "$target_hypr" "$target_qs" 2>/dev/null || true
         fi
     done
