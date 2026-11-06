@@ -395,7 +395,9 @@ is_recorder_running() {
 cmd_record_worker() {
     local scope="${1:-fullscreen}"
     local audio_mode="${2:-desktop}"
-    local vid_dir="${HOME}/Videos"
+    local vid_dir
+    vid_dir="$(xdg-user-dir VIDEOS 2>/dev/null)"
+    [ -z "$vid_dir" ] && vid_dir="${HOME}/Videos"
     mkdir -p "${vid_dir}"
 
     sleep 0.22
@@ -529,7 +531,9 @@ cmd_record() {
         pkill -INT -x wf-recorder >/dev/null 2>&1 || true
         rm -f "${STATE_DIR}/record.start" "${STATE_DIR}/record.engine"
         local saved_file
-        saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "${HOME}/Videos")
+        local def_vid
+        def_vid="$(xdg-user-dir VIDEOS 2>/dev/null || echo "${HOME}/Videos")"
+        saved_file=$(cat "${STATE_DIR}/record.file" 2>/dev/null || echo "${def_vid}")
         if [ "$IS_ES" -eq 1 ]; then
             notify_user "Grabación Guardada" "Video MP4 guardado: $(basename "$saved_file")" "Grabadora X64"
         else
@@ -540,7 +544,10 @@ cmd_record() {
 
 cmd_screenshot_worker() {
     local mode="${1:-full}"
-    local pic_dir="${HOME}/Pictures/Screenshots"
+    local pic_base
+    pic_base="$(xdg-user-dir PICTURES 2>/dev/null)"
+    [ -z "$pic_base" ] && pic_base="${HOME}/Pictures"
+    local pic_dir="${pic_base}/Screenshots"
     mkdir -p "${pic_dir}"
     local out_file="${pic_dir}/X64-Shot-$(date +%Y%m%d-%H%M%S).png"
 
