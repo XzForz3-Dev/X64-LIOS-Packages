@@ -235,8 +235,8 @@ PanelWindow {
                     implicitWidth: wipeRow.implicitWidth + 16
                     implicitHeight: 28
                     radius: 6
-                    color: wipeArea.containsMouse ? "#33ff2b2b" : "#1a1c24"
-                    border.color: wipeArea.containsMouse ? Theme.accent : "#2b303d"
+                    color: wipeArea.containsMouse ? Theme.accentDim : Theme.bgElevated
+                    border.color: wipeArea.containsMouse ? Theme.accent : Theme.borderSubtle
                     border.width: 1
                     Behavior on color { ColorAnimation { duration: 120 } }
                     Behavior on border.color { ColorAnimation { duration: 120 } }
@@ -522,17 +522,13 @@ PanelWindow {
                                 anchors.rightMargin: 10
                                 spacing: 10
 
-                                // Type Icon & Index Badge
+                                // Type Icon & Index Badge (Sober Obsidian & Crimson)
                                 Rectangle {
                                     implicitWidth: 28
                                     implicitHeight: 28
                                     radius: 6
-                                    color: modelData.isUrl
-                                        ? "#153388ff"
-                                        : (modelData.isCmd ? "#1500cc66" : "#14ffffff")
-                                    border.color: modelData.isUrl
-                                        ? "#443388ff"
-                                        : (modelData.isCmd ? "#4400cc66" : "#22ffffff")
+                                    color: itemDelegate.isSel ? "#25ff2b2b" : (itemMouseArea.containsMouse ? "#20ffffff" : "#14ffffff")
+                                    border.color: itemDelegate.isSel ? Theme.accent : (itemMouseArea.containsMouse ? "#33ffffff" : "#22ffffff")
                                     border.width: 1
 
                                     Text {
@@ -540,7 +536,7 @@ PanelWindow {
                                         text: modelData.isUrl ? "" : (modelData.isCmd ? "" : "󰦨")
                                         font.family: Theme.fontMono
                                         font.pixelSize: 12
-                                        color: modelData.isUrl ? "#3388ff" : (modelData.isCmd ? "#00cc66" : Theme.textSecondary)
+                                        color: itemDelegate.isSel ? Theme.accent : Theme.textSecondary
                                     }
                                 }
 
@@ -595,8 +591,11 @@ PanelWindow {
                                         implicitWidth: copyRow.implicitWidth + 12
                                         implicitHeight: 26
                                         radius: 5
-                                        color: copyArea.containsMouse ? Theme.accent : "#18ffffff"
+                                        color: copyArea.containsMouse ? Theme.accentDim : "#14ffffff"
+                                        border.color: copyArea.containsMouse ? Theme.accent : "#22ffffff"
+                                        border.width: 1
                                         Behavior on color { ColorAnimation { duration: 100 } }
+                                        Behavior on border.color { ColorAnimation { duration: 100 } }
 
                                         RowLayout {
                                             id: copyRow
@@ -607,7 +606,7 @@ PanelWindow {
                                                 text: "󰆏"
                                                 font.family: Theme.fontMono
                                                 font.pixelSize: 10
-                                                color: copyArea.containsMouse ? "#ffffff" : Theme.accent
+                                                color: copyArea.containsMouse ? Theme.accent : Theme.textSecondary
                                             }
 
                                             Text {
@@ -615,7 +614,7 @@ PanelWindow {
                                                 font.family: Theme.fontSans
                                                 font.pixelSize: 9
                                                 font.bold: true
-                                                color: copyArea.containsMouse ? "#ffffff" : Theme.textPrimary
+                                                color: copyArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                                             }
                                         }
 
@@ -633,10 +632,11 @@ PanelWindow {
                                         implicitWidth: 26
                                         implicitHeight: 26
                                         radius: 5
-                                        color: delArea.containsMouse ? "#33ff2b2b" : "#14ffffff"
+                                        color: delArea.containsMouse ? Theme.accentDim : "#14ffffff"
                                         border.color: delArea.containsMouse ? Theme.accent : "transparent"
                                         border.width: 1
                                         Behavior on color { ColorAnimation { duration: 100 } }
+                                        Behavior on border.color { ColorAnimation { duration: 100 } }
 
                                         Text {
                                             anchors.centerIn: parent
@@ -747,3 +747,4 @@ PanelWindow {
         }
     }
 }
+
