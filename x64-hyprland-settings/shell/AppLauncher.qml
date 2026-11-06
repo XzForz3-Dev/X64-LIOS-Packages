@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Io
 
 PanelWindow {
     id: launcherWindow
@@ -153,13 +154,29 @@ PanelWindow {
         return count;
     }
 
+    Process {
+        id: appLaunchProc
+    }
+
+    function launchItem(itemData) {
+        launcherWindow.closeRequested();
+        if (!itemData || !itemData.appRef) return;
+        var app = itemData.appRef;
+        if (app.runInTerminal) {
+            var cmd = app.execString || itemData.name.toLowerCase();
+            cmd = cmd.replace(/%[a-zA-Z]/g, "").trim();
+            if (appLaunchProc.running) appLaunchProc.running = false;
+            appLaunchProc.command = ["bash", "-c", "nohup kitty -e " + cmd + " >/dev/null 2>&1 &"];
+            appLaunchProc.running = true;
+        } else {
+            app.execute();
+        }
+    }
+
     function executeSelected() {
         if (launcherWindow.filteredAppList.length > launcherWindow.selectedIndex && launcherWindow.selectedIndex >= 0) {
-            var selectedApp = launcherWindow.filteredAppList[launcherWindow.selectedIndex].appRef;
-            if (selectedApp) {
-                selectedApp.execute();
-                launcherWindow.closeRequested();
-            }
+            var selectedItem = launcherWindow.filteredAppList[launcherWindow.selectedIndex];
+            launcherWindow.launchItem(selectedItem);
         }
     }
 
@@ -479,10 +496,7 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (appItem.modelData.appRef) {
-                                        appItem.modelData.appRef.execute();
-                                        launcherWindow.closeRequested();
-                                    }
+                                    launcherWindow.launchItem(appItem.modelData);
                                 }
                             }
                         }

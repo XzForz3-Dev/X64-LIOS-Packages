@@ -571,7 +571,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Hyprland (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-desktop-portal-hyprland x64-hyprland-settings chromium
+            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"
