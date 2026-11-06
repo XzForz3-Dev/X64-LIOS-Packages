@@ -59,12 +59,16 @@ case "$1" in
     name=$(echo "$info" | jq -r '.name // "Virtual-1"')
     height=$(echo "$info" | jq -r '.height // 1080')
 
+    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
     mode="preferred"
     if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
       mode="1920x1080@60"
+      if [ "$height" -eq 1022 ] || [ "$height" -ne 1080 ]; then
+        hyprctl eval "hl.monitor({ output = \"$name\", mode = \"1920x1080@60\", position = \"auto\", scale = 1.0 })" >/dev/null 2>&1
+        sleep 0.05
+      fi
     fi
 
-    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
     hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = \"auto\" })" >/dev/null 2>&1
 
     lua_cfg="$HOME/.config/hypr/hyprland.lua"
@@ -90,12 +94,16 @@ case "$1" in
     name=$(echo "$info" | jq -r '.name // "Virtual-1"')
     height=$(echo "$info" | jq -r '.height // 1080')
 
+    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
     mode="preferred"
     if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
       mode="1920x1080@60"
+      if [ "$height" -eq 1022 ] || [ "$height" -ne 1080 ]; then
+        hyprctl eval "hl.monitor({ output = \"$name\", mode = \"1920x1080@60\", position = \"auto\", scale = 1.0 })" >/dev/null 2>&1
+        sleep 0.05
+      fi
     fi
 
-    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
     hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = $final_scale })" >/dev/null 2>&1
 
     lua_cfg="$HOME/.config/hypr/hyprland.lua"

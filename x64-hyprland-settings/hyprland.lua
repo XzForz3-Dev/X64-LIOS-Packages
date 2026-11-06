@@ -6,6 +6,15 @@
 ------------------
 ---- MONITORS ----
 ------------------
+-- Virtualized environments (QEMU/KVM): lock to standard 1080p to guarantee clean subpixel divisors for fractional scaling
+hl.monitor({
+    output   = "Virtual-1",
+    mode     = "1920x1080@60",
+    position = "auto",
+    scale    = "auto",
+})
+
+-- Default catch-all for physical monitors (Auto-detect EDID)
 hl.monitor({
     output   = "",
     mode     = "preferred",
