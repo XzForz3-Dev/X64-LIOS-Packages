@@ -317,8 +317,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            controlWindow.closeRequested();
-                            Hyprland.dispatch('hl.dsp.exec_cmd("quickshell ipc call clipboard toggle")');
+                            controlWindow.launchApp("quickshell ipc call clipboard toggle");
                         }
                     }
                 }
@@ -347,8 +346,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            controlWindow.closeRequested();
-                            Hyprland.dispatch('hl.dsp.exec_cmd("quickshell ipc call shortcuts toggle")');
+                            controlWindow.launchApp("quickshell ipc call shortcuts toggle");
                         }
                     }
                 }
@@ -405,8 +403,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl reboot")');
-                            controlWindow.closeRequested();
+                            controlWindow.launchApp("systemctl reboot");
                         }
                     }
                 }
@@ -434,8 +431,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch('hl.dsp.exec_cmd("systemctl poweroff")');
-                            controlWindow.closeRequested();
+                            controlWindow.launchApp("systemctl poweroff");
                         }
                     }
                 }

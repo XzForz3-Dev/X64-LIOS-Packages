@@ -145,6 +145,20 @@ PanelWindow {
     }
 
     Process {
+        id: netAppProc
+    }
+
+    function launchApp(cmdStr) {
+        netWindow.passwordSsid = "";
+        netWindow.closeRequested();
+        if (netAppProc.running) {
+            netAppProc.running = false;
+        }
+        netAppProc.command = ["bash", "-c", "nohup " + cmdStr + " >/dev/null 2>&1 &"];
+        netAppProc.running = true;
+    }
+
+    Process {
         id: netStatusProc
         command: ["x64-hyprland-ctl", "net", "status"]
         stdout: StdioCollector {
@@ -742,9 +756,7 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        Hyprland.dispatch('hl.dsp.exec_cmd("nm-connection-editor")');
-                        netWindow.passwordSsid = "";
-                        netWindow.closeRequested();
+                        netWindow.launchApp("nm-connection-editor");
                     }
                 }
             }

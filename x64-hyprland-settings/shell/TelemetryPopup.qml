@@ -135,6 +135,19 @@ PanelWindow {
     }
 
     Process {
+        id: teleAppProc
+    }
+
+    function launchApp(cmdStr) {
+        teleWindow.closeRequested();
+        if (teleAppProc.running) {
+            teleAppProc.running = false;
+        }
+        teleAppProc.command = ["bash", "-c", "nohup " + cmdStr + " >/dev/null 2>&1 &"];
+        teleAppProc.running = true;
+    }
+
+    Process {
         id: statusProc
         command: ["x64-hyprland-ctl", "status"]
         stdout: StdioCollector {
@@ -765,8 +778,7 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        Hyprland.dispatch('hl.dsp.exec_cmd("kitty -e btop")');
-                        teleWindow.closeRequested();
+                        teleWindow.launchApp("kitty -e btop");
                     }
                 }
             }
