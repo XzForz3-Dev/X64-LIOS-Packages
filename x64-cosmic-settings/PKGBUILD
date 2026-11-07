@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -19,8 +19,18 @@ source=(
     'cosmic_term_font_size'
     'cosmic_term_show_headerbar'
     'screenshot.png'
+    '01-monolith.jpg'
+    'x64-limine-splash.png'
+    'bg_all_desktop'
+    'bg_same_on_all'
+    'bg_all_greeter'
 )
 sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -31,6 +41,11 @@ sha256sums=(
 )
 
 package() {
+    # 0. Fondos de Pantalla Oficiales de X64 LIOS
+    install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
+    install -m644 "${srcdir}/x64-limine-splash.png" "${pkgdir}/usr/share/backgrounds/x64-lios/x64-limine-splash.png"
+
     # 1. Configuracion en /etc/skel/.config/cosmic (Nuevos usuarios)
     install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2"
     install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
@@ -43,6 +58,11 @@ package() {
     install -m644 "${srcdir}/cosmic_term_color_schemes_dark" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/color_schemes_dark"
     install -m644 "${srcdir}/cosmic_term_font_size" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/font_size"
     install -m644 "${srcdir}/cosmic_term_show_headerbar" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/show_headerbar"
+
+    # Fondo de escritorio Monolith en skeleton
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicBackground/v1"
+    install -m644 "${srcdir}/bg_same_on_all" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicBackground/v1/same-on-all"
+    install -m644 "${srcdir}/bg_all_desktop" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicBackground/v1/all"
 
     # 2. Configuracion global de respaldo en /etc/xdg/cosmic
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2"
@@ -57,7 +77,17 @@ package() {
     install -m644 "${srcdir}/cosmic_term_font_size" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1/font_size"
     install -m644 "${srcdir}/cosmic_term_show_headerbar" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTerm/v1/show_headerbar"
 
-    # 3. Screenshot oficial de referencia
+    # Fondo de escritorio Monolith en xdg
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicBackground/v1"
+    install -m644 "${srcdir}/bg_same_on_all" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicBackground/v1/same-on-all"
+    install -m644 "${srcdir}/bg_all_desktop" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicBackground/v1/all"
+
+    # 3. Configuracion a nivel de sistema (/usr/share/cosmic)
+    install -d "${pkgdir}/usr/share/cosmic/com.system76.CosmicBackground/v1"
+    install -m644 "${srcdir}/bg_same_on_all" "${pkgdir}/usr/share/cosmic/com.system76.CosmicBackground/v1/same-on-all"
+    install -m644 "${srcdir}/bg_all_desktop" "${pkgdir}/usr/share/cosmic/com.system76.CosmicBackground/v1/all"
+
+    # 4. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-cosmic-settings"
     install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-cosmic-settings/screenshot.png"
 }

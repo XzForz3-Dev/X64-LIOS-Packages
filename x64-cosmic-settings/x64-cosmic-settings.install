@@ -3,6 +3,24 @@ post_install() {
     mkdir -p /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1
     echo '"JetBrainsMono Nerd Font"' > /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/font_name
 
+    # Configurar fondo oficial para cosmic-greeter (Limine Splash HD)
+    if [ -d /var/lib/cosmic-greeter ]; then
+        mkdir -p /var/lib/cosmic-greeter/.config/cosmic/com.system76.CosmicBackground/v1
+        echo "true" > /var/lib/cosmic-greeter/.config/cosmic/com.system76.CosmicBackground/v1/same-on-all
+        cat << 'EOF' > /var/lib/cosmic-greeter/.config/cosmic/com.system76.CosmicBackground/v1/all
+(
+    output: "all",
+    source: Path("/usr/share/backgrounds/x64-lios/x64-limine-splash.png"),
+    filter_by_theme: false,
+    rotation_frequency: 3600,
+    filter_method: Lanczos,
+    scaling_mode: Zoom,
+    sampling_method: Alphanumeric,
+)
+EOF
+        chown -R cosmic-greeter:cosmic-greeter /var/lib/cosmic-greeter/.config 2>/dev/null || true
+    fi
+
     # Propagar configuraciones soberanas de COSMIC a usuarios existentes en /home/*
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
@@ -14,14 +32,16 @@ post_install() {
             mkdir -p "$target_cosmic/com.system76.CosmicTheme.Dark/v1"
             mkdir -p "$target_cosmic/com.system76.CosmicAppList/v1"
             mkdir -p "$target_cosmic/com.system76.CosmicTerm/v1"
+            mkdir -p "$target_cosmic/com.system76.CosmicBackground/v1"
 
             # Copiar configs de skeleton
             if [ -d /etc/skel/.config/cosmic ]; then
                 cp -rn /etc/skel/.config/cosmic/* "$target_cosmic/" 2>/dev/null || true
-                # Forzar sobreescritura de temas y terminales clave para alineación soberana
+                # Forzar sobreescritura de temas, terminales y fondos clave para alineación soberana
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/* "$target_cosmic/com.system76.CosmicTheme.Dark/v2/" 2>/dev/null || true
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicAppList/v1/* "$target_cosmic/com.system76.CosmicAppList/v1/" 2>/dev/null || true
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/* "$target_cosmic/com.system76.CosmicTerm/v1/" 2>/dev/null || true
+                cp -f /etc/skel/.config/cosmic/com.system76.CosmicBackground/v1/* "$target_cosmic/com.system76.CosmicBackground/v1/" 2>/dev/null || true
             fi
 
             # Asegurar tipografía JetBrainsMono Nerd Font en el usuario
@@ -30,6 +50,9 @@ post_install() {
             chown -R "$u:$g" "$target_cosmic" 2>/dev/null || true
         fi
     done
+
+    # Refrescar cosmic-bg en caliente si esta corriendo
+    killall -q cosmic-bg 2>/dev/null || true
 }
 
 post_upgrade() {
