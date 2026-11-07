@@ -111,8 +111,12 @@ function draw_dashboard
     set -g desktop_names
     set -g desktop_dms
 
-    if type -q Hyprland
-        set -a desktop_names "X64 LIOS + Omarchy (Flagship Cyberpunk - Wayland)"
+    if test (count (pacman -Qq x64-hyprland-settings 2>/dev/null)) -gt 0
+        set -a desktop_names "Hyprland (X64 Cyberpunk Edition - Wayland)"
+        set -a desktop_dms "sddm"
+    end
+    if test -d /usr/share/omarchy
+        set -a desktop_names "X64 LIOS + Omarchy (Flagship Shell - Wayland)"
         set -a desktop_dms "sddm"
     end
     if type -q gnome-shell
@@ -286,16 +290,25 @@ function clean_previous_desktops -a target_id
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
     # Remove packages from previous desktop with safe recursive cascade (-Rcs)
-    if test "$target_id" != "1"; and test (count (pacman -Qq hyprland x64-hyprland-settings 2>/dev/null)) -gt 0
+    if test "$target_id" != "1"; and test (count (pacman -Qq x64-hyprland-settings 2>/dev/null)) -gt 0
         if test $is_es -eq 1
-            echo -e "  \e[0;37m-> Desinstalando X64 LIOS + Omarchy y componentes (Quickshell, Dolphin)...\e[0m"
+            echo -e "  \e[0;37m-> Desinstalando Hyprland Nativo y componentes...\e[0m"
         else
-            echo -e "  \e[0;37m-> Uninstalling X64 LIOS + Omarchy and components (Quickshell, Dolphin)...\e[0m"
+            echo -e "  \e[0;37m-> Uninstalling Native Hyprland and components...\e[0m"
         end
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland dolphin hyprcursor hyprgraphics hyprland-guiutils hyprlang hyprtoolkit hyprutils hyprwire aquamarine waybar rofi rofi-wayland dunst 2>/dev/null | sort -u)
+        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings 2>/dev/null | sort -u)
         if test (count $hypr_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
         end
+    end
+
+    if test "$target_id" != "8"; and test -d /usr/share/omarchy
+        if test $is_es -eq 1
+            echo -e "  \e[0;37m-> Desinstalando shell X64 LIOS + Omarchy (/usr/share/omarchy)...\e[0m"
+        else
+            echo -e "  \e[0;37m-> Uninstalling X64 LIOS + Omarchy shell (/usr/share/omarchy)...\e[0m"
+        end
+        sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
     end
 
     if test "$target_id" != "2"; and test (count (pacman -Qq gnome-shell x64-gnome-settings 2>/dev/null)) -gt 0
@@ -407,16 +420,18 @@ function install_desktop_menu
     set -l niri_tag ""
     set -l cinnamon_tag ""
     set -l xfce_tag ""
+    set -l omarchy_tag ""
     set -l nodesktop_tag ""
 
     set -l active_lbl (test $is_es -eq 1; and echo " \e[1;32m[ACTIVO]\e[0m"; or echo " \e[1;32m[ACTIVE]\e[0m")
-    type -q Hyprland; and set hypr_tag "$active_lbl"
+    test (count (pacman -Qq x64-hyprland-settings 2>/dev/null)) -gt 0; and set hypr_tag "$active_lbl"
     type -q gnome-shell; and set gnome_tag "$active_lbl"
     is_kde_installed; and set kde_tag "$active_lbl"
     type -q cosmic-session; and set cosmic_tag "$active_lbl"
     type -q niri-session; and set niri_tag "$active_lbl"
     type -q cinnamon-session; and set cinnamon_tag "$active_lbl"
     type -q xfce4-session; and set xfce_tag "$active_lbl"
+    test -d /usr/share/omarchy; and set omarchy_tag "$active_lbl"
     test $has_desktop -eq 0; and set nodesktop_tag "$active_lbl"
 
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
@@ -424,33 +439,35 @@ function install_desktop_menu
         echo -e "   $title X64 LIOS - GESTIÓN Y MUTACIÓN DE ENTORNOS DE ESCRITORIO$reset"
         echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
         echo -e "  Selecciona el escritorio oficial que deseas configurar en este equipo:\n"
-        echo -e "    \e[1;33m[1]\e[0m $title X64 LIOS + Omarchy$reset $val(Flagship Cyberpunk - Hyprland, Quickshell, español)$reset$hypr_tag"
-        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset$gnome_tag"
-        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Máximo rendimiento y control)$reset$kde_tag"
-        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
-        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
-        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
-        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
-        echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Modo Servidor / TTY puro sin entorno gráfico)$reset$nodesktop_tag\n"
+        echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset          $val(X64 Cyberpunk Edition - Nativo, animaciones fluidas)$reset$hypr_tag"
+        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset             $val(X64 Stealth Edition - Moderno, sobrio y pulido)$reset$gnome_tag"
+        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset      $val(X64 Gaming Edition - Máximo rendimiento y control)$reset$kde_tag"
+        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset            $val(Next-Gen Rust Desktop desarrollado por System76)$reset$cosmic_tag"
+        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset              $val(Tiling con scroll infinito horizontal innovador)$reset$niri_tag"
+        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset          $val(Entorno tradicional clásico de alta estabilidad)$reset$cinnamon_tag"
+        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset             $val(Ligero y ultrarrápido con mínimo consumo de RAM)$reset$xfce_tag"
+        echo -e "    \e[1;33m[8]\e[0m $title X64 LIOS + Omarchy$reset $val(Flagship Shell Basecamp adaptado con temas y español)$reset$omarchy_tag"
+        echo -e "    \e[1;33m[9]\e[0m $title No Desktop$reset        $val(Modo Servidor / TTY puro sin entorno gráfico)$reset$nodesktop_tag\n"
         echo -e "    \e[1;33m[0]\e[0m Volver al Dashboard Principal"
     else
         echo -e "   $title X64 LIOS - DESKTOP MANAGEMENT & MUTATION$reset"
         echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset\n"
         echo -e "  Select the official desktop you wish to configure on this system:\n"
-        echo -e "    \e[1;33m[1]\e[0m $title X64 LIOS + Omarchy$reset $val(Flagship Cyberpunk - Hyprland, Quickshell, Spanish)$reset$hypr_tag"
-        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset          $val(X64 Stealth Edition - Modern, sleek and polished)$reset$gnome_tag"
-        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset   $val(X64 Gaming Edition - Maximum performance and control)$reset$kde_tag"
-        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset         $val(Next-Gen Rust Desktop developed by System76)$reset$cosmic_tag"
-        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset           $val(Innovative infinite horizontal scroll tiling)$reset$niri_tag"
-        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset       $val(Classic traditional high-stability environment)$reset$cinnamon_tag"
-        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset          $val(Ultra-lightweight with minimal RAM footprint)$reset$xfce_tag"
-        echo -e "    \e[1;33m[8]\e[0m $title No Desktop$reset     $val(Pure Server / TTY Console Mode without GUI)$reset$nodesktop_tag\n"
+        echo -e "    \e[1;33m[1]\e[0m $title Hyprland$reset          $val(X64 Cyberpunk Edition - Native, fluid animations)$reset$hypr_tag"
+        echo -e "    \e[1;33m[2]\e[0m $title GNOME$reset             $val(X64 Stealth Edition - Modern, sleek and polished)$reset$gnome_tag"
+        echo -e "    \e[1;33m[3]\e[0m $title KDE Plasma 6$reset      $val(X64 Gaming Edition - Maximum performance and control)$reset$kde_tag"
+        echo -e "    \e[1;33m[4]\e[0m $title COSMIC$reset            $val(Next-Gen Rust Desktop developed by System76)$reset$cosmic_tag"
+        echo -e "    \e[1;33m[5]\e[0m $title Niri$reset              $val(Innovative infinite horizontal scroll tiling)$reset$niri_tag"
+        echo -e "    \e[1;33m[6]\e[0m $title Cinnamon$reset          $val(Classic traditional high-stability environment)$reset$cinnamon_tag"
+        echo -e "    \e[1;33m[7]\e[0m $title Xfce4$reset             $val(Ultra-lightweight with minimal RAM footprint)$reset$xfce_tag"
+        echo -e "    \e[1;33m[8]\e[0m $title X64 LIOS + Omarchy$reset $val(Flagship Basecamp Shell adapted with themes & Spanish)$reset$omarchy_tag"
+        echo -e "    \e[1;33m[9]\e[0m $title No Desktop$reset        $val(Pure Server / TTY Console Mode without GUI)$reset$nodesktop_tag\n"
         echo -e "    \e[1;33m[0]\e[0m Return to Main Dashboard"
     end
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     echo ""
-    set -l prompt_choice (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-8, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-8, 0]: \e[0m")
+    set -l prompt_choice (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-9, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-9, 0]: \e[0m")
     read -l -P (echo -e "$prompt_choice") d_choice
     test $status -ne 0; and return
 
@@ -484,6 +501,9 @@ function install_desktop_menu
             set target_name "Xfce4 (X64 Ultra-Lightweight Edition)"
             set target_dm "lightdm"
         case 8
+            set target_name "X64 LIOS + Omarchy (Flagship Cyberpunk Shell)"
+            set target_dm "sddm"
+        case 9
             set target_name (test $is_es -eq 1; and echo "No Desktop (Modo Servidor / Consola TTY Pura)"; or echo "No Desktop (Pure Server / TTY Console Mode)")
             set target_dm "none"
         case '*'
@@ -492,14 +512,15 @@ function install_desktop_menu
 
     # Check if target is already current desktop
     set -l is_current 0
-    if test "$d_choice" = "1"; and type -q Hyprland; set is_current 1; end
+    if test "$d_choice" = "1"; and test (count (pacman -Qq x64-hyprland-settings 2>/dev/null)) -gt 0; set is_current 1; end
     if test "$d_choice" = "2"; and type -q gnome-shell; set is_current 1; end
     if test "$d_choice" = "3"; and is_kde_installed; set is_current 1; end
     if test "$d_choice" = "4"; and type -q cosmic-session; set is_current 1; end
     if test "$d_choice" = "5"; and type -q niri-session; set is_current 1; end
     if test "$d_choice" = "6"; and type -q cinnamon-session; set is_current 1; end
     if test "$d_choice" = "7"; and type -q xfce4-session; set is_current 1; end
-    if test "$d_choice" = "8"; and test $has_desktop -eq 0; set is_current 1; end
+    if test "$d_choice" = "8"; and test -d /usr/share/omarchy; set is_current 1; end
+    if test "$d_choice" = "9"; and test $has_desktop -eq 0; set is_current 1; end
 
     if test $is_current -eq 1
         clear
@@ -625,25 +646,14 @@ function install_desktop_menu
     switch $d_choice
         case 1
             if test $is_es -eq 1
-                echo -e "\n  \e[1;32m[*] Instalando X64 LIOS + Omarchy Oficial (Suite Completa Flagship)...\e[0m"
+                echo -e "\n  \e[1;32m[*] Instalando Hyprland Nativo Oficial de X64 LIOS (Suite Cyberpunk)...\e[0m"
             else
-                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS + Omarchy (Full Flagship Suite)...\e[0m"
+                echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Native Hyprland (Cyberpunk Suite)...\e[0m"
             end
             sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
-                if not test -d /usr/share/omarchy
-                    if test $is_es -eq 1
-                        echo -e "  \e[1;36m-> Desplegando X64 LIOS + Omarchy Flagship Shell (/usr/share/omarchy)...\e[0m"
-                    else
-                        echo -e "  \e[1;36m-> Deploying X64 LIOS + Omarchy Flagship Shell (/usr/share/omarchy)...\e[0m"
-                    end
-                    sudo git clone --depth 1 -b main https://github.com/XzForz3-Dev/X64-LIOS-Omarchy.git /usr/share/omarchy
-                    sudo bash -c 'echo "export OMARCHY_PATH=/usr/share/omarchy" > /etc/profile.d/omarchy.sh'
-                    sudo chmod +x /etc/profile.d/omarchy.sh
-                    sudo cp /usr/share/omarchy/default/wayland-sessions/*.desktop /usr/share/wayland-sessions/ 2>/dev/null
-                end
-                configure_desktop_boot_mode sddm "X64 LIOS + Omarchy (Cyberpunk Edition)"
+                configure_desktop_boot_mode sddm "Hyprland (X64 Cyberpunk Edition)"
             end
         case 2
             if test $is_es -eq 1
@@ -712,6 +722,28 @@ function install_desktop_menu
                 configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"
             end
         case 8
+            if test $is_es -eq 1
+                echo -e "\n  \e[1;32m[*] Instalando X64 LIOS + Omarchy (Flagship Shell Basecamp)...\e[0m"
+            else
+                echo -e "\n  \e[1;32m[*] Installing X64 LIOS + Omarchy (Flagship Basecamp Shell)...\e[0m"
+            end
+            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland chromium
+            test $status -eq 0; and set install_ok 1
+            if test $install_ok -eq 1
+                if not test -d /usr/share/omarchy
+                    if test $is_es -eq 1
+                        echo -e "  \e[1;36m-> Desplegando X64 LIOS + Omarchy Flagship Shell (/usr/share/omarchy)...\e[0m"
+                    else
+                        echo -e "  \e[1;36m-> Deploying X64 LIOS + Omarchy Flagship Shell (/usr/share/omarchy)...\e[0m"
+                    end
+                    sudo git clone --depth 1 -b main https://github.com/XzForz3-Dev/X64-LIOS-Omarchy.git /usr/share/omarchy
+                    sudo bash -c 'echo "export OMARCHY_PATH=/usr/share/omarchy" > /etc/profile.d/omarchy.sh'
+                    sudo chmod +x /etc/profile.d/omarchy.sh
+                    sudo cp /usr/share/omarchy/default/wayland-sessions/*.desktop /usr/share/wayland-sessions/ 2>/dev/null
+                end
+                configure_desktop_boot_mode sddm "X64 LIOS + Omarchy (Cyberpunk Edition)"
+            end
+        case 9
             if test $is_es -eq 1
                 echo -e "\n  \e[1;32m[*] Configurando Sistema en Modo No Desktop (Consola TTY Pura)...\e[0m"
             else
