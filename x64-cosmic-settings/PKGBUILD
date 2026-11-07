@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -24,8 +24,10 @@ source=(
     'bg_all_desktop'
     'bg_same_on_all'
     'bg_all_greeter'
+    'chromium-flags.conf'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -45,6 +47,9 @@ package() {
     install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
     install -m644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
     install -m644 "${srcdir}/x64-limine-splash.png" "${pkgdir}/usr/share/backgrounds/x64-lios/x64-limine-splash.png"
+
+    # Chromium Wayland & Hardware Acceleration Flags
+    install -Dm644 "${srcdir}/chromium-flags.conf" "${pkgdir}/etc/chromium-flags.conf"
 
     # 1. Configuracion en /etc/skel/.config/cosmic (Nuevos usuarios)
     install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2"
