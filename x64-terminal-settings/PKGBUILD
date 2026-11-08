@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=53
+pkgrel=54
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -37,7 +37,31 @@ source=(
     'opencode.svg'
     'opencode.desktop'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
+            'b727fde05cbd61b3a0be086c02445a63d90b75d63147b827e878f61e365bd417'
+            '2ad43cfeb9ceb195ba1d22e389368a1d597e8dcdfcd1466b38dd8c866a166bd2'
+            '659b9c68a19327e221d799b953115e9b06f308fa815e2aa7df383042b0aeed97'
+            '65ee292b30ed380094a772042800b48053b14b2e4fdee48ac48c38846a1dff7d'
+            '935244e2f5cafd4b91a6f935eebd4bb4080b0a432cfa5d542d102e55919e6d0f'
+            '7e47d1b8276460630a213b6280ed84b426cee231f10a7258bb6f0cad5cf66013'
+            '8be9216d06fd2ab6c31561d1b4cd86303f30539ef3bedc5e8cec72ac81473bb4'
+            'dc270d33b6fe8fd5305694de21333e66539f595bcdd852ad58a87d41773660e2'
+            '7c28a1e9e68c9105a2d83428dc7c72047c061598cdfebd7900a9bd429dccac59'
+            'ce07ab50626b0a1ef116b0df892427cd84c179c27a368dbe46a52e6b0979fd7c'
+            '64b347cb8f13abee4ac1547c7010ab1c5602db0d3655ca4609aa71690dfbddc6'
+            '4443e87b9d37a84f829ee6169be2de7a8da42be0d489fd95e6d23b9f236bf77d'
+            'c561f4c49d4c9d43baaeef877e5261b5b3398f7e7390ce007bde8319d5022162'
+            'b87dde22beea7146cbfb1d124652c3f64fd22cd0c03d8b71ab9673646df3372a'
+            '17915729c66f31f6afe8504b285ef442d8ceee6cc41cf12eaf9b3339e627d827'
+            '49a85cc3eb270818bca89bed6e83782d8dd442bc6f0ffc39e0a4d2d18e3a4ac9'
+            '36e37fca10e3035bb7c97b0b1cbb3048d41af757660279ea4463091bbba9b000'
+            '7d46a20d2f882a26851aa731a4bf03b208b26a3562ecddb379b89743a3ffdff5'
+            '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
+            'd48b7bebe1d27aa120ca313594da626145726c1612bcc080ffaa544f19d29817'
+            '7ab3c2ef8cdc2c788a0c10537ea014eedb2ae5faf41a789a625cac79874fcc6c'
+            '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
+            'cbef6edab7ed9826c87bfae01b595ce6d2eff0ed5923250ead5584304530d0af'
+            '0e9bfa271366a5d92265165f5c802a1f50a7ea266b455ad1392711299b6e67e8')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
