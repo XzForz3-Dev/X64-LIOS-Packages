@@ -735,7 +735,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing X64 LIOS + Omarchy (Flagship Basecamp Shell)...\e[0m"
             end
-            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland uwsm sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland chromium
+            sudo pacman -Sy --needed --noconfirm --overwrite "*" hyprland uwsm sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland chromium socat udiskie wtype wl-clipboard pamixer brightnessctl inotify-tools bluez-tools fcitx5
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 if not test -d /usr/share/omarchy
@@ -750,6 +750,12 @@ function install_desktop_menu
                     sudo chmod +x /etc/profile.d/omarchy.sh
                     sudo cp /usr/share/omarchy/default/wayland-sessions/*.desktop /usr/share/wayland-sessions/ 2>/dev/null
                 end
+                # Integración de ejecutables, fuentes y servicios oficiales de Omarchy
+                sudo ln -sf /usr/share/omarchy/bin/* /usr/bin/ 2>/dev/null
+                sudo mkdir -p /usr/share/fonts/omarchy && sudo cp /usr/share/omarchy/default/fonts/omarchy/omarchy.ttf /usr/share/fonts/omarchy/ 2>/dev/null
+                sudo fc-cache -f /usr/share/fonts/omarchy 2>/dev/null
+                sudo cp /usr/share/omarchy/default/systemd/user/*.service /usr/lib/systemd/user/ 2>/dev/null
+                systemctl --user daemon-reload 2>/dev/null
                 # Aislar dotfiles nativos de Hyprland y aprovisionar dotfiles oficiales de Omarchy
                 if test -d $HOME/.config/hypr; and not test -d $HOME/.config/hypr.x64-native.bak
                     mv $HOME/.config/hypr $HOME/.config/hypr.x64-native.bak
@@ -760,8 +766,8 @@ function install_desktop_menu
                 cp -r /usr/share/omarchy/config/* $HOME/.config/ 2>/dev/null
                 set -gx OMARCHY_PATH /usr/share/omarchy
                 set -gx PATH /usr/share/omarchy/bin $PATH
-                /usr/share/omarchy/bin/omarchy-theme-set "x64-lios-cyberpunk" 2>/dev/null; or /usr/share/omarchy/bin/omarchy-theme-set "Tokyo Night" 2>/dev/null
-                configure_desktop_boot_mode sddm "X64 LIOS + Omarchy (Cyberpunk Edition)"
+                /usr/share/omarchy/bin/omarchy-theme-set "Tokyo Night" 2>/dev/null
+                configure_desktop_boot_mode sddm "X64 LIOS + Omarchy (Flagship Shell)"
             end
         case 9
             if test $is_es -eq 1
@@ -1106,6 +1112,9 @@ while true
                     end
                     sudo git config --system --add safe.directory /usr/share/omarchy 2>/dev/null
                     sudo git -C /usr/share/omarchy pull origin main
+                    sudo ln -sf /usr/share/omarchy/bin/* /usr/bin/ 2>/dev/null
+                    sudo mkdir -p /usr/share/fonts/omarchy && sudo cp /usr/share/omarchy/default/fonts/omarchy/omarchy.ttf /usr/share/fonts/omarchy/ 2>/dev/null
+                    sudo cp /usr/share/omarchy/default/systemd/user/*.service /usr/lib/systemd/user/ 2>/dev/null
                 end
                 if test $is_es -eq 1
                     echo -e "\n    \e[1;32m¡Actualización completada con éxito!\e[0m"
