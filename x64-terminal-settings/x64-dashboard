@@ -745,6 +745,7 @@ function install_desktop_menu
                         echo -e "  \e[1;36m-> Deploying X64 LIOS + Omarchy Flagship Shell (/usr/share/omarchy)...\e[0m"
                     end
                     sudo git clone --depth 1 -b main https://github.com/XzForz3-Dev/X64-LIOS-Omarchy.git /usr/share/omarchy
+                    sudo git config --system --add safe.directory /usr/share/omarchy 2>/dev/null
                     sudo bash -c 'echo "export OMARCHY_PATH=/usr/share/omarchy" > /etc/profile.d/omarchy.sh'
                     sudo chmod +x /etc/profile.d/omarchy.sh
                     sudo cp /usr/share/omarchy/default/wayland-sessions/*.desktop /usr/share/wayland-sessions/ 2>/dev/null
@@ -1097,13 +1098,14 @@ while true
                     echo -e "\n    \e[1;36mConnecting to repositories and updating packages...\e[0m\n"
                 end
                 sudo pacman -Syu
-                if test -f /usr/share/omarchy/bin/x64-sync-upstream.sh
+                if test -d /usr/share/omarchy/.git
                     if test $is_es -eq 1
-                        echo -e "\n    \e[1;36mSincronizando entorno X64 LIOS + Omarchy con Basecamp upstream...\e[0m"
+                        echo -e "\n    \e[1;36mActualizando shell X64 LIOS + Omarchy desde el repositorio oficial...\e[0m"
                     else
-                        echo -e "\n    \e[1;36mSynchronizing X64 LIOS + Omarchy shell with upstream Basecamp...\e[0m"
+                        echo -e "\n    \e[1;36mUpdating X64 LIOS + Omarchy shell from official repository...\e[0m"
                     end
-                    sudo /usr/share/omarchy/bin/x64-sync-upstream.sh
+                    sudo git config --system --add safe.directory /usr/share/omarchy 2>/dev/null
+                    sudo git -C /usr/share/omarchy pull origin main
                 end
                 if test $is_es -eq 1
                     echo -e "\n    \e[1;32m¡Actualización completada con éxito!\e[0m"
