@@ -176,7 +176,9 @@ Rectangle {
   // TOP LEFT: WALLPAPER SELECTOR (Premium Pill)
   // ==========================================
   Rectangle {
-      width: 320; height: 42
+      id: wpPill
+      width: Math.max(320, wpRow.implicitWidth + 40)
+      height: 42
       color: "#0a0a10"
       border.color: "#333344"
       border.width: 1
@@ -187,6 +189,7 @@ Rectangle {
       anchors.margins: 40
 
       Row {
+          id: wpRow
           anchors.centerIn: parent
           spacing: 20
 
@@ -277,7 +280,7 @@ Rectangle {
       
       // Fastfetch System Info Widget
       Rectangle {
-          width: 350
+          width: Math.max(350, sysCol.implicitWidth + 40)
           height: sysCol.implicitHeight + 36
           color: "#0a0a10"
           border.color: "#333344"
@@ -478,7 +481,9 @@ Rectangle {
   // BOTTOM LEFT: SESSION SELECTOR (Pill)
   // ==========================================
   Rectangle {
-      width: 280; height: 42
+      id: sessionPill
+      width: Math.max(280, sessionRow.implicitWidth + 40)
+      height: 42
       color: "#0a0a10"
       border.color: "#333344"
       border.width: 1
@@ -489,8 +494,9 @@ Rectangle {
       anchors.margins: 40
 
       Row {
+          id: sessionRow
           anchors.centerIn: parent
-          spacing: 20
+          spacing: 16
 
           Text {
               text: "❮"
