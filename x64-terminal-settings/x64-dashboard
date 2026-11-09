@@ -748,7 +748,7 @@ function install_desktop_menu
                 sudo git -C /usr/share/omarchy pull origin main 2>/dev/null
             end
             # Ejecutar el motor de instalación y configuración oficial de Omarchy
-            sudo python3 /usr/share/omarchy/bin/x64-omarchy-setup.py --user $USER
+            sudo python3 /usr/share/omarchy/bin/x64-omarchy-setup.py --user $USER --theme "x64-lios-crimson"
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "X64 LIOS + Omarchy (Flagship Shell)"
