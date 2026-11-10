@@ -1229,20 +1229,47 @@ def run_gui():
 
         def setup_theme_watcher(self):
             self.theme_watcher = QFileSystemWatcher(self)
+            self._last_theme_mtime = 0
+            self._arm_theme_watcher()
+            self.theme_watcher.fileChanged.connect(self.on_theme_changed)
+            self.theme_watcher.directoryChanged.connect(self.on_theme_changed)
+
+            # Timer de sondeo ultra-ligero (1s) para garantizar hot-reload incluso ante reemplazos atómicos (rm/mv)
+            self.theme_poll_timer = QTimer(self)
+            self.theme_poll_timer.timeout.connect(self.check_theme_poll)
+            self.theme_poll_timer.start(1000)
+
+        def _arm_theme_watcher(self):
+            theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+            theme_name_file = os.path.expanduser("~/.local/state/omarchy/current/theme.name")
+            current_dir = os.path.expanduser("~/.local/state/omarchy/current")
             theme_dir = os.path.expanduser("~/.local/state/omarchy/current/theme")
-            theme_file = os.path.join(theme_dir, "colors.toml")
-            paths = []
-            if os.path.isdir(theme_dir):
-                paths.append(theme_dir)
+            for p in [current_dir, theme_dir, theme_name_file, theme_file]:
+                if os.path.exists(p):
+                    if os.path.isdir(p) and p not in self.theme_watcher.directories():
+                        self.theme_watcher.addPath(p)
+                    elif os.path.isfile(p) and p not in self.theme_watcher.files():
+                        self.theme_watcher.addPath(p)
+
+        def check_theme_poll(self):
+            theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
             if os.path.isfile(theme_file):
-                paths.append(theme_file)
-            if paths:
-                self.theme_watcher.addPaths(paths)
-                self.theme_watcher.fileChanged.connect(self.on_theme_changed)
-                self.theme_watcher.directoryChanged.connect(self.on_theme_changed)
+                try:
+                    mtime = os.path.getmtime(theme_file)
+                    if mtime != self._last_theme_mtime:
+                        self._last_theme_mtime = mtime
+                        self.on_theme_changed()
+                except Exception:
+                    pass
 
         def on_theme_changed(self, path=None):
-            self.palette = load_theme_palette()
+            new_pal = load_theme_palette()
+            # Si no ha cambiado la paleta visual real, no redibujar innecesariamente
+            if getattr(self, "palette", None) and self.palette.get("accent") == new_pal.get("accent") and self.palette.get("background") == new_pal.get("background"):
+                self._arm_theme_watcher()
+                return
+
+            self.palette = new_pal
             if hasattr(self, "badge_delegate"):
                 self.badge_delegate.update_palette(self.palette)
             self.apply_theme()
@@ -1253,9 +1280,7 @@ def run_gui():
             c_fp = int(self.f_fp.text().split("(")[1].split(")")[0]) if "(" in self.f_fp.text() else 0
             self._update_chip_styles(c_all, c_crit, c_repo, c_aur, c_fp)
             self.apply_filter()
-            theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
-            if os.path.isfile(theme_file) and theme_file not in self.theme_watcher.files():
-                self.theme_watcher.addPath(theme_file)
+            self._arm_theme_watcher()
 
         def apply_theme(self):
             p = self.palette
