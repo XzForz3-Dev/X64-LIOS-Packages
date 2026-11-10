@@ -208,9 +208,33 @@ def check_flatpak_packages():
 
     return flatpak_pkgs
 
+def check_omarchy_git():
+    """Comprueba si el repositorio X64 LIOS + Omarchy (/usr/share/omarchy) tiene commits pendientes en Git."""
+    omarchy_git = "/usr/share/omarchy/.git"
+    if not os.path.isdir(omarchy_git):
+        return None
+    try:
+        local_cmd = ["git", "-C", "/usr/share/omarchy", "rev-parse", "--short", "HEAD"]
+        local_hash = subprocess.check_output(local_cmd, text=True, stderr=subprocess.DEVNULL, timeout=5).strip()
+
+        remote_cmd = ["git", "-C", "/usr/share/omarchy", "ls-remote", "-h", "origin", "refs/heads/main"]
+        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+        remote_out = subprocess.check_output(remote_cmd, env=env, text=True, stderr=subprocess.DEVNULL, timeout=10).strip()
+        if not remote_out:
+            return None
+        remote_hash = remote_out.split()[0][:7]
+        if local_hash and remote_hash and local_hash != remote_hash:
+            return f"x64-lios-omarchy {local_hash} -> {remote_hash}"
+    except Exception:
+        pass
+    return None
+
 def run_background_check_and_save():
     ensure_state_dir()
     repo_pkgs = check_official_repos()
+    omarchy_pkg = check_omarchy_git()
+    if omarchy_pkg:
+        repo_pkgs.insert(0, omarchy_pkg)
     aur_pkgs = check_aur_packages()
     flatpak_pkgs = check_flatpak_packages()
 
@@ -549,6 +573,11 @@ def run_gui():
         def run(self):
             self.status.emit("Comprobando repositorios oficiales...")
             repo_pkgs = check_official_repos()
+            if os.path.isdir("/usr/share/omarchy/.git"):
+                self.status.emit("Comprobando Capa X64 LIOS + Omarchy...")
+                omarchy_pkg = check_omarchy_git()
+                if omarchy_pkg:
+                    repo_pkgs.insert(0, omarchy_pkg)
             self.status.emit("Inspeccionando catálogo AUR...")
             aur_pkgs = check_aur_packages()
             self.status.emit("Verificando paquetes Flatpak...")
@@ -1866,9 +1895,20 @@ def run_gui():
             has_repo_updates = any(item.get("type") == "Sistema" for item in self.all_items)
             has_aur_updates = any(item.get("type") == "AUR" for item in self.all_items)
             has_fp_updates = any(item.get("type") == "Flatpak" for item in self.all_items)
+            has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
 
             commands = []
             display_cmds = []
+
+            # 1. Sincronización previa del repositorio Git de Omarchy
+            if has_omarchy:
+                commands.append(
+                    "{ if [ -d /usr/share/omarchy/.git ]; then "
+                    "printf '\\033[1;36m[+]\\033[0;1m Sincronizando Capa X64 LIOS + Omarchy desde Git...\\033[0m\\n'; "
+                    f"{sudo_cmd} git -C /usr/share/omarchy pull origin main || true; "
+                    "fi; }"
+                )
+                display_cmds.append("sudo git -C /usr/share/omarchy pull origin main")
 
             # 3. Separate Pacman (-Syu) and AUR (-Sua) execution
             if has_repo_updates or (not has_aur_updates and not has_fp_updates):
@@ -1900,6 +1940,20 @@ def run_gui():
                     "{ printf '\\033[1;34m::\\033[0;1m Optimizando caché de paquetes (conservando últimas 2 versiones)...\\033[0m\\n' && "
                     f"{sudo_cmd} paccache -rk2 -q && {sudo_cmd} paccache -ruk0 -q; }}"
                 )
+
+            # 7a. Recarga en caliente y sincronización de herramientas en Omarchy
+            if has_omarchy:
+                commands.append(
+                    "{ if [ -x /usr/share/omarchy/bin/omarchy-update-restart ]; then "
+                    "printf '\\033[1;36m[+]\\033[0;1m Recargando plugins y entorno de escritorio X64 LIOS + Omarchy...\\033[0m\\n'; "
+                    "/usr/share/omarchy/bin/omarchy-update-restart || true; "
+                    "fi; "
+                    "if [ -x /usr/share/omarchy/bin/omarchy-update-mise ]; then "
+                    "printf '\\033[1;36m[+]\\033[0;1m Actualizando herramientas y agentes IA (Mise)...\\033[0m\\n'; "
+                    "/usr/share/omarchy/bin/omarchy-update-mise || true; "
+                    "fi; }"
+                )
+                display_cmds.append("omarchy-update-restart && omarchy-update-mise")
 
             # 7b. Safe post-upgrade daemon restart (checkservices excluding display/session managers)
             if shutil.which("checkservices"):
@@ -2225,7 +2279,12 @@ def run_cli_interactive():
         return 0
 
     aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
+    has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
     cmds = []
+
+    if has_omarchy:
+        cmds.append("echo -e '\\033[1;36m[+]\\033[0;1m Sincronizando Capa X64 LIOS + Omarchy desde Git...\\033[0m' && sudo git -C /usr/share/omarchy pull origin main || true")
+
     if choice in ["1", "3"] and aur_helper:
         cmds.append(f"{aur_helper} -Syu")
     else:
@@ -2236,6 +2295,10 @@ def run_cli_interactive():
 
     if choice == "3":
         cmds.append("sudo pacman -Sc --noconfirm")
+
+    if has_omarchy:
+        cmds.append("if [ -x /usr/share/omarchy/bin/omarchy-update-restart ]; then /usr/share/omarchy/bin/omarchy-update-restart || true; fi")
+        cmds.append("if [ -x /usr/share/omarchy/bin/omarchy-update-mise ]; then /usr/share/omarchy/bin/omarchy-update-mise || true; fi")
 
     subprocess.run(" && ".join(cmds), shell=True)
     run_background_check_and_save()
