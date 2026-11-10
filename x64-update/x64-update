@@ -555,6 +555,152 @@ def ansi_to_html(text):
 
 
 # ==============================================================================
+# MOTOR DE TEMAS DINÁMICOS (OMARCHY & X64 LIOS)
+# ==============================================================================
+
+def hex_to_rgb(h):
+    h = h.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(rgb):
+    return f"#{int(max(0, min(255, rgb[0]))):02x}{int(max(0, min(255, rgb[1]))):02x}{int(max(0, min(255, rgb[2]))):02x}"
+
+def blend_colors(c1, c2, factor=0.5):
+    try:
+        r1, g1, b1 = hex_to_rgb(c1)
+        r2, g2, b2 = hex_to_rgb(c2)
+        return rgb_to_hex((
+            r1 + (r2 - r1) * factor,
+            g1 + (g2 - g1) * factor,
+            b1 + (b2 - b1) * factor,
+        ))
+    except Exception:
+        return c1
+
+DEFAULT_PALETTE = {
+    "mode": "dark",
+    "accent": "#dc2626",
+    "accent_hover": "#ef4444",
+    "accent_subtle": "#991b1b",
+    "background": "#09090d",
+    "dark_background": "#0b0b10",
+    "darker_background": "#07070b",
+    "lighter_background": "#13131d",
+    "card_bg": "#12121c",
+    "card_border": "#232334",
+    "table_bg": "#0d0d14",
+    "table_alt_bg": "#11111a",
+    "table_border": "#222232",
+    "selection": "#1f1218",
+    "foreground": "#f4f4f6",
+    "muted": "#7c7c90",
+    "sub_text": "#a1a1b5",
+    "laser_stop0": "#dc2626",
+    "laser_stop1": "#ef4444",
+    "green": "#22c55e",
+    "green_bg": "#0b291a",
+    "green_border": "#165636",
+    "green_text": "#4ade80",
+    "yellow": "#f59e0b",
+    "yellow_text": "#fbbf24",
+    "blue": "#38bdf8",
+    "cyan": "#00ccff",
+    "magenta": "#e879f9",
+}
+
+def load_theme_palette():
+    palette = dict(DEFAULT_PALETTE)
+    theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+    if not os.path.isfile(theme_file):
+        return palette
+
+    raw = {}
+    try:
+        import tomllib
+        with open(theme_file, "rb") as f:
+            raw = tomllib.load(f)
+    except Exception:
+        try:
+            with open(theme_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        raw[k.strip()] = v.strip().strip('"').strip("'")
+        except Exception:
+            return palette
+
+    mode = str(raw.get("mode", "dark")).lower()
+    palette["mode"] = mode
+
+    accent = raw.get("accent") or raw.get("red") or raw.get("color1") or "#dc2626"
+    palette["accent"] = accent
+
+    if mode == "light":
+        palette["accent_hover"] = blend_colors(accent, "#000000", 0.15)
+        palette["accent_subtle"] = blend_colors(accent, "#000000", 0.30)
+    else:
+        palette["accent_hover"] = raw.get("bright_accent") or raw.get("bright_red") or blend_colors(accent, "#ffffff", 0.18)
+        palette["accent_subtle"] = blend_colors(accent, "#000000", 0.35)
+
+    bg = raw.get("background") or raw.get("bg") or raw.get("color0") or ("#ffffff" if mode == "light" else "#09090d")
+    palette["background"] = bg
+
+    dark_bg = raw.get("dark_background") or (blend_colors(bg, "#000000", 0.04) if mode == "light" else blend_colors(bg, "#000000", 0.25))
+    palette["dark_background"] = dark_bg
+    palette["darker_background"] = raw.get("darker_background") or dark_bg
+
+    lighter_bg = raw.get("lighter_background") or raw.get("lighter_bg") or (blend_colors(bg, "#000000", 0.05) if mode == "light" else blend_colors(bg, "#ffffff", 0.08))
+    palette["lighter_background"] = lighter_bg
+    palette["card_bg"] = lighter_bg
+
+    selection = raw.get("selection") or (blend_colors(bg, "#000000", 0.12) if mode == "light" else blend_colors(bg, "#ffffff", 0.15))
+    palette["selection"] = selection
+
+    border = raw.get("border") or raw.get("selection") or (blend_colors(bg, "#000000", 0.16) if mode == "light" else blend_colors(bg, "#ffffff", 0.14))
+    palette["card_border"] = border
+    palette["table_border"] = border
+
+    palette["table_bg"] = bg
+    palette["table_alt_bg"] = lighter_bg
+
+    fg = raw.get("foreground") or raw.get("fg") or raw.get("color7") or ("#18181b" if mode == "light" else "#f4f4f6")
+    palette["foreground"] = fg
+
+    muted = raw.get("muted") or raw.get("dark_foreground") or raw.get("color8") or blend_colors(fg, bg, 0.45)
+    palette["muted"] = muted
+    palette["sub_text"] = blend_colors(fg, bg, 0.30)
+
+    palette["laser_stop0"] = accent
+    palette["laser_stop1"] = raw.get("bright_accent") or raw.get("bright_yellow") or raw.get("cyan") or palette["accent_hover"]
+
+    if "green" in raw:
+        palette["green"] = raw["green"]
+        palette["green_text"] = raw.get("bright_green", raw["green"])
+        if mode == "light":
+            palette["green_bg"] = blend_colors(raw["green"], "#ffffff", 0.85)
+            palette["green_border"] = blend_colors(raw["green"], "#ffffff", 0.50)
+        else:
+            palette["green_bg"] = blend_colors(raw["green"], "#000000", 0.82)
+            palette["green_border"] = blend_colors(raw["green"], "#000000", 0.65)
+
+    if "yellow" in raw:
+        palette["yellow"] = raw["yellow"]
+        palette["yellow_text"] = raw.get("bright_yellow", raw["yellow"])
+
+    if "blue" in raw:
+        palette["blue"] = raw["blue"]
+    if "cyan" in raw:
+        palette["cyan"] = raw["cyan"]
+    if "magenta" in raw:
+        palette["magenta"] = raw["magenta"]
+
+    return palette
+
+
+# ==============================================================================
 # GUI NATIVA (PyQt6) 100% INTEGRADA
 # ==============================================================================
 
@@ -565,7 +711,7 @@ def run_gui():
         QHeaderView, QCheckBox, QFrame, QButtonGroup, QAbstractItemView,
         QProgressBar, QTextEdit, QStackedWidget, QDialog, QStyledItemDelegate, QStyle
     )
-    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF, QFileSystemWatcher
     from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor, QPainter, QPen, QBrush, QPalette
 
     class CheckWorker(QThread):
@@ -735,21 +881,23 @@ def run_gui():
             self.transaction_done.emit(success, ret, self.kernel_updated)
 
     class ConfirmDialog(QDialog):
-        def __init__(self, items_count, crit_count, cached_sudo, parent=None, breakdown=None):
+        def __init__(self, items_count, crit_count, cached_sudo, parent=None, breakdown=None, palette=None):
             super().__init__(parent)
+            self.palette = palette or (parent.palette if hasattr(parent, "palette") else load_theme_palette())
+            p = self.palette
             self.setWindowTitle("Autorización del Sistema")
             self.setFixedWidth(480)
             self.setModal(True)
             self.cached_sudo = cached_sudo
             self.breakdown = breakdown or {}
-            self.setStyleSheet("""
-                QDialog {
-                    background-color: #0b0b10;
-                }
-                QLabel {
+            self.setStyleSheet(f"""
+                QDialog {{
+                    background-color: {p['dark_background']};
+                }}
+                QLabel {{
                     border: none;
                     background: transparent;
-                }
+                }}
             """)
 
             vbox = QVBoxLayout(self)
@@ -763,12 +911,12 @@ def run_gui():
             icon_box = QFrame()
             icon_box.setObjectName("iconBox")
             icon_box.setFixedSize(44, 44)
-            icon_box.setStyleSheet("""
-                QFrame#iconBox {
-                    background-color: #13131d;
-                    border: 1px solid #232334;
+            icon_box.setStyleSheet(f"""
+                QFrame#iconBox {{
+                    background-color: {p['lighter_background']};
+                    border: 1px solid {p['card_border']};
                     border-radius: 10px;
-                }
+                }}
             """)
             ib_layout = QVBoxLayout(icon_box)
             ib_layout.setContentsMargins(0, 0, 0, 0)
@@ -793,9 +941,9 @@ def run_gui():
             title_col = QVBoxLayout()
             title_col.setSpacing(2)
             lbl_title = QLabel("Autorización de Actualización")
-            lbl_title.setStyleSheet("color: #f4f4f6; font-size: 15px; font-weight: 800;")
+            lbl_title.setStyleSheet(f"color: {p['foreground']}; font-size: 15px; font-weight: 800;")
             lbl_sub = QLabel("Confirma la operación para iniciar la transacción del sistema")
-            lbl_sub.setStyleSheet("color: #7c7c90; font-size: 12px;")
+            lbl_sub.setStyleSheet(f"color: {p['muted']}; font-size: 12px;")
             title_col.addWidget(lbl_title)
             title_col.addWidget(lbl_sub)
             hdr.addLayout(title_col)
@@ -805,12 +953,12 @@ def run_gui():
             # Flat Summary Card (strictly scoped by #summaryCard so QLabels never inherit borders)
             summary_frame = QFrame()
             summary_frame.setObjectName("summaryCard")
-            summary_frame.setStyleSheet("""
-                QFrame#summaryCard {
-                    background-color: #12121b;
-                    border: 1px solid #222232;
+            summary_frame.setStyleSheet(f"""
+                QFrame#summaryCard {{
+                    background-color: {p['table_alt_bg']};
+                    border: 1px solid {p['card_border']};
                     border-radius: 9px;
-                }
+                }}
             """)
             sbox = QVBoxLayout(summary_frame)
             sbox.setContentsMargins(14, 12, 14, 12)
@@ -820,7 +968,7 @@ def run_gui():
             top_row.setSpacing(8)
             pkg_word = "paquete listo" if items_count == 1 else "paquetes listos"
             lbl_pkgs = QLabel(f"{items_count} {pkg_word} para actualizar")
-            lbl_pkgs.setStyleSheet("color: #f4f4f6; font-size: 13px; font-weight: 700;")
+            lbl_pkgs.setStyleSheet(f"color: {p['foreground']}; font-size: 13px; font-weight: 700;")
             top_row.addWidget(lbl_pkgs)
             top_row.addStretch()
 
@@ -831,12 +979,12 @@ def run_gui():
             fp_n = self.breakdown.get("fp", 0)
 
             def make_pill(text, fg, bg, border):
-                p = QLabel(text)
-                p.setStyleSheet(
+                pill = QLabel(text)
+                pill.setStyleSheet(
                     f"background-color: {bg}; color: {fg}; border: 1px solid {border}; "
                     f"border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700;"
                 )
-                return p
+                return pill
 
             if x64_n > 0:
                 top_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
@@ -854,10 +1002,10 @@ def run_gui():
             if crit_count > 0:
                 crit_word = "componente crítico" if crit_count == 1 else "componentes críticos"
                 lbl_note = QLabel(f"Incluye {crit_count} {crit_word} del sistema (Kernel / Controladores).")
-                lbl_note.setStyleSheet("color: #f59e0b; font-size: 11px; font-weight: 600;")
+                lbl_note.setStyleSheet(f"color: {p['yellow_text']}; font-size: 11px; font-weight: 600;")
             else:
                 lbl_note = QLabel("Los paquetes se descargarán e instalarán mediante verificación criptográfica.")
-                lbl_note.setStyleSheet("color: #717184; font-size: 11px;")
+                lbl_note.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
             sbox.addWidget(lbl_note)
 
             vbox.addWidget(summary_frame)
@@ -868,30 +1016,30 @@ def run_gui():
                 auth_col.setSpacing(6)
 
                 lbl_auth = QLabel("Contraseña de administrador")
-                lbl_auth.setStyleSheet("color: #a1a1b5; font-size: 12px; font-weight: 600;")
+                lbl_auth.setStyleSheet(f"color: {p['sub_text']}; font-size: 12px; font-weight: 600;")
                 auth_col.addWidget(lbl_auth)
 
                 self.pwd_input = QLineEdit()
                 self.pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
                 self.pwd_input.setPlaceholderText("Ingresa tu contraseña de sudo...")
-                self.pwd_input.setStyleSheet("""
-                    QLineEdit {
-                        background-color: #12121b;
-                        color: #ffffff;
-                        border: 1px solid #262638;
+                self.pwd_input.setStyleSheet(f"""
+                    QLineEdit {{
+                        background-color: {p['lighter_background']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['card_border']};
                         border-radius: 8px;
                         padding: 9px 12px;
                         font-size: 13px;
-                    }
-                    QLineEdit:focus {
-                        border: 1px solid #dc2626;
-                        background-color: #151520;
-                    }
+                    }}
+                    QLineEdit:focus {{
+                        border: 1px solid {p['accent']};
+                        background-color: {p['selection']};
+                    }}
                 """)
                 auth_col.addWidget(self.pwd_input)
 
                 self.lbl_error = QLabel("")
-                self.lbl_error.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: 600;")
+                self.lbl_error.setStyleSheet(f"color: {p['accent']}; font-size: 11px; font-weight: 600;")
                 self.lbl_error.setVisible(False)
                 auth_col.addWidget(self.lbl_error)
 
@@ -902,17 +1050,17 @@ def run_gui():
                 self.pwd_input = None
                 auth_ok_frame = QFrame()
                 auth_ok_frame.setObjectName("authOkFrame")
-                auth_ok_frame.setStyleSheet("""
-                    QFrame#authOkFrame {
-                        background-color: #091e14;
-                        border: 1px solid #14462c;
+                auth_ok_frame.setStyleSheet(f"""
+                    QFrame#authOkFrame {{
+                        background-color: {p['green_bg']};
+                        border: 1px solid {p['green_border']};
                         border-radius: 8px;
-                    }
+                    }}
                 """)
                 ok_box = QHBoxLayout(auth_ok_frame)
                 ok_box.setContentsMargins(12, 8, 12, 8)
                 lbl_auth_ok = QLabel("Sesión de administrador activa — no se requiere contraseña adicional.")
-                lbl_auth_ok.setStyleSheet("color: #4ade80; font-size: 11px; font-weight: 600;")
+                lbl_auth_ok.setStyleSheet(f"color: {p['green_text']}; font-size: 11px; font-weight: 600;")
                 ok_box.addWidget(lbl_auth_ok)
                 vbox.addWidget(auth_ok_frame)
 
@@ -924,39 +1072,39 @@ def run_gui():
 
             btn_cancel = QPushButton("Cancelar")
             btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_cancel.setStyleSheet("""
-                QPushButton {
-                    background-color: #161622;
-                    color: #a1a1b5;
-                    border: 1px solid #262638;
+            btn_cancel.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {p['table_bg']};
+                    color: {p['sub_text']};
+                    border: 1px solid {p['card_border']};
                     border-radius: 8px;
                     padding: 9px 18px;
                     font-weight: 600;
                     font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: #202030;
-                    color: #ffffff;
-                    border: 1px solid #34344a;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {p['selection']};
+                    color: {p['foreground']};
+                    border: 1px solid {p['accent']};
+                }}
             """)
             btn_cancel.clicked.connect(self.reject)
 
             btn_confirm = QPushButton("Autorizar y Actualizar")
             btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_confirm.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #dc2626, stop:1 #991b1b);
+            btn_confirm.setStyleSheet(f"""
+                QPushButton {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent']}, stop:1 {p['accent_subtle']});
                     color: #ffffff;
-                    border: 1px solid #ef4444;
+                    border: 1px solid {p['accent_hover']};
                     border-radius: 8px;
                     padding: 9px 22px;
                     font-weight: 700;
                     font-size: 12px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #b91c1c);
-                }
+                }}
+                QPushButton:hover {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent_hover']}, stop:1 {p['accent']});
+                }}
             """)
             btn_confirm.clicked.connect(self.verify_and_confirm)
 
@@ -996,18 +1144,29 @@ def run_gui():
 
     class BadgeDelegate(QStyledItemDelegate):
         """Renders rounded pill badges inside Column 0 without breaking QTableWidget sorting."""
+        def __init__(self, parent=None, palette=None):
+            super().__init__(parent)
+            self.palette = palette or {}
+
+        def update_palette(self, palette):
+            self.palette = palette
+
         def paint(self, painter, option, index):
             painter.save()
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+            sel_bg = self.palette.get("selection", "#1f1218")
+            hover_bg = self.palette.get("lighter_background", "#161622")
+            bdr_line = self.palette.get("card_border", "#171723")
+
             # Draw row selection/hover background if active
             if option.state & QStyle.StateFlag.State_Selected:
-                painter.fillRect(option.rect, QColor("#1f1218"))
+                painter.fillRect(option.rect, QColor(sel_bg))
             elif option.state & QStyle.StateFlag.State_MouseOver:
-                painter.fillRect(option.rect, QColor("#161622"))
+                painter.fillRect(option.rect, QColor(hover_bg))
 
             # Draw subtle horizontal bottom row separator to match columns 1..3
-            painter.setPen(QPen(QColor("#171723"), 1.0))
+            painter.setPen(QPen(QColor(bdr_line), 1.0))
             painter.drawLine(option.rect.bottomLeft(), option.rect.bottomRight())
 
             meta = index.data(Qt.ItemDataRole.UserRole)
@@ -1040,6 +1199,7 @@ def run_gui():
     class X64UpdateWindow(QMainWindow):
         def __init__(self):
             super().__init__()
+            self.palette = load_theme_palette()
             self.setWindowTitle("X64 LIOS Update")
             self.resize(1020, 680)
             self.setMinimumSize(850, 520)
@@ -1062,8 +1222,303 @@ def run_gui():
             self.timer_elapsed.timeout.connect(self.update_elapsed_time)
 
             self.init_ui()
+            self.setup_theme_watcher()
+            self.apply_theme()
             self.load_cached_state()
             self.trigger_refresh()
+
+        def setup_theme_watcher(self):
+            self.theme_watcher = QFileSystemWatcher(self)
+            theme_dir = os.path.expanduser("~/.local/state/omarchy/current/theme")
+            theme_file = os.path.join(theme_dir, "colors.toml")
+            paths = []
+            if os.path.isdir(theme_dir):
+                paths.append(theme_dir)
+            if os.path.isfile(theme_file):
+                paths.append(theme_file)
+            if paths:
+                self.theme_watcher.addPaths(paths)
+                self.theme_watcher.fileChanged.connect(self.on_theme_changed)
+                self.theme_watcher.directoryChanged.connect(self.on_theme_changed)
+
+        def on_theme_changed(self, path=None):
+            self.palette = load_theme_palette()
+            if hasattr(self, "badge_delegate"):
+                self.badge_delegate.update_palette(self.palette)
+            self.apply_theme()
+            c_all = int(self.f_all.text().split("(")[1].split(")")[0]) if "(" in self.f_all.text() else 0
+            c_crit = int(self.f_crit.text().split("(")[1].split(")")[0]) if "(" in self.f_crit.text() else 0
+            c_repo = int(self.f_repo.text().split("(")[1].split(")")[0]) if "(" in self.f_repo.text() else 0
+            c_aur = int(self.f_aur.text().split("(")[1].split(")")[0]) if "(" in self.f_aur.text() else 0
+            c_fp = int(self.f_fp.text().split("(")[1].split(")")[0]) if "(" in self.f_fp.text() else 0
+            self._update_chip_styles(c_all, c_crit, c_repo, c_aur, c_fp)
+            self.apply_filter()
+            theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+            if os.path.isfile(theme_file) and theme_file not in self.theme_watcher.files():
+                self.theme_watcher.addPath(theme_file)
+
+        def apply_theme(self):
+            p = self.palette
+            self.setStyleSheet(f"""
+                QMainWindow {{
+                    background-color: {p['background']};
+                }}
+            """)
+
+            if hasattr(self, "hdr_icon_box"):
+                self.hdr_icon_box.setStyleSheet(f"""
+                    QFrame#hdrIconBox {{
+                        background-color: {p['lighter_background']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 10px;
+                    }}
+                """)
+            if hasattr(self, "lbl_badge"):
+                self.lbl_badge.setStyleSheet(f"background-color: {p['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 7px; border-radius: 4px;")
+            if hasattr(self, "lbl_title"):
+                self.lbl_title.setStyleSheet(f"color: {p['foreground']}; font-weight: 800; font-size: 19px; letter-spacing: 0.8px;")
+            if hasattr(self, "lbl_sub"):
+                self.lbl_sub.setStyleSheet(f"color: {p['muted']}; font-size: 12px;")
+            if hasattr(self, "lbl_kernel"):
+                self.lbl_kernel.setStyleSheet(f"background-color: {p['lighter_background']}; color: {p['sub_text']}; border: 1px solid {p['card_border']}; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
+            if hasattr(self, "lbl_uptime"):
+                self.lbl_uptime.setStyleSheet(f"background-color: {p['lighter_background']}; color: {p['sub_text']}; border: 1px solid {p['card_border']}; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
+            if hasattr(self, "btn_refresh"):
+                self.btn_refresh.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['lighter_background']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 7px;
+                        padding: 0px 16px;
+                        font-weight: 700;
+                        font-size: 12px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['selection']};
+                        border: 1px solid {p['accent']};
+                    }}
+                    QPushButton:disabled {{
+                        background-color: {p['dark_background']};
+                        color: {p['muted']};
+                        border: 1px solid {p['card_border']};
+                    }}
+                """)
+
+            if hasattr(self, "search_input"):
+                self.search_input.setStyleSheet(f"""
+                    QLineEdit {{
+                        background-color: {p['lighter_background']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 8px;
+                        padding: 0px 14px;
+                        font-size: 13px;
+                    }}
+                    QLineEdit:focus {{
+                        border: 1px solid {p['accent']};
+                        background-color: {p['selection']};
+                    }}
+                """)
+
+            if hasattr(self, "prog_bar"):
+                self.prog_bar.setStyleSheet(f"""
+                    QProgressBar {{
+                        background: {p['dark_background']};
+                        border: none;
+                    }}
+                    QProgressBar::chunk {{
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {p['laser_stop0']}, stop:1 {p['laser_stop1']});
+                    }}
+                """)
+
+            if hasattr(self, "table"):
+                self.table.setStyleSheet(f"""
+                    QTableWidget {{
+                        background-color: {p['table_bg']};
+                        alternate-background-color: {p['table_alt_bg']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['table_border']};
+                        border-radius: 10px;
+                        selection-background-color: {p['selection']};
+                        selection-color: {p['foreground']};
+                        font-size: 13px;
+                    }}
+                    QTableWidget::item {{
+                        padding: 0px 14px;
+                        border-bottom: 1px solid {p['card_border']};
+                    }}
+                    QHeaderView::section {{
+                        background-color: {p['lighter_background']};
+                        color: {p['muted']};
+                        padding: 10px 14px;
+                        border: none;
+                        border-bottom: 2px solid {p['accent']};
+                        font-weight: 800;
+                        font-size: 11px;
+                        letter-spacing: 0.6px;
+                    }}
+                    QHeaderView::section:hover {{
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
+                    }}
+                    QScrollBar:vertical {{
+                        background: {p['table_bg']};
+                        width: 10px;
+                        margin: 0px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:vertical {{
+                        background: {p['card_border']};
+                        min-height: 35px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:vertical:hover {{
+                        background: {p['accent']};
+                    }}
+                    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                        height: 0px;
+                    }}
+                """)
+
+            if hasattr(self, "zero_card"):
+                self.zero_card.setStyleSheet(f"""
+                    QFrame#zero_card {{
+                        background-color: {p['table_alt_bg']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 12px;
+                    }}
+                    QFrame#zero_card QLabel {{
+                        border: none;
+                        background: transparent;
+                    }}
+                """)
+            if hasattr(self, "lbl_zero_icon"):
+                self.lbl_zero_icon.setStyleSheet(f"""
+                    background-color: {p['green_bg']};
+                    color: {p['green_text']};
+                    border: 1px solid {p['green_border']};
+                    border-radius: 30px;
+                    font-size: 28px;
+                    font-weight: 900;
+                """)
+            if hasattr(self, "lbl_zero_title"):
+                self.lbl_zero_title.setStyleSheet(f"color: {p['green_text']}; font-size: 17px; font-weight: 800;")
+            if hasattr(self, "lbl_zero_desc"):
+                self.lbl_zero_desc.setStyleSheet(f"color: {p['muted']}; font-size: 13px;")
+
+            if hasattr(self, "footer_frame"):
+                self.footer_frame.setStyleSheet(f"""
+                    QFrame#footerFrame {{
+                        background-color: {p['lighter_background']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 10px;
+                    }}
+                    QFrame#footerFrame QLabel {{
+                        border: none;
+                        background: transparent;
+                    }}
+                """)
+            if hasattr(self, "lbl_summary"):
+                self.lbl_summary.setStyleSheet(f"color: {p['foreground']}; font-weight: 700; font-size: 13px;")
+            if hasattr(self, "lbl_sub_summary"):
+                self.lbl_sub_summary.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
+            if hasattr(self, "btn_close"):
+                self.btn_close.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['table_bg']};
+                        color: {p['sub_text']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 8px;
+                        padding: 0px 20px;
+                        font-weight: 600;
+                        font-size: 13px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['accent']};
+                    }}
+                """)
+            if hasattr(self, "btn_update"):
+                self.btn_update.setStyleSheet(f"""
+                    QPushButton {{
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent']}, stop:1 {p['accent_subtle']});
+                        color: #ffffff;
+                        border: 1px solid {p['accent_hover']};
+                        border-radius: 8px;
+                        padding: 0px 26px;
+                        font-weight: 700;
+                        font-size: 13px;
+                    }}
+                    QPushButton:hover {{
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent_hover']}, stop:1 {p['accent']});
+                    }}
+                    QPushButton:disabled {{
+                        background-color: {p['dark_background']};
+                        color: {p['muted']};
+                        border: 1px solid {p['card_border']};
+                    }}
+                """)
+
+            if hasattr(self, "lbl_live"):
+                self.lbl_live.setStyleSheet(f"background-color: {p['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            if hasattr(self, "lbl_tx_title"):
+                self.lbl_tx_title.setStyleSheet(f"color: {p['foreground']}; font-weight: 800; font-size: 18px; letter-spacing: 0.5px;")
+            if hasattr(self, "lbl_elapsed"):
+                self.lbl_elapsed.setStyleSheet(f"background: {p['lighter_background']}; color: {p['sub_text']}; border: 1px solid {p['card_border']}; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: bold;")
+            if hasattr(self, "log_view"):
+                self.log_view.setStyleSheet(f"""
+                    QTextEdit {{
+                        background-color: {p['darker_background']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 8px;
+                        padding: 12px;
+                        font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace;
+                        font-size: 12px;
+                        line-height: 1.4;
+                    }}
+                    QScrollBar:vertical {{
+                        background: {p['darker_background']};
+                        width: 10px;
+                        margin: 0px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:vertical {{
+                        background: {p['card_border']};
+                        min-height: 35px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:vertical:hover {{
+                        background: {p['accent']};
+                    }}
+                    QScrollBar::horizontal {{
+                        background: {p['darker_background']};
+                        height: 10px;
+                        margin: 0px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:horizontal {{
+                        background: {p['card_border']};
+                        min-width: 35px;
+                        border-radius: 5px;
+                    }}
+                    QScrollBar::handle:horizontal:hover {{
+                        background: {p['accent']};
+                    }}
+                """)
+            if hasattr(self, "tx_footer"):
+                self.tx_footer.setStyleSheet(f"""
+                    QFrame#tx_footer {{
+                        background-color: {p['lighter_background']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 10px;
+                        padding: 8px 16px;
+                    }}
+                """)
+            if hasattr(self, "lbl_tx_status"):
+                self.lbl_tx_status.setStyleSheet(f"color: {p['foreground']}; font-weight: bold; font-size: 13px;")
 
         def init_ui(self):
             self.stacked_widget = QStackedWidget()
@@ -1079,12 +1534,6 @@ def run_gui():
             self.init_transaction_page(self.page_transaction)
             self.stacked_widget.addWidget(self.page_transaction)
 
-            self.setStyleSheet("""
-                QMainWindow {
-                    background-color: #09090d;
-                }
-            """)
-
         def init_packages_page(self, parent):
             layout = QVBoxLayout(parent)
             layout.setContentsMargins(24, 20, 24, 20)
@@ -1094,17 +1543,11 @@ def run_gui():
             header_layout = QHBoxLayout()
             header_layout.setSpacing(14)
 
-            hdr_icon_box = QFrame()
-            hdr_icon_box.setObjectName("hdrIconBox")
-            hdr_icon_box.setFixedSize(44, 44)
-            hdr_icon_box.setStyleSheet("""
-                QFrame#hdrIconBox {
-                    background-color: #12121c;
-                    border: 1px solid #232334;
-                    border-radius: 10px;
-                }
-            """)
-            hib_layout = QVBoxLayout(hdr_icon_box)
+            self.hdr_icon_box = QFrame()
+            self.hdr_icon_box.setObjectName("hdrIconBox")
+            self.hdr_icon_box.setFixedSize(44, 44)
+
+            hib_layout = QVBoxLayout(self.hdr_icon_box)
             hib_layout.setContentsMargins(0, 0, 0, 0)
             hib_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl_hdr_icon = QLabel()
@@ -1123,68 +1566,43 @@ def run_gui():
                     lbl_hdr_icon.setPixmap(pix)
                     break
             hib_layout.addWidget(lbl_hdr_icon)
-            header_layout.addWidget(hdr_icon_box)
+            header_layout.addWidget(self.hdr_icon_box)
 
             title_vbox = QVBoxLayout()
             title_vbox.setSpacing(2)
 
             title_row = QHBoxLayout()
             title_row.setSpacing(8)
-            lbl_badge = QLabel("X64")
-            lbl_badge.setStyleSheet("background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 7px; border-radius: 4px;")
-            lbl_title = QLabel("LIOS UPDATE")
-            lbl_title.setStyleSheet("color: #f4f4f6; font-weight: 800; font-size: 19px; letter-spacing: 0.8px;")
-            title_row.addWidget(lbl_badge)
-            title_row.addWidget(lbl_title)
+            self.lbl_badge = QLabel("X64")
+            self.lbl_title = QLabel("LIOS UPDATE")
+            title_row.addWidget(self.lbl_badge)
+            title_row.addWidget(self.lbl_title)
             title_row.addStretch()
 
-            lbl_sub = QLabel("Centro de Actualizaciones y Mantenimiento del Sistema")
-            lbl_sub.setStyleSheet("color: #7c7c90; font-size: 12px;")
+            self.lbl_sub = QLabel("Centro de Actualizaciones y Mantenimiento del Sistema")
 
             title_vbox.addLayout(title_row)
-            title_vbox.addWidget(lbl_sub)
+            title_vbox.addWidget(self.lbl_sub)
             header_layout.addLayout(title_vbox)
 
             header_layout.addStretch()
 
             t = get_telemetry()
-            lbl_kernel = QLabel(f"Kernel: {t['kernel']}")
-            lbl_kernel.setFixedHeight(34)
-            lbl_kernel.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl_kernel.setStyleSheet("background-color: #13131d; color: #a1a1b5; border: 1px solid #242434; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
+            self.lbl_kernel = QLabel(f"Kernel: {t['kernel']}")
+            self.lbl_kernel.setFixedHeight(34)
+            self.lbl_kernel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            lbl_uptime = QLabel(f"Activo: {t['uptime']}")
-            lbl_uptime.setFixedHeight(34)
-            lbl_uptime.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl_uptime.setStyleSheet("background-color: #13131d; color: #a1a1b5; border: 1px solid #242434; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
+            self.lbl_uptime = QLabel(f"Activo: {t['uptime']}")
+            self.lbl_uptime.setFixedHeight(34)
+            self.lbl_uptime.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
             self.btn_refresh = QPushButton("⟳ Comprobar")
             self.btn_refresh.setFixedHeight(34)
             self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_refresh.setStyleSheet("""
-                QPushButton {
-                    background-color: #191926;
-                    color: #f4f4f6;
-                    border: 1px solid #2e2e42;
-                    border-radius: 7px;
-                    padding: 0px 16px;
-                    font-weight: 700;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: #232334;
-                    border: 1px solid #dc2626;
-                }
-                QPushButton:disabled {
-                    background-color: #13131c;
-                    color: #626274;
-                    border: 1px solid #20202e;
-                }
-            """)
             self.btn_refresh.clicked.connect(self.trigger_refresh)
 
-            header_layout.addWidget(lbl_kernel)
-            header_layout.addWidget(lbl_uptime)
+            header_layout.addWidget(self.lbl_kernel)
+            header_layout.addWidget(self.lbl_uptime)
             header_layout.addWidget(self.btn_refresh)
             layout.addLayout(header_layout)
 
@@ -1195,20 +1613,6 @@ def run_gui():
             self.search_input = QLineEdit()
             self.search_input.setFixedHeight(36)
             self.search_input.setPlaceholderText("Filtrar paquetes por nombre o versión...")
-            self.search_input.setStyleSheet("""
-                QLineEdit {
-                    background-color: #111119;
-                    color: #f4f4f6;
-                    border: 1px solid #242434;
-                    border-radius: 8px;
-                    padding: 0px 14px;
-                    font-size: 13px;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #dc2626;
-                    background-color: #151520;
-                }
-            """)
             self.search_input.textChanged.connect(self.apply_filter)
             filter_layout.addWidget(self.search_input, stretch=2)
 
@@ -1243,7 +1647,6 @@ def run_gui():
                 btn.clicked.connect(self.on_filter_clicked)
                 filter_layout.addWidget(btn)
 
-            self._update_chip_styles(0, 0, 0, 0, 0)
             layout.addLayout(filter_layout)
 
             # Progress Bar (Thin Laser Line)
@@ -1251,15 +1654,6 @@ def run_gui():
             self.prog_bar.setFixedHeight(3)
             self.prog_bar.setTextVisible(False)
             self.prog_bar.setRange(0, 0)
-            self.prog_bar.setStyleSheet("""
-                QProgressBar {
-                    background: #181822;
-                    border: none;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #dc2626, stop:1 #ef4444);
-                }
-            """)
             self.prog_bar.setVisible(False)
             layout.addWidget(self.prog_bar)
 
@@ -1285,118 +1679,39 @@ def run_gui():
             self.table.verticalHeader().setDefaultSectionSize(44)
             self.table.setAlternatingRowColors(True)
             self.table.setSortingEnabled(True)
-            self.table.setItemDelegateForColumn(0, BadgeDelegate(self.table))
-
-            self.table.setStyleSheet("""
-                QTableWidget {
-                    background-color: #0d0d14;
-                    alternate-background-color: #11111a;
-                    color: #f4f4f6;
-                    border: 1px solid #222232;
-                    border-radius: 10px;
-                    selection-background-color: #1f1218;
-                    selection-color: #ffffff;
-                    font-size: 13px;
-                }
-                QTableWidget::item {
-                    padding: 0px 14px;
-                    border-bottom: 1px solid #171723;
-                }
-                QHeaderView::section {
-                    background-color: #14141f;
-                    color: #8a8a9e;
-                    padding: 10px 14px;
-                    border: none;
-                    border-bottom: 2px solid #dc2626;
-                    font-weight: 800;
-                    font-size: 11px;
-                    letter-spacing: 0.6px;
-                }
-                QHeaderView::section:hover {
-                    background-color: #1c1c2b;
-                    color: #ffffff;
-                }
-                QScrollBar:vertical {
-                    background: #0d0d14;
-                    width: 10px;
-                    margin: 0px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical {
-                    background: #2a2a38;
-                    min-height: 35px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical:hover {
-                    background: #dc2626;
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0px;
-                }
-            """)
+            self.badge_delegate = BadgeDelegate(self.table, self.palette)
+            self.table.setItemDelegateForColumn(0, self.badge_delegate)
             layout.addWidget(self.table, stretch=1)
 
             # Zero Updates Card (Placeholder when system is up to date)
             self.zero_card = QFrame()
             self.zero_card.setObjectName("zero_card")
-            self.zero_card.setStyleSheet("""
-                QFrame#zero_card {
-                    background-color: #0e1216;
-                    border: 1px solid #1b3828;
-                    border-radius: 12px;
-                }
-                QFrame#zero_card QLabel {
-                    border: none;
-                    background: transparent;
-                }
-            """)
             zero_vbox = QVBoxLayout(self.zero_card)
             zero_vbox.setContentsMargins(40, 50, 40, 50)
             zero_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
             zero_vbox.setSpacing(12)
 
-            lbl_zero_icon = QLabel("✓")
-            lbl_zero_icon.setFixedSize(60, 60)
-            lbl_zero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl_zero_icon.setStyleSheet("""
-                background-color: #0b291a;
-                color: #4ade80;
-                border: 1px solid #165636;
-                border-radius: 30px;
-                font-size: 28px;
-                font-weight: 900;
-            """)
+            self.lbl_zero_icon = QLabel("✓")
+            self.lbl_zero_icon.setFixedSize(60, 60)
+            self.lbl_zero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            lbl_zero_title = QLabel("Tu sistema X64 LIOS está completamente al día")
-            lbl_zero_title.setStyleSheet("color: #4ade80; font-size: 17px; font-weight: 800;")
-            lbl_zero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_zero_title = QLabel("Tu sistema X64 LIOS está completamente al día")
+            self.lbl_zero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            lbl_zero_desc = QLabel("Todos los paquetes del sistema, módulos X64 LIOS, catálogo AUR y aplicaciones Flatpak están en su última versión.")
-            lbl_zero_desc.setStyleSheet("color: #7c7c90; font-size: 13px;")
-            lbl_zero_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_zero_desc = QLabel("Todos los paquetes del sistema, módulos X64 LIOS, catálogo AUR y aplicaciones Flatpak están en su última versión.")
+            self.lbl_zero_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            zero_vbox.addWidget(lbl_zero_icon, alignment=Qt.AlignmentFlag.AlignCenter)
-            zero_vbox.addWidget(lbl_zero_title)
-            zero_vbox.addWidget(lbl_zero_desc)
+            zero_vbox.addWidget(self.lbl_zero_icon, alignment=Qt.AlignmentFlag.AlignCenter)
+            zero_vbox.addWidget(self.lbl_zero_title)
+            zero_vbox.addWidget(self.lbl_zero_desc)
 
             self.zero_card.setVisible(False)
             layout.addWidget(self.zero_card, stretch=1)
 
             # Footer Action Bar (strictly scoped by #footerFrame so QLabels never inherit borders)
-            footer_frame = QFrame()
-            footer_frame.setObjectName("footerFrame")
-            footer_frame.setStyleSheet("""
-                QFrame#footerFrame {
-                    background-color: #111119;
-                    border: 1px solid #222232;
-                    border-radius: 10px;
-                }
-                QFrame#footerFrame QLabel {
-                    border: none;
-                    background: transparent;
-                }
-            """)
-            footer_layout = QHBoxLayout(footer_frame)
+            self.footer_frame = QFrame()
+            self.footer_frame.setObjectName("footerFrame")
+            footer_layout = QHBoxLayout(self.footer_frame)
             footer_layout.setContentsMargins(18, 12, 18, 12)
             footer_layout.setSpacing(16)
 
@@ -1404,11 +1719,9 @@ def run_gui():
             opts_vbox.setSpacing(3)
 
             self.lbl_summary = QLabel("Analizando estado de los paquetes...")
-            self.lbl_summary.setStyleSheet("color: #f4f4f6; font-weight: 700; font-size: 13px;")
             opts_vbox.addWidget(self.lbl_summary)
 
             self.lbl_sub_summary = QLabel("Limpieza automática de paquetes residuales y caché segura activada")
-            self.lbl_sub_summary.setStyleSheet("color: #6e6e82; font-size: 11px;")
             opts_vbox.addWidget(self.lbl_sub_summary)
 
             footer_layout.addLayout(opts_vbox, stretch=2)
@@ -1416,59 +1729,25 @@ def run_gui():
             btn_box = QHBoxLayout()
             btn_box.setSpacing(10)
 
-            btn_close = QPushButton("Cerrar")
-            btn_close.setFixedHeight(38)
-            btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_close.setStyleSheet("""
-                QPushButton {
-                    background-color: #181824;
-                    color: #a1a1b5;
-                    border: 1px solid #28283a;
-                    border-radius: 8px;
-                    padding: 0px 20px;
-                    font-weight: 600;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background-color: #222232;
-                    color: #ffffff;
-                    border: 1px solid #36364c;
-                }
-            """)
-            btn_close.clicked.connect(self.close)
+            self.btn_close = QPushButton("Cerrar")
+            self.btn_close.setFixedHeight(38)
+            self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_close.clicked.connect(self.close)
 
             self.btn_update = QPushButton("Actualizar Sistema")
             self.btn_update.setObjectName("btn-update")
             self.btn_update.setFixedHeight(38)
             self.btn_update.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_update.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #dc2626, stop:1 #991b1b);
-                    color: #ffffff;
-                    border: 1px solid #ef4444;
-                    border-radius: 8px;
-                    padding: 0px 26px;
-                    font-weight: 700;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #b91c1c);
-                }
-                QPushButton:disabled {
-                    background-color: #1a1a24;
-                    color: #555568;
-                    border: 1px solid #262634;
-                }
-            """)
             self.btn_update.clicked.connect(self.start_inapp_transaction)
 
-            btn_box.addWidget(btn_close)
+            btn_box.addWidget(self.btn_close)
             btn_box.addWidget(self.btn_update)
             footer_layout.addLayout(btn_box)
 
-            layout.addWidget(footer_frame)
+            layout.addWidget(self.footer_frame)
 
         def _update_chip_styles(self, tot, crit_cnt, repo_cnt, aur_cnt, fp_cnt):
+            p = self.palette
             counts = {
                 self.f_all: tot,
                 self.f_crit: crit_cnt,
@@ -1477,9 +1756,9 @@ def run_gui():
                 self.f_fp: fp_cnt,
             }
             for btn, cnt in counts.items():
-                fg = "#b4b4c6" if cnt > 0 else "#525264"
-                bg = "#151520" if cnt > 0 else "#101017"
-                bdr = "#28283a" if cnt > 0 else "#1c1c28"
+                fg = p['foreground'] if cnt > 0 else p['muted']
+                bg = p['lighter_background'] if cnt > 0 else p['dark_background']
+                bdr = p['accent_hover'] if cnt > 0 else p['card_border']
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background-color: {bg};
@@ -1491,13 +1770,13 @@ def run_gui():
                         font-size: 12px;
                     }}
                     QPushButton:hover {{
-                        background-color: #1e1e2c;
-                        color: #ffffff;
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
                     }}
                     QPushButton:checked {{
-                        background-color: #dc2626;
+                        background-color: {p['accent']};
                         color: #ffffff;
-                        border: 1px solid #ef4444;
+                        border: 1px solid {p['accent_hover']};
                         font-weight: 700;
                     }}
                 """)
@@ -1514,9 +1793,7 @@ def run_gui():
 
             title_row = QHBoxLayout()
             self.lbl_live = QLabel("EN VIVO")
-            self.lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
             self.lbl_tx_title = QLabel("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
-            self.lbl_tx_title.setStyleSheet("color: #ffffff; font-weight: 800; font-size: 18px; letter-spacing: 0.5px;")
             title_row.addWidget(self.lbl_live)
             title_row.addWidget(self.lbl_tx_title)
             title_row.addStretch()
@@ -1531,7 +1808,6 @@ def run_gui():
             hdr_layout.addStretch()
 
             self.lbl_elapsed = QLabel("⏱ Tiempo: 00:00")
-            self.lbl_elapsed.setStyleSheet("background: #181822; color: #a0a0b2; border: 1px solid #282834; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: bold;")
             hdr_layout.addWidget(self.lbl_elapsed)
 
             layout.addLayout(hdr_layout)
@@ -1542,128 +1818,37 @@ def run_gui():
             self.tx_progress.setTextVisible(False)
             self.tx_progress.setRange(0, 100)
             self.tx_progress.setValue(10)
-            self.tx_progress.setStyleSheet("""
-                QProgressBar {
-                    background-color: #14141e;
-                    border: 1px solid #252536;
-                    border-radius: 4px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:0.7 #f59e0b, stop:1 #22c55e);
-                    border-radius: 4px;
-                }
-            """)
             layout.addWidget(self.tx_progress)
 
             # Embedded Console Log View
             self.log_view = QTextEdit()
             self.log_view.setReadOnly(True)
             self.log_view.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
-            self.log_view.setStyleSheet("""
-                QTextEdit {
-                    background-color: #07070b;
-                    color: #e4e4e7;
-                    border: 1px solid #222230;
-                    border-radius: 8px;
-                    padding: 12px;
-                    font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace;
-                    font-size: 12px;
-                    line-height: 1.4;
-                }
-                QScrollBar:vertical {
-                    background: #07070b;
-                    width: 10px;
-                    margin: 0px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical {
-                    background: #2a2a38;
-                    min-height: 35px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:vertical:hover {
-                    background: #ff1a1a;
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0px;
-                }
-                QScrollBar:horizontal {
-                    background: #07070b;
-                    height: 10px;
-                    margin: 0px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:horizontal {
-                    background: #2a2a38;
-                    min-width: 35px;
-                    border-radius: 5px;
-                }
-                QScrollBar::handle:horizontal:hover {
-                    background: #ff1a1a;
-                }
-                QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                    width: 0px;
-                }
-            """)
             layout.addWidget(self.log_view, stretch=1)
 
             # Transaction Footer
-            tx_footer = QFrame()
-            tx_footer.setObjectName("tx_footer")
-            tx_footer.setStyleSheet("""
-                QFrame#tx_footer {
-                    background-color: #111118;
-                    border: 1px solid #222230;
-                    border-radius: 10px;
-                    padding: 8px 16px;
-                }
-            """)
-            footer_box = QHBoxLayout(tx_footer)
+            self.tx_footer = QFrame()
+            self.tx_footer.setObjectName("tx_footer")
+            footer_box = QHBoxLayout(self.tx_footer)
             footer_box.setContentsMargins(14, 10, 14, 10)
             footer_box.setSpacing(16)
 
             self.lbl_tx_status = QLabel("⏳ Ejecutando comandos de actualización...")
-            self.lbl_tx_status.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px;")
             footer_box.addWidget(self.lbl_tx_status, stretch=2)
 
             self.btn_tx_reboot = QPushButton("🔄 Reiniciar Sistema")
             self.btn_tx_reboot.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_tx_reboot.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff1a1a, stop:1 #990000);
-                    color: #ffffff;
-                    border: 1px solid #ff3b3b;
-                    border-radius: 8px;
-                    padding: 10px 24px;
-                    font-weight: 800;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff3333, stop:1 #b30000);
-                }
-            """)
             self.btn_tx_reboot.setVisible(False)
             self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot"))
             footer_box.addWidget(self.btn_tx_reboot)
 
             self.btn_tx_done = QPushButton("Procesando...")
             self.btn_tx_done.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_tx_done.setStyleSheet("""
-                QPushButton {
-                    background: #181822;
-                    color: #555566;
-                    border: 1px solid #222230;
-                    border-radius: 8px;
-                    padding: 10px 24px;
-                    font-weight: bold;
-                    font-size: 13px;
-                }
-            """)
             self.btn_tx_done.setEnabled(False) # Enabled only on finish
             self.btn_tx_done.clicked.connect(self.on_tx_close_clicked)
             footer_box.addWidget(self.btn_tx_done)
 
-            layout.addWidget(tx_footer)
+            layout.addWidget(self.tx_footer)
 
         def update_elapsed_time(self):
             elapsed = int(time.time() - self.tx_start_time)
@@ -1842,14 +2027,14 @@ def run_gui():
                 p_font = QFont()
                 p_font.setBold(True)
                 p_item.setFont(p_font)
-                p_item.setForeground(QColor("#f4f4f6"))
+                p_item.setForeground(QColor(self.palette["foreground"]))
                 self.table.setItem(row, 1, p_item)
 
                 # Col 2: Current Version
                 old_item = QTableWidgetItem(item["old_v"] if item["old_v"] else "—")
                 old_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 old_item.setFont(mono_font)
-                old_item.setForeground(QColor("#8a8a9e"))
+                old_item.setForeground(QColor(self.palette["sub_text"]))
                 self.table.setItem(row, 2, old_item)
 
                 # Col 3: New Version
@@ -1857,7 +2042,7 @@ def run_gui():
                 new_item = QTableWidgetItem(new_str)
                 new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 new_item.setFont(mono_bold)
-                new_item.setForeground(QColor("#4ade80") if not item["crit"] else QColor("#fbbf24"))
+                new_item.setForeground(QColor(self.palette["green_text"]) if not item["crit"] else QColor(self.palette["yellow_text"]))
                 self.table.setItem(row, 3, new_item)
 
             self.table.setSortingEnabled(True)
@@ -1884,7 +2069,7 @@ def run_gui():
                 "fp": sum(1 for item in self.all_items if item.get("type") == "Flatpak"),
             }
 
-            dlg = ConfirmDialog(items_count, crit_count, cached_sudo, self, breakdown=breakdown)
+            dlg = ConfirmDialog(items_count, crit_count, cached_sudo, self, breakdown=breakdown, palette=self.palette)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return # User canceled
             if dlg.get_password():
@@ -2164,15 +2349,16 @@ def run_gui():
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    _palette = load_theme_palette()
     _pal = app.palette()
-    _pal.setColor(QPalette.ColorRole.Window, QColor("#121217"))
-    _pal.setColor(QPalette.ColorRole.WindowText, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Base, QColor("#0d0d11"))
-    _pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#16161c"))
-    _pal.setColor(QPalette.ColorRole.Text, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Button, QColor("#18181f"))
-    _pal.setColor(QPalette.ColorRole.ButtonText, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Highlight, QColor("#cc0000"))
+    _pal.setColor(QPalette.ColorRole.Window, QColor(_palette["background"]))
+    _pal.setColor(QPalette.ColorRole.WindowText, QColor(_palette["foreground"]))
+    _pal.setColor(QPalette.ColorRole.Base, QColor(_palette["table_bg"]))
+    _pal.setColor(QPalette.ColorRole.AlternateBase, QColor(_palette["lighter_background"]))
+    _pal.setColor(QPalette.ColorRole.Text, QColor(_palette["foreground"]))
+    _pal.setColor(QPalette.ColorRole.Button, QColor(_palette["lighter_background"]))
+    _pal.setColor(QPalette.ColorRole.ButtonText, QColor(_palette["foreground"]))
+    _pal.setColor(QPalette.ColorRole.Highlight, QColor(_palette["accent"]))
     _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
     app.setPalette(_pal)
     win = X64UpdateWindow()
