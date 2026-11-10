@@ -701,6 +701,215 @@ def load_theme_palette():
 
 
 # ==============================================================================
+# PIPELINE DE ACTUALIZACIÓN INTEGRAL (PARIDAD 100% OMARCHY & SEGURIDAD X64 LIOS)
+# ==============================================================================
+
+def build_update_pipeline(sudo_cmd="sudo", aur_helper=None, choice="1", has_repo=True, has_aur=False, has_fp=False, password=None):
+    """
+    Construye la lista ordenada de comandos shell para ejecutar la transacción completa con:
+    1. Inhibición de suspensión y reposo (Stay-Awake).
+    2. Comprobación preventiva de espacio libre en disco (/).
+    3. Poda preventiva de caché de paquetes (antes de snapshots BTRFS).
+    4. Instantánea de recuperación Snapper / BTRFS.
+    5. Sincronización Git robusta con safe.directory y autostash.
+    6. Actualización previa de llaveros PGP (archlinux-keyring, cachyos-keyring, omarchy-keyring).
+    7. Actualización de repositorios oficiales (Pacman -Syu).
+    8. Migraciones de configuración y dotfiles (omarchy-migrate).
+    9. Purgado de paquetes huérfanos.
+    10. Actualización de paquetes de usuario AUR (yay/paru).
+    11. Actualización de aplicaciones y runtimes Flatpak.
+    12. Recarga en caliente de plugins QML y servicios (omarchy-update-restart).
+    13. Ganchos de usuario post-actualización (omarchy-hook post-update).
+    14. Actualización de herramientas y agentes IA (omarchy-update-mise).
+    15. Verificación de la cadena de arranque (omarchy-update-boot).
+    16. Limpieza de notificación/badge en Quickshell (omarchy-shell clear).
+    17. Reinicio selectivo de daemons actualizados (checkservices).
+    18. Liberación limpia del inhibidor de suspensión.
+    """
+    commands = []
+    display_cmds = []
+
+    has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
+    sudo_flags = "--sudoflags -A " if password else ""
+
+    # 1. Inhibidor de suspensión y reposo del sistema (Stay-Awake)
+    if has_omarchy and os.path.isfile("/usr/share/omarchy/bin/omarchy-update-stay-awake"):
+        commands.append(
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-stay-awake ]; then "
+            "/usr/share/omarchy/bin/omarchy-update-stay-awake start 2>/dev/null || true; fi; }"
+        )
+
+    # 2. Verificación de espacio libre mínimo en disco (al menos 2 GB en /)
+    space_cmd = (
+        "{ if [ -x /usr/share/omarchy/bin/omarchy-update-requires-free-space ]; then "
+        "/usr/share/omarchy/bin/omarchy-update-requires-free-space || exit 1; "
+        "else "
+        "free_kb=$(df -k / 2>/dev/null | awk 'NR==2 {print $4}'); "
+        "if [ -n \"$free_kb\" ] && [ \"$free_kb\" -lt 2097152 ]; then "
+        "printf '\\033[1;31mError: Espacio insuficiente en disco. Se requieren al menos 2 GB libres en / para actualizar con seguridad.\\033[0m\\n' >&2; "
+        "exit 1; fi; fi; }"
+    )
+    commands.append(space_cmd)
+    display_cmds.append("comprobar-espacio")
+
+    # 3. Poda preventiva de caché de paquetes (ANTES del snapshot para no inflar BTRFS)
+    prune_cmd = (
+        "{ if [ -x /usr/share/omarchy/bin/omarchy-update-pkg-prune ]; then "
+        f"{sudo_cmd} /usr/share/omarchy/bin/omarchy-update-pkg-prune || true; "
+        "elif which paccache >/dev/null 2>&1; then "
+        "printf '\\033[1;34m::\\033[0;1m Optimizando caché de paquetes previa al snapshot...\\033[0m\\n'; "
+        f"{sudo_cmd} paccache -rk2 -q && {sudo_cmd} paccache -ruk0 -q || true; fi; }}"
+    )
+    commands.append(prune_cmd)
+
+    # 4. Instantánea de seguridad BTRFS / Snapper (omarchy-snapshot create)
+    if has_omarchy and os.path.isfile("/usr/share/omarchy/bin/omarchy-snapshot"):
+        snap_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-snapshot ]; then "
+            f"{sudo_cmd} /usr/share/omarchy/bin/omarchy-snapshot create || true; fi; }}"
+        )
+        commands.append(snap_cmd)
+        display_cmds.append("omarchy-snapshot")
+
+    # 5. Sincronización Git de la Capa Omarchy (con safe.directory y autostash)
+    if has_omarchy:
+        git_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-dev ]; then "
+            "/usr/share/omarchy/bin/omarchy-update-dev || true; "
+            "elif [ -d /usr/share/omarchy/.git ]; then "
+            "printf '\\033[1;36m[+]\\033[0;1m Sincronizando Capa X64 LIOS + Omarchy desde Git...\\033[0m\\n'; "
+            "git config --global --add safe.directory /usr/share/omarchy 2>/dev/null || true; "
+            f"{sudo_cmd} git config --global --add safe.directory /usr/share/omarchy 2>/dev/null || true; "
+            f"{sudo_cmd} git -C /usr/share/omarchy pull --rebase --autostash origin main || true; fi; }}"
+        )
+        commands.append(git_cmd)
+        display_cmds.append("git-pull-omarchy")
+
+    # 6. Actualización previa de Llaveros / Keyrings PGP (archlinux, cachyos, omarchy)
+    keyring_cmd = (
+        "{ if [ -x /usr/share/omarchy/bin/omarchy-update-keyring ]; then "
+        f"{sudo_cmd} /usr/share/omarchy/bin/omarchy-update-keyring || true; "
+        "else "
+        "printf '\\033[1;34m::\\033[0;1m Verificando depósitos de firmas PGP (keyrings)...\\033[0m\\n'; "
+        f"{sudo_cmd} pacman -Sy --needed --noconfirm archlinux-keyring cachyos-keyring 2>/dev/null || true; fi; }}"
+    )
+    commands.append(keyring_cmd)
+    display_cmds.append("actualizar-keyrings")
+
+    # 7. Actualización de paquetes oficiales (Pacman -Syu)
+    if has_repo or (not has_aur and not has_fp):
+        commands.append(f"{sudo_cmd} pacman -Syu --noconfirm")
+        display_cmds.append("sudo pacman -Syu --noconfirm")
+
+    # 8. Migraciones de configuración y dotfiles (omarchy-migrate)
+    if has_omarchy:
+        migrate_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-migrate ]; then "
+            "printf '\\033[1;36m[+]\\033[0;1m Comprobando y aplicando migraciones de configuración (Omarchy Migrations)...\\033[0m\\n'; "
+            "if /usr/share/omarchy/bin/omarchy-migrate --pending >/dev/null 2>&1; then "
+            "if [ -x /usr/share/omarchy/bin/omarchy-restart-shell ]; then "
+            "/usr/share/omarchy/bin/omarchy-restart-shell || true; fi; fi; "
+            "/usr/share/omarchy/bin/omarchy-migrate || true; fi; }"
+        )
+        commands.append(migrate_cmd)
+        display_cmds.append("omarchy-migrate")
+
+    # 9. Limpieza de paquetes huérfanos residuales
+    orphan_cmd = (
+        "{ if [ -x /usr/share/omarchy/bin/omarchy-update-orphan-pkgs ]; then "
+        f"{sudo_cmd} /usr/share/omarchy/bin/omarchy-update-orphan-pkgs -y || true; "
+        "else "
+        "orphans=$(pacman -Qtdq 2>/dev/null || true); "
+        "if [ -n \"$orphans\" ]; then "
+        "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
+        f"{sudo_cmd} pacman -Rns --noconfirm $orphans || true; fi; fi; }}"
+    )
+    commands.append(orphan_cmd)
+
+    # 10. Actualización de paquetes AUR (yay/paru)
+    if has_aur and aur_helper:
+        commands.append(f"{aur_helper} -Sua --noconfirm {sudo_flags}".strip())
+        display_cmds.append(f"{aur_helper} -Sua --noconfirm")
+
+    # 11. Actualización de aplicaciones Flatpak
+    if has_fp and shutil.which("flatpak"):
+        commands.append("{ flatpak update -y && flatpak uninstall --unused -y; }")
+        display_cmds.append("flatpak update -y && flatpak uninstall --unused -y")
+
+    # 12. Purgado adicional si se solicitó opción 3 en CLI
+    if choice == "3":
+        commands.append(f"{sudo_cmd} pacman -Sc --noconfirm")
+
+    # 13. Recarga en caliente de plugins QML y servicios de escritorio
+    if has_omarchy:
+        restart_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-restart ]; then "
+            "printf '\\033[1;36m[+]\\033[0;1m Recargando plugins y entorno de escritorio X64 LIOS + Omarchy...\\033[0m\\n'; "
+            "/usr/share/omarchy/bin/omarchy-update-restart --services-only 2>/dev/null || /usr/share/omarchy/bin/omarchy-update-restart || true; fi; }"
+        )
+        commands.append(restart_cmd)
+        display_cmds.append("omarchy-update-restart")
+
+    # 14. Ganchos post-actualización del usuario
+    if has_omarchy:
+        hook_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-hook ]; then "
+            "/usr/share/omarchy/bin/omarchy-hook post-update || true; fi; }"
+        )
+        commands.append(hook_cmd)
+
+    # 15. Actualización de herramientas y agentes IA (Mise)
+    if has_omarchy:
+        mise_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-mise ]; then "
+            "printf '\\033[1;36m[+]\\033[0;1m Actualizando herramientas y agentes IA (Mise)...\\033[0m\\n'; "
+            "/usr/share/omarchy/bin/omarchy-update-mise || true; fi; }"
+        )
+        commands.append(mise_cmd)
+        display_cmds.append("omarchy-update-mise")
+
+    # 16. Verificación de la cadena de arranque (omarchy-update-boot)
+    if has_omarchy:
+        boot_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-boot ]; then "
+            f"{sudo_cmd} /usr/share/omarchy/bin/omarchy-update-boot || true; fi; }}"
+        )
+        commands.append(boot_cmd)
+
+    # 17. Limpieza de notificación/badge en la barra de Quickshell (Shell IPC)
+    if has_omarchy:
+        shell_clear_cmd = (
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-shell ]; then "
+            "/usr/share/omarchy/bin/omarchy-shell -q omarchy.system-update clear 2>/dev/null || true; fi; }"
+        )
+        commands.append(shell_clear_cmd)
+
+    # 18. Reinicio de servicios de segundo plano actualizados (checkservices)
+    if shutil.which("checkservices"):
+        cs_cmd = (
+            f"{{ svcs=$({sudo_cmd} checkservices -F -P -R "
+            "-i gdm.service -i plasmalogin.service -i sddm.service -i lightdm.service "
+            "-i lxdm.service -i slim.service -i xdm.service -i greetd.service "
+            "-i nodm.service -i ly.service -i lemurs.service -i dbus.service "
+            "-i systemd-logind.service -i NetworkManager.service 2>/dev/null "
+            "| grep '.service' | cut -f2 -d \"'\" || true); "
+            "if [ -n \"$svcs\" ]; then "
+            "printf '\\033[1;34m::\\033[0;1m Reiniciando servicios de segundo plano actualizados...\\033[0m\\n'; "
+            f"{sudo_cmd} systemctl restart $svcs || true; fi; }}"
+        )
+        commands.append(cs_cmd)
+
+    # 19. Liberación del inhibidor de suspensión (Stay-Awake stop)
+    if has_omarchy and os.path.isfile("/usr/share/omarchy/bin/omarchy-update-stay-awake"):
+        commands.append(
+            "{ if [ -x /usr/share/omarchy/bin/omarchy-update-stay-awake ]; then "
+            "/usr/share/omarchy/bin/omarchy-update-stay-awake stop 2>/dev/null || true; fi; }"
+        )
+
+    return commands, display_cmds
+
+
+# ==============================================================================
 # GUI NATIVA (PyQt6) 100% INTEGRADA
 # ==============================================================================
 
@@ -828,16 +1037,30 @@ def run_gui():
                         if "vmlinuz" in low or "initramfs" in low or "linux-cachyos" in low or "nvidia" in low:
                             self.kernel_updated = True
 
-                        if "retrieving" in low or "recuperando" in low or "downloading" in low or "descargando" in low:
-                            self.stage_changed.emit("Descargando paquetes de repositorios...", 35)
-                        elif "checking keyring" in low or "comprobando el depósito" in low:
-                            self.stage_changed.emit("Verificando claves y firmas de seguridad...", 55)
+                        if "optimizando caché" in low or "paccache" in low:
+                            self.stage_changed.emit("Optimizando caché y preparando snapshot...", 20)
+                        elif "instantánea" in low or "snapshot" in low:
+                            self.stage_changed.emit("Creando instantánea Snapper / BTRFS...", 25)
+                        elif "sincronizando capa" in low or "git update" in low or "stepgit" in low:
+                            self.stage_changed.emit("Sincronizando capa Git de Omarchy...", 30)
+                        elif "retrieving" in low or "recuperando" in low or "downloading" in low or "descargando" in low:
+                            self.stage_changed.emit("Descargando paquetes de repositorios...", 40)
+                        elif "checking keyring" in low or "comprobando el depósito" in low or "verificando depósitos" in low:
+                            self.stage_changed.emit("Verificando claves y firmas de seguridad (Keyrings)...", 50)
                         elif "checking package integrity" in low or "verificando la integridad" in low:
-                            self.stage_changed.emit("Verificando integridad de archivos...", 65)
+                            self.stage_changed.emit("Verificando integridad de archivos...", 60)
                         elif "upgrading" in low or "actualizando" in low or "installing" in low or "instalando" in low:
-                            self.stage_changed.emit("Instalando y descomprimiendo paquetes...", 75)
+                            self.stage_changed.emit("Instalando y descomprimiendo paquetes...", 70)
                         elif "running post-transaction hooks" in low or "ejecutando" in low or "hooks" in low:
-                            self.stage_changed.emit("Ejecutando ganchos del sistema (initramfs, kernel)...", 90)
+                            self.stage_changed.emit("Ejecutando ganchos del sistema (initramfs, kernel)...", 80)
+                        elif "migraciones de configuración" in low or "running migration" in low:
+                            self.stage_changed.emit("Aplicando migraciones de configuración (Omarchy Migrations)...", 88)
+                        elif "eliminando paquetes huérfanos" in low or "removing orphan" in low:
+                            self.stage_changed.emit("Limpiando paquetes huérfanos residuales...", 92)
+                        elif "recargando plugins" in low or "reloading shell" in low:
+                            self.stage_changed.emit("Sincronizando plugins y entorno de escritorio...", 95)
+                        elif "actualizando herramientas" in low or "mise" in low:
+                            self.stage_changed.emit("Actualizando herramientas y agentes IA (Mise)...", 97)
 
                     except OSError:
                         break
@@ -2102,85 +2325,21 @@ def run_gui():
             password = getattr(self, "_session_sudo_pwd", None)
             sudo_cmd = "sudo -A" if password else "sudo"
 
-            # Assemble transaction commands (CachyOS-grade separated & automated pipeline)
+            # Assemble transaction commands (100% full parity with omarchy-update & CachyOS/X64 pipeline)
             aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
             has_repo_updates = any(item.get("type") == "Sistema" for item in self.all_items)
             has_aur_updates = any(item.get("type") == "AUR" for item in self.all_items)
             has_fp_updates = any(item.get("type") == "Flatpak" for item in self.all_items)
-            has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
 
-            commands = []
-            display_cmds = []
-
-            # 1. Sincronización previa del repositorio Git de Omarchy
-            if has_omarchy:
-                commands.append(
-                    "{ if [ -d /usr/share/omarchy/.git ]; then "
-                    "printf '\\033[1;36m[+]\\033[0;1m Sincronizando Capa X64 LIOS + Omarchy desde Git...\\033[0m\\n'; "
-                    f"{sudo_cmd} git -C /usr/share/omarchy pull origin main || true; "
-                    "fi; }"
-                )
-                display_cmds.append("sudo git -C /usr/share/omarchy pull origin main")
-
-            # 3. Separate Pacman (-Syu) and AUR (-Sua) execution
-            if has_repo_updates or (not has_aur_updates and not has_fp_updates):
-                commands.append(f"{sudo_cmd} pacman -Syu --noconfirm")
-                display_cmds.append("sudo pacman -Syu --noconfirm")
-
-            if has_aur_updates and aur_helper:
-                sudo_flags = "--sudoflags -A " if password else ""
-                commands.append(f"{aur_helper} -Sua --noconfirm {sudo_flags}".strip())
-                display_cmds.append(f"{aur_helper} -Sua --noconfirm")
-
-            # 4. Flatpak update + unused runtime cleanup
-            if has_fp_updates and shutil.which("flatpak"):
-                commands.append("{ flatpak update -y && flatpak uninstall --unused -y; }")
-                display_cmds.append("flatpak update -y && flatpak uninstall --unused -y")
-
-            # 5. Automatic orphan packages cleanup (pacman -Qtdq -> pacman -Rns)
-            commands.append(
-                "{ orphans=$(pacman -Qtdq 2>/dev/null || true); "
-                "if [ -n \"$orphans\" ]; then "
-                "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
-                f"{sudo_cmd} pacman -Rns --noconfirm $orphans; "
-                "fi; }"
+            commands, display_cmds = build_update_pipeline(
+                sudo_cmd=sudo_cmd,
+                aur_helper=aur_helper,
+                choice="1",
+                has_repo=has_repo_updates or (not has_aur_updates and not has_fp_updates),
+                has_aur=has_aur_updates,
+                has_fp=has_fp_updates,
+                password=password
             )
-
-            # 6. Automatic smart Pacman cache cleanup (paccache -rk2 -ruk0, keeping 2 rollback versions)
-            if shutil.which("paccache"):
-                commands.append(
-                    "{ printf '\\033[1;34m::\\033[0;1m Optimizando caché de paquetes (conservando últimas 2 versiones)...\\033[0m\\n' && "
-                    f"{sudo_cmd} paccache -rk2 -q && {sudo_cmd} paccache -ruk0 -q; }}"
-                )
-
-            # 7a. Recarga en caliente y sincronización de herramientas en Omarchy
-            if has_omarchy:
-                commands.append(
-                    "{ if [ -x /usr/share/omarchy/bin/omarchy-update-restart ]; then "
-                    "printf '\\033[1;36m[+]\\033[0;1m Recargando plugins y entorno de escritorio X64 LIOS + Omarchy...\\033[0m\\n'; "
-                    "/usr/share/omarchy/bin/omarchy-update-restart || true; "
-                    "fi; "
-                    "if [ -x /usr/share/omarchy/bin/omarchy-update-mise ]; then "
-                    "printf '\\033[1;36m[+]\\033[0;1m Actualizando herramientas y agentes IA (Mise)...\\033[0m\\n'; "
-                    "/usr/share/omarchy/bin/omarchy-update-mise || true; "
-                    "fi; }"
-                )
-                display_cmds.append("omarchy-update-restart && omarchy-update-mise")
-
-            # 7b. Safe post-upgrade daemon restart (checkservices excluding display/session managers)
-            if shutil.which("checkservices"):
-                commands.append(
-                    f"{{ svcs=$({sudo_cmd} checkservices -F -P -R "
-                    "-i gdm.service -i plasmalogin.service -i sddm.service -i lightdm.service "
-                    "-i lxdm.service -i slim.service -i xdm.service -i greetd.service "
-                    "-i nodm.service -i ly.service -i lemurs.service -i dbus.service "
-                    "-i systemd-logind.service -i NetworkManager.service 2>/dev/null "
-                    "| grep '.service' | cut -f2 -d \"'\" || true); "
-                    "if [ -n \"$svcs\" ]; then "
-                    "printf '\\033[1;34m::\\033[0;1m Reiniciando servicios de segundo plano actualizados...\\033[0m\\n'; "
-                    f"{sudo_cmd} systemctl restart $svcs || true; "
-                    "fi; }"
-                )
 
             # Switch to In-App Transaction View
             self.stacked_widget.setCurrentIndex(1)
@@ -2495,27 +2654,20 @@ def run_cli_interactive():
         return 0
 
     aur_helper = "paru" if shutil.which("paru") else ("yay" if shutil.which("yay") else None)
-    has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
-    cmds = []
+    has_aur = (choice in ["1", "3"] and bool(aur_helper) and len(aur_pkgs) > 0)
+    has_fp = (choice == "1" and bool(shutil.which("flatpak")) and len(flatpak_pkgs) > 0)
+    has_repo = (len(repo_pkgs) > 0 or (not has_aur and not has_fp))
 
-    if has_omarchy:
-        cmds.append("echo -e '\\033[1;36m[+]\\033[0;1m Sincronizando Capa X64 LIOS + Omarchy desde Git...\\033[0m' && sudo git -C /usr/share/omarchy pull origin main || true")
+    cmds, _ = build_update_pipeline(
+        sudo_cmd="sudo",
+        aur_helper=aur_helper,
+        choice=choice,
+        has_repo=has_repo,
+        has_aur=has_aur,
+        has_fp=has_fp
+    )
 
-    if choice in ["1", "3"] and aur_helper:
-        cmds.append(f"{aur_helper} -Syu")
-    else:
-        cmds.append("sudo pacman -Syu")
-
-    if choice == "1" and shutil.which("flatpak") and len(flatpak_pkgs) > 0:
-        cmds.append("flatpak update -y")
-
-    if choice == "3":
-        cmds.append("sudo pacman -Sc --noconfirm")
-
-    if has_omarchy:
-        cmds.append("if [ -x /usr/share/omarchy/bin/omarchy-update-restart ]; then /usr/share/omarchy/bin/omarchy-update-restart || true; fi")
-        cmds.append("if [ -x /usr/share/omarchy/bin/omarchy-update-mise ]; then /usr/share/omarchy/bin/omarchy-update-mise || true; fi")
-
+    print(f"\n  {C_RED}{C_BOLD}▶ EJECUTANDO TRANSACCIÓN INTEGRAL DEL SISTEMA...{C_RESET}\n")
     subprocess.run(" && ".join(cmds), shell=True)
     run_background_check_and_save()
     wait_for_user()
