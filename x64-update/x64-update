@@ -214,7 +214,7 @@ def check_omarchy_git():
     if not os.path.isdir(omarchy_git):
         return None
     try:
-        local_cmd = ["git", "-C", "/usr/share/omarchy", "rev-parse", "--short", "HEAD"]
+        local_cmd = ["git", "-C", "/usr/share/omarchy", "rev-parse", "HEAD"]
         local_hash = subprocess.check_output(local_cmd, text=True, stderr=subprocess.DEVNULL, timeout=5).strip()
 
         remote_cmd = ["git", "-C", "/usr/share/omarchy", "ls-remote", "-h", "origin", "refs/heads/main"]
@@ -222,22 +222,15 @@ def check_omarchy_git():
         remote_out = subprocess.check_output(remote_cmd, env=env, text=True, stderr=subprocess.DEVNULL, timeout=10).strip()
         if not remote_out:
             return None
-        remote_hash = remote_out.split()[0][:7]
+        remote_hash = remote_out.split()[0].strip()
         if local_hash and remote_hash and local_hash != remote_hash:
-            return f"x64-lios-omarchy {local_hash} -> {remote_hash}"
+            return f"x64-lios-omarchy {local_hash[:7]} -> {remote_hash[:7]}"
     except Exception:
         pass
     return None
 
-def run_background_check_and_save():
+def save_check_results(repo_pkgs, aur_pkgs, flatpak_pkgs):
     ensure_state_dir()
-    repo_pkgs = check_official_repos()
-    omarchy_pkg = check_omarchy_git()
-    if omarchy_pkg:
-        repo_pkgs.insert(0, omarchy_pkg)
-    aur_pkgs = check_aur_packages()
-    flatpak_pkgs = check_flatpak_packages()
-
     all_pkgs = []
     for p in repo_pkgs:
         all_pkgs.append(p)
@@ -266,6 +259,15 @@ def run_background_check_and_save():
         "all": all_pkgs,
         "count": total_count
     }
+
+def run_background_check_and_save():
+    repo_pkgs = check_official_repos()
+    omarchy_pkg = check_omarchy_git()
+    if omarchy_pkg:
+        repo_pkgs.insert(0, omarchy_pkg)
+    aur_pkgs = check_aur_packages()
+    flatpak_pkgs = check_flatpak_packages()
+    return save_check_results(repo_pkgs, aur_pkgs, flatpak_pkgs)
 
 ANSI_MAP = {
     '30': '#52525b', '31': '#ef4444', '32': '#22c55e', '33': '#facc15',
@@ -583,7 +585,7 @@ def run_gui():
             self.status.emit("Verificando paquetes Flatpak...")
             flatpak_pkgs = check_flatpak_packages()
 
-            data = run_background_check_and_save()
+            data = save_check_results(repo_pkgs, aur_pkgs, flatpak_pkgs)
             self.finished.emit({
                 "repo": repo_pkgs,
                 "aur": aur_pkgs,
@@ -2199,6 +2201,9 @@ def run_cli_interactive():
 
     print(f"  {C_CYAN}[*]{C_RESET} Comprobando repositorios oficiales...")
     repo_pkgs = check_official_repos()
+    omarchy_pkg = check_omarchy_git()
+    if omarchy_pkg:
+        repo_pkgs.insert(0, omarchy_pkg)
     aur_pkgs = check_aur_packages()
     flatpak_pkgs = check_flatpak_packages()
 
