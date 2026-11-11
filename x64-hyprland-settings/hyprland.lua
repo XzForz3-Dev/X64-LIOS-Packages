@@ -49,8 +49,8 @@ hl.on("hyprland.start", function ()
     -- X64 System Update Tray Monitor (SNI)
     hl.exec_cmd("x64-update-tray &")
 
-    -- X64 Hello Welcome Center (Floating Centered)
-    hl.exec_cmd("x64-hello &")
+    -- X64 Hello Welcome Center (Floating Centered - respects autostart preference and prevents UWSM duplication)
+    hl.exec_cmd("[ -f ~/.config/autostart/x64-hello.desktop ] && ! systemctl --user is-active -q app-x64\\x2dhello@autostart.service && x64-hello &")
 
     -- X64 Clipboard History Daemon (cliphist + wl-paste)
     hl.exec_cmd("x64-hyprland-ctl clipboard start-watch &")
