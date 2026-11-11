@@ -11,15 +11,15 @@ hl.monitor({
     output   = "Virtual-1",
     mode     = "1920x1080@60",
     position = "auto",
-    scale    = "auto",
+    scale    = 1,
 })
 
--- Default catch-all for physical monitors (Auto-detect EDID)
+-- Default catch-all for physical monitors (1.0 native scale for crisp 1:1 display)
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = "auto",
+    scale    = 1,
 })
 
 ---------------------
@@ -65,6 +65,7 @@ hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 hl.env("QT_QPA_PLATFORMTHEME", "kde")
 hl.env("KDE_SESSION_VERSION", "6")
 hl.env("GTK_THEME", "adw-gtk3-dark")
+hl.env("GDK_SCALE", "1")
 hl.env("GDK_BACKEND", "wayland,x11,*")
 hl.env("SDL_VIDEODRIVER", "wayland")
 hl.env("CLUTTER_BACKEND", "wayland")
