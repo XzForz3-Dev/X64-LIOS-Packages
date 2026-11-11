@@ -319,9 +319,9 @@ function clean_previous_desktops -a target_id
             sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
         end
 
-        # 2. Eliminar directorios, wrappers maestros y assets del sistema
+        # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema
         sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
-        sudo rm -f /usr/local/bin/omarchy* /usr/local/bin/x64-launch-tiled-terminal 2>/dev/null
+        sudo rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal 2>/dev/null
         sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /usr/share/fonts/omarchy 2>/dev/null
         sudo fc-cache -f /usr/share/fonts 2>/dev/null
 
