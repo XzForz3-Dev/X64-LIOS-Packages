@@ -313,8 +313,8 @@ function clean_previous_desktops -a target_id
         else
             echo -e "  \e[0;37m-> Purging packages, webapps, and configurations of X64 LIOS + Omarchy...\e[0m"
         end
-        # 1. Purgar paquetes específicos de Omarchy
-        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring 2>/dev/null | sort -u)
+        # 1. Purgar paquetes específicos y suite de aplicaciones de Omarchy
+        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh 2>/dev/null | sort -u)
         if test (count $oma_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
         end
