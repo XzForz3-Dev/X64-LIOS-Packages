@@ -323,7 +323,7 @@ function clean_previous_desktops -a target_id
 
         # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema
         sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
-        sudo rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal 2>/dev/null
+        sudo rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal /usr/share/bash-completion/completions-fallback/mise.bash 2>/dev/null
         sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /usr/share/fonts/omarchy 2>/dev/null
         sudo rm -rf /etc/mise /var/lib/pacman/sync/omarchy.* 2>/dev/null
         sudo fc-cache -f /usr/share/fonts 2>/dev/null
@@ -376,7 +376,7 @@ except Exception:
                 rm -f $udir/.local/share/applications/foot.desktop $udir/.local/share/applications/imv.desktop $udir/.local/share/applications/intent.cache 2>/dev/null
                 update-desktop-database $udir/.local/share/applications 2>/dev/null
                 rm -rf $udir/.config/omarchy $udir/.local/state/omarchy $udir/.cache/omarchy 2>/dev/null
-                rm -rf $udir/.local/share/mise $udir/.config/mise 2>/dev/null
+                rm -rf $udir/.local/share/mise $udir/.config/mise $udir/.local/state/mise $udir/.cache/mise 2>/dev/null
                 rm -rf $udir/.local/share/fcitx5/themes/omarchy 2>/dev/null
                 rm -f $udir/.config/hypr/autostart.lua $udir/.config/hypr/bindings.lua $udir/.config/hypr/input.lua $udir/.config/hypr/looknfeel.lua $udir/.config/hypr/monitors.lua $udir/.config/hypr/xdph.conf $udir/.config/hypr/.luarc.json $udir/.config/hypr/hyprsunset.conf 2>/dev/null
                 rm -f $udir/.config/systemd/user/*.wants/omarchy-* $udir/.config/systemd/user/*/*.wants/omarchy-* 2>/dev/null
