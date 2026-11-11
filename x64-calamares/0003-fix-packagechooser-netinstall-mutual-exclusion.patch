@@ -1,0 +1,162 @@
+diff --git a/src/modules/netinstall/NetInstallPage.cpp b/src/modules/netinstall/NetInstallPage.cpp
+index 9c70e97..df030fd 100644
+--- a/src/modules/netinstall/NetInstallPage.cpp
++++ b/src/modules/netinstall/NetInstallPage.cpp
+@@ -70,9 +70,25 @@ NetInstallPage::onActivate()
+     // The netinstallSelect global storage value can be used to make additional items selected by default
+     Calamares::GlobalStorage* gs = Calamares::JobQueue::instance()->globalStorage();
+     const QStringList selectNames = gs->value( "netinstallSelect" ).toStringList();
+-    if ( !selectNames.isEmpty() )
++    if ( m_appliedSelections != selectNames )
+     {
+-        m_config->model()->setSelections( selectNames );
++        QStringList toUncheck;
++        for ( const QString& oldName : m_appliedSelections )
++        {
++            if ( !selectNames.contains( oldName ) )
++            {
++                toUncheck.append( oldName );
++            }
++        }
++        if ( !toUncheck.isEmpty() )
++        {
++            m_config->model()->clearSelections( toUncheck );
++        }
++        if ( !selectNames.isEmpty() )
++        {
++            m_config->model()->setSelections( selectNames );
++        }
++        m_appliedSelections = selectNames;
+     }
+ 
+     // If NetInstallAdd is found in global storage, add those items to the tree
+diff --git a/src/modules/netinstall/NetInstallPage.h b/src/modules/netinstall/NetInstallPage.h
+index 5b10b5c..9b7b781 100644
+--- a/src/modules/netinstall/NetInstallPage.h
++++ b/src/modules/netinstall/NetInstallPage.h
+@@ -50,6 +50,7 @@ public:
+ private:
+     Config* m_config;
+     Ui::Page_NetInst* ui;
++    QStringList m_appliedSelections;
+ };
+ 
+ #endif  // NETINSTALLPAGE_H
+diff --git a/src/modules/netinstall/PackageModel.cpp b/src/modules/netinstall/PackageModel.cpp
+index 98eb446..e52ff84 100644
+--- a/src/modules/netinstall/PackageModel.cpp
++++ b/src/modules/netinstall/PackageModel.cpp
+@@ -30,6 +30,21 @@ setSelections( const QStringList& selectNames, PackageTreeItem* item )
+     }
+ }
+ 
++/// Recursive helper for clearSelections()
++static void
++clearSelections( const QStringList& unselectNames, PackageTreeItem* item )
++{
++    for ( int i = 0; i < item->childCount(); i++ )
++    {
++        auto* child = item->child( i );
++        clearSelections( unselectNames, child );
++    }
++    if ( item->isGroup() && unselectNames.contains( item->name() ) )
++    {
++        item->setSelected( Qt::CheckState::Unchecked );
++    }
++}
++
+ /** @brief Collects all the "source" values from @p groupList
+  *
+  * Iterates over @p groupList and returns all nonempty "source"
+@@ -217,6 +232,15 @@ PackageModel::setSelections( const QStringList& selectNames )
+     }
+ }
+ 
++void
++PackageModel::clearSelections( const QStringList& unselectNames )
++{
++    if ( m_rootItem )
++    {
++        ::clearSelections( unselectNames, m_rootItem );
++    }
++}
++
+ PackageTreeItem::List
+ PackageModel::getPackages() const
+ {
+diff --git a/src/modules/netinstall/PackageModel.h b/src/modules/netinstall/PackageModel.h
+index 01334fe..4257cd6 100644
+--- a/src/modules/netinstall/PackageModel.h
++++ b/src/modules/netinstall/PackageModel.h
+@@ -63,6 +63,7 @@ public:
+      *
+      */
+     void setSelections( const QStringList& selectNames );
++    void clearSelections( const QStringList& unselectNames );
+ 
+     PackageTreeItem::List getPackages() const;
+     PackageTreeItem::List getItemPackages( PackageTreeItem* item ) const;
+diff --git a/src/modules/packagechooser/Config.cpp b/src/modules/packagechooser/Config.cpp
+index 642311b..d8bcc75 100644
+--- a/src/modules/packagechooser/Config.cpp
++++ b/src/modules/packagechooser/Config.cpp
+@@ -176,7 +176,14 @@ Config::updateGlobalStorage( const QStringList& selected ) const
+             auto selectedOrig = gs->value( "netinstallSelect" );
+             if ( selectedOrig.canConvert< QStringList >() )
+             {
+-                newSelected += selectedOrig.toStringList();
++                const QStringList myIds = m_model ? m_model->allIds() : QStringList();
++                for ( const QString& s : selectedOrig.toStringList() )
++                {
++                    if ( !myIds.contains( s ) && !newSelected.contains( s ) )
++                    {
++                        newSelected.append( s );
++                    }
++                }
+             }
+             else
+             {
+diff --git a/src/modules/packagechooser/PackageModel.cpp b/src/modules/packagechooser/PackageModel.cpp
+index f2a0b43..9c2a6de 100644
+--- a/src/modules/packagechooser/PackageModel.cpp
++++ b/src/modules/packagechooser/PackageModel.cpp
+@@ -155,6 +155,20 @@ PackageListModel::getNetinstallDataForNames( const QStringList& ids ) const
+     return l;
+ }
+ 
++QStringList
++PackageListModel::allIds() const
++{
++    QStringList ids;
++    for ( const auto& p : std::as_const( m_packages ) )
++    {
++        if ( !p.id.isEmpty() )
++        {
++            ids.append( p.id );
++        }
++    }
++    return ids;
++}
++
+ int
+ PackageListModel::rowCount( const QModelIndex& index ) const
+ {
+diff --git a/src/modules/packagechooser/PackageModel.h b/src/modules/packagechooser/PackageModel.h
+index ed7ffcf..e8cf888 100644
+--- a/src/modules/packagechooser/PackageModel.h
++++ b/src/modules/packagechooser/PackageModel.h
+@@ -96,9 +96,13 @@ public:
+ 
+     /// @brief Direct (non-abstract) access to package data
+     const PackageItem& packageData( int r ) const { return m_packages[ r ]; }
+-    /// @brief Direct (non-abstract) count of package data
++    /** @brief Direct (non-abstract) count of package data
++     */
+     int packageCount() const { return m_packages.count(); }
+ 
++    /** @brief Returns list of all non-empty item IDs in the model */
++    QStringList allIds() const;
++
+     /** @brief Does a name lookup (based on id) and returns the packages member
+      *
+      * If there is a package with the given @p id, returns its packages

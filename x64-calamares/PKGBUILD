@@ -4,7 +4,7 @@
 _pkgname="calamares"
 pkgname="$_pkgname"
 pkgver=3.4.2
-pkgrel=3
+pkgrel=4
 pkgdesc="Instalador Oficial de X64 LIOS (Fork de Calamares)"
 url="https://codeberg.org/Calamares/calamares"
 license=("GPL-3.0-or-later")
@@ -27,8 +27,19 @@ makedepends=(
 )
 
 _pkgext="tar.gz"
-source=("$_pkgname-$pkgver.$_pkgext"::"$url/releases/download/v$pkgver/$_pkgname-$pkgver.$_pkgext")
-sha256sums=('733bbbb00dc9f84874bd5c22960952f317ea2537565431179fa2152b2fbfdccc')
+source=(
+  "$_pkgname-$pkgver.$_pkgext"::"$url/releases/download/v$pkgver/$_pkgname-$pkgver.$_pkgext"
+  "0003-fix-packagechooser-netinstall-mutual-exclusion.patch"
+)
+sha256sums=(
+  '733bbbb00dc9f84874bd5c22960952f317ea2537565431179fa2152b2fbfdccc'
+  '812399782279d01ffee65b949c3691507549d82bf4a4245026fb54d98ec9f635'
+)
+
+prepare() {
+  cd "$_pkgname-$pkgver"
+  patch -Np1 -i "$srcdir/0003-fix-packagechooser-netinstall-mutual-exclusion.patch"
+}
 
 build() {
   local _skip_modules=(
