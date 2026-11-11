@@ -302,13 +302,75 @@ function clean_previous_desktops -a target_id
         end
     end
 
-    if test "$target_id" != "8"; and test -d /usr/share/omarchy
+    set -l has_omarchy 0
+    test -d /usr/share/omarchy; and set has_omarchy 1
+    test -f /etc/profile.d/omarchy.sh; and set has_omarchy 1
+    test (count (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-speedtest omarchy-keyring owe monologue herdr hype signed superwhisper-bin gliff 2>/dev/null)) -gt 0; and set has_omarchy 1
+
+    if test "$target_id" != "8"; and test $has_omarchy -eq 1
         if test $is_es -eq 1
-            echo -e "  \e[0;37m-> Desinstalando shell X64 LIOS + Omarchy (/usr/share/omarchy)...\e[0m"
+            echo -e "  \e[0;37m-> Purgando paquetes, webapps y configuraciones de X64 LIOS + Omarchy...\e[0m"
         else
-            echo -e "  \e[0;37m-> Uninstalling X64 LIOS + Omarchy shell (/usr/share/omarchy)...\e[0m"
+            echo -e "  \e[0;37m-> Purging packages, webapps, and configurations of X64 LIOS + Omarchy...\e[0m"
         end
+        # 1. Purgar paquetes específicos de Omarchy
+        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring 2>/dev/null | sort -u)
+        if test (count $oma_pkgs) -gt 0
+            sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
+        end
+
+        # 2. Eliminar directorios, wrappers maestros y assets del sistema
         sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
+        sudo rm -f /usr/local/bin/omarchy* /usr/local/bin/x64-launch-tiled-terminal 2>/dev/null
+        sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /usr/share/fonts/omarchy 2>/dev/null
+        sudo fc-cache -f /usr/share/fonts 2>/dev/null
+
+        # 3. Eliminar servicios systemd y drop-ins
+        sudo rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service 2>/dev/null
+        sudo rm -rf /usr/lib/systemd/user/owed.service.d /etc/systemd/user/owed.service.d 2>/dev/null
+        sudo rm -f /etc/systemd/user/graphical-session.target.wants/owed.service 2>/dev/null
+        sudo rm -f /etc/systemd/logind.conf.d/20-inhibit-delay.conf 2>/dev/null
+        sudo rm -f /usr/lib/systemd/system-sleep/force-igpu /usr/lib/systemd/system-sleep/fprintd-resume /usr/lib/systemd/system-sleep/keyboard-backlight /usr/lib/systemd/system-sleep/unmount-fuse 2>/dev/null
+
+        # 4. Eliminar sudoers, tmpfiles, sysctl, udev, modprobe y hooks
+        sudo rm -f /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol 2>/dev/null
+        sudo rm -f /etc/tmpfiles.d/omarchy-nopasswd-sudo.conf 2>/dev/null
+        sudo rm -f /usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook 2>/dev/null
+        sudo rm -f /etc/modprobe.d/omarchy-usb-autosuspend.conf 2>/dev/null
+        sudo rm -f /etc/sysctl.d/90-omarchy-*.conf /etc/sysctl.d/99-omarchy-sysctl.conf 2>/dev/null
+        sudo rm -f /etc/udev/rules.d/60-omarchy-*.rules 2>/dev/null
+
+        # 5. Limpiar /etc/environment y repositorio [omarchy] en /etc/pacman.conf
+        sudo sed -i '/OMARCHY_PATH/d' /etc/environment 2>/dev/null
+        sudo python3 -c "
+import re
+try:
+    with open('/etc/pacman.conf', 'r') as f:
+        c = f.read()
+    c = re.sub(r'\[omarchy\]\s*\n(?:(?!\[).*\n)*', '', c)
+    with open('/etc/pacman.conf', 'w') as f:
+        f.write(c)
+except Exception:
+    pass
+" 2>/dev/null
+
+        # 6. Limpiar /etc/skel/.config/hypr de módulos Lua residuales de Omarchy
+        sudo rm -f /etc/skel/.config/hypr/autostart.lua /etc/skel/.config/hypr/bindings.lua /etc/skel/.config/hypr/input.lua /etc/skel/.config/hypr/looknfeel.lua /etc/skel/.config/hypr/monitors.lua /etc/skel/.config/hypr/xdph.conf /etc/skel/.config/hypr/.luarc.json /etc/skel/.config/hypr/hyprsunset.conf 2>/dev/null
+
+        # 7. Limpiar en los directorios de usuario (/home/*) las WebApps y configs
+        for udir in /home/*
+            if test -d $udir
+                for wapp in (find $udir/.local/share/applications -maxdepth 1 -name "*.desktop" 2>/dev/null)
+                    if grep -q "omarchy" $wapp 2>/dev/null
+                        rm -f $wapp 2>/dev/null
+                    end
+                end
+                rm -f $udir/.local/share/applications/foot.desktop $udir/.local/share/applications/imv.desktop $udir/.local/share/applications/intent.cache 2>/dev/null
+                update-desktop-database $udir/.local/share/applications 2>/dev/null
+                rm -rf $udir/.config/omarchy $udir/.local/state/omarchy 2>/dev/null
+                rm -f $udir/.config/hypr/autostart.lua $udir/.config/hypr/bindings.lua $udir/.config/hypr/input.lua $udir/.config/hypr/looknfeel.lua $udir/.config/hypr/monitors.lua $udir/.config/hypr/xdph.conf $udir/.config/hypr/.luarc.json $udir/.config/hypr/hyprsunset.conf 2>/dev/null
+            end
+        end
     end
 
     if test "$target_id" != "2"; and test (count (pacman -Qq gnome-shell x64-gnome-settings 2>/dev/null)) -gt 0
@@ -656,6 +718,20 @@ function install_desktop_menu
                 if test -d $HOME/.config/hypr.x64-native.bak
                     rm -rf $HOME/.config/hypr
                     mv $HOME/.config/hypr.x64-native.bak $HOME/.config/hypr
+                else
+                    mkdir -p $HOME/.config/hypr
+                    if not test -f $HOME/.config/hypr/hyprland.lua; and test -f /etc/xdg/hypr/hyprland.lua
+                        cp -f /etc/xdg/hypr/hyprland.lua $HOME/.config/hypr/hyprland.lua
+                    end
+                    if not test -f $HOME/.config/hypr/custom.lua; and test -f /etc/xdg/hypr/custom.lua
+                        cp -f /etc/xdg/hypr/custom.lua $HOME/.config/hypr/custom.lua
+                    end
+                    if not test -f $HOME/.config/hypr/hyprland.conf; and test -f /etc/xdg/hypr/hyprland.conf
+                        cp -f /etc/xdg/hypr/hyprland.conf $HOME/.config/hypr/hyprland.conf
+                    end
+                    if not test -f $HOME/.config/hypr/hyprlock.conf; and test -f /etc/xdg/hypr/hyprlock.conf
+                        cp -f /etc/xdg/hypr/hyprlock.conf $HOME/.config/hypr/hyprlock.conf
+                    end
                 end
                 if test -d $HOME/.config/quickshell.x64-native.bak
                     rm -rf $HOME/.config/quickshell
