@@ -96,6 +96,30 @@ ShellRoot {
         }
     }
 
+    // Screenshot & Recording Protection: Locks popups so they do not dismiss when slurp grabs focus
+    property bool lockPopups: false
+
+    Timer {
+        id: popupsLockSafetyTimer
+        interval: 15000
+        repeat: false
+        onTriggered: root.lockPopups = false
+    }
+
+    IpcHandler {
+        target: "popups"
+
+        function lock() {
+            root.lockPopups = true;
+            popupsLockSafetyTimer.restart();
+        }
+
+        function unlock() {
+            popupsLockSafetyTimer.stop();
+            root.lockPopups = false;
+        }
+    }
+
     IpcHandler {
         target: "telemetry"
 
@@ -312,6 +336,7 @@ ShellRoot {
         id: calendarPopup
         screen: root.primaryScreen
         visible: false
+        lockClose: root.lockPopups
         onCloseRequested: calendarPopup.visible = false
     }
 
@@ -320,6 +345,7 @@ ShellRoot {
         id: telemetryPopup
         screen: root.primaryScreen
         visible: false
+        lockClose: root.lockPopups
         onCloseRequested: telemetryPopup.visible = false
     }
 
@@ -328,6 +354,7 @@ ShellRoot {
         id: networkPopup
         screen: root.primaryScreen
         visible: false
+        lockClose: root.lockPopups
         onCloseRequested: networkPopup.visible = false
     }
 
@@ -336,6 +363,7 @@ ShellRoot {
         id: controlCenter
         screen: root.primaryScreen
         visible: false
+        lockClose: root.lockPopups
         onCloseRequested: controlCenter.visible = false
         onDndToggled: (active) => {
             mainBar.dndActive = active;

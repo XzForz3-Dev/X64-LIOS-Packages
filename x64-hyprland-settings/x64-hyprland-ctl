@@ -404,6 +404,7 @@ cmd_record_worker() {
     local geom=""
     if [ "$scope" = "region" ]; then
         geom=$(slurp -b '#08080a88' -c '#ff2b2bff' -s '#ff2b2b18' -w 2 2>/dev/null || echo "")
+        quickshell ipc call popups unlock >/dev/null 2>&1 || true
         [ -z "$geom" ] && return 0
         sleep 0.08
     fi
@@ -524,6 +525,7 @@ cmd_record() {
     fi
 
     if [ "$action" = "start" ] && [ "$is_rec" -eq 0 ]; then
+        [ "$scope" = "region" ] && quickshell ipc call popups lock >/dev/null 2>&1 || true
         setsid -f "$0" record-worker "$scope" "$audio_mode" >/dev/null 2>&1 < /dev/null
     elif [ "$action" = "stop" ] && [ "$is_rec" -eq 1 ]; then
         pkill -INT -x gpu-screen-recorder >/dev/null 2>&1 || true
@@ -551,9 +553,10 @@ cmd_screenshot_worker() {
     local out_file="${pic_dir}/X64-Shot-$(date +%Y%m%d-%H%M%S).png"
 
     if [ "$mode" = "region" ]; then
-        sleep 0.22
+        sleep 0.15
         local geom
         geom=$(slurp -b '#08080a88' -c '#ff2b2bff' -s '#ff2b2b18' -w 2 2>/dev/null || echo "")
+        quickshell ipc call popups unlock >/dev/null 2>&1 || true
         [ -z "$geom" ] && return 0
         quickshell ipc call filter hide >/dev/null 2>&1 || true
         sleep 0.05
@@ -573,6 +576,7 @@ cmd_screenshot_worker() {
         quickshell ipc call filter hide >/dev/null 2>&1 || true
         sleep 0.05
         if grim "$out_file"; then
+            quickshell ipc call popups unlock >/dev/null 2>&1 || true
             quickshell ipc call filter show >/dev/null 2>&1 || true
             setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
             if [ "$IS_ES" -eq 1 ]; then
@@ -581,6 +585,7 @@ cmd_screenshot_worker() {
                 notify_user "Screenshot Captured" "Copied to clipboard • $(basename "$out_file")" "X64 Capture"
             fi
         else
+            quickshell ipc call popups unlock >/dev/null 2>&1 || true
             quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
     fi
@@ -588,6 +593,8 @@ cmd_screenshot_worker() {
 
 cmd_screenshot() {
     local mode="${1:-full}"
+    # Immediately lock quickshell popups so shortcuts and slurp focus grab do not dismiss open widgets
+    quickshell ipc call popups lock >/dev/null 2>&1 || true
     setsid -f "$0" screenshot-worker "$mode" >/dev/null 2>&1 < /dev/null
 }
 

@@ -28,10 +28,17 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-popup"
 
+    property bool lockClose: false
+
     HyprlandFocusGrab {
-        active: calWindow.visible
+        id: focusGrab
+        active: calWindow.visible && !calWindow.lockClose
         windows: [calWindow]
-        onCleared: calWindow.closeAnimated()
+        onCleared: {
+            if (!calWindow.lockClose && calWindow.visible) {
+                calWindow.closeAnimated();
+            }
+        }
     }
 
     function closeAnimated() {

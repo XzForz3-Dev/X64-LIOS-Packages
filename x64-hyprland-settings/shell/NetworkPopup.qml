@@ -50,12 +50,17 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-popup"
     WlrLayershell.keyboardFocus: netWindow.passwordSsid !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
+    property bool lockClose: false
+
     HyprlandFocusGrab {
-        active: netWindow.visible
+        id: focusGrab
+        active: netWindow.visible && !netWindow.lockClose
         windows: [netWindow]
         onCleared: {
-            netWindow.passwordSsid = "";
-            netWindow.closeAnimated();
+            if (!netWindow.lockClose && netWindow.visible) {
+                netWindow.passwordSsid = "";
+                netWindow.closeAnimated();
+            }
         }
     }
 
