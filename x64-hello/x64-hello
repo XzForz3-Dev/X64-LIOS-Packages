@@ -2899,6 +2899,19 @@ for _lc, _ldict in SCHED_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
         TRANSLATIONS[_lc].update(_ldict)
 
+COMING_SOON_TRANSLATIONS = {
+    'en': {'COMING SOON': 'COMING SOON'},
+    'es': {'COMING SOON': 'PRÓXIMAMENTE'},
+    'fr': {'COMING SOON': 'BIENTÔT DISPONIBLE'},
+    'de': {'COMING SOON': 'DEMNÄCHST VERFÜGBAR'},
+    'it': {'COMING SOON': 'PROSSIMAMENTE'},
+    'pt': {'COMING SOON': 'EM BREVE'},
+    'ru': {'COMING SOON': 'СКОРО'},
+}
+for _lc, _ldict in COMING_SOON_TRANSLATIONS.items():
+    if _lc in TRANSLATIONS:
+        TRANSLATIONS[_lc].update(_ldict)
+
 LANG_CONF_PATH = os.path.expanduser("~/.config/x64-hello/lang.conf")
 
 def _detect_initial_lang():
@@ -5214,6 +5227,50 @@ class MitigationsConfirmDialog(QDialog):
         layout.addLayout(btn_row)
 
 
+class CardToggleSwitch(QPushButton):
+    def __init__(self, checked=False, parent=None):
+        super().__init__(parent)
+        self._checked = bool(checked)
+        self.setFixedSize(44, 24)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setStyleSheet("background: transparent; border: none;")
+
+    def set_checked(self, checked):
+        self._checked = bool(checked)
+        self.update()
+
+    def is_checked(self):
+        return self._checked
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            p.setOpacity(0.55)
+        hovered = self.underMouse() and self.isEnabled()
+        if self._checked:
+            border_col = "#ff4d4d" if hovered else "#ff3333"
+            fill_col = "#d60000" if hovered else "#b80000"
+            p.setPen(QPen(QColor(border_col), 1.2))
+            p.setBrush(QBrush(QColor(fill_col)))
+            p.drawRoundedRect(1, 1, 42, 22, 11, 11)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor("#ffffff")))
+            p.drawEllipse(23, 4, 16, 16)
+        else:
+            border_col = "#ef4444" if hovered else "#383842"
+            fill_col = "#24242c" if hovered else "#1a1a20"
+            thumb_col = "#d4d4d8" if hovered else "#777782"
+            p.setPen(QPen(QColor(border_col), 1.2))
+            p.setBrush(QBrush(QColor(fill_col)))
+            p.drawRoundedRect(1, 1, 42, 22, 11, 11)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor(thumb_col)))
+            p.drawEllipse(5, 4, 16, 16)
+        p.end()
+
+
 class MitigationsSwitchCard(QFrame):
     def __init__(self, parent_app=None):
         super().__init__()
@@ -5221,6 +5278,7 @@ class MitigationsSwitchCard(QFrame):
         self.setObjectName("MitigationsCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(64)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -5290,14 +5348,12 @@ class MitigationsSwitchCard(QFrame):
         hbox.addLayout(vbox, 1)
 
         self.status_pill = QLabel()
+        self.status_pill.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.status_pill.setFixedHeight(26)
         self.status_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hbox.addWidget(self.status_pill)
 
-        self.toggle_btn = QPushButton()
-        self.toggle_btn.setFixedHeight(28)
-        self.toggle_btn.setMinimumWidth(110)
-        self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_btn = CardToggleSwitch(True, self)
         self.toggle_btn.clicked.connect(self.toggle_action)
         hbox.addWidget(self.toggle_btn)
 
@@ -5312,6 +5368,12 @@ class MitigationsSwitchCard(QFrame):
 
         self._disabled_state = False
         self.refresh_state()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.toggle_btn.isEnabled():
+            self.toggle_action()
+        else:
+            super().mousePressEvent(event)
 
     def check_is_disabled(self):
         try:
@@ -5333,6 +5395,7 @@ class MitigationsSwitchCard(QFrame):
     def refresh_state(self):
         self._disabled_state = self.check_is_disabled()
         self.status_pill.setTextFormat(Qt.TextFormat.RichText)
+        self.toggle_btn.set_checked(not self._disabled_state)
         if self._disabled_state:
             self.status_pill.setText(f"● {tr('MITIGATIONS OFF (+FPS)')}")
             self.status_pill.setStyleSheet("""
@@ -5343,23 +5406,6 @@ class MitigationsSwitchCard(QFrame):
                 padding: 0 10px;
                 font-weight: bold;
                 font-size: 10px;
-            """)
-            self.toggle_btn.setText(tr("RESTORE SECURITY"))
-            self.toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(16, 185, 129, 0.13);
-                    color: #10b981;
-                    border: 1px solid rgba(16, 185, 129, 0.42);
-                    border-radius: 7px;
-                    padding: 0 12px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.22);
-                    border: 1px solid #10b981;
-                    color: #ffffff;
-                }
             """)
         else:
             self.status_pill.setText(f"● {tr('MITIGATIONS ACTIVE (SECURE)')}")
@@ -5372,23 +5418,6 @@ class MitigationsSwitchCard(QFrame):
                 font-weight: bold;
                 font-size: 10px;
             """)
-            self.toggle_btn.setText(tr("DISABLE (+FPS)"))
-            self.toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #e4e4e7;
-                    border: 1px solid rgba(255, 255, 255, 0.12);
-                    border-radius: 7px;
-                    padding: 0 12px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(220, 38, 38, 0.18);
-                    border: 1px solid #dc2626;
-                    color: #ffffff;
-                }
-            """)
 
     def toggle_action(self):
         if not self._disabled_state:
@@ -5398,7 +5427,6 @@ class MitigationsSwitchCard(QFrame):
 
         action_arg = "off" if not self._disabled_state else "on"
         self.toggle_btn.setEnabled(False)
-        self.toggle_btn.setText(tr("APPLYING..."))
 
         tool_cmd = "/usr/bin/x64-toggle-mitigations"
         if not os.path.exists(tool_cmd):
@@ -5434,6 +5462,7 @@ class ServiceSwitchCard(QFrame):
         self.setObjectName("ServiceCard")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(height)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
@@ -5447,7 +5476,7 @@ class ServiceSwitchCard(QFrame):
             }
             QFrame#ServiceCard:hover {
                 background-color: rgba(255, 255, 255, 0.055);
-                border: 1px solid rgba(255, 255, 255, 0.16);
+                border: 1px solid rgba(220, 38, 38, 0.45);
             }
         """)
 
@@ -5507,10 +5536,7 @@ class ServiceSwitchCard(QFrame):
         vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
 
-        self.toggle_btn = QPushButton()
-        self.toggle_btn.setFixedHeight(28)
-        self.toggle_btn.setMinimumWidth(82)
-        self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_btn = CardToggleSwitch(False, self)
         self.toggle_btn.setToolTip(rich_tip)
         self.toggle_btn.clicked.connect(self.toggle_service)
         hbox.addWidget(self.toggle_btn)
@@ -5518,44 +5544,15 @@ class ServiceSwitchCard(QFrame):
         self.setLayout(hbox)
         self.set_active_state(False)
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self.toggle_btn.isEnabled():
+            self.toggle_service()
+        else:
+            super().mousePressEvent(event)
+
     def set_active_state(self, active):
         self._active = active
-        if active:
-            self.toggle_btn.setText(f"● {tr('ACTIVE')}")
-            self.toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(16, 185, 129, 0.13);
-                    color: #10b981;
-                    border: 1px solid rgba(16, 185, 129, 0.42);
-                    border-radius: 7px;
-                    padding: 0 9px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.22);
-                    border: 1px solid #10b981;
-                    color: #ffffff;
-                }
-            """)
-        else:
-            self.toggle_btn.setText(f"○ {tr('INACTIVE')}")
-            self.toggle_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.025);
-                    color: #71717a;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 7px;
-                    padding: 0 9px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(220, 38, 38, 0.16);
-                    color: #ffffff;
-                    border: 1px solid #ef4444;
-                }
-            """)
+        self.toggle_btn.set_checked(active)
 
     def toggle_service(self):
         if not self._active and self.req_pkg and self.req_pkg not in INSTALLED_PKGS_CACHE:
@@ -6107,7 +6104,7 @@ class TelemetryCard(QFrame):
 
 
 class CommunityPillCard(QPushButton):
-    def __init__(self, title, desc, badge_text, icon_name, url):
+    def __init__(self, title, desc, badge_text, icon_name, url=None):
         super().__init__()
         self.url = url
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
@@ -6115,19 +6112,21 @@ class CommunityPillCard(QPushButton):
         self.setFixedHeight(112)
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor if self.url else Qt.CursorShape.ArrowCursor)
         self.setToolTip(f"<b>{title}</b><br>{desc}")
-        self.setStyleSheet("""
-            CommunityPillCard {
+        hover_border = "rgba(220, 38, 38, 0.55)" if self.url else "rgba(255, 255, 255, 0.14)"
+        hover_bg = "rgba(255, 255, 255, 0.055)" if self.url else "rgba(255, 255, 255, 0.038)"
+        self.setStyleSheet(f"""
+            CommunityPillCard {{
                 background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
                 border: 1px solid rgba(255, 255, 255, 0.065);
                 text-align: left;
-            }
-            CommunityPillCard:hover {
-                background-color: rgba(255, 255, 255, 0.055);
-                border: 1px solid rgba(220, 38, 38, 0.55);
-            }
+            }}
+            CommunityPillCard:hover {{
+                background-color: {hover_bg};
+                border: 1px solid {hover_border};
+            }}
         """)
 
         hbox = QHBoxLayout()
@@ -6183,14 +6182,37 @@ class CommunityPillCard(QPushButton):
 
         lbl_badge = QLabel(badge_text)
         lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        lbl_badge.setMinimumWidth(0)
-        lbl_badge.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_badge.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold; background: transparent; border: none;")
-        vbox.addWidget(lbl_badge)
+        if self.url:
+            lbl_badge.setMinimumWidth(0)
+            lbl_badge.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            lbl_badge.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold; background: transparent; border: none;")
+            vbox.addWidget(lbl_badge)
+        else:
+            lbl_badge.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            lbl_badge.setStyleSheet("""
+                color: #cbd5e1;
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 5px;
+                padding: 2px 9px;
+                font-size: 10px;
+                font-weight: bold;
+                letter-spacing: 0.9px;
+            """)
+            vbox.addWidget(lbl_badge, 0, Qt.AlignmentFlag.AlignLeft)
 
         hbox.addLayout(vbox, 1)
         self.setLayout(hbox)
-        self.clicked.connect(lambda: webbrowser.open(self.url))
+        if self.url:
+            self.clicked.connect(self.open_link)
+
+    def open_link(self):
+        if not self.url:
+            return
+        try:
+            subprocess.Popen(["xdg-open", self.url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            webbrowser.open(self.url)
 
 
 class X64Hello(QWidget):
@@ -6772,16 +6794,16 @@ class X64Hello(QWidget):
         btn_docs = CommunityPillCard(
             tr("Official Website & Wiki"),
             tr("Official guides, system modules, and documentation."),
-            "x64lios.com  ➔",
+            "https://x64lios.com  ➔",
             "wiki",
             "https://x64lios.com"
         )
         btn_discord = CommunityPillCard(
             tr("Discord Community"),
             tr("Real-time support channels, setups, and community chat."),
-            "discord.gg/x64studios  ➔",
+            f"◈   {tr('COMING SOON')}",
             "discord",
-            "https://discord.gg/x64studios"
+            None
         )
 
         eco_grid.addWidget(btn_docs, 0, 0)

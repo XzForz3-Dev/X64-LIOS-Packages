@@ -1,6 +1,6 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=26
+pkgrel=27
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
@@ -14,7 +14,7 @@ source=('x64-hello'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
         'x64-cube.png')
-sha256sums=('bdeda002c9269b67e5c95cb367c3ca73df3c59f4e1debed35d3dd8c226f88006'
+sha256sums=('581e239d3e1685a786b4e496c61a4ede45a8d4f51a8e909f32fbbb036faf8fc6'
             'd6f0f20f5c76e4bc97ebe9c32fa9c802372d71c4c561b9e73af63acca24e9fca'
             '4557155a893a22a904d03abd98118bc30103b39e735d2cfee594a1848799857c'
             'c6e52146774af3addcee711ea8dbb48bfb061532db9e70c1c4bad23b3c225c3d'
