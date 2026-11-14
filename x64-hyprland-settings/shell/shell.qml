@@ -22,6 +22,7 @@ ShellRoot {
         if (targetName !== "control") controlCenter.visible = false;
         if (targetName !== "telemetry") telemetryPopup.visible = false;
         if (targetName !== "network") networkPopup.visible = false;
+        if (targetName !== "audio") audioPopup.visible = false;
         if (targetName !== "shortcuts") shortcutsPopup.visible = false;
         if (targetName !== "clipboard") clipboardPopup.visible = false;
         if (targetName !== "overview") overviewPopup.visible = false;
@@ -161,6 +162,40 @@ ShellRoot {
 
         function close() {
             networkPopup.closeAnimated();
+        }
+    }
+
+    IpcHandler {
+        target: "audio"
+
+        function toggle() {
+            if (audioPopup.visible) {
+                audioPopup.closeAnimated();
+            } else {
+                audioPopup.visible = true;
+                root.closeAllExcept("audio");
+            }
+        }
+
+        function open() {
+            audioPopup.visible = true;
+            root.closeAllExcept("audio");
+        }
+
+        function openSinks() {
+            audioPopup.activeTab = "sinks";
+            audioPopup.visible = true;
+            root.closeAllExcept("audio");
+        }
+
+        function openSources() {
+            audioPopup.activeTab = "sources";
+            audioPopup.visible = true;
+            root.closeAllExcept("audio");
+        }
+
+        function close() {
+            audioPopup.closeAnimated();
         }
     }
 
@@ -318,6 +353,16 @@ ShellRoot {
             }
         }
 
+        onToggleAudio: (tab) => {
+            if (audioPopup.visible && (!tab || audioPopup.activeTab === tab)) {
+                audioPopup.closeAnimated();
+            } else {
+                if (tab) audioPopup.activeTab = tab;
+                audioPopup.visible = true;
+                root.closeAllExcept("audio");
+            }
+        }
+
         onBrightnessChangedOsd: (val) => {
             volumeOsd.showBrightness(val);
         }
@@ -356,6 +401,15 @@ ShellRoot {
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: networkPopup.visible = false
+    }
+
+    // Native Audio & Devices Popup (Outputs, Mic VU Meter, Boost 150%, Streams Mixer)
+    AudioPopup {
+        id: audioPopup
+        screen: root.primaryScreen
+        visible: false
+        lockClose: root.lockPopups
+        onCloseRequested: audioPopup.visible = false
     }
 
     // Control Center Sliding Panel

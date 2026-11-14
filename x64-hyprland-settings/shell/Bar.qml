@@ -27,6 +27,7 @@ PanelWindow {
     signal togglePower()
     signal toggleTelemetry()
     signal toggleNetwork()
+    signal toggleAudio(string tab)
     signal brightnessChangedOsd(int val)
 
     property bool trayExpanded: false
@@ -1081,9 +1082,14 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (systemCapsule.defaultSource && systemCapsule.defaultSource.audio) {
-                                        systemCapsule.defaultSource.audio.muted = !systemCapsule.defaultSource.audio.muted;
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.LeftButton) {
+                                        barWindow.toggleAudio("sources");
+                                    } else {
+                                        if (systemCapsule.defaultSource && systemCapsule.defaultSource.audio) {
+                                            systemCapsule.defaultSource.audio.muted = !systemCapsule.defaultSource.audio.muted;
+                                        }
                                     }
                                 }
                                 onWheel: (wheel) => {
@@ -1115,7 +1121,7 @@ PanelWindow {
                                     text: systemCapsule.sinkMuted ? "󰝟" : (systemCapsule.sinkVol <= 0.01 ? "󰕿" : (systemCapsule.sinkVol < 0.5 ? "󰖀" : "󰕾"))
                                     font.family: Theme.fontMono
                                     font.pixelSize: 11
-                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textSecondary
+                                    color: systemCapsule.sinkMuted ? Theme.accent : (systemCapsule.sinkVol > 1.0 ? Theme.accent : Theme.textSecondary)
                                 }
 
                                 Text {
@@ -1123,7 +1129,7 @@ PanelWindow {
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
                                     font.bold: true
-                                    color: systemCapsule.sinkMuted ? Theme.accent : Theme.textPrimary
+                                    color: systemCapsule.sinkMuted ? Theme.accent : (systemCapsule.sinkVol > 1.0 ? Theme.accent : Theme.textPrimary)
                                 }
                             }
 
@@ -1132,14 +1138,14 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                                 onClicked: (mouse) => {
                                     if (mouse.button === Qt.LeftButton) {
+                                        barWindow.toggleAudio("sinks");
+                                    } else {
                                         if (systemCapsule.defaultSink && systemCapsule.defaultSink.audio) {
                                             systemCapsule.defaultSink.audio.muted = !systemCapsule.defaultSink.audio.muted;
                                         }
-                                    } else if (mouse.button === Qt.RightButton) {
-                                        barWindow.toggleControl();
                                     }
                                 }
                                 onWheel: (wheel) => {

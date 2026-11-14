@@ -141,5 +141,23 @@ QtObject {
     readonly property string teleAvailable: isEs ? "disponibles" : "available"
     readonly property string teleActiveProcesses: isEs ? "PROCESOS ACTIVOS (TOP RECURSOS)" : "ACTIVE PROCESSES (TOP USAGE)"
     readonly property string teleOpenBtop: isEs ? "Abrir Monitor Completo (Btop)" : "Open Full Monitor (Btop)"
+
+    // -------------------------------------------------------------------------
+    // 6. AUDIO & DEVICES POPUP
+    // -------------------------------------------------------------------------
+    readonly property string audioTitle: isEs ? "AUDIO Y DISPOSITIVOS" : "AUDIO & DEVICES"
+    readonly property string audioTabSinks: isEs ? "Salidas" : "Outputs"
+    readonly property string audioTabSources: isEs ? "Micrófono" : "Microphone"
+    readonly property string audioTabStreams: isEs ? "Aplicaciones" : "Applications"
+    readonly property string audioOverdrive: "Boost 150%"
+    readonly property string audioOverdriveNotice: isEs ? "Sobreamplificación activa hasta 150%" : "Overamplification active up to 150%"
+    readonly property string audioOutputDevice: isEs ? "Dispositivo de Salida Activo" : "Active Output Device"
+    readonly property string audioInputDevice: isEs ? "Dispositivo de Entrada Activo" : "Active Input Device"
+    readonly property string audioOutputDevices: isEs ? "Dispositivos de Salida Disponibles" : "Available Output Devices"
+    readonly property string audioInputDevices: isEs ? "Dispositivos de Captura Disponibles" : "Available Input Devices"
+    readonly property string audioAppMixer: isEs ? "Mezclador de Aplicaciones" : "Application Mixer"
+    readonly property string audioNoStreams: isEs ? "No hay aplicaciones reproduciendo audio" : "No applications playing audio"
+    readonly property string audioVuMeter: isEs ? "Nivel de Entrada en Vivo" : "Live Input Level"
+    readonly property string audioAdvancedSettings: isEs ? "Ajustes Avanzados de Sonido" : "Advanced Audio Settings"
 }
 

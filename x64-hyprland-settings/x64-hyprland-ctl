@@ -1522,6 +1522,184 @@ cmd_keyboard() {
     esac
 }
 
+cmd_audio() {
+    local sub="${1:-status}"
+
+    case "$sub" in
+        data|status)
+            python3 -c '
+import json, subprocess, os
+
+def_sink = subprocess.run(["pactl", "get-default-sink"], capture_output=True, text=True).stdout.strip()
+def_source = subprocess.run(["pactl", "get-default-source"], capture_output=True, text=True).stdout.strip()
+
+try:
+    sinks_raw = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sinks"], capture_output=True, text=True).stdout or "[]")
+except Exception:
+    sinks_raw = []
+
+try:
+    sources_raw = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sources"], capture_output=True, text=True).stdout or "[]")
+except Exception:
+    sources_raw = []
+
+try:
+    streams_raw = json.loads(subprocess.run(["pactl", "-f", "json", "list", "sink-inputs"], capture_output=True, text=True).stdout or "[]")
+except Exception:
+    streams_raw = []
+
+overdrive_file = os.path.expanduser("~/.config/x64/audio_overdrive")
+overdrive = os.path.exists(overdrive_file)
+
+sinks = []
+for s in sinks_raw:
+    name = s.get("name", "")
+    desc = s.get("description", "")
+    vol_dict = s.get("volume", {})
+    fl = vol_dict.get("front-left", {})
+    val_pct_str = fl.get("value_percent", "0%").replace("%", "")
+    try:
+        vol_pct = int(val_pct_str)
+    except Exception:
+        vol_pct = 0
+    is_def = (name == def_sink)
+    icon = "󰓃"
+    form = s.get("properties", {}).get("device.form_factor", "")
+    bus = s.get("properties", {}).get("device.bus", "")
+    if "hdmi" in name.lower() or "hdmi" in desc.lower():
+        icon = "󰍹"
+    elif "usb" in bus or "dac" in desc.lower():
+        icon = "󰓋"
+    elif "blue" in bus or "head" in desc.lower():
+        icon = "󰋋"
+
+    sinks.append({
+        "index": s.get("index"),
+        "name": name,
+        "description": desc,
+        "volume": vol_pct,
+        "muted": s.get("mute", False),
+        "isDefault": is_def,
+        "icon": icon
+    })
+
+sources = []
+for s in sources_raw:
+    name = s.get("name", "")
+    if name.endswith(".monitor"):
+        continue
+    desc = s.get("description", "")
+    vol_dict = s.get("volume", {})
+    fl = vol_dict.get("front-left", {})
+    val_pct_str = fl.get("value_percent", "0%").replace("%", "")
+    try:
+        vol_pct = int(val_pct_str)
+    except Exception:
+        vol_pct = 0
+    is_def = (name == def_source)
+    icon = "󰍬"
+    if "webcam" in desc.lower() or "cam" in desc.lower():
+        icon = "󰖟"
+    elif "head" in desc.lower():
+        icon = "󰋎"
+
+    sources.append({
+        "index": s.get("index"),
+        "name": name,
+        "description": desc,
+        "volume": vol_pct,
+        "muted": s.get("mute", False),
+        "isDefault": is_def,
+        "icon": icon
+    })
+
+streams = []
+for st in streams_raw:
+    props = st.get("properties", {})
+    app_name = props.get("application.name", "") or props.get("media.name", "App")
+    icon_name = props.get("application.icon_name", "") or props.get("application.binary", "audio")
+    vol_dict = st.get("volume", {})
+    fl = vol_dict.get("front-left", {})
+    val_pct_str = fl.get("value_percent", "0%").replace("%", "")
+    try:
+        vol_pct = int(val_pct_str)
+    except Exception:
+        vol_pct = 0
+
+    streams.append({
+        "index": st.get("index"),
+        "name": app_name,
+        "icon": icon_name,
+        "volume": vol_pct,
+        "muted": st.get("mute", False)
+    })
+
+data = {
+    "sinks": sinks,
+    "sources": sources,
+    "streams": streams,
+    "overdrive": overdrive
+}
+print(json.dumps(data))
+'
+            ;;
+        set-sink)
+            local target="${2:-}"
+            [ -n "$target" ] && pactl set-default-sink "$target" >/dev/null 2>&1 || true
+            ;;
+        set-source)
+            local target="${2:-}"
+            [ -n "$target" ] && pactl set-default-source "$target" >/dev/null 2>&1 || true
+            ;;
+        set-sink-volume)
+            local target="${2:-@DEFAULT_SINK@}"
+            local vol="${3:-100}"
+            pactl set-sink-volume "$target" "${vol}%" >/dev/null 2>&1 || true
+            ;;
+        set-source-volume)
+            local target="${2:-@DEFAULT_SOURCE@}"
+            local vol="${3:-100}"
+            pactl set-source-volume "$target" "${vol}%" >/dev/null 2>&1 || true
+            ;;
+        toggle-sink-mute)
+            local target="${2:-@DEFAULT_SINK@}"
+            pactl set-sink-mute "$target" toggle >/dev/null 2>&1 || true
+            ;;
+        toggle-source-mute)
+            local target="${2:-@DEFAULT_SOURCE@}"
+            pactl set-source-mute "$target" toggle >/dev/null 2>&1 || true
+            ;;
+        set-stream-volume)
+            local idx="${2:-}"
+            local vol="${3:-100}"
+            [ -n "$idx" ] && pactl set-sink-input-volume "$idx" "${vol}%" >/dev/null 2>&1 || true
+            ;;
+        toggle-stream-mute)
+            local idx="${2:-}"
+            [ -n "$idx" ] && pactl set-sink-input-mute "$idx" toggle >/dev/null 2>&1 || true
+            ;;
+        toggle-overdrive)
+            local overdrive_file="${HOME}/.config/x64/audio_overdrive"
+            mkdir -p "$(dirname "$overdrive_file")"
+            if [ -f "$overdrive_file" ]; then
+                rm -f "$overdrive_file"
+                echo "false"
+            else
+                touch "$overdrive_file"
+                echo "true"
+            fi
+            ;;
+        overdrive)
+            local overdrive_file="${HOME}/.config/x64/audio_overdrive"
+            if [ -f "$overdrive_file" ]; then
+                echo "true"
+            else
+                echo "false"
+            fi
+            ;;
+    esac
+}
+
 cmd_init() {
     # Synchronize keyboard layout with system settings
     cmd_keyboard sync >/dev/null 2>&1 || true
@@ -1551,5 +1729,6 @@ case "${1:-status}" in
     keyboard|kb)       shift; cmd_keyboard "$@" ;;
     init)              cmd_init ;;
     net)        shift; cmd_net "$@" ;;
+    audio|snd)  shift; cmd_audio "$@" ;;
     *)          cmd_status ;;
 esac
