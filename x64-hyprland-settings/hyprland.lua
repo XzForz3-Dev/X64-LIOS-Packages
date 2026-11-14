@@ -140,7 +140,7 @@ hl.config({
     },
 
     input = {
-        kb_layout  = "us,es",
+        kb_layout  = "es,us",
         kb_options = "grp:alt_shift_toggle",
 
         follow_mouse = 1,

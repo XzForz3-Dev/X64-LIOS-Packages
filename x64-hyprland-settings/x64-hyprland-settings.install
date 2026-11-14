@@ -1,6 +1,35 @@
 sync_user_configs() {
     local mode="${1:-install}"
 
+    # Detect system keyboard layout from localectl / vconsole
+    local sys_layout="es"
+    if command -v localectl >/dev/null 2>&1; then
+        sys_layout=$(localectl status 2>/dev/null | awk -F': ' '/X11 Layout/{print $2}' | tr -d ' ')
+        if [ -z "$sys_layout" ] || [ "$sys_layout" = "n/a" ]; then
+            sys_layout=$(localectl status 2>/dev/null | awk -F': ' '/VC Keymap/{print $2}' | tr -d ' ')
+        fi
+    fi
+    if [ -z "$sys_layout" ] || [ "$sys_layout" = "n/a" ]; then
+        [ -f /etc/vconsole.conf ] && sys_layout=$(grep '^KEYMAP=' /etc/vconsole.conf | cut -d= -f2 | tr -d '"'\'' ')
+    fi
+    [ -z "$sys_layout" ] && sys_layout="es"
+
+    local pair="es,us"
+    if [ "$sys_layout" = "us" ]; then
+        pair="us,es"
+    elif [ "$sys_layout" = "latam" ]; then
+        pair="latam,us"
+    else
+        pair="${sys_layout},us"
+    fi
+
+    if [ -f /etc/skel/.config/hypr/hyprland.conf ]; then
+        sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/    kb_layout = ${pair}/" /etc/skel/.config/hypr/hyprland.conf 2>/dev/null || true
+    fi
+    if [ -f /etc/skel/.config/hypr/hyprland.lua ]; then
+        sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/        kb_layout  = \"${pair}\",/" /etc/skel/.config/hypr/hyprland.lua 2>/dev/null || true
+    fi
+
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
             u=$(basename "$user_dir")
@@ -27,6 +56,14 @@ sync_user_configs() {
                 # NEVER overwrite custom.lua if it already exists
                 if [ ! -f "$target_hypr/custom.lua" ]; then
                     cp -f /etc/skel/.config/hypr/custom.lua "$target_hypr/custom.lua" 2>/dev/null || true
+                fi
+
+                # Synchronize keyboard layout with system settings
+                if [ -f "$target_hypr/hyprland.conf" ]; then
+                    sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/    kb_layout = ${pair}/" "$target_hypr/hyprland.conf" 2>/dev/null || true
+                fi
+                if [ -f "$target_hypr/hyprland.lua" ]; then
+                    sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/        kb_layout  = \"${pair}\",/" "$target_hypr/hyprland.lua" 2>/dev/null || true
                 fi
             fi
 

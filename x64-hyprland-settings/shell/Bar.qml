@@ -161,19 +161,17 @@ PanelWindow {
     }
 
     // Active Keyboard Layout Detector
-    property string kbLayout: "US"
+    property string kbLayout: "ES"
     Process {
         id: kbProcess
-        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true) | .active_keymap), (.keyboards[0].active_keymap)' 2>/dev/null | head -n1 || echo 'English'"]
+        command: ["x64-hyprland-ctl", "keyboard", "get"]
         stdout: StdioCollector {
             id: kbCollector
             onStreamFinished: {
                 if (!kbCollector.text || kbGuardTimer.running) return;
-                var text = kbCollector.text.trim().toLowerCase();
-                if (text.indexOf("span") !== -1 || text.indexOf("es") !== -1) {
-                    barWindow.kbLayout = "ES";
-                } else {
-                    barWindow.kbLayout = "US";
+                var val = kbCollector.text.trim();
+                if (val.length > 0) {
+                    barWindow.kbLayout = val;
                 }
             }
         }
@@ -181,7 +179,21 @@ PanelWindow {
 
     Process {
         id: kbSwitchProc
-        command: ["sh", "-c", "export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/1000/hypr/ 2>/dev/null | head -n1); hyprctl switchxkblayout all next >/dev/null 2>&1"]
+        command: ["x64-hyprland-ctl", "keyboard", "next"]
+        stdout: StdioCollector {
+            id: kbSwitchCollector
+            onStreamFinished: {
+                if (!kbSwitchCollector.text) return;
+                var val = kbSwitchCollector.text.trim();
+                if (val.length > 0) {
+                    barWindow.kbLayout = val;
+                }
+            }
+        }
+        onExited: {
+            kbGuardTimer.stop();
+            if (!kbProcess.running) kbProcess.running = true;
+        }
     }
 
     // Network Connectivity Detector
@@ -923,7 +935,6 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    barWindow.kbLayout = (barWindow.kbLayout === "US" ? "ES" : "US");
                                     kbGuardTimer.restart();
                                     if (!kbSwitchProc.running) kbSwitchProc.running = true;
                                 }

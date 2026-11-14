@@ -1316,6 +1316,128 @@ cmd_focus_window() {
     hyprctl eval "hl.dispatch(hl.dsp.focus({ window = 'address:${addr}' }))" >/dev/null 2>&1 || hyprctl dispatch focuswindow "address:${addr}" >/dev/null 2>&1 || true
 }
 
+# -----------------------------------------------------------------------------
+# 13. DYNAMIC KEYBOARD LAYOUT ENGINE & SYSTEM SYNC
+# -----------------------------------------------------------------------------
+keymap_to_code() {
+    local km="$1"
+    local km_l
+    km_l=$(echo "$km" | tr '[:upper:]' '[:lower:]')
+    case "$km_l" in
+        *latin*|*latam*) echo "LA" ;;
+        *span*|*español*|*es*) echo "ES" ;;
+        *russ*|*русск*) echo "RU" ;;
+        *"united kingdom"*|*"(uk)"*) echo "UK" ;;
+        *germ*|*deutsch*|*"(de)"*) echo "DE" ;;
+        *fren*|*français*|*francais*|*"(fr)"*) echo "FR" ;;
+        *ital*|*"(it)"*) echo "IT" ;;
+        *port*|*"(pt)"*) echo "PT" ;;
+        *engl*|*"united states"*|*"(us)"*|us) echo "US" ;;
+        *) echo "${km:0:2}" | tr '[:lower:]' '[:upper:]' ;;
+    esac
+}
+
+cmd_keyboard() {
+    local sub="${1:-get}"
+    local uid_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}"
+    if [ -z "$sig" ] && [ -d "${uid_dir}/hypr" ]; then
+        sig=$(ls -t "${uid_dir}/hypr/" 2>/dev/null | head -n1)
+    fi
+
+    case "$sub" in
+        detect-system)
+            local layout=""
+            if command -v localectl >/dev/null 2>&1; then
+                layout=$(localectl status 2>/dev/null | awk -F': ' '/X11 Layout/{print $2}' | tr -d ' ')
+                if [ -z "$layout" ] || [ "$layout" = "n/a" ]; then
+                    layout=$(localectl status 2>/dev/null | awk -F': ' '/VC Keymap/{print $2}' | tr -d ' ')
+                fi
+            fi
+            if [ -z "$layout" ] || [ "$layout" = "n/a" ]; then
+                [ -f /etc/vconsole.conf ] && layout=$(grep '^KEYMAP=' /etc/vconsole.conf | cut -d= -f2 | tr -d '"'\'' ')
+            fi
+            if [ -z "$layout" ] || [ "$layout" = "n/a" ]; then
+                local raw_lang="${LC_ALL:-${LANG:-en_US.UTF-8}}"
+                if [[ "$raw_lang" =~ ^es ]]; then
+                    layout="es"
+                else
+                    layout="us"
+                fi
+            fi
+            echo "${layout:-es}"
+            ;;
+        get)
+            local keymap
+            keymap=$(HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl devices -j 2>/dev/null | jq -r '
+                [
+                  .keyboards[]
+                  | select(.name | test("video|power|sleep|hotkey|button"; "i") | not)
+                  | select(.active_keymap != null and .active_keymap != "")
+                  | {main: .main, active_keymap: .active_keymap}
+                ]
+                | sort_by(.main | not)
+                | .[0].active_keymap // "Spanish"
+            ' 2>/dev/null || echo "Spanish")
+            keymap_to_code "$keymap"
+            ;;
+        next|toggle)
+            HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl switchxkblayout all next >/dev/null 2>&1 || true
+            cmd_keyboard get
+            ;;
+        set)
+            local target_idx="${2:-0}"
+            HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl switchxkblayout all "$target_idx" >/dev/null 2>&1 || true
+            cmd_keyboard get
+            ;;
+        sync)
+            local sys_layout
+            sys_layout=$(cmd_keyboard detect-system)
+            [ -z "$sys_layout" ] && sys_layout="es"
+
+            local pair="es,us"
+            if [ "$sys_layout" = "us" ]; then
+                pair="us,es"
+            elif [ "$sys_layout" = "latam" ]; then
+                pair="latam,us"
+            else
+                pair="${sys_layout},us"
+            fi
+
+            local changed=0
+            local hypr_conf="${HOME}/.config/hypr/hyprland.conf"
+            if [ -f "$hypr_conf" ]; then
+                local curr_conf
+                curr_conf=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_conf" | awk -F'=' '{print $2}' | tr -d ' ' 2>/dev/null || echo "")
+                if [ "$curr_conf" != "$pair" ]; then
+                    sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/    kb_layout = ${pair}/" "$hypr_conf" 2>/dev/null || true
+                    changed=1
+                fi
+            fi
+
+            local hypr_lua="${HOME}/.config/hypr/hyprland.lua"
+            if [ -f "$hypr_lua" ]; then
+                local curr_lua
+                curr_lua=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_lua" | awk -F'=' '{print $2}' | tr -d ' "', 2>/dev/null || echo "")
+                if [ "$curr_lua" != "$pair" ]; then
+                    sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/        kb_layout  = \"${pair}\",/" "$hypr_lua" 2>/dev/null || true
+                    changed=1
+                fi
+            fi
+
+            if [ "$changed" -eq 1 ] && [ -n "$sig" ]; then
+                HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl reload >/dev/null 2>&1 || true
+            fi
+            cmd_keyboard get
+            ;;
+    esac
+}
+
+cmd_init() {
+    # Synchronize keyboard layout with system settings
+    cmd_keyboard sync >/dev/null 2>&1 || true
+}
+
 case "${1:-status}" in
     status)     cmd_status ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
@@ -1337,6 +1459,8 @@ case "${1:-status}" in
     overview-data)     cmd_overview_data ;;
     focus-workspace)   cmd_focus_workspace "$2" ;;
     focus-window)      cmd_focus_window "$2" ;;
+    keyboard|kb)       shift; cmd_keyboard "$@" ;;
+    init)              cmd_init ;;
     net)        shift; cmd_net "$@" ;;
     *)          cmd_status ;;
 esac
