@@ -1017,7 +1017,11 @@ cmd_net() {
             if [ "$has_wifi_hw" = "true" ] && [ "$wifi_enabled" = "true" ]; then
                 local saved_list
                 saved_list=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2 ~ /wireless|wifi/ {print $1}')
-                nets_json=$(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan no 2>/dev/null | awk -F: -v saved="$saved_list" -v is_es="$IS_ES" '
+                wifi_ssid=$(nmcli -t -f IN-USE,SSID dev wifi list --rescan no 2>/dev/null | awk -F: '$1=="*" {print $2; exit}')
+                if [ -n "$wifi_ssid" ]; then
+                    wifi_conn="true"
+                fi
+                nets_json=$(nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan no 2>/dev/null | awk -F: -v saved="$saved_list" -v is_es="$IS_ES" -v cur="$wifi_ssid" '
                     BEGIN {
                         n = split(saved, s_arr, "\n");
                         for (i=1; i<=n; i++) if (s_arr[i] != "") is_saved[s_arr[i]] = 1;
@@ -1025,11 +1029,11 @@ cmd_net() {
                         count = 0;
                     }
                     {
-                        in_use = ($1 == "*" ? "true" : "false");
                         ssid = $2;
                         sig = $3 + 0;
                         sec = $4;
                         if (ssid == "" || ssid == "--") next;
+                        in_use = ($1 == "*" || (cur != "" && ssid == cur) ? "true" : "false");
                         if (seen[ssid]++) next;
                         gsub(/\\:/, ":", ssid);
                         gsub(/"/, "\\\"", ssid);
@@ -1039,15 +1043,11 @@ cmd_net() {
                         if (count > 0) printf ",";
                         printf "{\"ssid\":\"%s\",\"signal\":%d,\"security\":\"%s\",\"connected\":%s,\"saved\":%s}", ssid, sig, sec, in_use, sv;
                         count++;
-                        if (count >= 12) exit;
+                        if (count >= 20) exit;
                     }
                     END { printf "]" }
                 ')
                 [ -z "$nets_json" ] && nets_json="[]"
-                wifi_ssid=$(nmcli -t -f IN-USE,SSID dev wifi list --rescan no 2>/dev/null | awk -F: '$1=="*" {print $2; exit}')
-                if [ -n "$wifi_ssid" ]; then
-                    wifi_conn="true"
-                fi
             fi
 
             # 4. Live Transfer Rates

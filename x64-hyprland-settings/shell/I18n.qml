@@ -119,7 +119,7 @@ QtObject {
     readonly property string netIpAddress: isEs ? "DIRECCIÓN IP" : "IP ADDRESS"
     readonly property string netGateway: "GATEWAY"
     readonly property string netDnsPrimary: isEs ? "DNS PRIMARIO" : "PRIMARY DNS"
-    readonly property string netWireless: isEs ? "󰤨 Redes Inalámbricas (Wi-Fi)" : "󰤨 Wireless Networks (Wi-Fi)"
+    readonly property string netWireless: isEs ? "Redes Inalámbricas (Wi-Fi)" : "Wireless Networks (Wi-Fi)"
     readonly property string netEthernetOnlyNotice: isEs 
         ? "Estación conectada por Ethernet LAN directo. Si conectas un adaptador Wi-Fi USB/PCIe aparecerán aquí las redes inalámbricas."
         : "Station connected via direct Ethernet LAN. Connect a USB or PCIe Wi-Fi adapter to scan for wireless networks."

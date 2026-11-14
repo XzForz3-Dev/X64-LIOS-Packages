@@ -43,7 +43,7 @@ PanelWindow {
         right: 96
     }
 
-    implicitWidth: 356
+    implicitWidth: 360
     implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 50)
 
     color: "transparent"
@@ -186,7 +186,11 @@ PanelWindow {
                     netWindow.wifiConnected = Boolean(d.wifiConnected);
                     netWindow.wifiSsid = d.wifiSsid || "";
                     netWindow.wifiDevice = d.wifiDevice || "wlan0";
-                    netWindow.networks = d.networks || [];
+                    if (typeof wifiListView !== "undefined" && wifiListView && wifiListView.applyNewNetworks) {
+                        wifiListView.applyNewNetworks(d.networks || []);
+                    } else {
+                        netWindow.networks = d.networks || [];
+                    }
                     netWindow.netDown = d.netDown || "0 KB/s";
                     netWindow.netUp = d.netUp || "0 KB/s";
                     if (netWindow.statusMsg === "Escaneando redes...") {
@@ -197,6 +201,7 @@ PanelWindow {
         }
     }
 
+    // Unified 1.5s timer for live transfer rates and status
     Timer {
         id: netLiveTimer
         interval: 1500
@@ -229,17 +234,9 @@ PanelWindow {
         }
     }
 
-    Timer {
-        interval: 3000
-        running: netWindow.visible && netWindow.passwordSsid === ""
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: netWindow.refreshNet(false)
-    }
-
     onVisibleChanged: {
         if (visible) {
-            netWindow.refreshNet(false);
+            netWindow.refreshNet(true); // Active scan immediately when opened
             card.scale = 0.82;
             card.y = -24;
             card.opacity = 0.0;
@@ -248,6 +245,11 @@ PanelWindow {
             card.scale = 1.0;
             card.y = 0;
             card.opacity = 1.0;
+            netWindow.passwordSsid = "";
+            if (typeof wifiListView !== "undefined" && wifiListView) {
+                wifiListView.stickyY = 0;
+                wifiListView.contentY = 0;
+            }
         }
     }
 
@@ -307,8 +309,7 @@ PanelWindow {
                     font.pixelSize: 9
                     color: Theme.textSecondary
                 }
-
-                // Rescan Button
+                // Rescan Button (with animated spin during scan)
                 Rectangle {
                     visible: netWindow.hasWifiHw && netWindow.wifiEnabled
                     implicitWidth: 24
@@ -319,11 +320,20 @@ PanelWindow {
                     border.width: 1
 
                     Text {
+                        id: scanIcon
                         anchors.centerIn: parent
                         text: "󰑐"
                         font.family: Theme.fontMono
                         font.pixelSize: 11
-                        color: scanArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                        color: (scanArea.containsMouse || netStatusProc.running) ? Theme.accent : Theme.textSecondary
+
+                        RotationAnimation on rotation {
+                            running: netStatusProc.running
+                            loops: Animation.Infinite
+                            from: 0
+                            to: 360
+                            duration: 800
+                        }
                     }
 
                     MouseArea {
@@ -337,183 +347,94 @@ PanelWindow {
             }
 
             // =========================================================
-            // 1B. LIVE NETWORK THROUGHPUT & ACTIVE INTERFACE BANNER
+            // 1B. ACTIVE INTERFACE, THROUGHPUT & ROUTING CARD
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 40
-                radius: Theme.radiusMd
-                color: Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 11
-                    anchors.rightMargin: 11
-                    spacing: 8
-
-                    Text {
-                        text: netWindow.wifiConnected ? "󰖩" : (netWindow.ethConnected ? "󰈀" : "󰌙")
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: Theme.textSecondary
-                    }
-
-                    Text {
-                        text: (netWindow.wifiConnected ? netWindow.wifiDevice : (netWindow.ethConnected ? netWindow.ethDevice : "net")) + " • " + netWindow.ipAddr
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: Theme.textPrimary
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                    }
-
-                    // Download Rate Badge (Monochromatic)
-                    Rectangle {
-                        implicitHeight: 22
-                        implicitWidth: rxNetRow.implicitWidth + 12
-                        radius: 6
-                        color: Theme.bgElevated
-                        border.color: Theme.borderSubtle
-                        border.width: 1
-                        RowLayout {
-                            id: rxNetRow
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Text { text: "↓"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
-                            Text { text: netWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary }
-                        }
-                    }
-
-                    // Upload Rate Badge (Monochromatic)
-                    Rectangle {
-                        implicitHeight: 22
-                        implicitWidth: txNetRow.implicitWidth + 12
-                        radius: 6
-                        color: Theme.bgElevated
-                        border.color: Theme.borderSubtle
-                        border.width: 1
-                        RowLayout {
-                            id: txNetRow
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Text { text: "↑"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textMuted }
-                            Text { text: netWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
-                        }
-                    }
-                }
-            }
-
-            // =========================================================
-            // 2. ETHERNET (LAN) & UNIFORM 3-COLUMN IP / GATEWAY / DNS GRID
-            // =========================================================
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 104
+                implicitHeight: activeNetCol.implicitHeight + 16
                 radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 ColumnLayout {
+                    id: activeNetCol
                     anchors.fill: parent
-                    anchors.margins: 11
+                    anchors.margins: 10
                     spacing: 8
 
+                    // Top Row: Active Interface, Device, and Live Speed Badges
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 9
+                        spacing: 8
 
+                        Text {
+                            text: netWindow.wifiConnected ? "󰖩" : (netWindow.ethConnected ? "󰈀" : "󰌙")
+                            font.family: Theme.fontMono
+                            font.pixelSize: 13
+                            color: (netWindow.wifiConnected || netWindow.ethConnected) ? Theme.statusOk : Theme.textMuted
+                        }
+
+                        Text {
+                            text: netWindow.wifiConnected ? (netWindow.wifiDevice + " • " + netWindow.wifiSsid) : (netWindow.ethConnected ? (netWindow.ethDevice + " • LAN") : (I18n.isEs ? "Sin conexión activa" : "No active connection"))
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+
+                        // Download Rate Badge
                         Rectangle {
-                            implicitWidth: 32
-                            implicitHeight: 32
-                            radius: 9
+                            implicitHeight: 22
+                            implicitWidth: rxNetRow.implicitWidth + 12
+                            radius: 6
                             color: Theme.bgElevated
                             border.color: Theme.borderSubtle
                             border.width: 1
-
-                            Text {
+                            RowLayout {
+                                id: rxNetRow
                                 anchors.centerIn: parent
-                                text: "󰈀"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 14
-                                color: netWindow.ethConnected ? Theme.textPrimary : Theme.textMuted
+                                spacing: 4
+                                Text { text: "↓"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
+                                Text { text: netWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary }
                             }
                         }
 
-                        ColumnLayout {
-                            spacing: 1
-                            Layout.fillWidth: true
-                            Text {
-                                text: I18n.netLanWired
-                                font.family: Theme.fontSans
-                                font.pixelSize: 11
-                                font.bold: true
-                                color: Theme.textPrimary
-                            }
-                            Text {
-                                text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? (I18n.isEs ? "1 Gbps Full Duplex" : "1 Gbps Full Duplex") : I18n.netCableDisconnected)
-                                font.family: Theme.fontMono
-                                font.pixelSize: 9
-                                color: Theme.textSecondary
-                            }
-                        }
-
-                        // Toggle Ethernet Interface Badge
+                        // Upload Rate Badge
                         Rectangle {
                             implicitHeight: 22
-                            implicitWidth: ethBtnRow.implicitWidth + 14
-                            radius: 11
-                            color: ethBtnArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            implicitWidth: txNetRow.implicitWidth + 12
+                            radius: 6
+                            color: Theme.bgElevated
                             border.color: Theme.borderSubtle
                             border.width: 1
-
                             RowLayout {
-                                id: ethBtnRow
+                                id: txNetRow
                                 anchors.centerIn: parent
-                                spacing: 5
-                                Rectangle {
-                                    width: 5
-                                    height: 5
-                                    radius: 2.5
-                                    color: netWindow.ethConnected ? Theme.statusOk : Theme.textMuted
-                                }
-                                Text {
-                                    text: netWindow.ethConnected ? I18n.netConnected : I18n.netConnect
-                                    font.family: Theme.fontSans
-                                    font.pixelSize: 9
-                                    font.weight: Font.DemiBold
-                                    color: Theme.textPrimary
-                                }
-                            }
-
-                            MouseArea {
-                                id: ethBtnArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: netWindow.runNetCmd(["eth-toggle", netWindow.ethDevice])
+                                spacing: 4
+                                Text { text: "↑"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textMuted }
+                                Text { text: netWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
                             }
                         }
                     }
 
-                    // Uniform 3-Column IP / Gateway / DNS Grid (Bone White Monospace)
+                    // Bottom Row: Uniform 3-Column IP / Gateway / DNS Grid
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 7
+                            implicitHeight: 34
+                            radius: 6
                             color: Theme.bgElevated
                             border.color: "#0affffff"
                             border.width: 1
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 6
+                                anchors.margins: 5
                                 spacing: 1
                                 Text { text: "IP LOCAL"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                                 Text { text: netWindow.ipAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
@@ -522,14 +443,14 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 7
+                            implicitHeight: 34
+                            radius: 6
                             color: Theme.bgElevated
                             border.color: "#0affffff"
                             border.width: 1
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 6
+                                anchors.margins: 5
                                 spacing: 1
                                 Text { text: "GATEWAY"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                                 Text { text: netWindow.gwAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
@@ -538,18 +459,108 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 7
+                            implicitHeight: 34
+                            radius: 6
                             color: Theme.bgElevated
                             border.color: "#0affffff"
                             border.width: 1
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 6
+                                anchors.margins: 5
                                 spacing: 1
                                 Text { text: "DNS"; font.family: Theme.fontMono; font.pixelSize: 8; color: Theme.textMuted }
                                 Text { text: netWindow.dnsAddr; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary; elide: Text.ElideRight; Layout.fillWidth: true }
                             }
+                        }
+                    }
+                }
+            }
+
+            // =========================================================
+            // 2. ETHERNET (LAN) ADAPTER
+            // =========================================================
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 46
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 9
+
+                    Rectangle {
+                        implicitWidth: 30
+                        implicitHeight: 30
+                        radius: 8
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰈀"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 13
+                            color: netWindow.ethConnected ? Theme.textPrimary : Theme.textMuted
+                        }
+                    }
+
+                    ColumnLayout {
+                        spacing: 1
+                        Layout.fillWidth: true
+                        Text {
+                            text: I18n.netLanWired
+                            font.family: Theme.fontSans
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: Theme.textPrimary
+                        }
+                        Text {
+                            text: netWindow.ethDevice + " • " + (netWindow.ethConnected ? "1 Gbps Full Duplex" : I18n.netCableDisconnected)
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            color: Theme.textSecondary
+                        }
+                    }
+
+                    // Toggle Ethernet Interface Badge
+                    Rectangle {
+                        implicitHeight: 22
+                        implicitWidth: ethBtnRow.implicitWidth + 14
+                        radius: 11
+                        color: ethBtnArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+
+                        RowLayout {
+                            id: ethBtnRow
+                            anchors.centerIn: parent
+                            spacing: 5
+                            Rectangle {
+                                width: 5
+                                height: 5
+                                radius: 2.5
+                                color: netWindow.ethConnected ? Theme.statusOk : Theme.textMuted
+                            }
+                            Text {
+                                text: netWindow.ethConnected ? I18n.netConnected : I18n.netConnect
+                                font.family: Theme.fontSans
+                                font.pixelSize: 9
+                                font.weight: Font.DemiBold
+                                color: netWindow.ethConnected ? Theme.textPrimary : Theme.textSecondary
+                            }
+                        }
+
+                        MouseArea {
+                            id: ethBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: netWindow.runNetCmd(["eth-toggle", netWindow.ethDevice])
                         }
                     }
                 }
@@ -569,37 +580,15 @@ PanelWindow {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 11
-                    anchors.rightMargin: 11
-                    spacing: 7
-
-                    Text {
-                        text: "󰖪"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: Theme.textMuted
-                    }
-
-                    Text {
-                        text: I18n.isEs ? "Redes Inalámbricas (Wi-Fi)" : "Wireless Networks (Wi-Fi)"
-                        font.family: Theme.fontSans
-                        font.pixelSize: 10
-                        color: Theme.textSecondary
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Text {
-                        text: I18n.isEs ? "Sin adaptador" : "No adapter"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 9
-                        color: Theme.textMuted
-                    }
+                    anchors.margins: 8
+                    spacing: 8
+                    Text { text: "󰤮"; font.family: Theme.fontMono; font.pixelSize: 12; color: Theme.textMuted }
+                    Text { text: I18n.netEthernetOnlyNotice; font.family: Theme.fontSans; font.pixelSize: 9; color: Theme.textMuted; Layout.fillWidth: true; elide: Text.ElideRight }
                 }
             }
 
             // =========================================================
-            // 3B. WI-FI SECTION (Only shown when Wi-Fi hardware exists)
+            // 3B. WI-FI SECTION (Always expanded when Wi-Fi HW exists)
             // =========================================================
             Rectangle {
                 visible: netWindow.hasWifiHw
@@ -616,16 +605,25 @@ PanelWindow {
                     anchors.margins: 10
                     spacing: 8
 
-                    // Wi-Fi Header & Radio Switch
+                    // Wi-Fi Header: Icon + Title & Radio Switch
                     RowLayout {
                         Layout.fillWidth: true
 
-                        Text {
-                            text: I18n.netWireless
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
+                        RowLayout {
+                            spacing: 6
+                            Text {
+                                text: "󰤨"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 12
+                                color: Theme.textSecondary
+                            }
+                            Text {
+                                text: I18n.netWireless
+                                font.family: Theme.fontSans
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: Theme.textPrimary
+                            }
                         }
 
                         Item { Layout.fillWidth: true }
@@ -668,142 +666,223 @@ PanelWindow {
                         color: Theme.textMuted
                     }
 
-                    // Wi-Fi Networks List
-                    ColumnLayout {
+                    // Wi-Fi Networks Scrollable ListView
+                    ListView {
+                        id: wifiListView
                         visible: netWindow.wifiEnabled
                         Layout.fillWidth: true
-                        spacing: 5
+                        implicitHeight: Math.min(185, Math.max(76, (netWindow.networks ? netWindow.networks.length : 0) * 40))
+                        clip: true
+                        spacing: 4
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: netWindow.networks
 
-                        Repeater {
-                            model: netWindow.networks
-                            delegate: Rectangle {
-                                Layout.fillWidth: true
-                                implicitHeight: (netWindow.passwordSsid === modelData.ssid) ? 74 : 36
-                                radius: 7
-                                color: modelData.connected ? Theme.bgElevated : (netRowArea.containsMouse ? Theme.bgHover : "#0cffffff")
-                                border.color: (netWindow.passwordSsid === modelData.ssid) ? Theme.accentBorder : Theme.borderSubtle
-                                border.width: 1
+                        property real stickyY: 0
+                        property bool updatingModel: false
 
-                                ColumnLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: 7
-                                    spacing: 6
+                        onContentYChanged: {
+                            if (!updatingModel) {
+                                stickyY = Math.max(0, contentY);
+                            }
+                        }
 
-                                    RowLayout {
+                        function applyNewNetworks(newList) {
+                            if (wifiScrollBar && wifiScrollBar.pressed) {
+                                return;
+                            }
+                            if (moving || dragging || flicking) {
+                                return;
+                            }
+                            updatingModel = true;
+                            let savedY = stickyY;
+                            netWindow.networks = newList;
+                            contentY = Math.min(savedY, Math.max(0, contentHeight - height));
+                            Qt.callLater(() => {
+                                contentY = Math.min(savedY, Math.max(0, contentHeight - height));
+                                updatingModel = false;
+                            });
+                        }
+
+                        ScrollBar.vertical: ScrollBar {
+                            id: wifiScrollBar
+                            policy: wifiListView.count > 4 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                            implicitWidth: 4
+                            contentItem: Rectangle {
+                                implicitWidth: 4
+                                radius: 2
+                                color: wifiScrollBar.pressed ? Theme.accent : (wifiScrollBar.hovered ? Theme.textPrimary : Theme.textMuted)
+                            }
+                            background: Rectangle {
+                                implicitWidth: 4
+                                radius: 2
+                                color: Theme.borderSubtle
+                            }
+                        }
+
+                        delegate: Rectangle {
+                            id: wifiRow
+                            width: wifiListView.width - (wifiScrollBar.visible ? 8 : 0)
+                            implicitHeight: (netWindow.passwordSsid === modelData.ssid) ? 76 : 36
+                            radius: 7
+                            readonly property bool isCurrent: Boolean(modelData.connected) || (netWindow.wifiConnected && modelData.ssid === netWindow.wifiSsid)
+                            color: isCurrent ? Theme.bgElevated : (netRowArea.containsMouse ? Theme.bgHover : "#0cffffff")
+                            border.color: isCurrent ? Theme.borderGlass : ((netWindow.passwordSsid === modelData.ssid) ? Theme.accentBorder : Theme.borderSubtle)
+                            border.width: 1
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 7
+                                spacing: 6
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 7
+
+                                    Text {
+                                        text: modelData.signal >= 75 ? "󰤨" : (modelData.signal >= 50 ? "󰤥" : (modelData.signal >= 25 ? "󰤢" : "󰤟"))
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 12
+                                        color: isCurrent ? Theme.statusOk : Theme.textSecondary
+                                    }
+
+                                    Text {
+                                        text: modelData.ssid
+                                        font.family: Theme.fontSans
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        color: isCurrent ? Theme.textPrimary : Theme.textSecondary
                                         Layout.fillWidth: true
-                                        spacing: 6
+                                        elide: Text.ElideRight
+                                    }
 
-                                        Text {
-                                            text: modelData.signal >= 75 ? "󰤨" : (modelData.signal >= 50 ? "󰤥" : (modelData.signal >= 25 ? "󰤢" : "󰤟"))
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: 12
-                                            color: modelData.connected ? Theme.textPrimary : Theme.textSecondary
-                                        }
+                                    Text {
+                                        text: ((modelData.security !== "Abierta" && modelData.security !== "Open") ? "󰌾 " : "") + ((modelData.security === "Abierta" || modelData.security === "Open") ? (I18n.isEs ? "Abierta" : "Open") : modelData.security) + " • " + modelData.signal + "%"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 8
+                                        color: Theme.textMuted
+                                    }
 
-                                        Text {
-                                            text: modelData.ssid
-                                            font.family: Theme.fontSans
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                            color: Theme.textPrimary
-                                            Layout.fillWidth: true
-                                            elide: Text.ElideRight
-                                        }
+                                    // Action / Status Badge
+                                    Rectangle {
+                                        implicitHeight: 20
+                                        implicitWidth: actRow.implicitWidth + 12
+                                        radius: 5
+                                        color: isCurrent ? "#1434d399" : (netBtnArea.containsMouse ? Theme.accentDim : Theme.bgElevated)
+                                        border.color: isCurrent ? "#3334d399" : (netBtnArea.containsMouse ? Theme.accentBorder : Theme.borderSubtle)
+                                        border.width: 1
 
-                                        Text {
-                                            text: ((modelData.security !== "Abierta" && modelData.security !== "Open") ? "󰌾 " : "") + ((modelData.security === "Abierta" || modelData.security === "Open") ? (I18n.isEs ? "Abierta" : "Open") : modelData.security) + " • " + modelData.signal + "%"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: 8
-                                            color: Theme.textMuted
-                                        }
+                                        RowLayout {
+                                            id: actRow
+                                            anchors.centerIn: parent
+                                            spacing: 4
 
-                                        Rectangle {
-                                            implicitHeight: 20
-                                            implicitWidth: actTxt.implicitWidth + 12
-                                            radius: 5
-                                            color: modelData.connected ? "#18ffffff" : Theme.accentDim
-                                            border.color: modelData.connected ? Theme.borderSubtle : Theme.accentBorder
-                                            border.width: 1
+                                            Rectangle {
+                                                visible: isCurrent
+                                                width: 5
+                                                height: 5
+                                                radius: 2.5
+                                                color: Theme.statusOk
+                                            }
+
                                             Text {
-                                                id: actTxt
-                                                anchors.centerIn: parent
-                                                text: modelData.connected ? I18n.netConnected : I18n.netConnect
+                                                text: isCurrent ? (I18n.isEs ? "Conectado" : "Connected") : (I18n.isEs ? "Conectar" : "Connect")
                                                 font.family: Theme.fontMono
                                                 font.pixelSize: 8
                                                 font.bold: true
-                                                color: Theme.textPrimary
-                                            }
-                                        }
-                                    }
-
-                                    // Inline Password Prompt when connecting to a secured Wi-Fi network
-                                    RowLayout {
-                                        visible: netWindow.passwordSsid === modelData.ssid
-                                        Layout.fillWidth: true
-                                        spacing: 6
-
-                                        TextField {
-                                            id: passField
-                                            Layout.fillWidth: true
-                                            implicitHeight: 24
-                                            placeholderText: I18n.netPasswordPrompt + modelData.ssid
-                                            placeholderTextColor: Theme.textMuted
-                                            echoMode: TextInput.Password
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: 9
-                                            color: Theme.textPrimary
-                                            onTextChanged: netWindow.passwordInput = text
-                                            onAccepted: netWindow.runNetCmd(["connect", modelData.ssid, netWindow.passwordInput])
-                                            background: Rectangle {
-                                                radius: 4
-                                                color: "#0b0b10"
-                                                border.color: Theme.accent
-                                                border.width: 1
+                                                color: isCurrent ? Theme.statusOk : Theme.textPrimary
                                             }
                                         }
 
-                                        Rectangle {
-                                            implicitWidth: 62
-                                            implicitHeight: 24
-                                            radius: 4
-                                            color: Theme.accent
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: I18n.netEnter
-                                                font.family: Theme.fontMono
-                                                font.pixelSize: 9
-                                                font.bold: true
-                                                color: "#ffffff"
-                                            }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: netWindow.runNetCmd(["connect", modelData.ssid, netWindow.passwordInput])
+                                        MouseArea {
+                                            id: netBtnArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (isCurrent) {
+                                                    netWindow.runNetCmd(["disconnect", modelData.ssid]);
+                                                } else if (modelData.saved || modelData.security === "Abierta" || modelData.security === "Open") {
+                                                    netWindow.runNetCmd(["connect", modelData.ssid]);
+                                                } else {
+                                                    if (netWindow.passwordSsid === modelData.ssid) {
+                                                        netWindow.passwordSsid = "";
+                                                    } else {
+                                                        netWindow.passwordInput = "";
+                                                        netWindow.passwordSsid = modelData.ssid;
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
 
-                                MouseArea {
-                                    id: netRowArea
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    height: 36
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (modelData.connected) {
-                                            netWindow.runNetCmd(["disconnect", modelData.ssid]);
-                                        } else if (modelData.saved || modelData.security === "Abierta" || modelData.security === "Open") {
-                                            netWindow.runNetCmd(["connect", modelData.ssid]);
+                                // Inline Password Prompt when connecting to a secured Wi-Fi network
+                                RowLayout {
+                                    visible: netWindow.passwordSsid === modelData.ssid
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    TextField {
+                                        id: passField
+                                        Layout.fillWidth: true
+                                        implicitHeight: 24
+                                        placeholderText: I18n.netPasswordPrompt + modelData.ssid
+                                        placeholderTextColor: Theme.textMuted
+                                        echoMode: TextInput.Password
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 9
+                                        color: Theme.textPrimary
+                                        onTextChanged: netWindow.passwordInput = text
+                                        onAccepted: netWindow.runNetCmd(["connect", modelData.ssid, netWindow.passwordInput])
+                                        background: Rectangle {
+                                            radius: 4
+                                            color: "#0b0b10"
+                                            border.color: Theme.accent
+                                            border.width: 1
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        implicitHeight: 24
+                                        implicitWidth: 64
+                                        radius: 4
+                                        color: Theme.accent
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: I18n.netConnect
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: "#ffffff"
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: netWindow.runNetCmd(["connect", modelData.ssid, netWindow.passwordInput])
+                                        }
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: netRowArea
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 36
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (isCurrent) {
+                                        netWindow.runNetCmd(["disconnect", modelData.ssid]);
+                                    } else if (modelData.saved || modelData.security === "Abierta" || modelData.security === "Open") {
+                                        netWindow.runNetCmd(["connect", modelData.ssid]);
+                                    } else {
+                                        if (netWindow.passwordSsid === modelData.ssid) {
+                                            netWindow.passwordSsid = "";
                                         } else {
-                                            if (netWindow.passwordSsid === modelData.ssid) {
-                                                netWindow.passwordSsid = "";
-                                            } else {
-                                                netWindow.passwordInput = "";
-                                                netWindow.passwordSsid = modelData.ssid;
-                                            }
+                                            netWindow.passwordInput = "";
+                                            netWindow.passwordSsid = modelData.ssid;
                                         }
                                     }
                                 }
