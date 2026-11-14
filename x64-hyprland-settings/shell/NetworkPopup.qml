@@ -30,6 +30,9 @@ PanelWindow {
     property string statusMsg: ""
     property bool isBusy: false
 
+    property string netDown: "0 KB/s"
+    property string netUp: "0 KB/s"
+
     anchors {
         top: true
         right: true
@@ -184,10 +187,25 @@ PanelWindow {
                     netWindow.wifiSsid = d.wifiSsid || "";
                     netWindow.wifiDevice = d.wifiDevice || "wlan0";
                     netWindow.networks = d.networks || [];
+                    netWindow.netDown = d.netDown || "0 KB/s";
+                    netWindow.netUp = d.netUp || "0 KB/s";
                     if (netWindow.statusMsg === "Escaneando redes...") {
                         netWindow.statusMsg = "";
                     }
                 } catch (e) {}
+            }
+        }
+    }
+
+    Timer {
+        id: netLiveTimer
+        interval: 1500
+        repeat: true
+        running: netWindow.visible && !netWindow.isBusy
+        onTriggered: {
+            if (!netStatusProc.running && !netActionProc.running) {
+                netStatusProc.command = ["x64-hyprland-ctl", "net", "status"];
+                netStatusProc.running = true;
             }
         }
     }
@@ -314,6 +332,76 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: netWindow.refreshNet(true)
+                    }
+                }
+            }
+
+            // =========================================================
+            // 1B. LIVE NETWORK THROUGHPUT & ACTIVE INTERFACE BANNER
+            // =========================================================
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 40
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 11
+                    anchors.rightMargin: 11
+                    spacing: 8
+
+                    Text {
+                        text: netWindow.wifiConnected ? "󰖩" : (netWindow.ethConnected ? "󰈀" : "󰌙")
+                        font.family: Theme.fontMono
+                        font.pixelSize: 12
+                        color: Theme.textSecondary
+                    }
+
+                    Text {
+                        text: (netWindow.wifiConnected ? netWindow.wifiDevice : (netWindow.ethConnected ? netWindow.ethDevice : "net")) + " • " + netWindow.ipAddr
+                        font.family: Theme.fontMono
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: Theme.textPrimary
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+
+                    // Download Rate Badge (Monochromatic)
+                    Rectangle {
+                        implicitHeight: 22
+                        implicitWidth: rxNetRow.implicitWidth + 12
+                        radius: 6
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+                        RowLayout {
+                            id: rxNetRow
+                            anchors.centerIn: parent
+                            spacing: 4
+                            Text { text: "↓"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
+                            Text { text: netWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary }
+                        }
+                    }
+
+                    // Upload Rate Badge (Monochromatic)
+                    Rectangle {
+                        implicitHeight: 22
+                        implicitWidth: txNetRow.implicitWidth + 12
+                        radius: 6
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+                        RowLayout {
+                            id: txNetRow
+                            anchors.centerIn: parent
+                            spacing: 4
+                            Text { text: "↑"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textMuted }
+                            Text { text: netWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
+                        }
                     }
                 }
             }

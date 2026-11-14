@@ -37,6 +37,8 @@ PanelWindow {
     property string netIp: "127.0.0.1"
     property string netIface: "eth0"
 
+    property var cpuCoresLoad: [0, 0, 0, 0, 0, 0, 0, 0]
+
     property string kernelVer: "Linux"
     property string uptimeStr: "0m"
     property int gpuCount: 0
@@ -44,9 +46,11 @@ PanelWindow {
     property int gpuUtil: 0
     property var gpus: []
     property var topList: [
-        { "name": "quickshell", "cpu": "1.2%", "mem": "115 MB" },
-        { "name": "Hyprland",   "cpu": "0.8%", "mem": "92 MB" },
-        { "name": "systemd",    "cpu": "0.1%", "mem": "24 MB" }
+        { "name": "antigravity-ide", "cpu": "8.8%", "mem": "389 MB" },
+        { "name": "Hyprland",        "cpu": "2.4%", "mem": "271 MB" },
+        { "name": "quickshell",      "cpu": "1.2%", "mem": "115 MB" },
+        { "name": "kitty",           "cpu": "0.4%", "mem": "64 MB" },
+        { "name": "systemd",         "cpu": "0.1%", "mem": "24 MB" }
     ]
 
     anchors {
@@ -59,7 +63,7 @@ PanelWindow {
         right: 175
     }
 
-    implicitWidth: 370
+    implicitWidth: 410
     implicitHeight: cardLayout.implicitHeight + 30
 
     color: "transparent"
@@ -174,6 +178,7 @@ PanelWindow {
                     if (data.cpuCores) teleWindow.cpuCores = data.cpuCores;
                     if (data.cpuFreq) teleWindow.cpuFreq = data.cpuFreq;
                     if (data.loadAvg) teleWindow.loadAvg = data.loadAvg;
+                    if (data.cpuCoresLoad && data.cpuCoresLoad.length > 0) teleWindow.cpuCoresLoad = data.cpuCoresLoad;
 
                     // Update rolling 20-sample sparkline history
                     var hist = teleWindow.cpuHistory.slice(1);
@@ -548,11 +553,11 @@ PanelWindow {
             }
 
             // =========================================================
-            // 2. PROCESSOR DETAIL & LIVE SPARKLINE CARD
+            // 2. PROCESSOR DETAIL & REAL-TIME PER-CORE MONITOR
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 74
+                implicitHeight: 84
                 radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
@@ -561,7 +566,7 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 5
+                    spacing: 6
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -582,25 +587,40 @@ PanelWindow {
                         }
                     }
 
-                    // 20-Sample Live History Sparkline Bars (Full Width)
+                    // Per-Core Realtime Load Bars (C1..Cn)
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 3
+                        spacing: 4
+
                         Repeater {
-                            model: teleWindow.cpuHistory
-                            delegate: Rectangle {
+                            model: teleWindow.cpuCoresLoad.length > 0 ? teleWindow.cpuCoresLoad : teleWindow.cpuCores
+                            delegate: ColumnLayout {
                                 Layout.fillWidth: true
-                                height: 26
-                                radius: 2
-                                color: Theme.bgElevated
+                                Layout.preferredWidth: 1
+                                spacing: 2
 
                                 Rectangle {
-                                    width: parent.width
-                                    height: Math.max(3, parent.height * (modelData / 100.0))
-                                    anchors.bottom: parent.bottom
+                                    Layout.fillWidth: true
+                                    height: 28
                                     radius: 2
-                                    color: modelData >= 80 ? Theme.accent : (modelData >= 60 ? Theme.statusWarn : "#c8c6c0")
-                                    opacity: 0.35 + 0.65 * (index / 20.0)
+                                    color: Theme.bgElevated
+
+                                    Rectangle {
+                                        width: parent.width
+                                        height: Math.max(2, parent.height * (Math.min(100, (typeof modelData === "number" ? modelData : 0)) / 100.0))
+                                        anchors.bottom: parent.bottom
+                                        radius: 2
+                                        color: modelData >= 85 ? Theme.accent : (modelData >= 65 ? Theme.statusWarn : "#c8c6c0")
+                                        Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    text: "C" + (index + 1)
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    color: Theme.textMuted
                                 }
                             }
                         }
@@ -814,90 +834,21 @@ PanelWindow {
             }
 
             // =========================================================
-            // 3. LIVE NETWORK THROUGHPUT (RX / TX) & IP ADDRESS
+            // 3. TOP 5 ACTIVE PROCESSES TABLE (Clean Monochromatic)
             // =========================================================
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 42
-                radius: Theme.radiusMd
-                color: Theme.bgCard
-                border.color: Theme.borderSubtle
-                border.width: 1
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: 8
-
-                    Text {
-                        text: "󰈀"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: Theme.textSecondary
-                    }
-
-                    Text {
-                        text: teleWindow.netIface + " • " + teleWindow.netIp
-                        font.family: Theme.fontMono
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: Theme.textPrimary
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    // Download Badge (Monochromatic)
-                    Rectangle {
-                        implicitHeight: 22
-                        implicitWidth: rxRow.implicitWidth + 12
-                        radius: 6
-                        color: Theme.bgElevated
-                        border.color: Theme.borderSubtle
-                        border.width: 1
-                        RowLayout {
-                            id: rxRow
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Text { text: "↓"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textSecondary }
-                            Text { text: teleWindow.netDown; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textPrimary }
-                        }
-                    }
-
-                    // Upload Badge (Monochromatic)
-                    Rectangle {
-                        implicitHeight: 22
-                        implicitWidth: txRow.implicitWidth + 12
-                        radius: 6
-                        color: Theme.bgElevated
-                        border.color: Theme.borderSubtle
-                        border.width: 1
-                        RowLayout {
-                            id: txRow
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Text { text: "↑"; font.family: Theme.fontMono; font.pixelSize: 10; color: Theme.textMuted }
-                            Text { text: teleWindow.netUp; font.family: Theme.fontMono; font.pixelSize: 9; font.bold: true; color: Theme.textSecondary }
-                        }
-                    }
-                }
-            }
-
-            // =========================================================
-            // 4. TOP 3 ACTIVE PROCESSES TABLE (Clean Monochromatic)
-            // =========================================================
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 88
+                implicitHeight: topProcCol.implicitHeight + 20
                 radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 ColumnLayout {
+                    id: topProcCol
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 4
+                    spacing: 5
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -922,7 +873,7 @@ PanelWindow {
                         model: teleWindow.topList
                         delegate: RowLayout {
                             Layout.fillWidth: true
-                            spacing: 6
+                            spacing: 8
 
                             Text {
                                 text: (index + 1) + "."
@@ -954,7 +905,7 @@ PanelWindow {
                                 font.pixelSize: 10
                                 font.bold: true
                                 color: Theme.textPrimary
-                                Layout.preferredWidth: 42
+                                Layout.preferredWidth: 46
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
