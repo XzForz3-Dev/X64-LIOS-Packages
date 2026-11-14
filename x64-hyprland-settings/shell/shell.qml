@@ -194,6 +194,12 @@ ShellRoot {
             root.closeAllExcept("audio");
         }
 
+        function openStreams() {
+            audioPopup.activeTab = "streams";
+            audioPopup.visible = true;
+            root.closeAllExcept("audio");
+        }
+
         function close() {
             audioPopup.closeAnimated();
         }

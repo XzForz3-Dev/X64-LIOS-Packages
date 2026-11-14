@@ -975,106 +975,147 @@ PanelWindow {
                         model: audioWindow.streams
 
                         Rectangle {
+                            id: appStreamRow
                             Layout.fillWidth: true
-                            implicitHeight: 52
-                            radius: Theme.radiusMd
+                            implicitHeight: 38
+                            radius: 10
                             color: Theme.bgElevated
-                            border.color: Theme.borderSubtle
+                            border.color: appDragArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
                             border.width: 1
+                            clip: true
 
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 6
+                            property real serverVol: (modelData && modelData.volume !== undefined) ? (modelData.volume / 100.0) : 1.0
+                            property real userVol: -1.0
+                            readonly property real liveVol: userVol >= 0.0 ? userVol : serverVol
+                            property bool userMuted: false
+                            property bool hasUserMute: false
+                            readonly property bool isMuted: hasUserMute ? userMuted : Boolean(modelData && modelData.muted)
 
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 7
-
-                                    Text {
-                                        text: "󰎆"
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: 12
-                                        color: modelData.muted ? Theme.accent : Theme.textPrimary
+                            // Filled Progress Bar with smooth animation
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(0, Math.min(parent.width, appStreamRow.liveVol * parent.width))
+                                radius: 10
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop {
+                                        position: 0.0
+                                        color: appStreamRow.isMuted ? "#221111" : "#1e818cf8"
                                     }
-
-                                    Text {
-                                        text: modelData.name
-                                        font.family: Theme.fontSans
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                        color: Theme.textPrimary
-                                        Layout.fillWidth: true
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        text: modelData.muted ? "MUT" : (modelData.volume + "%")
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: 9
-                                        font.bold: true
-                                        color: modelData.muted ? Theme.accent : Theme.textSecondary
-                                    }
-
-                                    Rectangle {
-                                        implicitWidth: 20
-                                        implicitHeight: 20
-                                        radius: 4
-                                        color: modelData.muted ? Theme.accentDim : Theme.bgCard
-                                        border.color: modelData.muted ? Theme.accentBorder : Theme.borderSubtle
-                                        border.width: 1
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: modelData.muted ? "󰝟" : "󰕾"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: 10
-                                            color: modelData.muted ? Theme.accent : Theme.textSecondary
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                audioWindow.runAudioCmd(["toggle-stream-mute", String(modelData.index)]);
-                                            }
-                                        }
+                                    GradientStop {
+                                        position: 1.0
+                                        color: appStreamRow.isMuted ? "#381818" : "#80818cf8"
                                     }
                                 }
+                                Behavior on width { NumberAnimation { duration: 50 } }
 
-                                // Stream Volume Slider
+                                // Vertical White Thumb Indicator Line
                                 Rectangle {
-                                    id: stSliderTrack
+                                    visible: appStreamRow.liveVol > 0.03
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 3
+                                    height: 18
+                                    radius: 1.5
+                                    color: appStreamRow.isMuted ? Theme.textMuted : "#ffffff"
+                                }
+                            }
+
+                            // Foreground Content (Icon + App Name + Percentage)
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 14
+                                spacing: 8
+
+                                Text {
+                                    text: appStreamRow.isMuted ? "󰝟" : (appStreamRow.liveVol <= 0.01 ? "󰕿" : (appStreamRow.liveVol < 0.5 ? "󰖀" : "󰕾"))
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 14
+                                    color: appStreamRow.isMuted ? Theme.accent : "#818cf8"
+                                }
+
+                                Text {
+                                    text: modelData.name
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: appStreamRow.isMuted ? Theme.textMuted : Theme.textPrimary
                                     Layout.fillWidth: true
-                                    implicitHeight: 16
-                                    radius: 4
-                                    color: "#0a0b10"
-                                    border.color: Theme.borderSubtle
-                                    border.width: 1
-                                    clip: true
+                                    elide: Text.ElideRight
+                                }
 
-                                    Rectangle {
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        anchors.left: parent.left
-                                        width: Math.max(0, Math.min(parent.width, (modelData.volume / 100.0) * parent.width))
-                                        radius: 3
-                                        color: modelData.muted ? "#451a1a" : "#a855f7"
-                                        Behavior on width { NumberAnimation { duration: 60 } }
-                                    }
+                                Text {
+                                    text: appStreamRow.isMuted ? "MUTE" : Math.round(appStreamRow.liveVol * 100) + "%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: appStreamRow.isMuted ? Theme.accent : Theme.textPrimary
+                                }
+                            }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        function setVol(mx) {
-                                            let pct = Math.round(Math.max(0, Math.min(100, (mx / stSliderTrack.width) * 100)));
-                                            audioWindow.runAudioCmd(["set-stream-volume", String(modelData.index), String(pct)]);
-                                        }
-                                        onClicked: (mouse) => setVol(mouse.x)
-                                        onPositionChanged: (mouse) => {
-                                            if (pressed) setVol(mouse.x);
-                                        }
+                            Timer {
+                                id: applyTimer
+                                interval: 40
+                                repeat: false
+                                onTriggered: {
+                                    let pct = Math.round(appStreamRow.liveVol * 100);
+                                    audioWindow.runAudioCmd(["set-stream-volume", String(modelData.index), String(pct)]);
+                                }
+                            }
+
+                            Timer {
+                                id: resetTimer
+                                interval: 1000
+                                repeat: false
+                                onTriggered: {
+                                    if (!appDragArea.pressed) {
+                                        appStreamRow.userVol = -1.0;
+                                        appStreamRow.hasUserMute = false;
                                     }
+                                }
+                            }
+
+                            MouseArea {
+                                id: appDragArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                function updateVol(mx) {
+                                    let ratio = Math.max(0.0, Math.min(1.0, mx / appStreamRow.width));
+                                    appStreamRow.userVol = ratio;
+                                    if (appStreamRow.isMuted) {
+                                        appStreamRow.hasUserMute = true;
+                                        appStreamRow.userMuted = false;
+                                    }
+                                    applyTimer.restart();
+                                }
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                                        appStreamRow.hasUserMute = true;
+                                        appStreamRow.userMuted = !appStreamRow.isMuted;
+                                        audioWindow.runAudioCmd(["toggle-stream-mute", String(modelData.index)]);
+                                        resetTimer.restart();
+                                    } else {
+                                        updateVol(mouse.x);
+                                    }
+                                }
+                                onPositionChanged: (mouse) => {
+                                    if (pressed && mouse.x >= 32) updateVol(mouse.x);
+                                }
+                                onReleased: {
+                                    resetTimer.restart();
+                                }
+                                onWheel: (wheel) => {
+                                    let step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                    let cur = appStreamRow.liveVol;
+                                    appStreamRow.userVol = Math.max(0.0, Math.min(1.0, cur + step));
+                                    applyTimer.restart();
+                                    resetTimer.restart();
                                 }
                             }
                         }
