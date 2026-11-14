@@ -352,7 +352,7 @@ function clean_previous_desktops -a target_id
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
         else
-            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk loupe papers gnome-text-editor gnome-disk-utility adw-gtk-theme xdg-terminal-exec hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
@@ -373,7 +373,7 @@ function clean_previous_desktops -a target_id
     test -f /etc/profile.d/omarchy.sh; and set has_omarchy 1
     test -d /etc/mise; and set has_omarchy 1
     test -f /etc/pam.d/omarchy-lock-password; and set has_omarchy 1
-    test (count (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-speedtest omarchy-keyring owe monologue herdr hype signed superwhisper-bin gliff mise-bin mise folio plain hyprland-preview-share-picker qtengine tzupdate ufw-docker yaru-icon-theme 2>/dev/null)) -gt 0; and set has_omarchy 1
+    test (count (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-speedtest omarchy-keyring owe monologue herdr hype signed superwhisper-bin gliff mise-bin mise folio plain hyprland-preview-share-picker qtengine tzupdate ufw-docker yaru-icon-theme google-chrome cmake 2>/dev/null)) -gt 0; and set has_omarchy 1
 
     if test "$target_id" != "8"; and test $has_omarchy -eq 1
         if test $is_es -eq 1
@@ -386,7 +386,7 @@ function clean_previous_desktops -a target_id
         if test "$target_id" != "1"
             set oma_extra_hypr hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland yaru-icon-theme hyprland-preview-share-picker qtengine
         end
-        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise folio plain tzupdate ufw-docker yaru-icon-theme $oma_extra_hypr 2>/dev/null | sort -u)
+        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise folio plain tzupdate ufw-docker yaru-icon-theme google-chrome cmake $oma_extra_hypr 2>/dev/null | sort -u)
         if test (count $oma_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
         end
@@ -446,7 +446,7 @@ except Exception:
                         rm -f $wapp 2>/dev/null
                     end
                 end
-                rm -f $udir/.local/share/applications/foot.desktop $udir/.local/share/applications/imv.desktop $udir/.local/share/applications/intent.cache 2>/dev/null
+                rm -f $udir/.local/share/applications/foot.desktop $udir/.local/share/applications/imv.desktop $udir/.local/share/applications/mpv.desktop $udir/.local/share/applications/intent.cache 2>/dev/null
                 update-desktop-database $udir/.local/share/applications 2>/dev/null
                 rm -rf $udir/.config/omarchy $udir/.local/state/omarchy $udir/.cache/omarchy 2>/dev/null
                 rm -rf $udir/.local/share/mise $udir/.config/mise $udir/.local/state/mise $udir/.cache/mise 2>/dev/null
