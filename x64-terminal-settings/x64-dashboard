@@ -216,7 +216,57 @@ function draw_dashboard
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 end
 
+function sanitize_user_dirs_and_configs
+    # 1. Sincronizar configuraciones de /etc/skel/.config con sobrescritura para aplicar el tema del nuevo escritorio
+    if test -d /etc/skel/.config
+        mkdir -p $HOME/.config 2>/dev/null
+        cp -rf /etc/skel/.config/. $HOME/.config/ 2>/dev/null
+    end
+
+    # 2. Inicializar y reparar directorios XDG según el idioma activo del sistema (evitando XDG_DESKTOP_DIR="$HOME")
+    if type -q xdg-user-dirs-update
+        xdg-user-dirs-update --force 2>/dev/null
+    end
+
+    if test $is_es -eq 1
+        mkdir -p $HOME/Escritorio $HOME/Descargas $HOME/Documentos $HOME/Imágenes $HOME/Música $HOME/Plantillas $HOME/Público $HOME/Vídeos 2>/dev/null
+        if test -f $HOME/.config/user-dirs.dirs
+            sed -i 's|XDG_DESKTOP_DIR="\$HOME/\?"|XDG_DESKTOP_DIR="\$HOME/Escritorio"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+            sed -i 's|XDG_TEMPLATES_DIR="\$HOME/\?"|XDG_TEMPLATES_DIR="\$HOME/Plantillas"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+            sed -i 's|XDG_PUBLICSHARE_DIR="\$HOME/\?"|XDG_PUBLICSHARE_DIR="\$HOME/Público"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+        end
+
+        # 3. Unificar y limpiar carpetas duplicadas en inglés si el sistema está en español
+        for pair in "Downloads:Descargas" "Pictures:Imágenes" "Videos:Vídeos" "Documents:Documentos" "Music:Música" "Desktop:Escritorio" "Templates:Plantillas" "Public:Público" "Projects:Proyectos"
+            set -l en_dir (string split ":" $pair)[1]
+            set -l es_dir (string split ":" $pair)[2]
+            if test -d "$HOME/$en_dir"; and test -d "$HOME/$es_dir"
+                # Mover cualquier archivo existente sin sobrescribir antes de eliminar el directorio vacío en inglés
+                find "$HOME/$en_dir" -mindepth 1 -maxdepth 1 -exec mv -n '{}' "$HOME/$es_dir/" \; 2>/dev/null
+                rmdir "$HOME/$en_dir" 2>/dev/null
+            end
+        end
+
+        # Limpiar marcadores GTK rotos que apunten a carpetas en inglés ya unificadas
+        if test -f $HOME/.config/gtk-3.0/bookmarks
+            sed -i '/\/Downloads /d; /\/Pictures /d; /\/Videos /d; /\/Projects /d' $HOME/.config/gtk-3.0/bookmarks 2>/dev/null
+        end
+    else
+        mkdir -p $HOME/Desktop $HOME/Downloads $HOME/Documents $HOME/Pictures $HOME/Music $HOME/Templates $HOME/Public $HOME/Videos 2>/dev/null
+        if test -f $HOME/.config/user-dirs.dirs
+            sed -i 's|XDG_DESKTOP_DIR="\$HOME/\?"|XDG_DESKTOP_DIR="\$HOME/Desktop"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+            sed -i 's|XDG_TEMPLATES_DIR="\$HOME/\?"|XDG_TEMPLATES_DIR="\$HOME/Templates"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+            sed -i 's|XDG_PUBLICSHARE_DIR="\$HOME/\?"|XDG_PUBLICSHARE_DIR="\$HOME/Public"|g' $HOME/.config/user-dirs.dirs 2>/dev/null
+        end
+    end
+
+    # 4. Purgar cachés de iconos y de Plasma para garantizar carga limpia del tema de iconos activo
+    rm -f $HOME/.cache/icon-cache.kcache $HOME/.cache/ksycoca6* 2>/dev/null
+    rm -rf $HOME/.cache/plasmashell 2>/dev/null
+end
+
 function configure_desktop_boot_mode -a dm_service desktop_name
+    sanitize_user_dirs_and_configs
     clear
     echo ""
     echo ""
@@ -290,15 +340,31 @@ function clean_previous_desktops -a target_id
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
     # Remove packages from previous desktop with safe recursive cascade (-Rcs)
-    if test "$target_id" != "1"; and test (count (pacman -Qq x64-hyprland-settings 2>/dev/null)) -gt 0
+    if test "$target_id" != "1"; and test (count (pacman -Qq x64-hyprland-settings hyprland 2>/dev/null)) -gt 0
         if test $is_es -eq 1
             echo -e "  \e[0;37m-> Desinstalando Hyprland Nativo y componentes...\e[0m"
         else
             echo -e "  \e[0;37m-> Uninstalling Native Hyprland and components...\e[0m"
         end
-        set -l hypr_pkgs (pacman -Qq x64-hyprland-settings 2>/dev/null | sort -u)
-        if test (count $hypr_pkgs) -gt 0
-            sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
+        if test "$target_id" = "8"
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings papirus-icon-theme 2>/dev/null | sort -u)
+            if test (count $hypr_pkgs) -gt 0
+                sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
+            end
+        else
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk 2>/dev/null | sort -u)
+            if test (count $hypr_pkgs) -gt 0
+                sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
+            end
+            sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
+        end
+        sudo rm -rf /etc/skel/.config/hypr /etc/skel/.config/quickshell /etc/xdg/hypr 2>/dev/null
+        sudo rm -f /etc/environment.d/10-qt.conf /usr/lib/environment.d/10-qt.conf /usr/bin/papirus-folders 2>/dev/null
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/hypr $udir/.config/hypr.x64-native.bak $udir/.config/quickshell $udir/.config/quickshell.x64-native.bak 2>/dev/null
+                rm -f $udir/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service 2>/dev/null
+            end
         end
     end
 
@@ -315,16 +381,23 @@ function clean_previous_desktops -a target_id
         else
             echo -e "  \e[0;37m-> Purging packages, webapps, and configurations of X64 LIOS + Omarchy...\e[0m"
         end
-        # 1. Purgar paquetes específicos y suite de aplicaciones de Omarchy (incluyendo mise)
-        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise 2>/dev/null | sort -u)
+        # 1. Purgar paquetes específicos y suite de aplicaciones de Omarchy (incluyendo mise y hyprland si no vamos a Hyprland nativo)
+        set -l oma_extra_hypr
+        if test "$target_id" != "1"
+            set oma_extra_hypr hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland yaru-icon-theme
+        end
+        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise $oma_extra_hypr 2>/dev/null | sort -u)
         if test (count $oma_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
+        end
+        if test "$target_id" != "1"
+            sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
         end
 
         # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema
         sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
         sudo rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal /usr/share/bash-completion/completions-fallback/mise.bash 2>/dev/null
-        sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /usr/share/fonts/omarchy 2>/dev/null
+        sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /etc/skel/Fondos /etc/skel/Temas /usr/share/fonts/omarchy 2>/dev/null
         sudo rm -rf /etc/mise /var/lib/pacman/sync/omarchy.* 2>/dev/null
         sudo fc-cache -f /usr/share/fonts 2>/dev/null
 
@@ -384,6 +457,7 @@ except Exception:
                 rm -f $udir/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua 2>/dev/null
                 find $udir/.config -name "com.omarchy.*" -delete 2>/dev/null
                 rm -rf $udir/.agents/skills/omarchy* $udir/.claude/skills/omarchy* $udir/.claude/themes/omarchy* $udir/.codex/skills/omarchy* $udir/.pi/agent/skills/omarchy* $udir/.pi/agent/themes/omarchy* $udir/.gemini/config/skills/omarchy* $udir/.hermes/skills/omarchy* 2>/dev/null
+                rmdir $udir/Fondos $udir/Temas $udir/Work/tries $udir/Work 2>/dev/null
             end
         end
     end
@@ -771,9 +845,24 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS KDE Plasma 6 (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" ark bluedevil breeze-gtk discover dolphin ffmpegthumbs filelight flatpak fwupd gwenview haruna kate kcalc kde-gtk-config kdeconnect kdegraphics-thumbnailers kdeplasma-addons kdialog kinfocenter kio-admin kio-fuse konsole kscreen kwallet-pam kwalletmanager okular partitionmanager phonon-qt6-vlc plasma-browser-integration plasma-desktop plasma-disks plasma-firewall plasma-nm plasma-pa plasma-systemmonitor plasma-thunderbolt plasma-vault plasma-workspace-wallpapers powerdevil print-manager sddm sddm-kcm x64-sddm-theme skanpage spectacle tesseract-data-eng xsettingsd x64-kde-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" ark bluedevil breeze breeze-icons breeze-gtk discover dolphin ffmpegthumbs filelight flatpak fwupd gwenview haruna kate kcalc kde-gtk-config kdeconnect kdegraphics-thumbnailers kdeplasma-addons kdialog kinfocenter kio-admin kio-fuse konsole kscreen kwallet-pam kwalletmanager okular partitionmanager phonon-qt6-vlc plasma-browser-integration plasma-desktop plasma-disks plasma-firewall plasma-nm plasma-pa plasma-systemmonitor plasma-thunderbolt plasma-vault plasma-workspace-wallpapers powerdevil print-manager sddm sddm-kcm x64-sddm-theme skanpage spectacle tesseract-data-eng xdg-desktop-portal-kde xdg-user-dirs xsettingsd x64-kde-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
+                for f in kdeglobals plasmashellrc plasma-org.kde.plasma.desktop-appletsrc plasmarc kwinrc kscreenlockerrc baloofilerc ksmserverrc
+                    if test -f /etc/skel/.config/$f
+                        cp -f /etc/skel/.config/$f $HOME/.config/$f 2>/dev/null
+                    end
+                end
+                mkdir -p $HOME/.config/kdedefaults $HOME/.config/gtk-3.0 $HOME/.config/gtk-4.0 2>/dev/null
+                for df in kdeglobals kwinrc plasmarc kscreenlockerrc ksmserverrc
+                    if test -f /etc/skel/.config/kdedefaults/$df
+                        cp -f /etc/skel/.config/kdedefaults/$df $HOME/.config/kdedefaults/$df 2>/dev/null
+                    end
+                end
+                test -f /etc/skel/.config/gtk-3.0/settings.ini; and cp -f /etc/skel/.config/gtk-3.0/settings.ini $HOME/.config/gtk-3.0/settings.ini 2>/dev/null
+                test -f /etc/skel/.config/gtk-4.0/settings.ini; and cp -f /etc/skel/.config/gtk-4.0/settings.ini $HOME/.config/gtk-4.0/settings.ini 2>/dev/null
+                rm -f $HOME/.config/gtk-3.0/gtk.css $HOME/.config/gtk-4.0/gtk.css $HOME/.cache/icon-cache.kcache $HOME/.cache/ksycoca6* 2>/dev/null
+                rm -rf $HOME/.cache/plasmashell 2>/dev/null
                 configure_desktop_boot_mode sddm "KDE Plasma 6 (X64 Gaming Edition)"
             end
         case 4
@@ -879,10 +968,8 @@ function install_desktop_menu
         end
     end
 
-    # Sync official default configurations from /etc/skel to active user directory
-    if test -d /etc/skel/.config
-        cp -rn /etc/skel/.config/* $HOME/.config/ 2>/dev/null
-    end
+    # Sync official default configurations from /etc/skel to active user directory and sanitize XDG dirs
+    sanitize_user_dirs_and_configs
 end
 
 # Interactive Dashboard Loop

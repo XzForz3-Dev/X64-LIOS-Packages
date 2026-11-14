@@ -32,6 +32,9 @@ local fileManager = "dolphin"
 ---- AUTOSTART ----
 -------------------
 hl.on("hyprland.start", function ()
+    -- Ensure localized XDG user directories exist before apps launch
+    hl.exec_cmd("xdg-user-dirs-update 2>/dev/null &")
+
     -- Export Wayland & Desktop session variables to DBus / Systemd
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
     hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")

@@ -1,3 +1,77 @@
+sync_kde_user_configs() {
+    local mode="${1:-install}"
+
+    for udir in /home/*; do
+        if [ -d "$udir" ]; then
+            local ug
+            ug=$(stat -c "%u:%g" "$udir" 2>/dev/null || echo "1000:1000")
+            mkdir -p "$udir/.config/kdedefaults" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0" "$udir/.config/autostart"
+
+            if [ "$mode" = "install" ]; then
+                # En instalación limpia o mutación desde otro escritorio: aplicar suite completa de configs KDE
+                for f in kdeglobals plasmashellrc plasma-org.kde.plasma.desktop-appletsrc plasmarc kwinrc kscreenlockerrc baloofilerc ksmserverrc; do
+                    if [ -f "/etc/skel/.config/$f" ]; then
+                        cp -f "/etc/skel/.config/$f" "$udir/.config/$f"
+                    fi
+                done
+                for df in kdeglobals kwinrc plasmarc kscreenlockerrc ksmserverrc; do
+                    if [ -f "/etc/skel/.config/kdedefaults/$df" ]; then
+                        cp -f "/etc/skel/.config/kdedefaults/$df" "$udir/.config/kdedefaults/$df"
+                    fi
+                done
+                [ -f /etc/skel/.config/gtk-3.0/settings.ini ] && cp -f /etc/skel/.config/gtk-3.0/settings.ini "$udir/.config/gtk-3.0/settings.ini"
+                [ -f /etc/skel/.config/gtk-4.0/settings.ini ] && cp -f /etc/skel/.config/gtk-4.0/settings.ini "$udir/.config/gtk-4.0/settings.ini"
+                rm -f "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
+            else
+                # En actualización: corregir kdeglobals si quedó con Papirus-Dark de Hyprland sin existir el tema
+                if [ -f "$udir/.config/kdeglobals" ] && grep -q "Theme=Papirus" "$udir/.config/kdeglobals" 2>/dev/null; then
+                    if [ ! -d /usr/share/icons/Papirus-Dark ]; then
+                        cp -f /etc/skel/.config/kdeglobals "$udir/.config/kdeglobals"
+                    fi
+                fi
+            fi
+
+            # Limpiar sesiones previas y asegurar emptySession
+            rm -rf "$udir/.config/session"
+            if [ -f "$udir/.config/ksmserverrc" ]; then
+                sed -i '/loginMode=/d' "$udir/.config/ksmserverrc"
+                if grep -q "^\[General\]" "$udir/.config/ksmserverrc"; then
+                    sed -i '/^\[General\]/a loginMode=emptySession' "$udir/.config/ksmserverrc"
+                else
+                    echo -e "\n[General]\nloginMode=emptySession" >> "$udir/.config/ksmserverrc"
+                fi
+            else
+                echo -e "[General]\nloginMode=emptySession" > "$udir/.config/ksmserverrc"
+            fi
+
+            # Reparar XDG_DESKTOP_DIR si apunta a $HOME por paso previo en Omarchy/No-Desktop
+            if [ -f "$udir/.config/user-dirs.dirs" ]; then
+                if grep -q 'XDG_DESKTOP_DIR="\$HOME/\?"' "$udir/.config/user-dirs.dirs" 2>/dev/null; then
+                    if [ -d "$udir/Descargas" ] || grep -q "Descargas" "$udir/.config/user-dirs.dirs" 2>/dev/null; then
+                        mkdir -p "$udir/Escritorio" "$udir/Plantillas" "$udir/Público"
+                        sed -i 's|XDG_DESKTOP_DIR="\$HOME/\?"|XDG_DESKTOP_DIR="\$HOME/Escritorio"|g' "$udir/.config/user-dirs.dirs"
+                        sed -i 's|XDG_TEMPLATES_DIR="\$HOME/\?"|XDG_TEMPLATES_DIR="\$HOME/Plantillas"|g' "$udir/.config/user-dirs.dirs"
+                        sed -i 's|XDG_PUBLICSHARE_DIR="\$HOME/\?"|XDG_PUBLICSHARE_DIR="\$HOME/Público"|g' "$udir/.config/user-dirs.dirs"
+                        chown "$ug" "$udir/Escritorio" "$udir/Plantillas" "$udir/Público" 2>/dev/null || true
+                    else
+                        mkdir -p "$udir/Desktop" "$udir/Templates" "$udir/Public"
+                        sed -i 's|XDG_DESKTOP_DIR="\$HOME/\?"|XDG_DESKTOP_DIR="\$HOME/Desktop"|g' "$udir/.config/user-dirs.dirs"
+                        sed -i 's|XDG_TEMPLATES_DIR="\$HOME/\?"|XDG_TEMPLATES_DIR="\$HOME/Templates"|g' "$udir/.config/user-dirs.dirs"
+                        sed -i 's|XDG_PUBLICSHARE_DIR="\$HOME/\?"|XDG_PUBLICSHARE_DIR="\$HOME/Public"|g' "$udir/.config/user-dirs.dirs"
+                        chown "$ug" "$udir/Desktop" "$udir/Templates" "$udir/Public" 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            # Purgar cachés de iconos y QML para forzar recarga limpia de breeze-dark
+            rm -f "$udir/.cache/icon-cache.kcache" "$udir/.cache/ksycoca6"* 2>/dev/null || true
+            rm -rf "$udir/.cache/plasmashell" 2>/dev/null || true
+
+            chown -R "$ug" "$udir/.config" 2>/dev/null || true
+        fi
+    done
+}
+
 post_install() {
     echo "=> [X64 Theme] Inyectando layout custom de Plasma..."
     if [ -d /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents ]; then
@@ -9,28 +83,17 @@ post_install() {
         /usr/share/x64-lios/set-default-wallpaper.sh
     fi
 
-    echo "=> [X64 Theme] Asegurando arranque de sesión limpio (cero ventanas previas restauradas)..."
-    for udir in /home/*; do
-        if [ -d "$udir/.config" ]; then
-            rm -rf "$udir/.config/session"
-            if [ -f "$udir/.config/ksmserverrc" ]; then
-                sed -i '/loginMode=/d' "$udir/.config/ksmserverrc"
-                if grep -q "^\[General\]" "$udir/.config/ksmserverrc"; then
-                    sed -i '/^\[General\]/a loginMode=emptySession' "$udir/.config/ksmserverrc"
-                else
-                    echo -e "\n[General]\nloginMode=emptySession" >> "$udir/.config/ksmserverrc"
-                fi
-            else
-                mkdir -p "$udir/.config"
-                echo -e "[General]\nloginMode=emptySession" > "$udir/.config/ksmserverrc"
-            fi
-            chown -R $(stat -c "%u:%g" "$udir") "$udir/.config/ksmserverrc" 2>/dev/null || true
-        fi
-    done
+    echo "=> [X64 Theme] Sincronizando configuración maestra de KDE Plasma y arranque limpio..."
+    sync_kde_user_configs "install"
 }
 
 post_upgrade() {
-    # Limpiar carpeta duplicada anterior si existía
     rm -rf /usr/share/wallpapers/X64-LIOS-01-Monolith
-    post_install
+    if [ -d /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents ]; then
+        cp -f /usr/share/x64-lios/x64-layout.js /usr/share/plasma/layout-templates/org.kde.plasma.desktop.defaultPanel/contents/layout.js
+    fi
+    if [ -x /usr/share/x64-lios/set-default-wallpaper.sh ]; then
+        /usr/share/x64-lios/set-default-wallpaper.sh
+    fi
+    sync_kde_user_configs "upgrade"
 }

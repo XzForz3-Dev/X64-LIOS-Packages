@@ -1,11 +1,11 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=17
+pkgrel=18
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
 install='x64-kde-settings.install'
-depends=('plasma-desktop' 'sddm')
+depends=('plasma-desktop' 'breeze' 'breeze-icons' 'breeze-gtk' 'xdg-user-dirs' 'sddm')
 source=('01-monolith.jpg'
         '02-v3-carbon.jpg'
         '03-v2-shield.jpg'
