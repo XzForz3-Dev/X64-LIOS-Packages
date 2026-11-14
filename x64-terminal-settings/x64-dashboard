@@ -100,14 +100,6 @@ function draw_dashboard
     printf "    \e[1;36m%-8s\e[0m $ssh_color%-24s\e[0m \e[1;36m%-9s\e[0m $ufw_color%-28s\e[0m\n" "[SSH]" "$ssh_txt" "[UFW]" "$ufw_txt"
 
     # Section 2: Graphical Environment
-    echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
-    if test $is_es -eq 1
-        echo -e "   $title ENTORNO GRÁFICO$reset"
-    else
-        echo -e "   $title GRAPHICAL ENVIRONMENT$reset"
-    end
-    echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
-
     set -g desktop_names
     set -g desktop_dms
 
@@ -145,6 +137,28 @@ function draw_dashboard
     end
 
     set -g has_desktop (count $desktop_names)
+    set -l dm_active ""
+    set -l short_de ""
+    if test $has_desktop -gt 0
+        set dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
+        set short_de (string match -r '^[^(]+' "$desktop_names[1]" | string trim)
+    end
+
+    echo -e "\n  $border─────────────────────────────────────────────────────────────────────────────$reset"
+    if test $is_es -eq 1
+        if test "$dm_active" = "active"
+            echo -e "   $title ENTORNO GRÁFICO: \e[1;37m$short_de\e[0m \e[1;32m[EN EJECUCIÓN ●]\e[0m$reset"
+        else
+            echo -e "   $title ENTORNO GRÁFICO$reset"
+        end
+    else
+        if test "$dm_active" = "active"
+            echo -e "   $title GRAPHICAL ENVIRONMENT: \e[1;37m$short_de\e[0m \e[1;32m[RUNNING ●]\e[0m$reset"
+        else
+            echo -e "   $title GRAPHICAL ENVIRONMENT$reset"
+        end
+    end
+    echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     if test $has_desktop -eq 0
         if test $is_es -eq 1
@@ -155,14 +169,13 @@ function draw_dashboard
             echo -e "    \e[1;33m[1]\e[0m \e[1;37mInstall an Official Desktop Environment (Hyprland, GNOME, etc.)\e[0m"
         end
     else
-        set -l dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
         if test "$dm_active" = "active"
             if test $is_es -eq 1
-                printf "    \e[1;32m[1]\e[0m \e[0;37mDetener Servicio Gráfico (\e[1;32m%s ACTIVO\e[0m\e[0;37m)\e[0m\n" "$desktop_dms[1]"
-                echo -e "    \e[1;36m[G]\e[0m \e[1;37mConmutar a la Pantalla Gráfica (VT2)\e[0m"
+                printf "    \e[1;32m[1]\e[0m \e[0;37mVolver al Escritorio Gráfico (\e[1;32m%s\e[0m\e[0;37m)\e[0m\n" "$short_de"
+                printf "    \e[1;31m[D]\e[0m \e[0;37mDetener Entorno Gráfico y liberar memoria RAM\e[0m\n"
             else
-                printf "    \e[1;32m[1]\e[0m \e[0;37mStop Graphical Service (\e[1;32m%s ACTIVE\e[0m\e[0;37m)\e[0m\n" "$desktop_dms[1]"
-                echo -e "    \e[1;36m[G]\e[0m \e[1;37mSwitch to Graphical Screen (VT2)\e[0m"
+                printf "    \e[1;32m[1]\e[0m \e[0;37mReturn to Graphical Desktop (\e[1;32m%s\e[0m\e[0;37m)\e[0m\n" "$short_de"
+                printf "    \e[1;31m[D]\e[0m \e[0;37mStop Graphical Environment and free RAM\e[0m\n"
             end
         else
             if test $is_es -eq 1
@@ -1071,54 +1084,7 @@ while true
             else
                 set -l dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
                 if test "$dm_active" = "active"
-                    clear
-                    echo ""
-                    echo ""
-                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                    if test $is_es -eq 1
-                        echo -e "   \e[1;37mDETENER ENTORNO GRÁFICO ($desktop_dms[1])\e[0m"
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                        echo -e "    El servicio gráfico \e[1;32m$desktop_dms[1]\e[0m está actualmente en ejecución.\n"
-                        echo -e "    \e[1;31m[1]\e[0m Detener servicio gráfico y liberar memoria RAM"
-                        echo -e "    \e[1;36m[2]\e[0m Conmutar de vuelta a la pantalla gráfica (VT2)"
-                        echo -e "    \e[1;33m[0]\e[0m Volver al Centro de Mando\n"
-                    else
-                        echo -e "   \e[1;37mSTOP GRAPHICAL ENVIRONMENT ($desktop_dms[1])\e[0m"
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                        echo -e "    The graphical service \e[1;32m$desktop_dms[1]\e[0m is currently running.\n"
-                        echo -e "    \e[1;31m[1]\e[0m Stop graphical service and free RAM"
-                        echo -e "    \e[1;36m[2]\e[0m Switch back to graphical screen (VT2)"
-                        echo -e "    \e[1;33m[0]\e[0m Return to Control Center\n"
-                    end
-                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                    echo ""
-                    set -l prompt_dm_stop (test $is_es -eq 1; and echo "  \e[1;31m> Opción [1, 2, 0]: \e[0m"; or echo "  \e[1;31m> Option [1, 2, 0]: \e[0m")
-                    read -l -P (echo -e "$prompt_dm_stop") dm_stop_choice
-                    if test "$dm_stop_choice" = "1"
-                        if is_graphical_session
-                            if test $is_es -eq 1
-                                echo -e "\n  \e[1;31m[BLOQUEO DE SEGURIDAD] Estás ejecutando esta terminal dentro de la sesión gráfica.\e[0m"
-                                echo -e "  \e[0;37mPara detener el servicio gráfico sin cerrar tu ventana, cambia a una TTY con \e[1;36mCtrl+Alt+F3\e[0m.\e[0m"
-                            else
-                                echo -e "\n  \e[1;31m[SAFETY LOCK] You are running this terminal inside the graphical session.\e[0m"
-                                echo -e "  \e[0;37mTo safely stop the graphical service without aborting, switch to a TTY with \e[1;36mCtrl+Alt+F3\e[0m.\e[0m"
-                            end
-                            sleep 2
-                        else
-                            if test $is_es -eq 1
-                                echo -e "\n  \e[1;33mDeteniendo $desktop_dms[1]...\e[0m"
-                                sudo systemctl stop $desktop_dms[1]
-                                echo -e "  \e[1;32m[OK] Servicio detenido y memoria liberada.\e[0m"
-                            else
-                                echo -e "\n  \e[1;33mStopping $desktop_dms[1]...\e[0m"
-                                sudo systemctl stop $desktop_dms[1]
-                                echo -e "  \e[1;32m[OK] Service stopped and RAM released.\e[0m"
-                            end
-                            sleep 1
-                        end
-                    else if test "$dm_stop_choice" = "2"
-                        sudo chvt 2 2>/dev/null
-                    end
+                    sudo chvt 2 2>/dev/null
                 else
                     clear
                     echo ""
@@ -1149,6 +1115,67 @@ while true
                     end
                     sudo systemctl start $desktop_dms[1]
                     sleep 2
+                end
+            end
+        case 'd' 'D'
+            if test $has_desktop -gt 0
+                set -l dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
+                if test "$dm_active" = "active"
+                    clear
+                    echo ""
+                    echo ""
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                    if test $is_es -eq 1
+                        echo -e "   \e[1;37mDETENER ENTORNO GRÁFICO ($desktop_names[1])\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    El entorno gráfico \e[1;32m$desktop_names[1]\e[0m está actualmente en ejecución.\n"
+                        echo -e "    \e[1;31m[1]\e[0m Detener entorno gráfico ($desktop_dms[1]) y liberar memoria RAM"
+                        echo -e "    \e[1;36m[2]\e[0m Volver a la pantalla del escritorio (VT2)"
+                        echo -e "    \e[1;33m[0]\e[0m Volver al Centro de Mando\n"
+                    else
+                        echo -e "   \e[1;37mSTOP GRAPHICAL ENVIRONMENT ($desktop_names[1])\e[0m"
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                        echo -e "    The graphical environment \e[1;32m$desktop_names[1]\e[0m is currently running.\n"
+                        echo -e "    \e[1;31m[1]\e[0m Stop graphical environment ($desktop_dms[1]) and free RAM"
+                        echo -e "    \e[1;36m[2]\e[0m Switch back to graphical screen (VT2)"
+                        echo -e "    \e[1;33m[0]\e[0m Return to Control Center\n"
+                    end
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                    echo ""
+                    set -l prompt_dm_stop (test $is_es -eq 1; and echo "  \e[1;31m> Opción [1, 2, 0]: \e[0m"; or echo "  \e[1;31m> Option [1, 2, 0]: \e[0m")
+                    read -l -P (echo -e "$prompt_dm_stop") dm_stop_choice
+                    if test "$dm_stop_choice" = "1"
+                        if is_graphical_session
+                            if test $is_es -eq 1
+                                echo -e "\n  \e[1;31m[BLOQUEO DE SEGURIDAD] Estás ejecutando esta terminal dentro de la sesión gráfica.\e[0m"
+                                echo -e "  \e[0;37mPara detener el servicio gráfico sin cerrar tu ventana, cambia a una TTY con \e[1;36mCtrl+Alt+F3\e[0m.\e[0m"
+                            else
+                                echo -e "\n  \e[1;31m[SAFETY LOCK] You are running this terminal inside the graphical session.\e[0m"
+                                echo -e "  \e[0;37mTo safely stop the graphical service without aborting, switch to a TTY with \e[1;36mCtrl+Alt+F3\e[0m.\e[0m"
+                            end
+                            sleep 2
+                        else
+                            if test $is_es -eq 1
+                                echo -e "\n  \e[1;33mDeteniendo $desktop_names[1] ($desktop_dms[1])...\e[0m"
+                                sudo systemctl stop $desktop_dms[1]
+                                echo -e "  \e[1;32m[OK] Servicio detenido y memoria liberada.\e[0m"
+                            else
+                                echo -e "\n  \e[1;33mStopping $desktop_names[1] ($desktop_dms[1])...\e[0m"
+                                sudo systemctl stop $desktop_dms[1]
+                                echo -e "  \e[1;32m[OK] Service stopped and RAM released.\e[0m"
+                            end
+                            sleep 1
+                        end
+                    else if test "$dm_stop_choice" = "2"
+                        sudo chvt 2 2>/dev/null
+                    end
+                else
+                    if test $is_es -eq 1
+                        echo -e "\n  \e[1;33m[!] El entorno gráfico no está en ejecución actualmente.\e[0m"
+                    else
+                        echo -e "\n  \e[1;33m[!] The graphical environment is not currently running.\e[0m"
+                    end
+                    sleep 1
                 end
             end
         case 2 'm' 'M'
