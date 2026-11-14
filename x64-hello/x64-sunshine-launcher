@@ -55,24 +55,46 @@ if [ -s "$CERT_FILE" ] && command -v certutil >/dev/null 2>&1; then
     fi
 fi
 
-# 4. Asegurar servicio de usuario de Sunshine (reiniciar si el certificado acaba de actualizarse)
-if ! systemctl --user is-active --quiet app-dev.lizardbyte.app.Sunshine.service 2>/dev/null && ! systemctl --user is-active --quiet sunshine.service 2>/dev/null; then
-    systemctl --user daemon-reload
-    systemctl --user enable --now app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user start sunshine.service 2>/dev/null || true
-elif [ "$CERT_UPDATED" -eq 1 ]; then
-    systemctl --user restart app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user restart sunshine.service 2>/dev/null || true
-fi
-
-if [ "$1" = "--setup-only" ]; then
+# 4. Procesar banderas de control o inicialización
+if [ "$1" = "--stop" ]; then
+    systemctl --user stop app-dev.lizardbyte.app.Sunshine.service sunshine.service >/dev/null 2>&1 || true
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming detenido.\nMemoria RAM y codificadores liberados."
+    fi
     exit 0
 fi
 
-# 5. Notificación amigable de inicio
-if command -v notify-send >/dev/null 2>&1; then
-    notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming activo.\nAbriendo panel de control seguro (https://localhost:47990)"
+if [ "$1" = "--setup-only" ]; then
+    # Garantizar que el servicio permanezca desactivado al inicio del sistema (Zero-RAM on startup)
+    systemctl --user disable app-dev.lizardbyte.app.Sunshine.service sunshine.service >/dev/null 2>&1 || true
+    systemctl --user stop app-dev.lizardbyte.app.Sunshine.service sunshine.service >/dev/null 2>&1 || true
+    exit 0
 fi
 
-# 6. Abrir panel de control Web para emparejamiento con Moonlight
+# 5. Iniciar servicio de usuario de Sunshine bajo demanda (Zero-RAM on startup)
+systemctl --user disable app-dev.lizardbyte.app.Sunshine.service sunshine.service >/dev/null 2>&1 || true
+
+WAS_ALREADY_ACTIVE=0
+if systemctl --user is-active --quiet app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user is-active --quiet sunshine.service 2>/dev/null; then
+    WAS_ALREADY_ACTIVE=1
+    if [ "$CERT_UPDATED" -eq 1 ]; then
+        systemctl --user restart app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user restart sunshine.service 2>/dev/null || true
+    fi
+else
+    systemctl --user daemon-reload
+    systemctl --user start app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user start sunshine.service 2>/dev/null || true
+fi
+
+# 6. Notificación amigable de inicio
+if command -v notify-send >/dev/null 2>&1; then
+    if [ "$WAS_ALREADY_ACTIVE" -eq 1 ]; then
+        notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "El servidor ya está en ejecución.\nAbriendo panel de control (https://localhost:47990)"
+    else
+        notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming iniciado bajo demanda.\nAbriendo panel de control (https://localhost:47990)"
+    fi
+fi
+
+# 7. Abrir panel de control Web para emparejamiento con Moonlight
 sleep 1
 if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "https://localhost:47990" 2>/dev/null || true

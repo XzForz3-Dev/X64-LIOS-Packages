@@ -7321,7 +7321,7 @@ class X64Hello(QWidget):
                 "sunshine moonlight-qt",
                 "sunshine moonlight-qt avahi",
                 "sunshine",
-                "sudo systemctl enable --now avahi-daemon.service 2>/dev/null; /usr/bin/x64-sunshine-launcher --setup-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Sunshine + Moonlight instalados, certificado SSL local verificado y servicio activo.\\033[0m\\nPanel de configuración Web: \\033[1;36mhttps://localhost:47990\\033[0m\\n'; xdg-open https://localhost:47990 2>/dev/null || true",
+                "sudo systemctl enable --now avahi-daemon.service 2>/dev/null; /usr/bin/x64-sunshine-launcher --setup-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Sunshine + Moonlight instalados en modo Bajo Demanda (0 MB RAM en reposo).\\033[0m\\nHaz clic en \\033[1;37mABRIR\\033[0m en X64 Hello para iniciar el servidor de streaming cuando desees jugar.\\n'",
                 "x64-sunshine-launcher"
             )
         ]
