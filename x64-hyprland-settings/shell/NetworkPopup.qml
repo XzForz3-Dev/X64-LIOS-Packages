@@ -527,19 +527,19 @@ PanelWindow {
                         }
                     }
 
-                    // Toggle Ethernet Interface Badge
+                    // Ethernet Status Badge
                     Rectangle {
-                        implicitHeight: 22
-                        implicitWidth: ethBtnRow.implicitWidth + 14
-                        radius: 11
-                        color: ethBtnArea.containsMouse ? Theme.bgHover : Theme.bgElevated
-                        border.color: Theme.borderSubtle
+                        implicitHeight: 20
+                        implicitWidth: ethBadgeRow.implicitWidth + 12
+                        radius: 5
+                        color: netWindow.ethConnected ? "#1434d399" : "transparent"
+                        border.color: netWindow.ethConnected ? "#3334d399" : Theme.borderSubtle
                         border.width: 1
 
                         RowLayout {
-                            id: ethBtnRow
+                            id: ethBadgeRow
                             anchors.centerIn: parent
-                            spacing: 5
+                            spacing: 4
                             Rectangle {
                                 width: 5
                                 height: 5
@@ -547,20 +547,24 @@ PanelWindow {
                                 color: netWindow.ethConnected ? Theme.statusOk : Theme.textMuted
                             }
                             Text {
-                                text: netWindow.ethConnected ? I18n.netConnected : I18n.netConnect
-                                font.family: Theme.fontSans
-                                font.pixelSize: 9
-                                font.weight: Font.DemiBold
-                                color: netWindow.ethConnected ? Theme.textPrimary : Theme.textSecondary
+                                text: netWindow.ethConnected ? I18n.netConnected : (I18n.isEs ? "Sin cable" : "No cable")
+                                font.family: Theme.fontMono
+                                font.pixelSize: 8
+                                font.bold: netWindow.ethConnected
+                                color: netWindow.ethConnected ? Theme.statusOk : Theme.textMuted
                             }
                         }
 
                         MouseArea {
                             id: ethBtnArea
                             anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: netWindow.runNetCmd(["eth-toggle", netWindow.ethDevice])
+                            enabled: netWindow.ethConnected
+                            cursorShape: netWindow.ethConnected ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: {
+                                if (netWindow.ethConnected) {
+                                    netWindow.runNetCmd(["eth-toggle", netWindow.ethDevice]);
+                                }
+                            }
                         }
                     }
                 }
@@ -629,20 +633,26 @@ PanelWindow {
                         Item { Layout.fillWidth: true }
 
                         Rectangle {
+                            id: wifiSwitchTrack
+                            implicitWidth: 38
                             implicitHeight: 20
-                            implicitWidth: 44
                             radius: 10
                             color: netWindow.wifiEnabled ? Theme.accentDim : Theme.bgElevated
                             border.color: netWindow.wifiEnabled ? Theme.accentBorder : Theme.borderSubtle
                             border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: netWindow.wifiEnabled ? "ON" : "OFF"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 8
-                                font.bold: true
-                                color: netWindow.wifiEnabled ? Theme.textPrimary : Theme.textSecondary
+                            Rectangle {
+                                id: wifiSwitchThumb
+                                width: 14
+                                height: 14
+                                radius: 7
+                                y: 3
+                                x: netWindow.wifiEnabled ? 21 : 3
+                                color: netWindow.wifiEnabled ? Theme.accent : Theme.textMuted
+                                Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                                Behavior on color { ColorAnimation { duration: 150 } }
                             }
 
                             MouseArea {
@@ -762,56 +772,28 @@ PanelWindow {
                                         color: Theme.textMuted
                                     }
 
-                                    // Action / Status Badge
-                                    Rectangle {
+                                    // Status & Interaction Indicator
+                                    Item {
+                                        implicitWidth: 20
                                         implicitHeight: 20
-                                        implicitWidth: actRow.implicitWidth + 12
-                                        radius: 5
-                                        color: isCurrent ? "#1434d399" : (netBtnArea.containsMouse ? Theme.accentDim : Theme.bgElevated)
-                                        border.color: isCurrent ? "#3334d399" : (netBtnArea.containsMouse ? Theme.accentBorder : Theme.borderSubtle)
-                                        border.width: 1
 
-                                        RowLayout {
-                                            id: actRow
+                                        Text {
+                                            visible: isCurrent
                                             anchors.centerIn: parent
-                                            spacing: 4
-
-                                            Rectangle {
-                                                visible: isCurrent
-                                                width: 5
-                                                height: 5
-                                                radius: 2.5
-                                                color: Theme.statusOk
-                                            }
-
-                                            Text {
-                                                text: isCurrent ? (I18n.isEs ? "Conectado" : "Connected") : (I18n.isEs ? "Conectar" : "Connect")
-                                                font.family: Theme.fontMono
-                                                font.pixelSize: 8
-                                                font.bold: true
-                                                color: isCurrent ? Theme.statusOk : Theme.textPrimary
-                                            }
+                                            text: netRowArea.containsMouse ? "󰅖" : "󰄬"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: netRowArea.containsMouse ? 12 : 13
+                                            font.bold: true
+                                            color: netRowArea.containsMouse ? Theme.accent : Theme.statusOk
                                         }
 
-                                        MouseArea {
-                                            id: netBtnArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (isCurrent) {
-                                                    netWindow.runNetCmd(["disconnect", modelData.ssid]);
-                                                } else if (modelData.saved || modelData.security === "Abierta" || modelData.security === "Open") {
-                                                    netWindow.runNetCmd(["connect", modelData.ssid]);
-                                                } else {
-                                                    if (netWindow.passwordSsid === modelData.ssid) {
-                                                        netWindow.passwordSsid = "";
-                                                    } else {
-                                                        netWindow.passwordInput = "";
-                                                        netWindow.passwordSsid = modelData.ssid;
-                                                    }
-                                                }
-                                            }
+                                        Text {
+                                            visible: !isCurrent && netRowArea.containsMouse
+                                            anchors.centerIn: parent
+                                            text: "󰁕"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 12
+                                            color: Theme.accent
                                         }
                                     }
                                 }
