@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.0.0
-pkgrel=70
+pkgrel=71
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -59,7 +59,7 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '7d46a20d2f882a26851aa731a4bf03b208b26a3562ecddb379b89743a3ffdff5'
             '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
             '6bf718270636a86861b098ef20db507f90948a96cd7d93322224d30f51323700'
-            '19860b4f541eace4091c4ea6701744408075930a84df761462bae092a2c3e68c'
+            '4a81898096efe1ace499e7034888cd4e1111f204bc039d7201d0a8ca5c5cdbef'
             '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
             'cbef6edab7ed9826c87bfae01b595ce6d2eff0ed5923250ead5584304530d0af'
             '0e9bfa271366a5d92265165f5c802a1f50a7ea266b455ad1392711299b6e67e8'

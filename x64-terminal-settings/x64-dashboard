@@ -161,49 +161,49 @@ function draw_dashboard
 
     # Prioritize currently running graphical session to index 1
     set -l active_de_idx 0
-    if pgrep -x plasmashell >/dev/null; or pgrep -x kwin_wayland >/dev/null
+    if pgrep -x plasmashell >/dev/null 2>&1; or pgrep -x kwin_wayland >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*KDE*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -x gnome-shell >/dev/null
+    else if pgrep -x gnome-shell >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*GNOME*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -x cosmic-comp >/dev/null; or pgrep -x cosmic-session >/dev/null
+    else if pgrep -x cosmic-comp >/dev/null 2>&1; or pgrep -x cosmic-session >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*COSMIC*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -x niri >/dev/null
+    else if pgrep -x niri >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*Niri*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -x cinnamon-session >/dev/null
+    else if pgrep -f cinnamon-session >/dev/null 2>&1; or pgrep -x cinnamon >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*Cinnamon*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -x xfce4-session >/dev/null
+    else if pgrep -x xfce4-session >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if string match -q "*Xfce4*" "$desktop_names[$i]"
                 set active_de_idx $i
                 break
             end
         end
-    else if pgrep -xi Hyprland >/dev/null
+    else if pgrep -xi Hyprland >/dev/null 2>&1
         for i in (seq (count $desktop_names))
             if test -d /usr/share/omarchy; and string match -q "*Omarchy*" "$desktop_names[$i]"
                 set active_de_idx $i
