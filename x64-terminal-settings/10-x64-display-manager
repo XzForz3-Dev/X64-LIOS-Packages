@@ -14,3 +14,5 @@
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable --now sshd, /usr/bin/systemctl disable --now sshd, /usr/bin/systemctl enable --now ufw, /usr/bin/systemctl disable --now ufw
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart NetworkManager, /usr/bin/systemctl restart NetworkManager.service
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/ufw
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/journalctl --vacuum-time=1w
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/pacman -Sc --noconfirm

@@ -289,12 +289,12 @@ function draw_dashboard
     echo -e "  $border─────────────────────────────────────────────────────────────────────────────$reset"
 
     if test $is_es -eq 1
-        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Monitor de Recursos (btop)" "[5]" "Diagnóstico de Red e IPs"
-        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Acceso Remoto SSH y Firewall" "[6]" "Limpieza Profunda de Caché"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Monitor de Recursos (btop)" "[5]" "Diagnóstico y Red Wi-Fi"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Acceso Remoto SSH y Firewall" "[6]" "Mantenimiento y Limpieza"
         printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[4]" "Actualizar Sistema (Pacman)" "[7]" "Registro de Errores (Boot)"
     else
-        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Resource Monitor (btop)" "[5]" "Network & IP Diagnostics"
-        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Remote SSH & Firewall" "[6]" "Deep System Cache Clean"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[2]" "Resource Monitor (btop)" "[5]" "Network & Wi-Fi Diagnostics"
+        printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[3]" "Remote SSH & Firewall" "[6]" "Maintenance & Cleanup"
         printf "    \e[1;36m%-4s\e[0m \e[0;37m%-32s\e[0m \e[1;36m%-4s\e[0m \e[0;37m%-30s\e[0m\n" "[4]" "System Update (Pacman)" "[7]" "Boot Error Logs (Journal)"
     end
 
@@ -1545,60 +1545,220 @@ while true
                 end
             end
         case 6 'l' 'L'
-            clear
-            echo ""
-            echo ""
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            if test $is_es -eq 1
-                echo -e "   \e[1;37mLIMPIEZA PROFUNDA DEL SISTEMA\e[0m"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                echo -e "    Esta operación purgará paquetes parciales corruptos, vaciará la caché"
-                echo -e "    antigua de pacman y compactará los registros de journalctl.\n"
-                echo -e "    \e[1;33m[1]\e[0m \e[1;37mEjecutar limpieza profunda ahora\e[0m"
-                echo -e "    \e[1;32m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
-            else
-                echo -e "   \e[1;37mDEEP SYSTEM CLEANUP\e[0m"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                echo -e "    This operation will purge corrupted partial downloads, clean old"
-                echo -e "    pacman package cache, and vacuum journalctl log entries.\n"
-                echo -e "    \e[1;33m[1]\e[0m \e[1;37mRun deep cleanup now\e[0m"
-                echo -e "    \e[1;32m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
-            end
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            echo ""
-            set -l prompt_clean (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1, 0]: \e[0m")
-            read -l -P (echo -e "$prompt_clean") l_choice
-            if test "$l_choice" = "1"
+            while true
+                clear
+                echo ""
+                echo ""
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+
+                set -l pkg_cache_size (du -sh /var/cache/pacman/pkg 2>/dev/null | cut -f1)
+                test -z "$pkg_cache_size"; and set pkg_cache_size "0B"
+
+                set -l journal_size (journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]\+[KMGTPiB]\+' | head -n 1)
+                test -z "$journal_size"; and set journal_size "0B"
+
+                set -l orphans (pacman -Qtdq 2>/dev/null)
+                set -l orphan_count (count $orphans)
+
                 if test $is_es -eq 1
-                    echo -e "\n    \e[1;36m1. Limpiando descargas parciales e incompletas...\e[0m"
-                    sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
-                    echo -e "       \e[1;32m[OK] Paquetes temporales limpios.\e[0m\n"
-
-                    echo -e "    \e[1;36m2. Purgando caché de paquetes descargados antiguos...\e[0m"
-                    sudo pacman -Sc --noconfirm | sed 's/^/       /'
-                    echo ""
-
-                    echo -e "    \e[1;36m3. Compactando registros del sistema (journalctl)...\e[0m"
-                    sudo journalctl --vacuum-time=1w | sed 's/^/       /'
-
-                    echo -e "\n    \e[1;32m¡Limpieza finalizada con éxito!\e[0m\n"
+                    echo -e "   \e[1;37mMANTENIMIENTO Y LIMPIEZA DEL SISTEMA\e[0m"
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                    echo -e "    \e[1;33mTelemetría de Almacenamiento y Paquetes:\e[0m"
+                    echo -e "      • Caché de paquetes Pacman:    \e[1;37m$pkg_cache_size\e[0m"
+                    echo -e "      • Registros de Journalctl:     \e[1;37m$journal_size\e[0m"
+                    if test $orphan_count -eq 0
+                        echo -e "      • Paquetes huérfanos:          \e[1;32m0 (Sistema limpio)\e[0m\n"
+                    else
+                        echo -e "      • Paquetes huérfanos:          \e[1;31m$orphan_count detectados\e[0m\n"
+                    end
+                    echo -e "    \e[1;33m[1]\e[0m \e[1;37mLimpieza profunda completa (Caché + Huérfanos + Registros)\e[0m"
+                    echo -e "    \e[1;33m[2]\e[0m \e[1;37mDetectar y purgar paquetes huérfanos (pacman -Qtdq)\e[0m"
+                    echo -e "    \e[1;33m[3]\e[0m \e[1;37mOptimizar y vaciar caché de Pacman (pacman -Sc)\e[0m"
+                    echo -e "    \e[1;33m[4]\e[0m \e[1;37mCompactar registros del sistema Journalctl (últimos 7 días)\e[0m"
+                    echo -e "    \e[1;31m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
                 else
-                    echo -e "\n    \e[1;36m1. Purging partial and incomplete downloads...\e[0m"
-                    sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
-                    echo -e "       \e[1;32m[OK] Temporary files cleared.\e[0m\n"
-
-                    echo -e "    \e[1;36m2. Cleaning old downloaded package cache...\e[0m"
-                    sudo pacman -Sc --noconfirm | sed 's/^/       /'
-                    echo ""
-
-                    echo -e "    \e[1;36m3. Vacuuming system logs (journalctl)...\e[0m"
-                    sudo journalctl --vacuum-time=1w | sed 's/^/       /'
-
-                    echo -e "\n    \e[1;32mDeep cleanup finished successfully!\e[0m\n"
+                    echo -e "   \e[1;37mSYSTEM MAINTENANCE & CLEANUP\e[0m"
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                    echo -e "    \e[1;33mStorage & Package Telemetry:\e[0m"
+                    echo -e "      • Pacman package cache:        \e[1;37m$pkg_cache_size\e[0m"
+                    echo -e "      • Journalctl system logs:      \e[1;37m$journal_size\e[0m"
+                    if test $orphan_count -eq 0
+                        echo -e "      • Orphan packages:             \e[1;32m0 (System clean)\e[0m\n"
+                    else
+                        echo -e "      • Orphan packages:             \e[1;31m$orphan_count detected\e[0m\n"
+                    end
+                    echo -e "    \e[1;33m[1]\e[0m \e[1;37mFull deep system cleanup (Cache + Orphans + Logs)\e[0m"
+                    echo -e "    \e[1;33m[2]\e[0m \e[1;37mDetect and purge orphaned packages (pacman -Qtdq)\e[0m"
+                    echo -e "    \e[1;33m[3]\e[0m \e[1;37mOptimize and clean Pacman package cache (pacman -Sc)\e[0m"
+                    echo -e "    \e[1;33m[4]\e[0m \e[1;37mVacuum Journalctl system logs (retain last 7 days)\e[0m"
+                    echo -e "    \e[1;31m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
                 end
                 echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                set -l prompt_clean_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
-                read -l -P "$prompt_clean_back" dummy
+                echo ""
+                set -l prompt_clean (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-4, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-4, 0]: \e[0m")
+                read -l -P (echo -e "$prompt_clean") l_choice
+                test $status -ne 0; and break
+
+                switch "$l_choice"
+                    case 1
+                        clear
+                        echo ""
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        if test $is_es -eq 1
+                            echo -e "   \e[1;37mLIMPIEZA PROFUNDA COMPLETA DEL SISTEMA\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    \e[1;36m1. Limpiando descargas parciales e incompletas...\e[0m"
+                            sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                            echo -e "       \e[1;32m[OK] Paquetes temporales limpios.\e[0m\n"
+
+                            echo -e "    \e[1;36m2. Analizando paquetes huérfanos sin dependencias...\e[0m"
+                            set -l cur_orphans (pacman -Qtdq 2>/dev/null)
+                            set -l num_orphans (count $cur_orphans)
+                            if test $num_orphans -gt 0
+                                echo -e "       Purgando $num_orphans paquetes huérfanos..."
+                                sudo pacman -Rns --noconfirm $cur_orphans | sed 's/^/       /'
+                                echo -e "       \e[1;32m[OK] Paquetes huérfanos eliminados.\e[0m\n"
+                            else
+                                echo -e "       \e[1;32m[OK] Sin paquetes huérfanos en el sistema.\e[0m\n"
+                            end
+
+                            echo -e "    \e[1;36m3. Purgando caché de paquetes descargados antiguos...\e[0m"
+                            sudo pacman -Sc --noconfirm | sed 's/^/       /'
+                            echo ""
+
+                            echo -e "    \e[1;36m4. Compactando registros del sistema (journalctl)...\e[0m"
+                            sudo journalctl --vacuum-time=1w | sed 's/^/       /'
+
+                            echo -e "\n    \e[1;32m¡Limpieza profunda finalizada con éxito!\e[0m\n"
+                        else
+                            echo -e "   \e[1;37mFULL DEEP SYSTEM CLEANUP\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    \e[1;36m1. Purging partial and incomplete downloads...\e[0m"
+                            sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                            echo -e "       \e[1;32m[OK] Temporary files cleared.\e[0m\n"
+
+                            echo -e "    \e[1;36m2. Checking orphaned packages without dependencies...\e[0m"
+                            set -l cur_orphans (pacman -Qtdq 2>/dev/null)
+                            set -l num_orphans (count $cur_orphans)
+                            if test $num_orphans -gt 0
+                                echo -e "       Purging $num_orphans orphan packages..."
+                                sudo pacman -Rns --noconfirm $cur_orphans | sed 's/^/       /'
+                                echo -e "       \e[1;32m[OK] Orphan packages removed.\e[0m\n"
+                            else
+                                echo -e "       \e[1;32m[OK] No orphan packages found.\e[0m\n"
+                            end
+
+                            echo -e "    \e[1;36m3. Cleaning old downloaded package cache...\e[0m"
+                            sudo pacman -Sc --noconfirm | sed 's/^/       /'
+                            echo ""
+
+                            echo -e "    \e[1;36m4. Vacuuming system logs (journalctl)...\e[0m"
+                            sudo journalctl --vacuum-time=1w | sed 's/^/       /'
+
+                            echo -e "\n    \e[1;32mDeep cleanup finished successfully!\e[0m\n"
+                        end
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        set -l prompt_clean_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                        read -l -P "$prompt_clean_back" dummy
+                    case 2
+                        set -l cur_orphans (pacman -Qtdq 2>/dev/null)
+                        set -l num_orphans (count $cur_orphans)
+                        if test $num_orphans -eq 0
+                            if test $is_es -eq 1
+                                echo -e "\n  \e[1;32m[OK] No se detectaron paquetes huérfanos. Tu sistema está 100% limpio.\e[0m"
+                            else
+                                echo -e "\n  \e[1;32m[OK] No orphan packages detected. Your system is 100% clean.\e[0m"
+                            end
+                            sleep 2
+                        else
+                            clear
+                            echo ""
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                            if test $is_es -eq 1
+                                echo -e "   \e[1;37mPAQUETES HUÉRFANOS DETECTADOS\e[0m"
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                                echo -e "    Los siguientes paquetes ya no son requeridos por ningún software instalado:\n"
+                                for p in $cur_orphans
+                                    echo -e "      \e[1;33m•\e[0m \e[1;37m$p\e[0m"
+                                end
+                                echo ""
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                                read -l -P "  ¿Deseas desinstalar estos paquetes huérfanos y sus dependencias? [s/N]: " confirm_orphan
+                                if test "$confirm_orphan" = "s" -o "$confirm_orphan" = "S" -o "$confirm_orphan" = "y" -o "$confirm_orphan" = "Y"
+                                    echo -e "\n  \e[1;36m[*] Desinstalando paquetes huérfanos...\e[0m\n"
+                                    sudo pacman -Rns --noconfirm $cur_orphans | sed 's/^/    /'
+                                    echo -e "\n  \e[1;32m[OK] Paquetes huérfanos purgados con éxito.\e[0m"
+                                else
+                                    echo -e "\n  \e[1;33mOperación cancelada por el usuario.\e[0m"
+                                end
+                            else
+                                echo -e "   \e[1;37mORPHAN PACKAGES DETECTED\e[0m"
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                                echo -e "    The following packages are no longer required by any installed software:\n"
+                                for p in $cur_orphans
+                                    echo -e "      \e[1;33m•\e[0m \e[1;37m$p\e[0m"
+                                end
+                                echo ""
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                                read -l -P "  Do you want to purge these orphan packages and their unused deps? [y/N]: " confirm_orphan
+                                if test "$confirm_orphan" = "y" -o "$confirm_orphan" = "Y" -o "$confirm_orphan" = "s" -o "$confirm_orphan" = "S"
+                                    echo -e "\n  \e[1;36m[*] Purging orphan packages...\e[0m\n"
+                                    sudo pacman -Rns --noconfirm $cur_orphans | sed 's/^/    /'
+                                    echo -e "\n  \e[1;32m[OK] Orphan packages purged successfully.\e[0m"
+                                else
+                                    echo -e "\n  \e[1;33mOperation cancelled by user.\e[0m"
+                                end
+                            end
+                            set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                            read -l -P "$prompt_back" dummy
+                        end
+                    case 3
+                        clear
+                        echo ""
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        if test $is_es -eq 1
+                            echo -e "   \e[1;37mLIMPIEZA DE CACHÉ DE PACMAN\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Purgando paquetes parciales corruptos y paquetes desinstalados de la caché...\n"
+                            sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                            sudo pacman -Sc --noconfirm | sed 's/^/    /'
+                            echo -e "\n  \e[1;32m[OK] Caché de paquetes optimizada.\e[0m"
+                        else
+                            echo -e "   \e[1;37mPACMAN PACKAGE CACHE CLEANUP\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Purging partial downloads and outdated cached packages...\n"
+                            sudo sh -c 'rm -f /var/cache/pacman/pkg/*.part /var/cache/pacman/pkg/*.download 2>/dev/null'
+                            sudo pacman -Sc --noconfirm | sed 's/^/    /'
+                            echo -e "\n  \e[1;32m[OK] Package cache optimized.\e[0m"
+                        end
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                        read -l -P "$prompt_back" dummy
+                    case 4
+                        clear
+                        echo ""
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        if test $is_es -eq 1
+                            echo -e "   \e[1;37mCOMPACTACIÓN DE REGISTROS JOURNALCTL\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Purgando registros de eventos anteriores a 7 días...\n"
+                            sudo journalctl --vacuum-time=1w | sed 's/^/    /'
+                            echo -e "\n  \e[1;32m[OK] Registros de journalctl compactados con éxito.\e[0m"
+                        else
+                            echo -e "   \e[1;37mVACUUM JOURNALCTL LOGS\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Purging log events older than 7 days...\n"
+                            sudo journalctl --vacuum-time=1w | sed 's/^/    /'
+                            echo -e "\n  \e[1;32m[OK] Journalctl logs vacuumed successfully.\e[0m"
+                        end
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                        read -l -P "$prompt_back" dummy
+                    case 0 'q' 'Q' ''
+                        break
+                    case '*'
+                        continue
+                end
             end
         case 7 'e' 'E'
             clear
