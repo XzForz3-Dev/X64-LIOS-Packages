@@ -961,7 +961,7 @@ def run_gui():
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QLabel, QPushButton, QLineEdit, QTableWidget, QTableWidgetItem,
         QHeaderView, QCheckBox, QFrame, QButtonGroup, QAbstractItemView,
-        QProgressBar, QTextEdit, QStackedWidget, QDialog, QStyledItemDelegate, QStyle
+        QProgressBar, QTextEdit, QStackedWidget, QDialog, QStyledItemDelegate, QStyle, QSizePolicy
     )
     from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF, QFileSystemWatcher
     from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor, QPainter, QPen, QBrush, QPalette
@@ -1152,7 +1152,7 @@ def run_gui():
             self.palette = palette or (parent.palette if hasattr(parent, "palette") else load_theme_palette())
             p = self.palette
             self.setWindowTitle("Autorización del Sistema")
-            self.setFixedWidth(480)
+            self.setFixedWidth(520)
             self.setModal(True)
             self.cached_sudo = cached_sudo
             self.breakdown = breakdown or {}
@@ -1228,17 +1228,16 @@ def run_gui():
             """)
             sbox = QVBoxLayout(summary_frame)
             sbox.setContentsMargins(14, 12, 14, 12)
-            sbox.setSpacing(6)
+            sbox.setSpacing(8)
 
-            top_row = QHBoxLayout()
-            top_row.setSpacing(8)
             pkg_word = "paquete listo" if items_count == 1 else "paquetes listos"
             lbl_pkgs = QLabel(f"{items_count} {pkg_word} para actualizar")
             lbl_pkgs.setStyleSheet(f"color: {p['foreground']}; font-size: 13px; font-weight: 700;")
-            top_row.addWidget(lbl_pkgs)
-            top_row.addStretch()
+            sbox.addWidget(lbl_pkgs)
 
-            # Breakdown pills
+            # Breakdown pills in their own dedicated row so neither title nor pills ever get clipped
+            pills_row = QHBoxLayout()
+            pills_row.setSpacing(6)
             x64_n = self.breakdown.get("x64", 0)
             repo_n = self.breakdown.get("repo", 0)
             aur_n = self.breakdown.get("aur", 0)
@@ -1246,24 +1245,26 @@ def run_gui():
 
             def make_pill(text, fg, bg, border):
                 pill = QLabel(text)
+                pill.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
                 pill.setStyleSheet(
                     f"background-color: {bg}; color: {fg}; border: 1px solid {border}; "
-                    f"border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700;"
+                    f"border-radius: 5px; padding: 3px 9px; font-size: 11px; font-weight: 700;"
                 )
                 return pill
 
             if x64_n > 0:
-                top_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
+                pills_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
             if repo_n > 0:
-                top_row.addWidget(make_pill(f"Sistema: {repo_n}", "#38bdf8", "#092030", "#123b56"))
+                pills_row.addWidget(make_pill(f"Sistema: {repo_n}", "#38bdf8", "#092030", "#123b56"))
             if aur_n > 0:
-                top_row.addWidget(make_pill(f"AUR: {aur_n}", "#e879f9", "#26092e", "#481456"))
+                pills_row.addWidget(make_pill(f"AUR: {aur_n}", "#e879f9", "#26092e", "#481456"))
             if fp_n > 0:
-                top_row.addWidget(make_pill(f"Flatpak: {fp_n}", "#818cf8", "#101036", "#232368"))
+                pills_row.addWidget(make_pill(f"Flatpak: {fp_n}", "#818cf8", "#101036", "#232368"))
             if crit_count > 0:
-                top_row.addWidget(make_pill(f"Críticos: {crit_count}", "#fbbf24", "#2b1d06", "#573b0c"))
+                pills_row.addWidget(make_pill(f"Críticos: {crit_count}", "#fbbf24", "#2b1d06", "#573b0c"))
+            pills_row.addStretch()
 
-            sbox.addLayout(top_row)
+            sbox.addLayout(pills_row)
 
             if crit_count > 0:
                 crit_word = "componente crítico" if crit_count == 1 else "componentes críticos"
@@ -1379,7 +1380,7 @@ def run_gui():
             btn_row.addWidget(btn_confirm)
             vbox.addLayout(btn_row)
             self.adjustSize()
-            self.setFixedSize(480, self.sizeHint().height())
+            self.setFixedSize(520, self.sizeHint().height())
 
         def verify_and_confirm(self):
             if not self.cached_sudo:
