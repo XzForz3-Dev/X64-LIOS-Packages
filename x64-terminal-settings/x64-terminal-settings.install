@@ -10,9 +10,10 @@ post_install() {
     rm -f /etc/systemd/system/dbus-org.freedesktop.oom1.service 2>/dev/null || true
     rm -f /etc/systemd/system/timers.target.wants/fwupd-refresh.timer 2>/dev/null || true
 
-    # Neutralizar hooks de branding de cachyos-hooks y blindar identidad X64 LIOS
+    # Neutralizar hooks de branding y reboot de cachyos-hooks y blindar identidad X64 LIOS
     mkdir -p /etc/pacman.d/hooks
     ln -sf /dev/null /etc/pacman.d/hooks/cachyos-branding.hook
+    ln -sf /dev/null /etc/pacman.d/hooks/cachyos-reboot-required.hook
     ln -sf /dev/null /etc/pacman.d/hooks/os-release.hook
     ln -sf /dev/null /etc/pacman.d/hooks/lsb-release.hook
 
