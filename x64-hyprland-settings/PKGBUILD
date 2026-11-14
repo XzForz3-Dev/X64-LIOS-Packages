@@ -1,10 +1,10 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=58
+pkgrel=59
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'hyprlock' 'hypridle' 'hyprpolkitagent' 'hyprpwcenter' 'hyprpicker' 'hyprsunset' 'quickshell' 'swaybg' 'kitty' 'opencode' 'dolphin' 'breeze' 'plasma-integration' 'adw-gtk-theme' 'xdg-terminal-exec' 'xdg-user-dirs' 'ark' 'ffmpegthumbs' 'kdegraphics-thumbnailers' 'loupe' 'papers' 'gnome-text-editor' 'qalculate-gtk' 'blueman' 'gnome-disk-utility' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'cliphist' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'libnotify')
+depends=('hyprland' 'hyprlock' 'hypridle' 'hyprpolkitagent' 'hyprpwcenter' 'hyprpicker' 'hyprsunset' 'quickshell' 'swaybg' 'kitty' 'opencode' 'dolphin' 'breeze' 'adw-gtk-theme' 'xdg-terminal-exec' 'xdg-user-dirs' 'ark' 'ffmpegthumbs' 'kdegraphics-thumbnailers' 'loupe' 'papers' 'gnome-text-editor' 'qalculate-gtk' 'blueman' 'gnome-disk-utility' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'cliphist' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'libnotify')
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'

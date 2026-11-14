@@ -14,7 +14,7 @@ end
 # Detection helper: KDE Plasma 6 desktop environment
 # (plasma-workspace provides plasmashell and startplasma-wayland for portals, but only plasma-desktop provides the actual full desktop environment)
 function is_kde_installed
-    test -d /usr/share/plasma/shells/org.kde.plasma.desktop; or pacman -Q plasma-desktop >/dev/null 2>&1
+    test -d /usr/share/plasma/shells/org.kde.plasma.desktop; or pacman -Q plasma-desktop >/dev/null 2>&1; or pacman -Q plasma-workspace >/dev/null 2>&1; or test -f /usr/share/wayland-sessions/plasma.desktop
 end
 
 # Detection helper: Active graphical desktop session (Kitty, Konsole, Gnome-Terminal, etc.)
@@ -587,10 +587,11 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full KDE Plasma 6 suite...\e[0m"
         end
-        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons ffmpegthumbs kdegraphics-thumbnailers kdegraphics-mobipocket kdialog kio-admin kio-fuse kwallet kwallet-pam phonon-qt6-vlc phonon-qt6 breeze-gtk xsettingsd 2>/dev/null | sort -u)
+        set -l kde_pkgs (pacman -Qq x64-kde-settings plasma-desktop plasma-workspace plasma-integration xdg-desktop-portal-kde plasma-systemmonitor plasma-nm plasma-pa plasma-disks plasma-firewall plasma-vault plasma-thunderbolt plasma-browser-integration plasma-workspace-wallpapers sddm-kcm dolphin konsole ark discover filelight gwenview haruna kate kcalc okular partitionmanager skanpage spectacle bluedevil kdeconnect kinfocenter kscreen kwalletmanager print-manager kde-gtk-config kdeplasma-addons ffmpegthumbs kdegraphics-thumbnailers kdegraphics-mobipocket kdialog kio-admin kio-fuse kwallet kwallet-pam phonon-qt6-vlc phonon-qt6 breeze-gtk xsettingsd 2>/dev/null | sort -u)
         if test (count $kde_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $kde_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $kde_pkgs 2>/dev/null
         end
+        sudo rm -f /usr/share/wayland-sessions/plasma.desktop /usr/share/xsessions/plasma.desktop 2>/dev/null
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
