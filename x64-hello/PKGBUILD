@@ -1,10 +1,10 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=25
+pkgrel=26
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
-depends=('python' 'python-pyqt6' 'qt6-svg')
+depends=('python' 'python-pyqt6' 'qt6-svg' 'openssl' 'nss')
 source=('x64-hello'
         'x64-toggle-mitigations'
         'x64-waydroid-launcher'
@@ -14,10 +14,10 @@ source=('x64-hello'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
         'x64-cube.png')
-sha256sums=('9691d3e4ac2094e75c2f4694b381eb8ea0d45cc6b931002248f5d357d043200f'
+sha256sums=('bdeda002c9269b67e5c95cb367c3ca73df3c59f4e1debed35d3dd8c226f88006'
             'd6f0f20f5c76e4bc97ebe9c32fa9c802372d71c4c561b9e73af63acca24e9fca'
             '4557155a893a22a904d03abd98118bc30103b39e735d2cfee594a1848799857c'
-            '5120a98c44bd073895f60e9a0dcfd83c1f6ee562d4a4b996dfd632b2e865bfe4'
+            'c6e52146774af3addcee711ea8dbb48bfb061532db9e70c1c4bad23b3c225c3d'
             '3c2755ca907b77d12d900a255488424c0a8059bfb556556866d64348ae56e71b'
             '77bc0a482b7dc076f0f7f3872c6febb527ec19698020df683400e5a086715acf'
             '4ee93bf93ac94f77442a26e56e350d73ace7d76cc63f99ec7a6ac9946d2e9ee2'

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # X64 LIOS Sunshine Game Streaming Launcher & Controller
-# Optimizes uinput permissions, enables Avahi, verifies user daemon, and launches Web UI
+# Optimizes uinput permissions, enables Avahi, provisions trusted localhost SAN SSL cert, and launches Web UI
 
 set -e
 
@@ -17,18 +17,62 @@ if ! systemctl is-active --quiet avahi-daemon.service 2>/dev/null; then
     sudo systemctl enable --now avahi-daemon.service 2>/dev/null || true
 fi
 
-# 3. Asegurar servicio de usuario de Sunshine
+# 3. Asegurar certificado TLS local con SAN (DNS:localhost, IP:127.0.0.1) y registrar confianza en navegador (NSS)
+CRED_DIR="$HOME/.config/sunshine/credentials"
+KEY_FILE="$CRED_DIR/cakey.pem"
+CERT_FILE="$CRED_DIR/cacert.pem"
+CERT_UPDATED=0
+
+mkdir -p "$CRED_DIR"
+if [ ! -s "$KEY_FILE" ]; then
+    openssl genrsa -out "$KEY_FILE" 2048 >/dev/null 2>&1 || true
+    chmod 600 "$KEY_FILE" 2>/dev/null || true
+fi
+
+if [ -s "$KEY_FILE" ]; then
+    if [ ! -s "$CERT_FILE" ] || ! openssl x509 -in "$CERT_FILE" -noout -ext subjectAltName 2>/dev/null | grep -q "DNS:localhost"; then
+        openssl req -new -x509 -days 365 -key "$KEY_FILE" -out "$CERT_FILE" \
+            -subj "/CN=Sunshine Gamestream Host" \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign" \
+            -addext "extendedKeyUsage=serverAuth,clientAuth" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" >/dev/null 2>&1 || true
+        chmod 644 "$CERT_FILE" 2>/dev/null || true
+        CERT_UPDATED=1
+    fi
+fi
+
+if [ -s "$CERT_FILE" ] && command -v certutil >/dev/null 2>&1; then
+    mkdir -p "$HOME/.pki/nssdb"
+    if [ ! -f "$HOME/.pki/nssdb/cert9.db" ]; then
+        certutil -d "sql:$HOME/.pki/nssdb" -N --empty-password >/dev/null 2>&1 || true
+    fi
+    if [ "$CERT_UPDATED" -eq 1 ]; then
+        certutil -d "sql:$HOME/.pki/nssdb" -D -n "X64 Sunshine Localhost" >/dev/null 2>&1 || true
+    fi
+    if ! certutil -d "sql:$HOME/.pki/nssdb" -L -n "X64 Sunshine Localhost" >/dev/null 2>&1; then
+        certutil -d "sql:$HOME/.pki/nssdb" -A -t "CT,C,C" -n "X64 Sunshine Localhost" -i "$CERT_FILE" >/dev/null 2>&1 || true
+    fi
+fi
+
+# 4. Asegurar servicio de usuario de Sunshine (reiniciar si el certificado acaba de actualizarse)
 if ! systemctl --user is-active --quiet app-dev.lizardbyte.app.Sunshine.service 2>/dev/null && ! systemctl --user is-active --quiet sunshine.service 2>/dev/null; then
     systemctl --user daemon-reload
     systemctl --user enable --now app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user start sunshine.service 2>/dev/null || true
+elif [ "$CERT_UPDATED" -eq 1 ]; then
+    systemctl --user restart app-dev.lizardbyte.app.Sunshine.service 2>/dev/null || systemctl --user restart sunshine.service 2>/dev/null || true
 fi
 
-# 4. Notificación amigable de inicio
+if [ "$1" = "--setup-only" ]; then
+    exit 0
+fi
+
+# 5. Notificación amigable de inicio
 if command -v notify-send >/dev/null 2>&1; then
-    notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming activo.\nAbriendo panel web (https://localhost:47990)\nAcepta el certificado local si el navegador lo solicita."
+    notify-send -i dev.lizardbyte.app.Sunshine "X64 Sunshine Streaming" "Servidor de streaming activo.\nAbriendo panel de control seguro (https://localhost:47990)"
 fi
 
-# 5. Abrir panel de control Web para emparejamiento con Moonlight
+# 6. Abrir panel de control Web para emparejamiento con Moonlight
 sleep 1
 if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "https://localhost:47990" 2>/dev/null || true

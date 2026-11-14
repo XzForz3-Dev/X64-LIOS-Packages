@@ -3061,111 +3061,48 @@ for _lc, _d in FIT_TRANSLATIONS.items():
 
 SUNSHINE_TRANSLATIONS = {
     'en': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Game Stream Server)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine & Moonlight (Game Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.'
     },
     'es': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Streaming de Juegos)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Servidor de streaming para Moonlight. Transmite tus juegos a móviles, Smart TVs y consolas a baja latencia.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine y Moonlight (Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Dúo completo de streaming: servidor Sunshine + cliente Moonlight para emitir o jugar en remoto a baja latencia.'
     },
     'fr': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Serveur de Streaming Jeux)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Serveur de streaming pour Moonlight. Diffusez vos jeux PC vers mobiles, TV et consoles à très faible latence.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine & Moonlight (Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Duo complet de streaming : serveur Sunshine + client Moonlight pour diffuser ou jouer à distance à très faible latence.'
     },
     'de': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Game-Streaming-Server)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Self-hosted Streaming-Server für Moonlight. PC-Spiele mit extrem niedriger Latenz auf Smartphones, TVs & Handhelds streamen.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine & Moonlight (Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Komplettes Streaming-Duo: Sunshine-Server + Moonlight-Client zum Senden oder Empfangen von PC-Spielen mit minimaler Latenz.'
     },
     'it': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Server Streaming Giochi)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Server di streaming per Moonlight. Trasmetti giochi PC su smartphone, TV e console con bassissima latenza.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine & Moonlight (Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Duo completo di streaming: server Sunshine + client Moonlight per trasmettere o giocare in remoto a bassissima latenza.'
     },
     'pt': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Servidor de Streaming de Jogos)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Servidor de streaming para Moonlight. Transmita seus jogos para celulares, Smart TVs e portáteis com baixíssima latência.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine e Moonlight (Streaming)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Dupla completa de streaming: servidor Sunshine + cliente Moonlight para transmitir ou jogar remotamente com baixa latência.'
     },
     'ru': {
-        'Sunshine (Game Stream Server)': 'Sunshine (Игровой Стриминг-Сервер)',
-        'Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency.': 'Сервер игрового стриминга для Moonlight. Трансляция игр на смартфоны, ТВ и консоли с ультранизкой задержкой.'
+        'Sunshine & Moonlight (Game Streaming)': 'Sunshine и Moonlight (Стриминг)',
+        'Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency.': 'Полный комплект стриминга: сервер Sunshine + клиент Moonlight для трансляции и удаленной игры с ультранизкой задержкой.'
     }
 }
 for _lc, _d in SUNSHINE_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
         TRANSLATIONS[_lc].update(_d)
 
-SECUREBOOT_TRANSLATIONS = {
-    'en': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Secure Boot & UEFI Key Manager (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.',
-        'OPEN ASSISTANT ↗': 'OPEN ASSISTANT ↗',
-        'ACTIVE': 'ACTIVE',
-        'DISABLED': 'DISABLED',
-        'SETUP MODE': 'SETUP MODE',
-        'LEGACY BIOS': 'LEGACY BIOS'
-    },
-    'es': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SEGURIDAD DE FIRMWARE Y HARDWARE (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Asistente de Secure Boot y Firmas UEFI (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enrola claves personalizadas en UEFI manteniendo activos los certificados de Microsoft para Windows 11 y anticheats.',
-        'OPEN ASSISTANT ↗': 'ABRIR ASISTENTE ↗',
-        'ACTIVE': 'ACTIVADO',
-        'DISABLED': 'DESACTIVADO',
-        'SETUP MODE': 'MODO SETUP',
-        'LEGACY BIOS': 'BIOS LEGACY'
-    },
-    'fr': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SÉCURITÉ DU FIRMWARE ET HARDWARE (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Gestionnaire de Clés UEFI & Secure Boot (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Enregistrez des clés personnalisées dans UEFI tout en conservant les certificats Microsoft pour Windows 11 et anticheats.',
-        'OPEN ASSISTANT ↗': 'OUVRIR ASSISTANT ↗',
-        'ACTIVE': 'ACTIVÉ',
-        'DISABLED': 'DÉSACTIVÉ',
-        'SETUP MODE': 'MODE SETUP',
-        'LEGACY BIOS': 'BIOS LEGACY'
-    },
-    'de': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'FIRMWARE- & HARDWARE-SICHERHEIT (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Secure Boot & UEFI-Schlüsselmanager (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Eigene kryptografische Schlüssel im UEFI registrieren und Microsoft-Zertifikate für Windows 11 Dual-Boot behalten.',
-        'OPEN ASSISTANT ↗': 'ASSISTENT ÖFFNEN ↗',
-        'ACTIVE': 'AKTIV',
-        'DISABLED': 'DEAKTIVIERT',
-        'SETUP MODE': 'SETUP-MODUS',
-        'LEGACY BIOS': 'LEGACY-BIOS'
-    },
-    'it': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SICUREZZA FIRMWARE E HARDWARE (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Gestore Chiavi UEFI & Secure Boot (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Registra chiavi personalizzate in UEFI mantenendo i certificati Microsoft per Windows 11 e anticheat.',
-        'OPEN ASSISTANT ↗': 'APRI ASSISTENTE ↗',
-        'ACTIVE': 'ATTIVO',
-        'DISABLED': 'DISATTIVATO',
-        'SETUP MODE': 'MODO SETUP',
-        'LEGACY BIOS': 'BIOS LEGACY'
-    },
-    'pt': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'SEGURANÇA DE FIRMWARE E HARDWARE (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Assistente de Secure Boot e Chaves UEFI (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Inscreva chaves personalizadas no UEFI mantendo certificados da Microsoft para Windows 11 e anticheats.',
-        'OPEN ASSISTANT ↗': 'ABRIR ASSISTENTE ↗',
-        'ACTIVE': 'ATIVADO',
-        'DISABLED': 'DESATIVADO',
-        'SETUP MODE': 'MODO SETUP',
-        'LEGACY BIOS': 'BIOS LEGACY'
-    },
-    'ru': {
-        'FIRMWARE & HARDWARE SECURITY (SECURE BOOT)': 'БЕЗОПАСНОСТЬ ПРОШИВКИ И ОБОРУДОВАНИЯ (SECURE BOOT)',
-        'Secure Boot & UEFI Key Manager (sbctl)': 'Менеджер ключей UEFI и Secure Boot (sbctl)',
-        'Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.': 'Регистрация пользовательских ключей в UEFI с сохранением сертификатов Microsoft для Windows 11 и античитов.',
-        'OPEN ASSISTANT ↗': 'ОТКРЫТЬ АССИСТЕНТ ↗',
-        'ACTIVE': 'АКТИВЕН',
-        'DISABLED': 'ОТКЛЮЧЕН',
-        'SETUP MODE': 'РЕЖИМ SETUP',
-        'LEGACY BIOS': 'LEGACY BIOS'
-    }
+STATUS_BADGE_TRANSLATIONS = {
+    'en': {'ACTIVE': 'ACTIVE', 'DISABLED': 'DISABLED'},
+    'es': {'ACTIVE': 'ACTIVADO', 'DISABLED': 'DESACTIVADO'},
+    'fr': {'ACTIVE': 'ACTIVÉ', 'DISABLED': 'DÉSACTIVÉ'},
+    'de': {'ACTIVE': 'AKTIV', 'DISABLED': 'DEAKTIVIERT'},
+    'it': {'ACTIVE': 'ATTIVO', 'DISABLED': 'DISATTIVATO'},
+    'pt': {'ACTIVE': 'ATIVADO', 'DISABLED': 'DESATIVADO'},
+    'ru': {'ACTIVE': 'АКТИВЕН', 'DISABLED': 'ОТКЛЮЧЕН'}
 }
-for _lc, _d in SECUREBOOT_TRANSLATIONS.items():
+for _lc, _d in STATUS_BADGE_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
         TRANSLATIONS[_lc].update(_d)
 
@@ -3439,10 +3376,10 @@ TOOLTIP_GUIDES = {
             'Permite instalar y jugar títulos móviles de Android con aceleración gráfica directa por GPU y soporte de pantalla completa.',
             'Instálalo si quieres usar apps o juegos de Android directamente en tu PC sin la lentitud de un emulador tradicional.'
         ),
-        'sunshine': (
-            'Servidor de streaming de videojuegos auto-alojado de ultra-baja latencia compatible con clientes Moonlight.',
-            'Codifica tu escritorio y juegos en tiempo real por hardware para que puedas jugarlos desde tu TV del salón, tablet, móvil o consola portátil.',
-            'Instálalo si quieres convertir tu PC en tu propio servidor de juego en la nube privado dentro de tu red local.'
+        'sunshine moonlight-qt': (
+            'Suite completa de juego remoto de ultra-baja latencia: servidor emisor Sunshine + cliente receptor Moonlight (moonlight-qt).',
+            'Sunshine transmite los juegos de tu PC hacia tu TV, móvil o portátil; Moonlight te permite conectarte desde este PC a otro equipo gamer.',
+            'Instálalo para convertir tu red local en tu propio sistema de Cloud Gaming privado en ambas direcciones.'
         ),
     },
     'en': {
@@ -3696,10 +3633,10 @@ TOOLTIP_GUIDES = {
             'Lets you install and play mobile Android games and apps with direct hardware GPU acceleration and multi-touch/mouse support.',
             'Install it if you want to run Android games or mobile apps natively on your PC without heavy emulation.'
         ),
-        'sunshine': (
-            'Self-hosted, ultra-low-latency game streaming server compatible with Moonlight clients.',
-            'Hardware-encodes your PC games in real time so you can play them remotely on your living-room TV, phone, tablet, or handheld.',
-            'Install it to turn your gaming PC into your own private cloud gaming host across your home network.'
+        'sunshine moonlight-qt': (
+            'Complete ultra-low-latency game streaming suite: Sunshine host server + Moonlight desktop client (moonlight-qt).',
+            'Sunshine streams your PC games to your TV, phone, or handheld, while Moonlight lets this PC connect to another gaming rig.',
+            'Install it to turn your local network into a two-way private cloud gaming ecosystem.'
         ),
     },
     'fr': {
@@ -3908,11 +3845,11 @@ def format_rich_tooltip(title, badge="", guide_key=None, fallback_desc=""):
         f"<b style='color:#ffffff; font-size:13px;'>{title}</b>{badge_html}"
         f"<hr style='border:none; background-color:#2e2e3a; height:1px; margin:5px 0;'>"
         f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-        f"<b style='color:#ff4d4d;'>• {lbl_what}</b> {what_txt}</p>"
+        f"<b style='color:#ef4444;'>• {lbl_what}</b> {what_txt}</p>"
         f"<p style='margin:4px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-        f"<b style='color:#38bdf8;'>• {lbl_for}</b> {for_txt}</p>"
+        f"<b style='color:#d4d4d8;'>• {lbl_for}</b> {for_txt}</p>"
         f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-        f"<b style='color:#2ecc71;'>• {lbl_when}</b> {when_txt}</p>"
+        f"<b style='color:#a1a1aa;'>• {lbl_when}</b> {when_txt}</p>"
         f"</td></tr></table>"
     )
 
@@ -4015,10 +3952,13 @@ SVG_ICONS = {
     "sunshine": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5" fill="#ff3333" fill-opacity="0.22" stroke="#ffffff" stroke-width="2.2"/><line x1="12" y1="1" x2="12" y2="3" stroke="#ff3333" stroke-width="2.4"/><line x1="12" y1="21" x2="12" y2="23" stroke="#ff3333" stroke-width="2.4"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#ffffff" stroke-width="2.2"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#ffffff" stroke-width="2.2"/><line x1="1" y1="12" x2="3" y2="12" stroke="#ff3333" stroke-width="2.4"/><line x1="21" y1="12" x2="23" y2="12" stroke="#ff3333" stroke-width="2.4"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#ffffff" stroke-width="2.2"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#ffffff" stroke-width="2.2"/></svg>'''
 }
 
-def make_svg_pixmap(icon_key, size=28):
+def make_svg_pixmap(icon_key, size=28, accent="#ff3333"):
     if icon_key in SVG_ICONS:
         pix = QPixmap()
-        if pix.loadFromData(SVG_ICONS[icon_key], "SVG"):
+        svg_data = SVG_ICONS[icon_key]
+        if accent and accent != "#ff3333":
+            svg_data = svg_data.replace(b"#ff3333", accent.encode("utf-8"))
+        if pix.loadFromData(svg_data, "SVG"):
             return pix.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     icon = QIcon.fromTheme(icon_key)
     if not icon.isNull():
@@ -4193,21 +4133,23 @@ class DnsOptimizerPanel(QFrame):
         conn_row.addWidget(lbl_conn)
         conn_row.addWidget(self.conn_combo)
 
-        self.btn_ping = QPushButton(tr("⚡ Benchmark DNS Latency (Ping)"))
+        ping_txt = tr("⚡ Benchmark DNS Latency (Ping)").replace("⚡ ", "").strip()
+        self.btn_ping = QPushButton(f"◈  {ping_txt}")
         self.btn_ping.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_ping.setFixedHeight(34)
         self.btn_ping.setStyleSheet("""
             QPushButton {
-                background-color: rgba(204, 0, 0, 0.16);
-                color: #ff4d4d;
-                border: 1px solid #cc0000;
+                background-color: rgba(220, 38, 38, 0.12);
+                color: #f4f4f5;
+                border: 1px solid rgba(220, 38, 38, 0.42);
                 border-radius: 8px;
                 padding: 0 14px;
                 font-weight: bold;
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: rgba(204, 0, 0, 0.30);
+                background-color: rgba(220, 38, 38, 0.24);
+                border: 1px solid #ef4444;
                 color: #ffffff;
             }
         """)
@@ -4215,7 +4157,7 @@ class DnsOptimizerPanel(QFrame):
         conn_row.addWidget(self.btn_ping)
 
         self.status_lbl = FitLabel("", min_ratio=0.85)
-        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setStyleSheet("color: #10b981; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         conn_row.addSpacing(6)
         conn_row.addWidget(self.status_lbl, 1)
         layout.addLayout(conn_row)
@@ -4252,11 +4194,12 @@ class DnsOptimizerPanel(QFrame):
             lbl_n = QLabel(p["name"])
             lbl_n.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
-            lbl_ms = QLabel("● — ms")
+            lbl_ms = QLabel("<span style='color:#52525b;'>●</span> — ms")
+            lbl_ms.setTextFormat(Qt.TextFormat.RichText)
             lbl_ms.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_ms.setStyleSheet("""
-                color: #888888; background-color: rgba(255,255,255,0.05);
-                border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+                color: #a1a1aa; background-color: rgba(255,255,255,0.045);
+                border: 1px solid rgba(255,255,255,0.10); border-radius: 6px;
                 padding: 2px 7px; font-weight: bold; font-size: 10.5px;
             """)
             top_h.addWidget(lbl_n)
@@ -4267,7 +4210,7 @@ class DnsOptimizerPanel(QFrame):
             ipv4_pretty = p["ipv4"].split(",")[0]
             lbl_ip = FitLabel(f"{tr(p['tag'])}  •  {ipv4_pretty}")
             lbl_ip.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_ip.setStyleSheet("color: #ff4d4d; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
+            lbl_ip.setStyleSheet("color: #cbd5e1; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             b_lay.addWidget(lbl_ip)
 
             lbl_dot = QLabel(f"TLS (DoT): {p['dot']}")
@@ -4367,8 +4310,8 @@ class DnsOptimizerPanel(QFrame):
             if i == idx:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(204, 0, 0, 0.16);
-                        border: 2px solid #ff1a1a;
+                        background-color: rgba(220, 38, 38, 0.12);
+                        border: 1.5px solid #ef4444;
                         border-radius: 10px;
                         text-align: left;
                     }
@@ -4376,14 +4319,14 @@ class DnsOptimizerPanel(QFrame):
             else:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        background-color: rgba(255, 255, 255, 0.025);
+                        border: 1px solid rgba(255, 255, 255, 0.07);
                         border-radius: 10px;
                         text-align: left;
                     }
                     QPushButton:hover {
-                        background-color: rgba(255, 255, 255, 0.06);
-                        border: 1px solid rgba(204, 0, 0, 0.5);
+                        background-color: rgba(255, 255, 255, 0.055);
+                        border: 1px solid rgba(220, 38, 38, 0.45);
                     }
                 """)
 
@@ -4391,7 +4334,7 @@ class DnsOptimizerPanel(QFrame):
         if self._ping_worker and self._ping_worker.isRunning():
             return
         self._has_benchmarked = True
-        self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setStyleSheet("color: #f59e0b; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(tr("Testing ping to all DNS servers..."))
         worker = DnsPingWorker()
         self._ping_worker = worker
@@ -4403,43 +4346,39 @@ class DnsOptimizerPanel(QFrame):
     def on_ping_results(self, latencies):
         best_idx = None
         best_ms = 999999.0
+        pill_css = """
+            color: #e4e4e7; background-color: rgba(255, 255, 255, 0.045);
+            border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 6px;
+            padding: 2px 7px; font-weight: bold; font-size: 10.5px;
+        """
         for i, p in enumerate(DNS_PROVIDERS):
             _, lbl_ms = self.provider_buttons[i]
+            lbl_ms.setTextFormat(Qt.TextFormat.RichText)
             ms = latencies.get(p["ping_ip"])
             if ms is not None:
-                lbl_ms.setText(f"● {ms:.1f} ms")
                 if ms < 35:
-                    lbl_ms.setStyleSheet("""
-                        color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
-                        border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
-                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
-                    """)
+                    dot_col = "#10b981"
                 elif ms < 85:
-                    lbl_ms.setStyleSheet("""
-                        color: #f1c40f; background-color: rgba(241, 196, 15, 0.14);
-                        border: 1px solid rgba(241, 196, 15, 0.45); border-radius: 6px;
-                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
-                    """)
+                    dot_col = "#f59e0b"
                 else:
-                    lbl_ms.setStyleSheet("""
-                        color: #e67e22; background-color: rgba(230, 126, 34, 0.14);
-                        border: 1px solid rgba(230, 126, 34, 0.45); border-radius: 6px;
-                        padding: 2px 7px; font-weight: bold; font-size: 10.5px;
-                    """)
+                    dot_col = "#ef4444"
+                lbl_ms.setText(f"<span style='color:{dot_col};'>●</span> {ms:.1f} ms")
+                lbl_ms.setStyleSheet(pill_css)
                 if ms < best_ms:
                     best_ms = ms
                     best_idx = i
             else:
-                lbl_ms.setText("timeout")
+                lbl_ms.setText("<span style='color:#52525b;'>○</span> timeout")
                 lbl_ms.setStyleSheet("""
-                    color: #777777; background-color: rgba(255,255,255,0.04);
-                    border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+                    color: #71717a; background-color: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px;
                     padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                 """)
         if best_idx is not None:
             self.select_provider(best_idx)
-            self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
-            self.status_lbl.setText(f"✓ {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
+            self.status_lbl.setStyleSheet("color: #d4d4d8; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+            self.status_lbl.setTextFormat(Qt.TextFormat.RichText)
+            self.status_lbl.setText(f"<span style='color:#10b981;'>✓</span> {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
         else:
             self.status_lbl.setText("")
 
@@ -4654,15 +4593,16 @@ class ScxSchedulerPanel(QFrame):
         lbl_act_title.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
         top_bar.addWidget(lbl_act_title)
 
-        self.lbl_active_pill = QLabel("● BORE")
+        self.lbl_active_pill = QLabel("<span style='color:#10b981;'>●</span> BORE")
+        self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
         top_bar.addWidget(self.lbl_active_pill)
         top_bar.addStretch(1)
 
         self.lbl_auto_profile_pill = QLabel("")
         self.lbl_auto_profile_pill.setStyleSheet("""
-            color: #e2e2ec;
-            background-color: rgba(204, 0, 0, 0.14);
-            border: 1px solid rgba(255, 77, 77, 0.45);
+            color: #e4e4e7;
+            background-color: rgba(220, 38, 38, 0.10);
+            border: 1px solid rgba(220, 38, 38, 0.34);
             border-radius: 6px;
             padding: 3px 10px;
             font-weight: bold;
@@ -4706,6 +4646,7 @@ class ScxSchedulerPanel(QFrame):
             lbl_n.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12.5px; border: none; background: transparent;")
 
             lbl_badge = QLabel(s["badge"])
+            lbl_badge.setTextFormat(Qt.TextFormat.RichText)
             lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             top_h.addWidget(lbl_n)
             top_h.addStretch(1)
@@ -4714,7 +4655,7 @@ class ScxSchedulerPanel(QFrame):
 
             lbl_tag = FitLabel(tr(s["tag"]))
             lbl_tag.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-            lbl_tag.setStyleSheet("color: #ff4d4d; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
+            lbl_tag.setStyleSheet("color: #cbd5e1; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             b_lay.addWidget(lbl_tag)
 
             lbl_desc = QLabel(tr(s["desc"]))
@@ -4810,47 +4751,35 @@ class ScxSchedulerPanel(QFrame):
         s_id, m_id, pretty = query_scxctl_runtime()
         self.active_sched_id = s_id
         self.active_mode_id = m_id
-        self.lbl_active_pill.setText(f" ●  {pretty} ")
+        self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_active_pill.setText(f"<span style='color:#10b981;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{pretty}</span>")
         self.lbl_active_pill.setToolTip(format_rich_tooltip(
             pretty,
             tr("ACTIVE"),
             guide_key=f"scx_{s_id}"
         ))
-        if s_id == "bore":
-            self.lbl_active_pill.setStyleSheet("""
-                color: #38bdf8; background-color: rgba(56, 189, 248, 0.14);
-                border: 1px solid rgba(56, 189, 248, 0.55); border-radius: 6px;
-                padding: 3px 10px; font-weight: bold; font-size: 11.5px;
-            """)
-        else:
-            self.lbl_active_pill.setStyleSheet("""
-                color: #2ecc71; background-color: rgba(46, 204, 113, 0.16);
-                border: 1px solid rgba(46, 204, 113, 0.55); border-radius: 6px;
-                padding: 3px 10px; font-weight: bold; font-size: 11.5px;
-            """)
+        self.lbl_active_pill.setStyleSheet("""
+            color: #ffffff; background-color: rgba(16, 185, 129, 0.13);
+            border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
+            padding: 3px 10px; font-weight: bold; font-size: 11.5px;
+        """)
 
         found_idx = 0
         for i, (_btn, lbl_badge, s_info) in enumerate(self.sched_buttons):
             if s_info["id"] == s_id:
                 found_idx = i
+                lbl_badge.setTextFormat(Qt.TextFormat.RichText)
                 lbl_badge.setText(f"● {tr('ACTIVE')}")
-                if s_id == "bore":
-                    lbl_badge.setStyleSheet("""
-                        color: #38bdf8; background-color: rgba(56, 189, 248, 0.15);
-                        border: 1px solid rgba(56, 189, 248, 0.55); border-radius: 6px;
-                        padding: 2px 7px; font-weight: bold; font-size: 10px;
-                    """)
-                else:
-                    lbl_badge.setStyleSheet("""
-                        color: #2ecc71; background-color: rgba(46, 204, 113, 0.16);
-                        border: 1px solid rgba(46, 204, 113, 0.55); border-radius: 6px;
-                        padding: 2px 7px; font-weight: bold; font-size: 10px;
-                    """)
+                lbl_badge.setStyleSheet("""
+                    color: #10b981; background-color: rgba(16, 185, 129, 0.13);
+                    border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
+                    padding: 2px 7px; font-weight: bold; font-size: 10px;
+                """)
             else:
                 lbl_badge.setText(s_info["badge"])
                 lbl_badge.setStyleSheet("""
-                    color: #888892; background-color: rgba(255,255,255,0.05);
-                    border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+                    color: #9ca3af; background-color: rgba(255,255,255,0.04);
+                    border: 1px solid rgba(255,255,255,0.09); border-radius: 6px;
                     padding: 2px 7px; font-weight: bold; font-size: 10px;
                 """)
 
@@ -4868,8 +4797,8 @@ class ScxSchedulerPanel(QFrame):
             if i == idx:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(204, 0, 0, 0.16);
-                        border: 2px solid #ff1a1a;
+                        background-color: rgba(220, 38, 38, 0.12);
+                        border: 1.5px solid #ef4444;
                         border-radius: 10px;
                         text-align: left;
                     }
@@ -4877,28 +4806,34 @@ class ScxSchedulerPanel(QFrame):
             else:
                 btn.setStyleSheet("""
                     QPushButton {
-                        background-color: rgba(255, 255, 255, 0.03);
-                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        background-color: rgba(255, 255, 255, 0.025);
+                        border: 1px solid rgba(255, 255, 255, 0.07);
                         border-radius: 10px;
                         text-align: left;
                     }
                     QPushButton:hover {
-                        background-color: rgba(255, 255, 255, 0.06);
-                        border: 1px solid rgba(204, 0, 0, 0.5);
+                        background-color: rgba(255, 255, 255, 0.055);
+                        border: 1px solid rgba(220, 38, 38, 0.45);
                     }
                 """)
         chosen = SCX_SCHEDULERS[idx]
         self.select_mode(chosen["default_mode"])
 
+    @staticmethod
+    def _strip_emoji(txt):
+        for e in ("⚡", "🎯", "⚙️", "⚙", "🔋"):
+            txt = txt.replace(e, "")
+        return txt.strip()
+
     def select_mode(self, mode_id):
         self.selected_mode = mode_id
         chosen = SCX_SCHEDULERS[self.selected_idx]
         mode_labels = {
-            "bore": f"⚡ {tr('Native Kernel + FalconD Auto')}",
-            "gaming": f"{tr('Workload Profile:')} {tr('⚡ Gaming')}",
-            "lowlatency": f"{tr('Workload Profile:')} {tr('🎯 Low Latency')}",
-            "auto": f"{tr('Workload Profile:')} {tr('⚙️ Auto')}",
-            "powersave": f"{tr('Workload Profile:')} {tr('🔋 Power Save')}",
+            "bore": f"◈  {tr('Native Kernel + FalconD Auto')}",
+            "gaming": f"{tr('Workload Profile:')} {self._strip_emoji(tr('⚡ Gaming'))}",
+            "lowlatency": f"{tr('Workload Profile:')} {self._strip_emoji(tr('🎯 Low Latency'))}",
+            "auto": f"{tr('Workload Profile:')} {self._strip_emoji(tr('⚙️ Auto'))}",
+            "powersave": f"{tr('Workload Profile:')} {self._strip_emoji(tr('🔋 Power Save'))}",
         }
         if chosen["id"] == "bore":
             pill_txt = mode_labels["bore"]
@@ -5013,13 +4948,13 @@ class KernelStatusCard(QFrame):
         self.setToolTip(format_rich_tooltip(title, badge_text, guide_key=guide_key, fallback_desc=desc))
         self.setStyleSheet("""
             QFrame#KernelStatusCard {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 11px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.065);
             }
             QFrame#KernelStatusCard:hover {
-                background-color: rgba(255, 255, 255, 0.055);
-                border: 1px solid rgba(56, 189, 248, 0.45);
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.18);
             }
         """)
 
@@ -5032,9 +4967,9 @@ class KernelStatusCard(QFrame):
         icon_box.setFixedSize(40, 40)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.35);
-                border-radius: 9px;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
+                border-radius: 10px;
             }
         """)
         ibox_layout = QVBoxLayout(icon_box)
@@ -5077,169 +5012,18 @@ class KernelStatusCard(QFrame):
         hbox.addLayout(vbox, 1)
 
         lbl_badge = QLabel(f"● {badge_text}")
+        lbl_badge.setTextFormat(Qt.TextFormat.RichText)
         lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_badge.setStyleSheet("""
-            color: #38bdf8;
-            background-color: rgba(56, 189, 248, 0.14);
-            border: 1px solid rgba(56, 189, 248, 0.5);
+            color: #10b981;
+            background-color: rgba(16, 185, 129, 0.13);
+            border: 1px solid rgba(16, 185, 129, 0.42);
             border-radius: 7px;
             padding: 4px 10px;
             font-weight: bold;
-            font-size: 11px;
+            font-size: 10.5px;
         """)
         hbox.addWidget(lbl_badge, 0, Qt.AlignmentFlag.AlignVCenter)
-
-
-class SecureBootCard(QFrame):
-    def __init__(self, parent=None, height=76):
-        super().__init__(parent)
-        self.setObjectName("SecureBootCard")
-        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedHeight(height)
-        self.setMinimumWidth(0)
-        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet("""
-            QFrame#SecureBootCard {
-                background-color: rgba(255, 255, 255, 0.03);
-                border-radius: 11px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
-            }
-            QFrame#SecureBootCard:hover {
-                background-color: rgba(255, 255, 255, 0.055);
-                border: 1px solid #cc0000;
-            }
-        """)
-
-        hbox = QHBoxLayout(self)
-        hbox.setContentsMargins(14, 6, 14, 6)
-        hbox.setSpacing(12)
-
-        icon_box = QFrame()
-        icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        icon_box.setFixedSize(40, 40)
-        icon_box.setStyleSheet("""
-            QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.35);
-                border-radius: 9px;
-            }
-        """)
-        ibox_layout = QVBoxLayout(icon_box)
-        ibox_layout.setContentsMargins(0, 0, 0, 0)
-        ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        icon_label = QLabel()
-        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        pix = make_svg_pixmap("shield-warn", 20)
-        if not pix.isNull():
-            icon_label.setPixmap(pix)
-        icon_label.setStyleSheet("background: transparent; border: none;")
-        ibox_layout.addWidget(icon_label)
-        hbox.addWidget(icon_box)
-
-        vbox = QVBoxLayout()
-        vbox.setContentsMargins(0, 0, 0, 0)
-        vbox.setSpacing(2)
-        vbox.addStretch(1)
-
-        title = tr("Secure Boot & UEFI Key Manager (sbctl)")
-        desc = tr("Enroll custom cryptographic keys in UEFI and keep Microsoft certificates active for Windows 11 dual-boot and anti-cheat games.")
-        self._rich_tip = format_rich_tooltip(title, "sbctl", guide_key="secureboot", fallback_desc=desc)
-        self.setToolTip(self._rich_tip)
-
-        lbl_title = FitLabel(title)
-        lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        lbl_title.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; border: none; background: transparent;")
-        vbox.addWidget(lbl_title)
-
-        lbl_desc = QLabel(desc)
-        lbl_desc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        lbl_desc.setStyleSheet("color: #a0a0a8; font-size: 11px; border: none; background: transparent;")
-        lbl_desc.setWordWrap(True)
-        vbox.addWidget(lbl_desc)
-        vbox.addStretch(1)
-        hbox.addLayout(vbox, 1)
-
-        # Detect status
-        sb_state, color, bg_col, border_col = self._detect_sb_state()
-
-        self.lbl_badge = QLabel(f"● {sb_state}")
-        self.lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.lbl_badge.setStyleSheet(f"""
-            color: {color};
-            background-color: {bg_col};
-            border: 1px solid {border_col};
-            border-radius: 7px;
-            padding: 4px 10px;
-            font-weight: bold;
-            font-size: 11px;
-        """)
-        hbox.addWidget(self.lbl_badge, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        self.btn_open = QPushButton(tr("OPEN ASSISTANT ↗"))
-        self.btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_open.setToolTip(self._rich_tip)
-        self.btn_open.setStyleSheet("""
-            QPushButton {
-                background: rgba(16, 185, 129, 0.15);
-                color: #10b981;
-                border: 1px solid rgba(16, 185, 129, 0.45);
-                border-radius: 7px;
-                padding: 5px 12px;
-                font-weight: bold;
-                font-size: 11px;
-            }
-            QPushButton:hover {
-                background: #10b981;
-                color: #ffffff;
-            }
-        """)
-        self.btn_open.clicked.connect(self._launch)
-        hbox.addWidget(self.btn_open, 0, Qt.AlignmentFlag.AlignVCenter)
-
-    def _detect_sb_state(self):
-        if not os.path.exists('/sys/firmware/efi'):
-            return tr("LEGACY BIOS"), "#888899", "rgba(136, 136, 153, 0.15)", "rgba(136, 136, 153, 0.4)"
-
-        import glob
-        setup_files = glob.glob('/sys/firmware/efi/efivars/SetupMode-*')
-        if setup_files:
-            try:
-                with open(setup_files[0], 'rb') as f:
-                    d = f.read()
-                    if len(d) >= 5 and d[4] == 1:
-                        return tr("SETUP MODE"), "#f59e0b", "rgba(245, 158, 11, 0.15)", "rgba(245, 158, 11, 0.4)"
-            except Exception:
-                pass
-
-        sb_files = glob.glob('/sys/firmware/efi/efivars/SecureBoot-*')
-        if sb_files:
-            try:
-                with open(sb_files[0], 'rb') as f:
-                    d = f.read()
-                    if len(d) >= 5 and d[4] == 1:
-                        return tr("ACTIVE"), "#10b981", "rgba(16, 185, 129, 0.15)", "rgba(16, 185, 129, 0.4)"
-            except Exception:
-                pass
-
-        return tr("DISABLED"), "#ef4444", "rgba(239, 68, 68, 0.15)", "rgba(239, 68, 68, 0.4)"
-
-    def _launch(self):
-        try:
-            import subprocess
-            cmd = ["x64-secureboot"]
-            if _lang_code:
-                cmd.extend(["--lang", _lang_code])
-            subprocess.Popen(cmd, preexec_fn=os.setsid)
-        except Exception:
-            pass
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._launch()
-        super().mousePressEvent(event)
 
 
 class PremiumButton(QPushButton):
@@ -5258,14 +5042,14 @@ class PremiumButton(QPushButton):
 
         self.setStyleSheet("""
             PremiumButton {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.065);
                 text-align: left;
             }
             PremiumButton:hover {
-                background-color: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(204, 0, 0, 0.6);
+                background-color: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(220, 38, 38, 0.55);
             }
         """)
 
@@ -5278,8 +5062,8 @@ class PremiumButton(QPushButton):
         icon_box.setFixedSize(40, 40)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.35);
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
                 border-radius: 10px;
             }
         """)
@@ -5442,13 +5226,13 @@ class MitigationsSwitchCard(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setStyleSheet("""
             QFrame#MitigationsCard {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.065);
             }
             QFrame#MitigationsCard:hover {
-                background-color: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(204, 0, 0, 0.45);
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(220, 38, 38, 0.45);
             }
         """)
 
@@ -5461,9 +5245,9 @@ class MitigationsSwitchCard(QFrame):
         icon_box.setFixedSize(36, 36)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.35);
-                border-radius: 9px;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
+                border-radius: 10px;
             }
         """)
         ibox_layout = QVBoxLayout(icon_box)
@@ -5548,12 +5332,13 @@ class MitigationsSwitchCard(QFrame):
 
     def refresh_state(self):
         self._disabled_state = self.check_is_disabled()
+        self.status_pill.setTextFormat(Qt.TextFormat.RichText)
         if self._disabled_state:
             self.status_pill.setText(f"● {tr('MITIGATIONS OFF (+FPS)')}")
             self.status_pill.setStyleSheet("""
-                color: #ff4d4d;
-                background-color: rgba(204, 0, 0, 0.15);
-                border: 1px solid rgba(255, 51, 51, 0.45);
+                color: #f59e0b;
+                background-color: rgba(245, 158, 11, 0.13);
+                border: 1px solid rgba(245, 158, 11, 0.42);
                 border-radius: 6px;
                 padding: 0 10px;
                 font-weight: bold;
@@ -5562,24 +5347,26 @@ class MitigationsSwitchCard(QFrame):
             self.toggle_btn.setText(tr("RESTORE SECURITY"))
             self.toggle_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(0, 180, 90, 0.18);
-                    color: #2ecc71;
-                    border: 1px solid #27ae60;
+                    background-color: rgba(16, 185, 129, 0.13);
+                    color: #10b981;
+                    border: 1px solid rgba(16, 185, 129, 0.42);
                     border-radius: 7px;
                     padding: 0 12px;
                     font-weight: bold;
                     font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(0, 180, 90, 0.28);
+                    background-color: rgba(16, 185, 129, 0.22);
+                    border: 1px solid #10b981;
+                    color: #ffffff;
                 }
             """)
         else:
             self.status_pill.setText(f"● {tr('MITIGATIONS ACTIVE (SECURE)')}")
             self.status_pill.setStyleSheet("""
-                color: #2ecc71;
-                background-color: rgba(0, 180, 90, 0.15);
-                border: 1px solid rgba(46, 204, 113, 0.45);
+                color: #10b981;
+                background-color: rgba(16, 185, 129, 0.13);
+                border: 1px solid rgba(16, 185, 129, 0.42);
                 border-radius: 6px;
                 padding: 0 10px;
                 font-weight: bold;
@@ -5589,16 +5376,16 @@ class MitigationsSwitchCard(QFrame):
             self.toggle_btn.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(255, 255, 255, 0.05);
-                    color: #e0e0e0;
-                    border: 1px solid #44444c;
+                    color: #e4e4e7;
+                    border: 1px solid rgba(255, 255, 255, 0.12);
                     border-radius: 7px;
                     padding: 0 12px;
                     font-weight: bold;
                     font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(204, 0, 0, 0.2);
-                    border: 1px solid #cc0000;
+                    background-color: rgba(220, 38, 38, 0.18);
+                    border: 1px solid #dc2626;
                     color: #ffffff;
                 }
             """)
@@ -5654,13 +5441,13 @@ class ServiceSwitchCard(QFrame):
         self.setToolTip(rich_tip)
         self.setStyleSheet("""
             QFrame#ServiceCard {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.065);
             }
             QFrame#ServiceCard:hover {
-                background-color: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(204, 0, 0, 0.45);
+                background-color: rgba(255, 255, 255, 0.055);
+                border: 1px solid rgba(255, 255, 255, 0.16);
             }
         """)
 
@@ -5673,9 +5460,9 @@ class ServiceSwitchCard(QFrame):
         icon_box.setFixedSize(38, 38)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.35);
-                border-radius: 9px;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
+                border-radius: 10px;
             }
         """)
         ibox_layout = QVBoxLayout(icon_box)
@@ -5737,34 +5524,36 @@ class ServiceSwitchCard(QFrame):
             self.toggle_btn.setText(f"● {tr('ACTIVE')}")
             self.toggle_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(0, 180, 90, 0.18);
-                    color: #2ecc71;
-                    border: 1px solid #27ae60;
+                    background-color: rgba(16, 185, 129, 0.13);
+                    color: #10b981;
+                    border: 1px solid rgba(16, 185, 129, 0.42);
                     border-radius: 7px;
-                    padding: 0 8px;
+                    padding: 0 9px;
                     font-weight: bold;
                     font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(0, 180, 90, 0.28);
+                    background-color: rgba(16, 185, 129, 0.22);
+                    border: 1px solid #10b981;
+                    color: #ffffff;
                 }
             """)
         else:
             self.toggle_btn.setText(f"○ {tr('INACTIVE')}")
             self.toggle_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #888888;
-                    border: 1px solid #333333;
+                    background-color: rgba(255, 255, 255, 0.025);
+                    color: #71717a;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
                     border-radius: 7px;
-                    padding: 0 8px;
+                    padding: 0 9px;
                     font-weight: bold;
                     font-size: 10.5px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(204, 0, 0, 0.18);
+                    background-color: rgba(220, 38, 38, 0.16);
                     color: #ffffff;
-                    border: 1px solid #cc0000;
+                    border: 1px solid #ef4444;
                 }
             """)
 
@@ -5841,6 +5630,11 @@ def get_gaming_gpu_support_pkgs():
     support = ["lib32-mesa", "ttf-liberation"]
     vk_map = {
         "nvidia-utils": "lib32-nvidia-utils",
+        "nvidia-580xx-utils": "lib32-nvidia-580xx-utils",
+        "nvidia-550xx-utils": "lib32-nvidia-550xx-utils",
+        "nvidia-535xx-utils": "lib32-nvidia-535xx-utils",
+        "nvidia-470xx-utils": "lib32-nvidia-470xx-utils",
+        "nvidia-390xx-utils": "lib32-nvidia-390xx-utils",
         "vulkan-radeon": "lib32-vulkan-radeon",
         "vulkan-intel": "lib32-vulkan-intel",
         "vulkan-virtio": "lib32-vulkan-virtio",
@@ -5851,6 +5645,10 @@ def get_gaming_gpu_support_pkgs():
     for pkg64, pkg32 in vk_map.items():
         if pkg64 in INSTALLED_PKGS_CACHE:
             support.append(pkg32)
+            found_vk = True
+    for pkg in INSTALLED_PKGS_CACHE:
+        if pkg.startswith("nvidia-") and pkg.endswith("-utils"):
+            support.append(f"lib32-{pkg}")
             found_vk = True
     if not found_vk:
         gpu_up = STATIC_HW.get("gpu_model", "").upper()
@@ -5886,8 +5684,8 @@ class GamingInstallCard(QFrame):
         self._rich_tip = format_rich_tooltip(title, pkg_badge, guide_key=check_pkg, fallback_desc=desc)
         self.setToolTip(self._rich_tip)
 
-        border_color = "rgba(204, 0, 0, 0.55)" if is_suite else "rgba(255, 255, 255, 0.06)"
-        bg_color = "rgba(204, 0, 0, 0.09)" if is_suite else "rgba(255, 255, 255, 0.03)"
+        border_color = "rgba(220, 38, 38, 0.35)" if is_suite else "rgba(255, 255, 255, 0.065)"
+        bg_color = "rgba(220, 38, 38, 0.06)" if is_suite else "rgba(255, 255, 255, 0.025)"
         self.setStyleSheet(f"""
             QFrame#GamingCard {{
                 background-color: {bg_color};
@@ -5895,8 +5693,8 @@ class GamingInstallCard(QFrame):
                 border: 1px solid {border_color};
             }}
             QFrame#GamingCard:hover {{
-                background-color: rgba(255, 255, 255, 0.07);
-                border: 1px solid #cc0000;
+                background-color: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(220, 38, 38, 0.55);
             }}
         """)
 
@@ -5908,20 +5706,29 @@ class GamingInstallCard(QFrame):
         icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         box_sz = 42 if is_suite else 36
         icon_box.setFixedSize(box_sz, box_sz)
-        icon_box.setStyleSheet("""
-            QFrame {
-                background-color: rgba(204, 0, 0, 0.14);
-                border: 1px solid rgba(204, 0, 0, 0.38);
-                border-radius: 9px;
-            }
-        """)
+        if is_suite:
+            icon_box.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(220, 38, 38, 0.15);
+                    border: 1px solid rgba(220, 38, 38, 0.45);
+                    border-radius: 10px;
+                }
+            """)
+        else:
+            icon_box.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(220, 38, 38, 0.10);
+                    border: 1px solid rgba(220, 38, 38, 0.28);
+                    border-radius: 10px;
+                }
+            """)
         ibox_layout = QVBoxLayout(icon_box)
         ibox_layout.setContentsMargins(0, 0, 0, 0)
         ibox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         icon_label = QLabel()
         icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        pix = make_svg_pixmap(icon_name, 22 if is_suite else 19)
+        pix = make_svg_pixmap(icon_name, 22 if is_suite else 19, accent="#ff3333")
         if not pix.isNull():
             icon_label.setPixmap(pix)
         else:
@@ -5993,17 +5800,18 @@ class GamingInstallCard(QFrame):
             self.btn_action.setToolTip(self._rich_tip)
             self.btn_action.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(0, 180, 90, 0.16);
-                    color: #2ecc71;
-                    border: 1px solid #27ae60;
+                    background-color: rgba(16, 185, 129, 0.13);
+                    color: #10b981;
+                    border: 1px solid rgba(16, 185, 129, 0.42);
                     border-radius: 8px;
                     padding: 0 12px;
                     font-weight: bold;
                     font-size: 11px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(0, 180, 90, 0.30);
-                    border: 1px solid #2ecc71;
+                    background-color: rgba(16, 185, 129, 0.22);
+                    border: 1px solid #10b981;
+                    color: #ffffff;
                 }
             """)
         else:
@@ -6037,7 +5845,7 @@ class GamingInstallCard(QFrame):
             f"if ! grep -q '^\\[multilib\\]' /etc/pacman.conf; then "
             f"  sudo sed -i '/^#\\[multilib\\]/,/^#Include/ s/^#//' /etc/pacman.conf; "
             f"fi; "
-            f"sudo pacman -Syu --needed --overwrite '*' {extra_gpu_pkgs}{self.install_pkgs}" + (f"; {self.post_cmd}" if self.post_cmd else "")
+            f"sudo pacman -Syu --needed --overwrite '*' {extra_gpu_pkgs}{self.install_pkgs}" + (f" && {{ {self.post_cmd}; }}" if self.post_cmd else "")
         )
         cmd = build_x64_term_cmd("X64 LIOS Gaming Installer", "INSTALADOR MODULAR DE GAMING", body)
         os.system(f"{cmd} &")
@@ -6077,6 +5885,7 @@ class NavButton(QPushButton):
     def __init__(self, title, icon_name, index, parent_app):
         super().__init__()
         self.index = index
+        self.icon_name = icon_name
         self.parent_app = parent_app
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -6089,7 +5898,8 @@ class NavButton(QPushButton):
 
         icon_lbl = QLabel()
         icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        pix = make_svg_pixmap(icon_name, 19)
+        self.icon_lbl = icon_lbl
+        pix = make_svg_pixmap(icon_name, 19, accent="#ef4444")
         if not pix.isNull():
             icon_lbl.setPixmap(pix)
         icon_lbl.setStyleSheet("background: transparent; border: none;")
@@ -6097,7 +5907,7 @@ class NavButton(QPushButton):
 
         text_lbl = QLabel(title)
         text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 13px; background: transparent; border: none;")
+        text_lbl.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px; background: transparent; border: none;")
         self.text_lbl = text_lbl
         hbox.addWidget(text_lbl)
         hbox.addStretch(1)
@@ -6109,14 +5919,17 @@ class NavButton(QPushButton):
     def set_active_style(self):
         self.setStyleSheet("""
             NavButton {
-                background-color: rgba(204, 0, 0, 0.16);
+                background-color: rgba(220, 38, 38, 0.16);
                 border-radius: 8px;
                 border: none;
-                border-left: 4px solid #cc0000;
+                border-left: 3px solid #ef4444;
                 border-top-left-radius: 4px;
                 border-bottom-left-radius: 4px;
             }
         """)
+        pix = make_svg_pixmap(self.icon_name, 19, accent="#ff3333")
+        if not pix.isNull():
+            self.icon_lbl.setPixmap(pix)
         self.text_lbl.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px; background: transparent; border: none;")
 
     def set_inactive_style(self):
@@ -6130,7 +5943,10 @@ class NavButton(QPushButton):
                 background-color: rgba(255, 255, 255, 0.05);
             }
         """)
-        self.text_lbl.setStyleSheet("color: #888888; font-weight: bold; font-size: 13px; background: transparent; border: none;")
+        pix = make_svg_pixmap(self.icon_name, 19, accent="#ef4444")
+        if not pix.isNull():
+            self.icon_lbl.setPixmap(pix)
+        self.text_lbl.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px; background: transparent; border: none;")
 
     def activate(self):
         self.parent_app.change_page(self.index)
@@ -6150,13 +5966,13 @@ class TelemetryCard(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setStyleSheet("""
             QFrame#TelemetryCard {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.07);
+                border: 1px solid rgba(255, 255, 255, 0.065);
             }
             QFrame#TelemetryCard:hover {
-                background-color: rgba(255, 255, 255, 0.055);
-                border: 1px solid rgba(204, 0, 0, 0.55);
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(220, 38, 38, 0.50);
             }
         """)
 
@@ -6169,9 +5985,9 @@ class TelemetryCard(QFrame):
         icon_box.setFixedSize(54, 54)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.38);
-                border-radius: 12px;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
+                border-radius: 10px;
             }
         """)
         ibox_layout = QVBoxLayout()
@@ -6198,10 +6014,10 @@ class TelemetryCard(QFrame):
         top_row.setContentsMargins(0, 0, 0, 0)
         self.lbl_cat = QLabel(category)
         self.lbl_cat.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.lbl_cat.setStyleSheet("color: #888888; font-size: 11px; font-weight: bold; letter-spacing: 0.6px; background: transparent; border: none;")
+        self.lbl_cat.setStyleSheet("color: #9ca3af; font-size: 11px; font-weight: bold; letter-spacing: 0.6px; background: transparent; border: none;")
         self.lbl_val = QLabel(initial_val)
         self.lbl_val.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.lbl_val.setStyleSheet("color: #ff3333; font-size: 13px; font-weight: bold; background: transparent; border: none;")
+        self.lbl_val.setStyleSheet("color: #ffffff; font-size: 12.5px; font-weight: bold; background: transparent; border: none;")
         top_row.addWidget(self.lbl_cat)
         top_row.addStretch(1)
         top_row.addWidget(self.lbl_val)
@@ -6221,7 +6037,7 @@ class TelemetryCard(QFrame):
         self.lbl_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_sub.setMinimumWidth(0)
         self.lbl_sub.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.lbl_sub.setStyleSheet("color: #999999; font-size: 12px; background: transparent; border: none;")
+        self.lbl_sub.setStyleSheet("color: #a1a1aa; font-size: 12px; background: transparent; border: none;")
         sub_row.addWidget(self.lbl_sub, 1)
 
         self.action_badge = None
@@ -6236,18 +6052,18 @@ class TelemetryCard(QFrame):
 
         self.bar = QProgressBar()
         self.bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.bar.setFixedHeight(7)
+        self.bar.setFixedHeight(6)
         self.bar.setRange(0, 100)
         self.bar.setValue(initial_pct)
         self.bar.setTextVisible(False)
         self.bar.setStyleSheet("""
             QProgressBar {
-                background-color: #191920;
+                background-color: #18181f;
                 border: none;
                 border-radius: 3px;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8a0000, stop:1 #ff2424);
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #991b1b, stop:1 #ef4444);
                 border-radius: 3px;
             }
         """)
@@ -6259,40 +6075,23 @@ class TelemetryCard(QFrame):
     def set_sched_badge(self, sched_name):
         if not self.action_badge:
             return
-        is_bore = (sched_name.upper() == "BORE")
-        self.action_badge.setText(f"⚡ {sched_name.upper()}  •  {tr('Configure ➔')}")
-        if is_bore:
-            self.action_badge.setStyleSheet("""
-                QPushButton {
-                    color: #38bdf8;
-                    background-color: rgba(56, 189, 248, 0.14);
-                    border: 1px solid rgba(56, 189, 248, 0.55);
-                    border-radius: 6px;
-                    padding: 0 9px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(56, 189, 248, 0.26);
-                    color: #ffffff;
-                }
-            """)
-        else:
-            self.action_badge.setStyleSheet("""
-                QPushButton {
-                    color: #2ecc71;
-                    background-color: rgba(46, 204, 113, 0.16);
-                    border: 1px solid rgba(46, 204, 113, 0.55);
-                    border-radius: 6px;
-                    padding: 0 9px;
-                    font-weight: bold;
-                    font-size: 10.5px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(46, 204, 113, 0.28);
-                    color: #ffffff;
-                }
-            """)
+        self.action_badge.setText(f"● {sched_name.upper()}  •  {tr('Configure ➔')}")
+        self.action_badge.setStyleSheet("""
+            QPushButton {
+                color: #f4f4f5;
+                background-color: rgba(220, 38, 38, 0.12);
+                border: 1px solid rgba(220, 38, 38, 0.38);
+                border-radius: 6px;
+                padding: 0 9px;
+                font-weight: bold;
+                font-size: 10.5px;
+            }
+            QPushButton:hover {
+                background-color: rgba(220, 38, 38, 0.24);
+                border: 1px solid #ef4444;
+                color: #ffffff;
+            }
+        """)
 
     def mousePressEvent(self, event):
         if self.on_click and event.button() == Qt.MouseButton.LeftButton:
@@ -6320,14 +6119,14 @@ class CommunityPillCard(QPushButton):
         self.setToolTip(f"<b>{title}</b><br>{desc}")
         self.setStyleSheet("""
             CommunityPillCard {
-                background-color: rgba(255, 255, 255, 0.03);
+                background-color: rgba(255, 255, 255, 0.025);
                 border-radius: 12px;
-                border: 1px solid rgba(255, 255, 255, 0.07);
+                border: 1px solid rgba(255, 255, 255, 0.065);
                 text-align: left;
             }
             CommunityPillCard:hover {
-                background-color: rgba(204, 0, 0, 0.11);
-                border: 1px solid rgba(204, 0, 0, 0.65);
+                background-color: rgba(255, 255, 255, 0.055);
+                border: 1px solid rgba(220, 38, 38, 0.55);
             }
         """)
 
@@ -6340,9 +6139,9 @@ class CommunityPillCard(QPushButton):
         icon_box.setFixedSize(48, 48)
         icon_box.setStyleSheet("""
             QFrame {
-                background-color: rgba(204, 0, 0, 0.13);
-                border: 1px solid rgba(204, 0, 0, 0.38);
-                border-radius: 11px;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(220, 38, 38, 0.28);
+                border-radius: 10px;
             }
         """)
         ibox_layout = QVBoxLayout()
@@ -6386,7 +6185,7 @@ class CommunityPillCard(QPushButton):
         lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_badge.setMinimumWidth(0)
         lbl_badge.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        lbl_badge.setStyleSheet("color: #ff3333; font-size: 11px; font-weight: bold; background: transparent; border: none;")
+        lbl_badge.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold; background: transparent; border: none;")
         vbox.addWidget(lbl_badge)
 
         hbox.addLayout(vbox, 1)
@@ -6504,18 +6303,19 @@ class X64Hello(QWidget):
         self.change_page(1)
 
     def set_hero_pill_state(self, pill, name, is_active):
+        pill.setTextFormat(Qt.TextFormat.RichText)
         if is_active:
-            pill.setText(f" ●  {name}: {tr('ACTIVE')} ")
+            pill.setText(f"<span style='color:#10b981;'>●</span>&nbsp;&nbsp;{name}: <span style='color:#ffffff;'>{tr('ACTIVE')}</span>")
             pill.setStyleSheet("""
-                color: #2ecc71; background-color: rgba(46, 204, 113, 0.14);
-                border: 1px solid rgba(46, 204, 113, 0.45); border-radius: 6px;
+                color: #e4e4e7; background-color: rgba(16, 185, 129, 0.13);
+                border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
                 font-size: 10.5px; font-weight: bold; padding: 3px 10px;
             """)
         else:
-            pill.setText(f" ○  {name}: {tr('INACTIVE')} ")
+            pill.setText(f"<span style='color:#52525b;'>○</span>&nbsp;&nbsp;{name}: <span style='color:#71717a;'>{tr('INACTIVE')}</span>")
             pill.setStyleSheet("""
-                color: #888888; background-color: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 6px;
+                color: #a1a1aa; background-color: rgba(255, 255, 255, 0.035);
+                border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 6px;
                 font-size: 10.5px; font-weight: bold; padding: 3px 10px;
             """)
 
@@ -6677,7 +6477,7 @@ class X64Hello(QWidget):
             'it': 'Italiano', 'pt': 'Português', 'ru': 'Русский'
         }.get(_lang_code, 'Español')
 
-        self.lang_btn = QPushButton(" 🌎  " + current_lang_str + " ")
+        self.lang_btn = QPushButton(" ◈  " + current_lang_str + " ")
         self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lang_btn.setFixedHeight(26)
         self.lang_btn.setStyleSheet("""
@@ -6798,10 +6598,10 @@ class X64Hello(QWidget):
         hero.setFixedHeight(144)
         hero.setStyleSheet("""
             QFrame#HeroBanner {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(190, 0, 0, 0.24), stop:0.45 rgba(55, 0, 0, 0.12), stop:1 rgba(255, 255, 255, 0.03));
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(204, 0, 0, 0.18), stop:0.45 rgba(45, 0, 0, 0.10), stop:1 rgba(255, 255, 255, 0.025));
                 border-radius: 14px;
-                border: 1px solid rgba(204, 0, 0, 0.45);
-                border-left: 5px solid #ff1a1a;
+                border: 1px solid rgba(220, 38, 38, 0.38);
+                border-left: 4px solid #ef4444;
             }
         """)
         hero_hbox = QHBoxLayout()
@@ -6869,14 +6669,14 @@ class X64Hello(QWidget):
         btn_hero_upd.clicked.connect(lambda: os.system(f"{upd_cmd} &"))
         hero_right.addWidget(btn_hero_upd)
 
-        btn_hero_btop = QPushButton(f"📊   {tr('LIVE BTOP MONITOR')}")
+        btn_hero_btop = QPushButton(f"◈   {tr('LIVE BTOP MONITOR')}")
         btn_hero_btop.setFixedHeight(36)
         btn_hero_btop.setMinimumWidth(210)
         btn_hero_btop.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_hero_btop.setStyleSheet("""
             QPushButton {
-                background-color: rgba(255, 255, 255, 0.06);
-                color: #dddddd;
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #d4d4d8;
                 border: 1px solid rgba(255, 255, 255, 0.14);
                 border-radius: 8px;
                 padding: 0 16px;
@@ -6884,8 +6684,8 @@ class X64Hello(QWidget):
                 font-size: 11px;
             }
             QPushButton:hover {
-                background-color: rgba(204, 0, 0, 0.22);
-                border: 1px solid #cc0000;
+                background-color: rgba(220, 38, 38, 0.18);
+                border: 1px solid rgba(220, 38, 38, 0.55);
                 color: #ffffff;
             }
         """)
@@ -6900,7 +6700,7 @@ class X64Hello(QWidget):
 
         # 2. REAL-TIME HARDWARE TELEMETRY (2x2)
         sec_hw = QLabel(tr("REAL-TIME HARDWARE TELEMETRY"))
-        sec_hw.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 13px; letter-spacing: 1px; background: transparent;")
+        sec_hw.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec_hw)
         layout.addSpacing(10)
 
@@ -6940,7 +6740,7 @@ class X64Hello(QWidget):
             tr("Hardware Acceleration Active"),
             "video-display",
             f"{sess_type}  •  {desktop_env}",
-            100
+            16
         )
         self.card_disk = TelemetryCard(
             tr("ROOT STORAGE (/) & UPTIME"),
@@ -6960,7 +6760,7 @@ class X64Hello(QWidget):
 
         # 3. ECOSYSTEM & COMMUNITY (1x2 Spacious Cards)
         sec_eco = QLabel(tr("OFFICIAL ECOSYSTEM & COMMUNITY"))
-        sec_eco.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 13px; letter-spacing: 1px; background: transparent;")
+        sec_eco.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec_eco)
         layout.addSpacing(10)
 
@@ -7009,7 +6809,7 @@ class X64Hello(QWidget):
         layout.addSpacing(8)
 
         sec1 = QLabel(tr("REAL-TIME CPU SCHEDULER (BORE / SCHED_EXT)"))
-        sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 11.2px; letter-spacing: 1px; background: transparent;")
+        sec1.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.2px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec1)
         layout.addSpacing(4)
 
@@ -7018,7 +6818,7 @@ class X64Hello(QWidget):
         layout.addSpacing(8)
 
         sec2 = QLabel(tr("PERFORMANCE, MEMORY & STORAGE DAEMONS"))
-        sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 11.2px; letter-spacing: 1px; background: transparent;")
+        sec2.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.2px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec2)
         layout.addSpacing(4)
 
@@ -7046,7 +6846,7 @@ class X64Hello(QWidget):
         layout.addSpacing(8)
 
         sec3 = QLabel(tr("HARDWARE SECURITY & KERNEL MITIGATIONS"))
-        sec3.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 11.2px; letter-spacing: 1px; background: transparent;")
+        sec3.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.2px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec3)
         layout.addSpacing(4)
 
@@ -7058,7 +6858,7 @@ class X64Hello(QWidget):
     def create_page_network_sec(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(36, 20, 36, 16)
+        layout.setContentsMargins(36, 22, 36, 20)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
@@ -7071,39 +6871,39 @@ class X64Hello(QWidget):
         desc = QLabel(tr("Benchmark DNS ping latency in real time, enable DNS-over-TLS encryption, and manage your firewall."))
         desc.setStyleSheet("color: #a0a0a0; font-size: 12.5px; background: transparent;")
         layout.addWidget(desc)
-        layout.addSpacing(12)
+        layout.addSpacing(14)
 
         sec1 = QLabel(tr("DNS OPTIMIZER & REAL-TIME PING BENCHMARK"))
-        sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        sec1.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec1)
-        layout.addSpacing(6)
+        layout.addSpacing(8)
 
         self.dns_panel = DnsOptimizerPanel(self)
         layout.addWidget(self.dns_panel)
-        layout.addSpacing(14)
+        layout.addSpacing(20)
 
         sec2 = QLabel(tr("FIREWALL, BLUETOOTH & KERNEL NETWORK STACK"))
-        sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        sec2.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec2)
-        layout.addSpacing(6)
+        layout.addSpacing(8)
 
         net_grid = QGridLayout()
-        net_grid.setHorizontalSpacing(12)
-        net_grid.setVerticalSpacing(8)
+        net_grid.setHorizontalSpacing(14)
+        net_grid.setVerticalSpacing(12)
         net_grid.setColumnStretch(0, 1)
         net_grid.setColumnStretch(1, 1)
 
         card_ufw = ServiceSwitchCard(
             tr("UFW Security Firewall"),
             tr("Active network protection against unauthorized incoming connections."),
-            "ufw.service", "shield", self, is_user=False, req_pkg="ufw", height=78
+            "ufw.service", "shield", self, is_user=False, req_pkg="ufw", height=90
         )
         self.service_cards.append(card_ufw)
 
         card_bt = ServiceSwitchCard(
             tr("Bluetooth Service"),
             tr("Support for wireless controllers, headsets, and Bluetooth peripherals."),
-            "bluetooth.service", "bluetooth", self, is_user=False, req_pkg="bluez", height=78
+            "bluetooth.service", "bluetooth", self, is_user=False, req_pkg="bluez", height=90
         )
         self.service_cards.append(card_bt)
 
@@ -7119,7 +6919,7 @@ class X64Hello(QWidget):
             tr("Google BBR congestion control, Fair Queueing (fq), and low-latency network buffers active in kernel."),
             f"{tcp_cc} + FQ",
             "bolt",
-            height=78,
+            height=90,
             guide_key="tcp_bbr"
         )
 
@@ -7128,7 +6928,7 @@ class X64Hello(QWidget):
             tr("Wireless power-saving disabled (wifi.powersave = 2) to eliminate ping spikes in online gaming."),
             tr("ACTIVE"),
             "wifi",
-            height=78,
+            height=90,
             guide_key="wifi_lowjitter"
         )
 
@@ -7137,15 +6937,6 @@ class X64Hello(QWidget):
         net_grid.addWidget(card_bbr, 1, 0)
         net_grid.addWidget(card_wifi, 1, 1)
         layout.addLayout(net_grid)
-        layout.addSpacing(12)
-
-        sec3 = QLabel(tr("FIRMWARE & HARDWARE SECURITY (SECURE BOOT)"))
-        sec3.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
-        layout.addWidget(sec3)
-        layout.addSpacing(6)
-
-        self.sb_card = SecureBootCard(self)
-        layout.addWidget(self.sb_card)
         return page
 
     def create_page_maintenance(self):
@@ -7167,7 +6958,7 @@ class X64Hello(QWidget):
         layout.addSpacing(14)
 
         sec1 = QLabel(tr("PREVENTIVE MAINTENANCE & SYSTEM UPDATES"))
-        sec1.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        sec1.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec1)
         layout.addSpacing(8)
 
@@ -7250,7 +7041,7 @@ class X64Hello(QWidget):
         layout.addSpacing(20)
 
         sec2 = QLabel(tr("SYSTEM DOCTOR & EMERGENCY RESCUE"))
-        sec2.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 12px; letter-spacing: 1px; background: transparent;")
+        sec2.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.5px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec2)
         layout.addSpacing(8)
 
@@ -7367,7 +7158,7 @@ class X64Hello(QWidget):
         layout.addSpacing(8)
 
         sec_mod = QLabel(tr("MODULAR COMPONENT INSTALLATION"))
-        sec_mod.setStyleSheet("color: #cc0000; font-weight: bold; font-size: 11.2px; letter-spacing: 1px; background: transparent;")
+        sec_mod.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11.2px; letter-spacing: 1.4px; background: transparent;")
         layout.addWidget(sec_mod)
         layout.addSpacing(5)
 
@@ -7472,12 +7263,12 @@ class X64Hello(QWidget):
                 "x64-waydroid-launcher"
             ),
             (
-                tr("Sunshine (Game Stream Server)"),
-                tr("Self-hosted game stream host for Moonlight. Stream PC games to phones, TVs & handhelds at ultra-low latency."),
+                tr("Sunshine & Moonlight (Game Streaming)"),
+                tr("Complete game streaming duo: Sunshine host server + Moonlight client to stream or play remotely at ultra-low latency."),
+                "sunshine moonlight-qt",
+                "sunshine moonlight-qt avahi",
                 "sunshine",
-                "sunshine avahi",
-                "sunshine",
-                "sudo systemctl enable --now avahi-daemon.service 2>/dev/null; systemctl --user daemon-reload; systemctl --user enable --now app-dev.lizardbyte.app.Sunshine.service 2>/dev/null; printf '\\n\\033[1;32m[✓] Servidor Sunshine instalado y servicio activo.\\033[0m\\nPanel de configuración Web: \\033[1;36mhttps://localhost:47990\\033[0m\\n'; xdg-open https://localhost:47990 2>/dev/null || true",
+                "sudo systemctl enable --now avahi-daemon.service 2>/dev/null; /usr/bin/x64-sunshine-launcher --setup-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Sunshine + Moonlight instalados, certificado SSL local verificado y servicio activo.\\033[0m\\nPanel de configuración Web: \\033[1;36mhttps://localhost:47990\\033[0m\\n'; xdg-open https://localhost:47990 2>/dev/null || true",
                 "x64-sunshine-launcher"
             )
         ]
@@ -7544,7 +7335,7 @@ class X64Hello(QWidget):
                         "Jerarquía soberana de repositorios en cascada. [x64-lios] ostenta la prioridad #1 absoluta sobre CachyOS y Arch, entregando paquetes propios y optimizaciones vía SSL sin cuellos de botella.",
                         (
                             "Infraestructura propia de distribución de paquetes (repo.x64lios.com) auditada con paridad estricta.",
-                            "Entrega actualizaciones instantáneas de nuestras herramientas (x64-hello, x64-update, x64-secureboot, temas y perfiles) con prioridad máxima.",
+                            "Entrega actualizaciones instantáneas de nuestras herramientas (x64-hello, x64-update, temas y perfiles) con prioridad máxima.",
                             "Se aplica automáticamente en cada actualización mediante X64 Update o pacman."
                         )
                     ),
@@ -7567,12 +7358,12 @@ class X64Hello(QWidget):
                         )
                     ),
                     (
-                        "VII. Escudo Btrfs, 4 Bootloaders y Secure Boot",
-                        "Inmutabilidad temporal con Btrfs + Snapper en Limine, GRUB, systemd-boot o rEFInd, unido al asistente x64-secureboot (sbctl) para firma UEFI y Dual-Boot con Windows 11.",
+                        "VII. Escudo Btrfs y 4 Gestores de Arranque",
+                        "Inmutabilidad temporal con Btrfs + Snapper integrada en los 4 gestores de arranque oficiales (Limine, GRUB, systemd-boot y rEFInd), con autodetección segura de Dual-Boot con Windows.",
                         (
-                            "Sistema de respaldo por instantáneas fotográficas en el arranque y firmado criptográfico de kernels UEFI.",
-                            "Permite restaurar el sistema en segundos desde el menú de encendido si algo falla y jugar títulos con anti-cheat que exigen Secure Boot activo.",
-                            "Snapshots automáticos antes de actualizar; Secure Boot configurable en Red y Seguridad."
+                            "Sistema de respaldo por instantáneas fotográficas arrancables antes de cada actualización del sistema.",
+                            "Permite restaurar el sistema en segundos desde el menú de encendido si algo falla, protegiendo intacto tu arranque dual.",
+                            "Snapshots automáticos activos antes de cada actualización del sistema."
                         )
                     ),
                     (
@@ -7658,8 +7449,8 @@ class X64Hello(QWidget):
                         "IV. Sovereign Repositories",
                         "Sovereign cascading repository hierarchy. [x64-lios] holds priority #1 above CachyOS and Arch, delivering custom packages and optimizations over SSL without bottlenecks.",
                         (
-                            "Dedicated package distribution infrastructure (repo.x64lios.com) audited with strict 21/21 parity.",
-                            "Delivers instant updates for X64 tools (x64-hello, x64-update, x64-secureboot, themes, and profiles) with top priority.",
+                            "Dedicated package distribution infrastructure (repo.x64lios.com) audited with strict parity.",
+                            "Delivers instant updates for X64 tools (x64-hello, x64-update, themes, and profiles) with top priority.",
                             "Automatically applied on every system sync via X64 Update or pacman."
                         )
                     ),
@@ -7682,12 +7473,12 @@ class X64Hello(QWidget):
                         )
                     ),
                     (
-                        "VII. Btrfs Shield, 4 Bootloaders & Secure Boot",
-                        "Temporal immutability with Btrfs + Snapper across Limine, GRUB, systemd-boot, or rEFInd, paired with x64-secureboot (sbctl) for UEFI key signing and Windows 11 dual-boot.",
+                        "VII. Btrfs Shield & 4 Official Bootloaders",
+                        "Temporal immutability with Btrfs + Snapper integrated across Limine, GRUB, systemd-boot, and rEFInd, with safe non-invasive Windows Dual-Boot detection.",
                         (
-                            "Automated bootable snapshot recovery system combined with custom UEFI cryptographic kernel signing.",
-                            "Lets you roll back any faulty update in seconds from the boot menu and play anti-cheat games that require Secure Boot enabled.",
-                            "Snapshots run automatically before updates; Secure Boot is managed in Network & Security."
+                            "Automated bootable snapshot recovery system before every system upgrade.",
+                            "Lets you roll back any faulty update in seconds directly from the boot menu while keeping Dual-Boot intact.",
+                            "Snapshots run automatically before every system update."
                         )
                     ),
                     (
@@ -7772,10 +7563,10 @@ class X64Hello(QWidget):
                         "Garde le système ultra-léger au démarrage tout en permettant d'installer Steam ou Lutris en 1 clic.",
                         "Disponible à la demande dans l'onglet Gaming Center."
                     )),
-                    ("VII. Bouclier Btrfs, 4 Bootloaders & Secure Boot", "Immutabilité temporelle avec Btrfs + Snapper sur Limine, GRUB, systemd-boot ou rEFInd, avec l'assistant x64-secureboot (sbctl) pour Windows 11 Dual-Boot.", (
-                        "Système de snapshots automatiques amorçables combiné à la signature cryptographique UEFI (sbctl).",
-                        "Permet d'annuler une mise à jour défaillante depuis le menu de boot et de jouer aux titres exigeant Secure Boot.",
-                        "Les snapshots sont automatiques ; Secure Boot se gère dans Réseau & Sécurité."
+                    ("VII. Bouclier Btrfs & 4 Bootloaders Officiels", "Immutabilité temporelle avec Btrfs + Snapper intégrée sur Limine, GRUB, systemd-boot et rEFInd, avec détection Dual-Boot Windows sécurisée.", (
+                        "Système de snapshots automatiques amorçables avant chaque mise à jour du système.",
+                        "Permet d'annuler une mise à jour défaillante en quelques secondes depuis le menu de démarrage.",
+                        "Les snapshots sont créés automatiquement avant chaque mise à jour."
                     )),
                     ("VIII. Philosophie GUI-First & Terminal Hacker", "Contrôle quotidien intuitif via des outils graphiques natifs PyQt6, couplé au terminal d'élite Kitty avec Fish, Fastfetch et Starship.", (
                         "Synergie entre panneaux de contrôle graphiques en 1 clic et terminal préconfiguré de haut vol.",
@@ -7839,10 +7630,10 @@ class X64Hello(QWidget):
                         "Hält das System extrem ressourcenschonend und erlaubt die 1-Klick-Installation von Steam, Heroic oder Lutris.",
                         "Jederzeit bei Bedarf im Tab Gaming Center verfügbar."
                     )),
-                    ("VII. Btrfs-Schutzschild, 4 Bootloader & Secure Boot", "Zeitsichere Btrfs-Snapshots mit Snapper für Limine, GRUB, systemd-boot oder rEFInd, inklusive x64-secureboot (sbctl) für Windows 11 Dual-Boot.", (
-                        "Automatisiertes, bootfähiges Snapshot-System kombiniert mit eigener UEFI-Kernelsignierung (sbctl).",
-                        "Ermöglicht das Zurückrollen fehlerhafter Updates direkt im Bootmenü und unterstützt Anti-Cheat mit Secure Boot.",
-                        "Snapshots laufen automatisch vor Updates; Secure Boot wird unter Netzwerk & Sicherheit verwaltet."
+                    ("VII. Btrfs-Schutzschild & 4 Offizielle Bootloader", "Zeitsichere Btrfs-Snapshots mit Snapper für Limine, GRUB, systemd-boot und rEFInd, inklusive sicherer Windows-Dual-Boot-Erkennung.", (
+                        "Automatisiertes, bootfähiges Snapshot-System vor jeder Systemaktualisierung.",
+                        "Ermöglicht das Zurückrollen fehlerhafter Updates in Sekunden direkt über das Bootmenü.",
+                        "Snapshots laufen automatisch vor jedem System-Update."
                     )),
                     ("VIII. GUI-First & Hacker-Terminal", "Mühelose Steuerung über native PyQt6-Apps, kombiniert mit einem erstklassigen Hacker-Terminal in Kitty, Fish-Shell, Fastfetch und Starship-Pills.", (
                         "Synergie aus visuellen 1-Klick-Kontrollzentren und einer vorkonfigurierten Profi-Kommandozeile.",
@@ -7906,10 +7697,10 @@ class X64Hello(QWidget):
                         "Mantiene il sistema scattante e leggero, consentendo di installare Steam, Heroic o Lutris con 1 clic.",
                         "Disponibile su richiesta nella scheda Gaming Center."
                     )),
-                    ("VII. Scudo Btrfs, 4 Bootloader & Secure Boot", "Immutabilità temporale con Btrfs + Snapper su Limine, GRUB, systemd-boot o rEFInd, più assistente x64-secureboot (sbctl) per Windows 11 Dual-Boot.", (
-                        "Sistema automatico di snapshot avviabili unito alla firma crittografica UEFI del kernel (sbctl).",
-                        "Permette di annullare qualsiasi aggiornamento difettoso dal menu di avvio e usare giochi con Secure Boot.",
-                        "Gli snapshot sono automatici; Secure Boot si gestisce in Rete e Sicurezza."
+                    ("VII. Scudo Btrfs & 4 Bootloader Ufficiali", "Immutabilità temporale con Btrfs + Snapper integrata su Limine, GRUB, systemd-boot e rEFInd, con rilevamento sicuro Dual-Boot Windows.", (
+                        "Sistema automatico di snapshot avviabili prima di ogni aggiornamento di sistema.",
+                        "Permette di annullare qualsiasi aggiornamento difettoso in pochi secondi direttamente dal menu di avvio.",
+                        "Gli snapshot vengono creati automaticamente prima di ogni aggiornamento."
                     )),
                     ("VIII. Filosofia GUI-First & Terminale Hacker", "Controllo quotidiano intuitivo tramite app grafiche native PyQt6, affiancato dal terminale d'élite Kitty con Fish, Fastfetch e Starship.", (
                         "Sinergia tra pannelli di controllo grafici a 1 clic e un terminale preconfigurato d'élite.",
@@ -7973,10 +7764,10 @@ class X64Hello(QWidget):
                         "Mantém o sistema ultraleve na inicialização e permite instalar Steam, Heroic ou Lutris em 1 clique.",
                         "Disponível sob demanda na aba Centro Gaming."
                     )),
-                    ("VII. Escudo Btrfs, 4 Bootloaders & Secure Boot", "Imutabilidade temporal com Btrfs + Snapper no Limine, GRUB, systemd-boot ou rEFInd, junto ao assistente x64-secureboot (sbctl) para Dual-Boot com Windows 11.", (
-                        "Sistema automático de snapshots inicializáveis aliado à assinatura criptográfica UEFI (sbctl).",
-                        "Permite reverter qualquer atualização problemática no menu de boot e jogar títulos que exigem Secure Boot.",
-                        "Snapshots rodam automaticamente antes de atualizar; Secure Boot é gerido em Rede e Segurança."
+                    ("VII. Escudo Btrfs & 4 Bootloaders Oficiais", "Imutabilidade temporal com Btrfs + Snapper integrada no Limine, GRUB, systemd-boot e rEFInd, com detecção segura de Dual-Boot com Windows.", (
+                        "Sistema automático de snapshots inicializáveis antes de cada atualização do sistema.",
+                        "Permite reverter qualquer atualização problemática em segundos diretamente no menu de boot.",
+                        "Snapshots rodam automaticamente antes de cada atualização."
                     )),
                     ("VIII. Filosofia GUI-First & Terminal Hacker", "Controle diário intuitivo via aplicativos nativos PyQt6, combinado com o terminal hacker de elite no Kitty com Fish, Fastfetch e Starship.", (
                         "Sinergia entre painéis visuais de 1 clique e um ambiente de linha de comando pré-configurado de elite.",
@@ -8040,10 +7831,10 @@ class X64Hello(QWidget):
                         "Сохраняет минимальное потребление ОЗУ и позволяет установить Steam, Heroic или Lutris в 1 клик.",
                         "Доступно по запросу во вкладке Игровой Центр."
                     )),
-                    ("VII. Защита Btrfs, 4 Загрузчика и Secure Boot", "Мгновенные снимки Btrfs + Snapper для Limine, GRUB, systemd-boot и rEFInd, а также мастер x64-secureboot (sbctl) для Dual-Boot с Windows 11.", (
-                        "Система автоматических загружаемых снимков в сочетании с криптографической подписью UEFI (sbctl).",
-                        "Позволяет откатить любое обновление прямо из меню загрузчика и запускать игры с требованием Secure Boot.",
-                        "Снимки создаются автоматически перед обновлениями; Secure Boot управляется в разделе Сеть и Безопасность."
+                    ("VII. Защита Btrfs и 4 Официальных Загрузчика", "Мгновенные снимки Btrfs + Snapper для Limine, GRUB, systemd-boot и rEFInd с безопасным обнаружением Dual-Boot с Windows.", (
+                        "Система автоматических загружаемых снимков перед каждым обновлением системы.",
+                        "Позволяет откатить любое обновление за секунды прямо из меню загрузчика.",
+                        "Снимки создаются автоматически перед каждым обновлением."
                     )),
                     ("VIII. Принцип GUI-First и Терминал Хакера", "Удобное управление через нативные приложения PyQt6 в сочетании с терминалом Kitty, оболочкой Fish, Fastfetch и приглашением Starship.", (
                         "Синергия удобных графических панелей управления в 1 клик и преднастроенного терминала.",
@@ -8078,7 +7869,7 @@ class X64Hello(QWidget):
         en_pillars = philo_i18n["en"]["pillars"]
 
         cat_lbl = QLabel(cur_data["cat"])
-        cat_lbl.setStyleSheet("color: #cc0000; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; background: transparent;")
+        cat_lbl.setStyleSheet("color: #ef4444; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; background: transparent;")
         layout.addWidget(cat_lbl)
 
         title = QLabel(cur_data["title"])
@@ -8116,15 +7907,15 @@ class X64Hello(QWidget):
             frame.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             frame.setStyleSheet("""
                 QFrame#FiloCard {
-                    background-color: rgba(255, 255, 255, 0.03);
-                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    background-color: rgba(255, 255, 255, 0.025);
+                    border: 1px solid rgba(255, 255, 255, 0.065);
                     border-radius: 10px;
-                    border-left: 3px solid #cc0000;
+                    border-left: 2px solid rgba(220, 38, 38, 0.55);
                 }
                 QFrame#FiloCard:hover {
-                    background-color: rgba(204, 0, 0, 0.09);
-                    border: 1px solid rgba(204, 0, 0, 0.4);
-                    border-left: 3px solid #ff3333;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-left: 2px solid #dc2626;
                 }
             """)
             flayout = QVBoxLayout()
@@ -8244,7 +8035,7 @@ if __name__ == '__main__':
     hello.show()
     if "--scheduler" in sys.argv:
         hello.change_page(1)
-    elif "--dns" in sys.argv or "--security" in sys.argv or "--secureboot" in sys.argv:
+    elif "--dns" in sys.argv or "--security" in sys.argv:
         hello.change_page(2)
     elif "--gaming" in sys.argv:
         hello.change_page(4)
