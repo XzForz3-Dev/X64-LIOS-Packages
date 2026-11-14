@@ -39,6 +39,10 @@ PanelWindow {
 
     property string kernelVer: "Linux"
     property string uptimeStr: "0m"
+    property int gpuCount: 0
+    property int gpuTemp: 0
+    property int gpuUtil: 0
+    property var gpus: []
     property var topList: [
         { "name": "quickshell", "cpu": "1.2%", "mem": "115 MB" },
         { "name": "Hyprland",   "cpu": "0.8%", "mem": "92 MB" },
@@ -189,6 +193,10 @@ PanelWindow {
 
                     if (data.kernel) teleWindow.kernelVer = data.kernel;
                     teleWindow.uptimeStr = data.uptime || "0m";
+                    teleWindow.gpuCount = data.gpuCount || 0;
+                    teleWindow.gpuTemp = data.gpuTemp || 0;
+                    teleWindow.gpuUtil = data.gpuUtil || 0;
+                    teleWindow.gpus = data.gpus || [];
                     if (data.topList && data.topList.length > 0) {
                         teleWindow.topList = data.topList;
                     }
@@ -587,6 +595,208 @@ PanelWindow {
                                     color: modelData >= 80 ? Theme.accent : (modelData >= 60 ? Theme.statusWarn : "#c8c6c0")
                                     opacity: 0.35 + 0.65 * (index / 20.0)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =========================================================
+            // 2B. DEDICATED GRAPHICS & VRAM (MULTI-GPU / SLI ENGINE)
+            // =========================================================
+            Rectangle {
+                visible: teleWindow.gpuCount > 0
+                Layout.fillWidth: true
+                implicitHeight: teleWindow.gpuCount > 1 ? gpuLayoutMulti.implicitHeight + 20 : gpuLayoutSingle.implicitHeight + 20
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 6
+
+                    // Card Header: Icon, Label & SLI Badge
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            text: "󰢮"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 12
+                            color: Theme.accent
+                        }
+
+                        Text {
+                            text: teleWindow.gpuCount > 1 ? "GPU MULTI-PROCESADOR (SLI)" : "GPU DEDICADA"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 1.0
+                            color: Theme.textSecondary
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        Rectangle {
+                            visible: teleWindow.gpuCount > 1
+                            implicitHeight: 18
+                            implicitWidth: sliBadgeRow.implicitWidth + 10
+                            radius: 9
+                            color: Theme.accentDim
+                            border.color: Theme.accentBorder
+                            border.width: 1
+
+                            RowLayout {
+                                id: sliBadgeRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    text: "⚡ 2x SLI"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: Theme.accent
+                                }
+                            }
+                        }
+                    }
+
+                    // Multi-GPU (Dual/SLI) Grid: 2 columns
+                    RowLayout {
+                        id: gpuLayoutMulti
+                        visible: teleWindow.gpuCount > 1
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Repeater {
+                            model: teleWindow.gpus
+                            delegate: Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 68
+                                radius: Theme.radiusSm
+                                color: Theme.bgElevated
+                                border.color: (modelData.temp >= 78 || modelData.util >= 85) ? Theme.borderAccent : Theme.borderSubtle
+                                border.width: 1
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 4
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: "GPU " + modelData.index + (modelData.index === 0 ? " (Master)" : " (Slave)")
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: Theme.textPrimary
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: modelData.temp + "°C"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: modelData.temp >= 78 ? Theme.accent : (modelData.temp >= 65 ? Theme.statusWarn : Theme.textSecondary)
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: "Carga: " + modelData.util + "%"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            color: modelData.util >= 85 ? Theme.accent : Theme.textMuted
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: "VRAM: " + modelData.vramUsed
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 8
+                                            color: Theme.textMuted
+                                        }
+                                    }
+
+                                    // VRAM Usage Progress Bar
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 4
+                                        radius: 2
+                                        color: "#20ffffff"
+
+                                        Rectangle {
+                                            width: Math.max(3, parent.width * (Math.min(100, modelData.vramPct) / 100.0))
+                                            height: parent.height
+                                            radius: 2
+                                            color: modelData.vramPct >= 85 ? Theme.accent : (modelData.vramPct >= 65 ? Theme.statusWarn : "#38bdf8")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Single GPU Layout (if 1 GPU)
+                    ColumnLayout {
+                        id: gpuLayoutSingle
+                        visible: teleWindow.gpuCount === 1
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text {
+                                text: teleWindow.gpus.length > 0 ? teleWindow.gpus[0].name : "NVIDIA GPU"
+                                font.family: Theme.fontSans
+                                font.pixelSize: 10
+                                font.bold: true
+                                color: Theme.textPrimary
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                text: (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].temp : 0) + "°C • " + (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].util : 0) + "% Load"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.bold: true
+                                color: teleWindow.gpuTemp >= 78 ? Theme.accent : (teleWindow.gpuTemp >= 65 ? Theme.statusWarn : Theme.textSecondary)
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text {
+                                text: "VRAM: " + (teleWindow.gpus.length > 0 ? (teleWindow.gpus[0].vramUsed + " / " + teleWindow.gpus[0].vramTotal) : "0 GB")
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                color: Theme.textMuted
+                            }
+                            Item { Layout.fillWidth: true }
+                            Text {
+                                text: (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].vramPct : 0) + "%"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                color: Theme.textMuted
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 4
+                            radius: 2
+                            color: "#20ffffff"
+
+                            Rectangle {
+                                width: Math.max(3, parent.width * (Math.min(100, (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].vramPct : 0)) / 100.0))
+                                height: parent.height
+                                radius: 2
+                                color: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 85) ? Theme.accent : "#38bdf8"
                             }
                         }
                     }

@@ -82,6 +82,10 @@ PanelWindow {
     property int batPct: 100
     property string batStatus: "AC"
     property int brightnessVal: 100
+    property int gpuCount: 0
+    property int gpuTemp: 0
+    property int gpuUtil: 0
+    property var gpus: []
 
     function runCtl(args) {
         toggleGuardTimer.restart();
@@ -126,6 +130,10 @@ PanelWindow {
                     barWindow.cpuUsage = d.cpu || 0;
                     barWindow.ramUsage = d.ramUsed || "0.0";
                     barWindow.cpuTemp = d.temp || 40;
+                    barWindow.gpuCount = d.gpuCount || 0;
+                    barWindow.gpuTemp = d.gpuTemp || 0;
+                    barWindow.gpuUtil = d.gpuUtil || 0;
+                    barWindow.gpus = d.gpus || [];
                     if (!toggleGuardTimer.running) {
                         barWindow.caffeineActive = Boolean(d.caffeine);
                         barWindow.nightlightActive = Boolean(d.nightlight);
@@ -796,6 +804,32 @@ PanelWindow {
                             font.pixelSize: 10
                             font.bold: true
                             color: barWindow.cpuTemp >= 78 ? Theme.accent : (barWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textPrimary)
+                        }
+
+                        // Divider (GPU)
+                        Rectangle {
+                            visible: barWindow.gpuCount > 0
+                            implicitWidth: 1
+                            implicitHeight: 10
+                            color: "#16ffffff"
+                        }
+
+                        // Dedicated GPU (Threshold-aware: neutral silver <65°C, amber >=65°C, crimson >=78°C)
+                        Text {
+                            visible: barWindow.gpuCount > 0
+                            text: "󰢮"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 11
+                            color: barWindow.gpuTemp >= 78 ? Theme.accent : (barWindow.gpuTemp >= 65 ? Theme.statusWarn : Theme.textSecondary)
+                        }
+
+                        Text {
+                            visible: barWindow.gpuCount > 0
+                            text: (barWindow.gpuCount > 1 ? "SLI " : "") + barWindow.gpuTemp + "°C"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: barWindow.gpuTemp >= 78 ? Theme.accent : (barWindow.gpuTemp >= 65 ? Theme.statusWarn : Theme.textPrimary)
                         }
                     }
 

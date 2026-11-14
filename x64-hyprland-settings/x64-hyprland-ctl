@@ -784,7 +784,29 @@ cmd_status() {
     zoom_fac=$(cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
     game_en=$(get_effective_gaming_mode)
 
-    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s}\n' \
+    # 11. Multi-GPU Telemetry (NVIDIA SMI + Dual/SLI Aware)
+    local gpu_count=0 gpu_primary_temp=0 gpu_primary_util=0 gpus_json="[]"
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        local smi_out
+        smi_out=$(nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null)
+        if [ -n "$smi_out" ]; then
+            gpus_json=$(echo "$smi_out" | awk -F', ' 'BEGIN{printf "["} {
+                if (NR>1) printf ",";
+                idx=$1; name=$2; temp=$3; util=$4; vram_u=$5; vram_t=$6;
+                vram_pct = (vram_t > 0) ? int((vram_u * 100) / vram_t) : 0;
+                if (vram_u >= 1024) vram_u_str = sprintf("%.1f GB", vram_u / 1024);
+                else vram_u_str = sprintf("%d MB", vram_u);
+                vram_t_str = sprintf("%.1f GB", vram_t / 1024);
+                gsub(/"/,"",name);
+                printf "{\"index\":%d,\"name\":\"%s\",\"temp\":%d,\"util\":%d,\"vramUsed\":\"%s\",\"vramTotal\":\"%s\",\"vramPct\":%d}", idx, name, temp, util, vram_u_str, vram_t_str, vram_pct;
+            } END{printf "]"}')
+            gpu_count=$(echo "$smi_out" | wc -l)
+            gpu_primary_temp=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $3}')
+            gpu_primary_util=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $4}')
+        fi
+    fi
+
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d,"gpus":%s}\n' \
         "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" \
         "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
         "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
@@ -796,7 +818,8 @@ cmd_status() {
         "$rec_active" "$rec_time" \
         "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}" "$ai_eng" \
         "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
-        "$([ "$game_en" = "1" ] && echo true || echo false)"
+        "$([ "$game_en" = "1" ] && echo true || echo false)" \
+        "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}" "$gpus_json"
 }
 
 # -----------------------------------------------------------------------------
