@@ -27,6 +27,29 @@ function is_graphical_session
     test -n "$WAYLAND_DISPLAY"; or test -n "$DISPLAY"
 end
 
+# Dynamic Detection Helper: Determine the active virtual terminal (VT) of the graphical desktop
+function get_graphical_vt
+    # 1. Query loginctl for active graphical sessions (Wayland or X11)
+    for s in (loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}')
+        set -l s_type (loginctl show-session $s -p Type --value 2>/dev/null)
+        set -l s_vt (loginctl show-session $s -p VTNr --value 2>/dev/null)
+        if test "$s_type" = "wayland"; or test "$s_type" = "x11"
+            if test -n "$s_vt"; and test "$s_vt" -gt 0
+                echo $s_vt
+                return 0
+            end
+        end
+    end
+    # 2. Inspect active graphical processes for assigned tty (startplasma-wayland, Xorg, etc.)
+    set -l p_tty (ps -eo tty,args 2>/dev/null | grep -E 'startplasma|kwin|gnome-shell|Xorg' | grep -oE 'tty[0-9]+' | head -n 1 | tr -d 'tty')
+    if test -n "$p_tty"; and test "$p_tty" -gt 0
+        echo $p_tty
+        return 0
+    end
+    # 3. Fallback to VT1 (standard Wayland user session on Arch Linux)
+    echo 1
+end
+
 function draw_dashboard
     clear
     # Breathing room for header
@@ -1076,7 +1099,8 @@ while true
             install_desktop_menu
         case 'g' 'G'
             if test $has_desktop -gt 0
-                sudo chvt 2 2>/dev/null
+                set -l target_vt (get_graphical_vt)
+                sudo chvt $target_vt 2>/dev/null
             end
         case 1
             if test $has_desktop -eq 0
@@ -1084,7 +1108,8 @@ while true
             else
                 set -l dm_active (systemctl is-active $desktop_dms[1] 2>/dev/null)
                 if test "$dm_active" = "active"
-                    sudo chvt 2 2>/dev/null
+                    set -l target_vt (get_graphical_vt)
+                    sudo chvt $target_vt 2>/dev/null
                 else
                     clear
                     echo ""
@@ -1130,14 +1155,14 @@ while true
                         echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
                         echo -e "    El entorno gráfico \e[1;32m$desktop_names[1]\e[0m está actualmente en ejecución.\n"
                         echo -e "    \e[1;31m[1]\e[0m Detener entorno gráfico ($desktop_dms[1]) y liberar memoria RAM"
-                        echo -e "    \e[1;36m[2]\e[0m Volver a la pantalla del escritorio (VT2)"
+                        echo -e "    \e[1;36m[2]\e[0m Volver a la pantalla del escritorio"
                         echo -e "    \e[1;33m[0]\e[0m Volver al Centro de Mando\n"
                     else
                         echo -e "   \e[1;37mSTOP GRAPHICAL ENVIRONMENT ($desktop_names[1])\e[0m"
                         echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
                         echo -e "    The graphical environment \e[1;32m$desktop_names[1]\e[0m is currently running.\n"
                         echo -e "    \e[1;31m[1]\e[0m Stop graphical environment ($desktop_dms[1]) and free RAM"
-                        echo -e "    \e[1;36m[2]\e[0m Switch back to graphical screen (VT2)"
+                        echo -e "    \e[1;36m[2]\e[0m Switch back to graphical screen"
                         echo -e "    \e[1;33m[0]\e[0m Return to Control Center\n"
                     end
                     echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
@@ -1167,7 +1192,8 @@ while true
                             sleep 1
                         end
                     else if test "$dm_stop_choice" = "2"
-                        sudo chvt 2 2>/dev/null
+                        set -l target_vt (get_graphical_vt)
+                        sudo chvt $target_vt 2>/dev/null
                     end
                 else
                     if test $is_es -eq 1
