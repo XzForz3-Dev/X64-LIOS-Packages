@@ -1463,25 +1463,87 @@ while true
                 exec x64-dashboard
             end
         case 5 'n' 'N'
-            clear
-            echo ""
-            echo ""
-            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            if test $is_es -eq 1
-                echo -e "   \e[1;37mDIAGNÓSTICO DE RED E INTERFACES\e[0m"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                ip -br addr | sed 's/^/    /'
-                echo -e "\n    \e[1;33mPrueba de conectividad a Internet (Ping 1.1.1.1):\e[0m"
-            else
-                echo -e "   \e[1;37mNETWORK & INTERFACE DIAGNOSTICS\e[0m"
-                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                ip -br addr | sed 's/^/    /'
-                echo -e "\n    \e[1;33mInternet connectivity test (Ping 1.1.1.1):\e[0m"
+            while true
+                clear
+                echo ""
+                echo ""
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                if test $is_es -eq 1
+                    echo -e "   \e[1;37mDIAGNÓSTICO Y CONFIGURACIÓN DE RED\e[0m"
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                    echo -e "    \e[1;33mInterfaces y direcciones IP activas:\e[0m"
+                    ip -br addr | sed 's/^/      /'
+                    echo ""
+                    echo -e "    \e[1;36m[1]\e[0m \e[1;37mProbar conectividad a Internet (Ping a 1.1.1.1)\e[0m"
+                    echo -e "    \e[1;32m[2]\e[0m \e[1;37mConectar a Red Wi-Fi o Cableada (Asistente Visual nmtui)\e[0m"
+                    echo -e "    \e[1;33m[3]\e[0m \e[1;37mReiniciar servicio de red (NetworkManager)\e[0m"
+                    echo -e "    \e[1;31m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
+                else
+                    echo -e "   \e[1;37mNETWORK DIAGNOSTICS & CONFIGURATION\e[0m"
+                    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                    echo -e "    \e[1;33mActive interfaces and IP addresses:\e[0m"
+                    ip -br addr | sed 's/^/      /'
+                    echo ""
+                    echo -e "    \e[1;36m[1]\e[0m \e[1;37mTest Internet connectivity (Ping 1.1.1.1)\e[0m"
+                    echo -e "    \e[1;32m[2]\e[0m \e[1;37mConnect to Wi-Fi or Wired Network (Visual Wizard nmtui)\e[0m"
+                    echo -e "    \e[1;33m[3]\e[0m \e[1;37mRestart network service (NetworkManager)\e[0m"
+                    echo -e "    \e[1;31m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
+                end
+                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                echo ""
+                set -l prompt_net (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-3, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-3, 0]: \e[0m")
+                read -l -P (echo -e "$prompt_net") net_choice
+                test $status -ne 0; and break
+
+                switch "$net_choice"
+                    case 1
+                        clear
+                        echo ""
+                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        if test $is_es -eq 1
+                            echo -e "   \e[1;37mPRUEBA DE CONECTIVIDAD A INTERNET\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Enviando 3 paquetes ICMP a Cloudflare DNS (1.1.1.1)...\n"
+                        else
+                            echo -e "   \e[1;37mINTERNET CONNECTIVITY TEST\e[0m"
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            echo -e "    Sending 3 ICMP packets to Cloudflare DNS (1.1.1.1)...\n"
+                        end
+                        ping -c 3 1.1.1.1 | sed 's/^/    /'
+                        echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                        set -l prompt_ping_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                        read -l -P "$prompt_ping_back" dummy
+                    case 2
+                        if type -q nmtui
+                            nmtui
+                        else
+                            if test $is_es -eq 1
+                                echo -e "\n  \e[1;31m[!] NetworkManager TUI (nmtui) no está disponible en este sistema.\e[0m"
+                            else
+                                echo -e "\n  \e[1;31m[!] NetworkManager TUI (nmtui) is not available on this system.\e[0m"
+                            end
+                            sleep 2
+                        end
+                    case 3
+                        if test $is_es -eq 1
+                            echo -e "\n  \e[1;33m[*] Reiniciando NetworkManager...\e[0m"
+                        else
+                            echo -e "\n  \e[1;33m[*] Restarting NetworkManager...\e[0m"
+                        end
+                        sudo systemctl restart NetworkManager
+                        sleep 2
+                        if test $is_es -eq 1
+                            echo -e "  \e[1;32m[OK] Servicio de red reiniciado con éxito.\e[0m"
+                        else
+                            echo -e "  \e[1;32m[OK] Network service restarted successfully.\e[0m"
+                        end
+                        sleep 1
+                    case 0 'q' 'Q' ''
+                        break
+                    case '*'
+                        continue
+                end
             end
-            ping -c 3 1.1.1.1 | sed 's/^/    /'
-            echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-            set -l prompt_net_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
-            read -l -P "$prompt_net_back" dummy
         case 6 'l' 'L'
             clear
             echo ""
