@@ -614,16 +614,17 @@ PanelWindow {
             Rectangle {
                 visible: teleWindow.gpuCount > 0
                 Layout.fillWidth: true
-                implicitHeight: teleWindow.gpuCount > 1 ? gpuLayoutMulti.implicitHeight + 20 : gpuLayoutSingle.implicitHeight + 20
+                implicitHeight: gpuInnerCol.implicitHeight + 20
                 radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
                 ColumnLayout {
+                    id: gpuInnerCol
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 6
+                    spacing: 8
 
                     // Card Header: Icon, Label & SLI Badge
                     RowLayout {
@@ -683,7 +684,8 @@ PanelWindow {
                             model: teleWindow.gpus
                             delegate: Rectangle {
                                 Layout.fillWidth: true
-                                implicitHeight: 68
+                                Layout.preferredWidth: 1
+                                implicitHeight: 56
                                 radius: Theme.radiusSm
                                 color: Theme.bgElevated
                                 border.color: (modelData.temp >= 78 || modelData.util >= 85) ? Theme.borderAccent : Theme.borderSubtle
@@ -692,7 +694,7 @@ PanelWindow {
                                 ColumnLayout {
                                     anchors.fill: parent
                                     anchors.margins: 8
-                                    spacing: 4
+                                    spacing: 5
 
                                     RowLayout {
                                         Layout.fillWidth: true
@@ -725,7 +727,7 @@ PanelWindow {
                                         Text {
                                             text: "VRAM: " + modelData.vramUsed
                                             font.family: Theme.fontMono
-                                            font.pixelSize: 8
+                                            font.pixelSize: 9
                                             color: Theme.textMuted
                                         }
                                     }
@@ -754,7 +756,7 @@ PanelWindow {
                         id: gpuLayoutSingle
                         visible: teleWindow.gpuCount === 1
                         Layout.fillWidth: true
-                        spacing: 4
+                        spacing: 5
 
                         RowLayout {
                             Layout.fillWidth: true
