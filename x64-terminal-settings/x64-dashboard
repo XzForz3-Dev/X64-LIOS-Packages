@@ -1078,6 +1078,80 @@ function install_desktop_menu
     sanitize_user_dirs_and_configs
 end
 
+# Paginated log viewer for Option [7] (mode: errors | current | previous)
+# Pager options are passed directly to less on the command line (no fragile LESS/SYSTEMD_LESS env scoping).
+function x64_log_viewer -a mode
+    set -l title_es ""
+    set -l title_en ""
+    set -l j_args
+    switch $mode
+        case errors
+            set title_es "VISOR DE ERRORES CRÍTICOS DEL ARRANQUE (JOURNALCTL -P 3 -XB)"
+            set title_en "CRITICAL BOOT ERROR VIEWER (JOURNALCTL -P 3 -XB)"
+            set j_args -p 3 -x -b
+        case current
+            set title_es "REGISTRO COMPLETO DEL ARRANQUE ACTUAL (JOURNALCTL -B)"
+            set title_en "FULL CURRENT BOOT LOG (JOURNALCTL -B)"
+            set j_args -b
+        case previous
+            set title_es "REGISTRO DEL ARRANQUE ANTERIOR (JOURNALCTL -B -1)"
+            set title_en "PREVIOUS BOOT LOG (JOURNALCTL -B -1)"
+            set j_args -b -1
+        case '*'
+            return 1
+    end
+
+    clear
+    echo ""
+    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+    if test $is_es -eq 1
+        echo -e "   \e[1;37m$title_es\e[0m"
+    else
+        echo -e "   \e[1;37m$title_en\e[0m"
+    end
+    echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+
+    # Previous boot may not exist on fresh installations or volatile journals
+    if test "$mode" = "previous"
+        if test (journalctl -b -1 -n 1 -q --no-pager 2>/dev/null | count) -eq 0
+            if test $is_es -eq 1
+                echo -e "    \e[1;33m[!] No existe un arranque previo registrado en el journal.\e[0m"
+                echo -e "    Esto es normal en una instalación recién hecha o tras limpiar los registros.\n"
+            else
+                echo -e "    \e[1;33m[!] No previous boot is recorded in the journal.\e[0m"
+                echo -e "    This is normal on a fresh installation or after vacuuming the logs.\n"
+            end
+            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+            set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para volver..."; or echo "  Press Enter to return...")
+            read -l -P "$prompt_back" dummy
+            return 0
+        end
+    end
+
+    set -l less_prompt "[ Pulsa q para salir | Flechas arriba y abajo para navegar ]"
+    if test $is_es -eq 1
+        echo -e "    \e[1;33m[TIP]\e[0m Usa las flechas \e[1;32m↑ / ↓\e[0m (o Re Pág / Av Pág) para desplazarte."
+        echo -e "          Pulsa la tecla \e[1;32mq\e[0m para salir del visor y volver al menú.\n"
+        read -l -P "  Presiona Enter para abrir el visor..." dummy
+    else
+        set less_prompt "[ Press q to exit | Up and Down arrows to navigate ]"
+        echo -e "    \e[1;33m[TIP]\e[0m Use the \e[1;32m↑ / ↓\e[0m arrows (or PgUp / PgDn) to scroll."
+        echo -e "          Press the \e[1;32mq\e[0m key to exit the viewer and return to the menu.\n"
+        read -l -P "  Press Enter to open the viewer..." dummy
+    end
+
+    if type -q less
+        # -R colors, -X keep output on exit, -F auto-exit if it fits one screen, -K Ctrl+C exits, -Ps custom bottom prompt
+        SYSTEMD_COLORS=1 journalctl $j_args --no-pager 2>&1 | less -R -X -F -K -Ps"$less_prompt"
+    else
+        SYSTEMD_COLORS=1 journalctl $j_args --no-pager 2>&1 | tail -n 200
+    end
+
+    echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+    set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para volver al menú de diagnóstico..."; or echo "  Press Enter to return to the diagnostics menu...")
+    read -l -P "$prompt_back" dummy
+end
+
 # Interactive Dashboard Loop
 while true
     draw_dashboard
@@ -1770,8 +1844,7 @@ while true
                 set -l failed_units (systemctl --failed --no-legend 2>/dev/null | awk '{print $2}')
                 set -l failed_count (count $failed_units)
 
-                set -l crit_count (journalctl -p 3 -b --no-pager 2>/dev/null | grep -vcE "^(--|\$)")
-                test -z "$crit_count"; and set crit_count 0
+                set -l crit_count (journalctl -p 3 -b -q --no-pager 2>/dev/null | count)
 
                 if test $is_es -eq 1
                     echo -e "   \e[1;37mDIAGNÓSTICO DE ERRORES Y SALUD DEL SISTEMA\e[0m"
@@ -1822,25 +1895,7 @@ while true
 
                 switch "$d_choice"
                     case 1
-                        clear
-                        echo ""
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        if test $is_es -eq 1
-                            echo -e "   \e[1;37mVISOR DE ERRORES CRÍTICOS DEL ARRANQUE (JOURNALCTL)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUsa las flechas \e[1;32m↑ / ↓\e[0m para desplazarte. Pulsa \e[1;32m'q'\e[0m para salir del visor.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Pulsa 'q' para salir | Flechas para navegar ]\\\$"
-                        else
-                            echo -e "   \e[1;37mCRITICAL BOOT ERROR VIEWER (JOURNALCTL)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUse arrow keys \e[1;32m↑ / ↓\e[0m to scroll. Press \e[1;32m'q'\e[0m to exit viewer.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Press 'q' to exit | Arrow keys to navigate ]\\\$"
-                        end
-                        set -lx SYSTEMD_LESS "$LESS"
-                        journalctl -p 3 -xb
-                        echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
-                        read -l -P "$prompt_back" dummy
+                        x64_log_viewer errors
                     case 2
                         clear
                         echo ""
@@ -1880,45 +1935,9 @@ while true
                             end
                         end
                     case 3
-                        clear
-                        echo ""
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        if test $is_es -eq 1
-                            echo -e "   \e[1;37mREGISTRO COMPLETO DEL ARRANQUE ACTUAL (JOURNALCTL -B)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUsa las flechas \e[1;32m↑ / ↓\e[0m para desplazarte. Pulsa \e[1;32m'q'\e[0m para salir del visor.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Pulsa 'q' para salir | Flechas para navegar ]\\\$"
-                        else
-                            echo -e "   \e[1;37mFULL CURRENT BOOT LOG (JOURNALCTL -B)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUse arrow keys \e[1;32m↑ / ↓\e[0m to scroll. Press \e[1;32m'q'\e[0m to exit viewer.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Press 'q' to exit | Arrow keys to navigate ]\\\$"
-                        end
-                        set -lx SYSTEMD_LESS "$LESS"
-                        journalctl -b
-                        echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
-                        read -l -P "$prompt_back" dummy
+                        x64_log_viewer current
                     case 4
-                        clear
-                        echo ""
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        if test $is_es -eq 1
-                            echo -e "   \e[1;37mREGISTRO DEL ARRANQUE ANTERIOR (JOURNALCTL -B -1)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUsa las flechas \e[1;32m↑ / ↓\e[0m para desplazarte. Pulsa \e[1;32m'q'\e[0m para salir del visor.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Pulsa 'q' para salir | Flechas para navegar ]\\\$"
-                        else
-                            echo -e "   \e[1;37mPREVIOUS BOOT LOG (JOURNALCTL -B -1)\e[0m"
-                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
-                            echo -e "    \e[1;33m[TIP]\e[0m \e[1;37mUse arrow keys \e[1;32m↑ / ↓\e[0m to scroll. Press \e[1;32m'q'\e[0m to exit viewer.\e[0m\n"
-                            set -lx LESS "-FRSMK -P [ Press 'q' to exit | Arrow keys to navigate ]\\\$"
-                        end
-                        set -lx SYSTEMD_LESS "$LESS"
-                        journalctl -b -1
-                        echo -e "\n  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
-                        read -l -P "$prompt_back" dummy
+                        x64_log_viewer previous
                     case 0 'q' 'Q' ''
                         break
                     case '*'
