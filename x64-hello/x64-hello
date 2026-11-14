@@ -2902,9 +2902,25 @@ for _lc, _ldict in SCHED_TRANSLATIONS.items():
 COMING_SOON_TRANSLATIONS = {
     'en': {'COMING SOON': 'COMING SOON'},
     'es': {'COMING SOON': 'PRÓXIMAMENTE'},
-    'fr': {'COMING SOON': 'BIENTÔT DISPONIBLE'},
-    'de': {'COMING SOON': 'DEMNÄCHST VERFÜGBAR'},
-    'it': {'COMING SOON': 'PROSSIMAMENTE'},
+    'fr': {
+        'COMING SOON': 'BIENTÔT DISPONIBLE',
+        'Disabling CPU hardware vulnerability mitigations (Spectre, Meltdown, MDS, TAA, etc.) with the <b>mitigations=off</b> kernel parameter recovers <b>3% to 7% CPU performance</b> and reduces frame latency in competitive gaming.<br><br><b>Security Warning:</b> Disabling mitigations exposes the processor to speculative execution side-channel attacks from untrusted local code or unisolated web scripts.<br><br>Do you want to proceed and inject <b>mitigations=off</b> into the bootloader?<br><i>(A system restart will be required to apply this change).</i>': (
+            "La désactivation des correctifs de sécurité matériels CPU (Spectre, Meltdown, MDS, TAA, etc.) via le paramètre noyau <b>mitigations=off</b> permet de récupérer <b>3 % à 7 % de performances CPU</b> et réduit la latence en jeu compétitif.<br><br><b>Avertissement de sécurité :</b> Désactiver ces protections expose le processeur aux attaques par canal auxiliaire provenant de code local non fiable.<br><br>Voulez-vous continuer et injecter <b>mitigations=off</b> dans le chargeur d'amorçage ?<br><i>(Un redémarrage du système sera nécessaire pour appliquer ce changement).</i>"
+        ),
+    },
+    'de': {
+        'COMING SOON': 'DEMNÄCHST VERFÜGBAR',
+        'Complete arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-bit libs.': 'Komplettes Arsenal: Steam, Lutris, Heroic, Faugus, LACT, Gamescope, Proton-SLR, UMU, Wine, MangoHud, ProtonUp-Qt & 32-Bit-Bibliotheken.',
+        'Disabling CPU hardware vulnerability mitigations (Spectre, Meltdown, MDS, TAA, etc.) with the <b>mitigations=off</b> kernel parameter recovers <b>3% to 7% CPU performance</b> and reduces frame latency in competitive gaming.<br><br><b>Security Warning:</b> Disabling mitigations exposes the processor to speculative execution side-channel attacks from untrusted local code or unisolated web scripts.<br><br>Do you want to proceed and inject <b>mitigations=off</b> into the bootloader?<br><i>(A system restart will be required to apply this change).</i>': (
+            "Das Deaktivieren der CPU-Hardware-Sicherheitsfilter (Spectre, Meltdown, MDS, TAA usw.) mit dem Kernel-Parameter <b>mitigations=off</b> gewinnt <b>3 % bis 7 % CPU-Leistung</b> zurück und reduziert die Frame-Latenz im kompetitiven Gaming.<br><br><b>Sicherheitswarnung:</b> Das Deaktivieren setzt den Prozessor Seitenkanalangriffen durch nicht vertrauenswürdigen lokalen Code aus.<br><br>Möchten Sie fortfahren und <b>mitigations=off</b> in den Bootloader eintragen?<br><i>(Ein Systemneustart ist erforderlich, um diese Änderung anzuwenden).</i>"
+        ),
+    },
+    'it': {
+        'COMING SOON': 'PROSSIMAMENTE',
+        'Disabling CPU hardware vulnerability mitigations (Spectre, Meltdown, MDS, TAA, etc.) with the <b>mitigations=off</b> kernel parameter recovers <b>3% to 7% CPU performance</b> and reduces frame latency in competitive gaming.<br><br><b>Security Warning:</b> Disabling mitigations exposes the processor to speculative execution side-channel attacks from untrusted local code or unisolated web scripts.<br><br>Do you want to proceed and inject <b>mitigations=off</b> into the bootloader?<br><i>(A system restart will be required to apply this change).</i>': (
+            "La disattivazione delle mitigazioni hardware della CPU (Spectre, Meltdown, MDS, TAA, ecc.) tramite il parametro kernel <b>mitigations=off</b> recupera dal <b>3% al 7% di prestazioni CPU</b> e riduce la latenza nei giochi competitivi.<br><br><b>Avviso di sicurezza:</b> Disattivare le mitigazioni espone il processore ad attacchi side-channel da codice locale non attendibile.<br><br>Vuoi procedere e inserire <b>mitigations=off</b> nel bootloader?<br><i>(Sarà necessario riavviare il sistema per applicare la modifica).</i>"
+        ),
+    },
     'pt': {'COMING SOON': 'EM BREVE'},
     'ru': {'COMING SOON': 'СКОРО'},
 }
@@ -3234,11 +3250,6 @@ TOOLTIP_GUIDES = {
             'Impide que el chip Wi-Fi entre en micro-estados de suspensión entre paquetes, erradicando los picos de lag (jitter) en partidas online.',
             'Viene ACTIVO de fábrica en X64 LIOS para garantizar estabilidad de nivel cableado jugando por Wi-Fi.'
         ),
-        'secureboot': (
-            'Asistente criptográfico gráfico basado en sbctl para firmar el kernel y gestores de arranque UEFI.',
-            'Te permite tener Secure Boot ACTIVADO en tu placa base con tus propias claves sin borrar los certificados oficiales de Microsoft.',
-            'Úsalo si tienes Dual-Boot con Windows 11 y juegas títulos que exigen Secure Boot obligatorio en BIOS (Valorant, EA FC, FaceIT).'
-        ),
         'maint_update': (
             'Lanzador directo del Centro Oficial de Actualizaciones de X64 LIOS (x64-update).',
             'Sincroniza los repositorios oficiales [x64-lios], CachyOS, Arch, paquetes AUR y aplicaciones Flatpak en una interfaz gráfica segura.',
@@ -3490,11 +3501,6 @@ TOOLTIP_GUIDES = {
             'Wireless low-latency rule (wifi.powersave = 2) applied to NetworkManager.',
             'Prevents the Wi-Fi radio from entering micro-sleep states between packets, eliminating lag spikes (jitter) in online multiplayer games.',
             'ACTIVE out of the box in X64 LIOS to ensure wired-grade ping stability over Wi-Fi.'
-        ),
-        'secureboot': (
-            'Graphical cryptographic assistant powered by sbctl to sign your Linux kernels and UEFI bootloaders.',
-            'Allows you to keep Secure Boot ENABLED in BIOS using your own custom keys while preserving official Microsoft certificates.',
-            'Use it if you dual-boot Windows 11 and play games that strictly require Secure Boot in BIOS (Valorant, EA FC, FaceIT).'
         ),
         'maint_update': (
             'Direct launcher for the official X64 LIOS Update Center (x64-update).',
@@ -5382,7 +5388,7 @@ class MitigationsSwitchCard(QFrame):
                     return True
         except Exception:
             pass
-        for path in ["/etc/default/grub", "/etc/default/limine", "/boot/limine.conf"]:
+        for path in ["/etc/default/grub", "/etc/default/limine", "/boot/limine.conf", "/boot/efi/limine.conf", "/boot/refind_linux.conf"]:
             if os.path.exists(path):
                 try:
                     with open(path, "r") as f:
@@ -5390,6 +5396,15 @@ class MitigationsSwitchCard(QFrame):
                             return True
                 except Exception:
                     pass
+        if os.path.isdir("/boot/loader/entries"):
+            try:
+                for fname in os.listdir("/boot/loader/entries"):
+                    if fname.endswith(".conf"):
+                        with open(os.path.join("/boot/loader/entries", fname), "r") as f:
+                            if "mitigations=off" in f.read():
+                                return True
+            except Exception:
+                pass
         return False
 
     def refresh_state(self):
@@ -6449,15 +6464,15 @@ class X64Hello(QWidget):
         )
         info_label = QLabel(hud_text)
         info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info_label.setStyleSheet("color: #555555; font-size: 11.5px; font-weight: bold; line-height: 1.45; background: transparent; border: none;")
+        info_label.setStyleSheet("color: #8a8a93; font-size: 11.5px; font-weight: bold; line-height: 1.45; background: transparent; border: none;")
         sidebar_layout.addWidget(info_label)
         sidebar_layout.addSpacing(10)
 
         sidebar_sep = QFrame()
         sidebar_sep.setFixedHeight(1)
-        sidebar_sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.06); border: none;")
+        sidebar_sep.setStyleSheet("background-color: rgba(255, 255, 255, 0.08); border: none;")
         sidebar_layout.addWidget(sidebar_sep)
-        sidebar_layout.addSpacing(6)
+        sidebar_layout.addSpacing(8)
 
         self.autostart_btn = QPushButton()
         self.autostart_btn.setFixedHeight(28)
@@ -6466,15 +6481,14 @@ class X64Hello(QWidget):
             QPushButton {
                 background-color: transparent;
                 border: 1px solid transparent;
-                border-radius: 14px;
+                border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                background-color: rgba(255, 255, 255, 0.035);
             }
         """)
         auto_hbox = QHBoxLayout(self.autostart_btn)
-        auto_hbox.setContentsMargins(10, 0, 8, 0)
+        auto_hbox.setContentsMargins(8, 0, 6, 0)
         auto_hbox.setSpacing(8)
 
         self.autostart_lbl = QLabel(tr("Launch at startup"))
@@ -6489,7 +6503,7 @@ class X64Hello(QWidget):
         self.autostart_btn.clicked.connect(self.toggle_autostart)
         self.update_autostart_btn()
         sidebar_layout.addWidget(self.autostart_btn)
-        sidebar_layout.addSpacing(4)
+        sidebar_layout.addSpacing(8)
 
         lang_hbox = QHBoxLayout()
         lang_hbox.addStretch(1)
@@ -6498,44 +6512,60 @@ class X64Hello(QWidget):
             'en': 'English', 'es': 'Español', 'fr': 'Français', 'de': 'Deutsch',
             'it': 'Italiano', 'pt': 'Português', 'ru': 'Русский'
         }.get(_lang_code, 'Español')
+        iso_code = _lang_code.upper()
 
-        self.lang_btn = QPushButton(" ◈  " + current_lang_str + " ")
+        self.lang_btn = QPushButton()
         self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.lang_btn.setFixedHeight(26)
         self.lang_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                color: #777777;
-                border: 1px solid transparent;
+                background-color: rgba(255, 255, 255, 0.055);
+                border: 1px solid rgba(255, 255, 255, 0.13);
                 border-radius: 13px;
-                padding: 0px 10px;
-                font-size: 11px;
             }
             QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #aaaaaa;
+                background-color: rgba(220, 38, 38, 0.15);
+                border: 1px solid rgba(239, 68, 68, 0.55);
             }
             QPushButton::menu-indicator { image: none; }
         """)
+        pill_hbox = QHBoxLayout(self.lang_btn)
+        pill_hbox.setContentsMargins(12, 0, 13, 0)
+        pill_hbox.setSpacing(6)
+
+        pill_lbl = QLabel(
+            f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;"
+            f"<span style='color:#f4f4f5; font-weight:bold;'>{current_lang_str}</span>"
+            f"&nbsp;&nbsp;<span style='color:#71717a;'>·</span>&nbsp;&nbsp;"
+            f"<span style='color:#a1a1aa; font-size:10.5px; font-weight:bold;'>{iso_code}</span>"
+        )
+        pill_lbl.setTextFormat(Qt.TextFormat.RichText)
+        pill_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pill_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        pill_lbl.setStyleSheet("font-size: 11.5px; background: transparent; border: none;")
+        pill_hbox.addWidget(pill_lbl)
+        pill_lbl.adjustSize()
+        self.lang_btn.setFixedWidth(max(136, pill_lbl.sizeHint().width() + 32))
 
         lang_menu = QMenu(self.lang_btn)
         lang_menu.setCursor(Qt.CursorShape.PointingHandCursor)
+        lang_menu.setMinimumWidth(165)
         lang_menu.setStyleSheet("""
             QMenu {
-                background-color: #0a0a0a;
-                color: #bbbbbb;
-                border: 1px solid #222222;
-                border-radius: 6px;
+                background-color: #0d0d11;
+                color: #e4e4e7;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 10px;
                 padding: 5px;
             }
             QMenu::item {
-                padding: 5px 20px 5px 15px;
-                border-radius: 4px;
+                padding: 6px 16px 6px 12px;
+                border-radius: 6px;
                 font-size: 12px;
+                font-weight: 600;
             }
             QMenu::item:selected {
-                background-color: #cc0000;
+                background-color: rgba(220, 38, 38, 0.22);
                 color: #ffffff;
             }
         """)
@@ -6547,7 +6577,8 @@ class X64Hello(QWidget):
         ]
 
         for code, name in langs:
-            action = QAction(name, lang_menu)
+            prefix = "✓   " if code == _lang_code else "      "
+            action = QAction(f"{prefix}{name}  ({code.upper()})", lang_menu)
             action.triggered.connect(lambda checked=False, c=code: self.change_language(c))
             lang_menu.addAction(action)
 
@@ -6579,9 +6610,9 @@ class X64Hello(QWidget):
         if hasattr(self, "autostart_switch"):
             self.autostart_switch.set_checked(enabled)
         if hasattr(self, "autostart_lbl"):
-            color = "#cccccc" if enabled else "#666666"
+            color = "#f4f4f5" if enabled else "#9ca3af"
             self.autostart_lbl.setStyleSheet(
-                f"color: {color}; font-size: 11.5px; font-weight: 600; background: transparent; border: none;"
+                f"color: {color}; font-size: 12px; font-weight: bold; background: transparent; border: none;"
             )
 
     def toggle_autostart(self):
@@ -7281,7 +7312,7 @@ class X64Hello(QWidget):
                 "waydroid",
                 "waydroid",
                 "android",
-                "sudo systemctl enable --now waydroid-container.service; printf '\\n\\033[1;32m[✓] Waydroid instalado y servicio waydroid-container activo.\\033[0m\\nPara inicializar la imagen de Android ejecuta: \\033[1;37mwaydroid init\\033[0m\\n'",
+                "sudo systemctl enable --now waydroid-container.service; /usr/bin/x64-waydroid-launcher --configure-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Waydroid instalado en modo Bajo Demanda (0 MB RAM en reposo).\\033[0m\\nHaz clic en \\033[1;37mABRIR\\033[0m en X64 Hello para inicializar o arrancar Android.\\n'",
                 "x64-waydroid-launcher"
             ),
             (
