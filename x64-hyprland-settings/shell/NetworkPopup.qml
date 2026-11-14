@@ -637,8 +637,8 @@ PanelWindow {
                             implicitWidth: 38
                             implicitHeight: 20
                             radius: 10
-                            color: netWindow.wifiEnabled ? Theme.accentDim : Theme.bgElevated
-                            border.color: netWindow.wifiEnabled ? Theme.accentBorder : Theme.borderSubtle
+                            color: netWindow.wifiEnabled ? "#b80000" : "#1a1a20"
+                            border.color: netWindow.wifiEnabled ? "#ff3333" : "#383842"
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -650,7 +650,7 @@ PanelWindow {
                                 radius: 7
                                 y: 3
                                 x: netWindow.wifiEnabled ? 21 : 3
-                                color: netWindow.wifiEnabled ? Theme.accent : Theme.textMuted
+                                color: netWindow.wifiEnabled ? "#ffffff" : "#777782"
                                 Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }

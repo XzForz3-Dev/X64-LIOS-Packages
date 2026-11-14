@@ -28,7 +28,6 @@ PanelWindow {
     readonly property real srcVol: (defaultSource && defaultSource.audio) ? defaultSource.audio.volume : 0.0
     readonly property bool srcMuted: (defaultSource && defaultSource.audio) ? defaultSource.audio.muted : false
 
-    // Track default devices for Quickshell telemetry
     PwObjectTracker {
         objects: {
             var list = [];
@@ -38,7 +37,6 @@ PanelWindow {
         }
     }
 
-    // Native Peak Monitor for Mic VU Meter
     PwNodePeakMonitor {
         id: micPeakMon
         node: Pipewire.defaultAudioSource
@@ -190,11 +188,13 @@ PanelWindow {
 
     function refreshAudio() {
         if (!audioDataProc.running) {
+            audioDataProc.command = ["/usr/bin/x64-hyprland-ctl", "audio", "data"];
             audioDataProc.running = true;
         }
     }
 
     function runAudioCmd(args) {
+        if (audioCmdProc.running) return;
         audioCmdProc.command = ["/usr/bin/x64-hyprland-ctl", "audio"].concat(args);
         audioCmdProc.running = true;
     }
@@ -221,7 +221,7 @@ PanelWindow {
             spacing: 12
 
             // =========================================================
-            // 1. TOP HEADER: TITLE, OVERDRIVE SWITCH & REFRESH
+            // 1. TOP HEADER: TITLE, x64-hello TOGGLE SWITCH & REFRESH
             // =========================================================
             RowLayout {
                 Layout.fillWidth: true
@@ -245,45 +245,37 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Overdrive 150% Boost Pill & Switch
+                // Overdrive Boost Label
+                Text {
+                    text: "BOOST 150%"
+                    font.family: Theme.fontMono
+                    font.pixelSize: 8
+                    font.bold: true
+                    color: audioWindow.overdrive ? "#ff4d4d" : Theme.textMuted
+                }
+
+                // x64-hello Physical Toggle Switch
                 Rectangle {
-                    implicitHeight: 22
-                    implicitWidth: boostRow.implicitWidth + 8
-                    radius: 11
-                    color: audioWindow.overdrive ? Theme.accentDim : Theme.bgElevated
-                    border.color: audioWindow.overdrive ? Theme.accentBorder : Theme.borderSubtle
+                    id: boostSwitchTrack
+                    implicitWidth: 38
+                    implicitHeight: 20
+                    radius: 10
+                    color: audioWindow.overdrive ? "#b80000" : "#1a1a20"
+                    border.color: audioWindow.overdrive ? "#ff3333" : "#383842"
                     border.width: 1
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
-                    RowLayout {
-                        id: boostRow
-                        anchors.centerIn: parent
-                        spacing: 5
-
-                        Text {
-                            text: "150%"
-                            font.family: Theme.fontMono
-                            font.pixelSize: 8
-                            font.bold: true
-                            color: audioWindow.overdrive ? Theme.accent : Theme.textMuted
-                        }
-
-                        // Mini Animated Switch Track
-                        Rectangle {
-                            implicitWidth: 26
-                            implicitHeight: 14
-                            radius: 7
-                            color: audioWindow.overdrive ? Theme.accent : "#22242b"
-
-                            Rectangle {
-                                width: 10
-                                height: 10
-                                radius: 5
-                                y: 2
-                                x: audioWindow.overdrive ? 14 : 2
-                                color: "#ffffff"
-                                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                            }
-                        }
+                    Rectangle {
+                        id: boostSwitchThumb
+                        width: 14
+                        height: 14
+                        radius: 7
+                        y: 3
+                        x: audioWindow.overdrive ? 21 : 3
+                        color: audioWindow.overdrive ? "#ffffff" : "#777782"
+                        Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
                     }
 
                     MouseArea {
@@ -333,71 +325,81 @@ PanelWindow {
             }
 
             // =========================================================
-            // 2. TAB SELECTOR PILLS
+            // 2. UNIFIED SEGMENTED TABS BAR (High-End Gaming Style)
             // =========================================================
-            RowLayout {
+            Rectangle {
                 Layout.fillWidth: true
-                spacing: 6
+                implicitHeight: 32
+                radius: 8
+                color: "#0c0d14"
+                border.color: "#1c1d26"
+                border.width: 1
 
-                Repeater {
-                    model: [
-                        { id: "sinks",   icon: "󰕾", label: I18n.audioTabSinks },
-                        { id: "sources", icon: "󰍬", label: I18n.audioTabSources },
-                        { id: "streams", icon: "󰎆", label: I18n.audioTabStreams, count: audioWindow.streams ? audioWindow.streams.length : 0 }
-                    ]
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    spacing: 2
 
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: 26
-                        radius: 7
-                        readonly property bool isSelected: audioWindow.activeTab === modelData.id
-                        color: isSelected ? Theme.accentDim : (tabArea.containsMouse ? Theme.bgHover : Theme.bgElevated)
-                        border.color: isSelected ? Theme.accentBorder : Theme.borderSubtle
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 140 } }
+                    Repeater {
+                        model: [
+                            { id: "sinks",   icon: "󰕾", label: I18n.audioTabSinks },
+                            { id: "sources", icon: "󰍬", label: I18n.audioTabSources },
+                            { id: "streams", icon: "󰎆", label: I18n.audioTabStreams, count: audioWindow.streams ? audioWindow.streams.length : 0 }
+                        ]
 
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 5
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: 6
+                            readonly property bool isSelected: audioWindow.activeTab === modelData.id
+                            color: isSelected ? "#1e1f29" : (tabSegArea.containsMouse ? "#14151f" : "transparent")
+                            border.color: isSelected ? "#33ffffff" : "transparent"
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                            Text {
-                                text: modelData.icon
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
-                                color: isSelected ? Theme.accent : (tabArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
-                            }
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 5
 
-                            Text {
-                                text: modelData.label
-                                font.family: Theme.fontSans
-                                font.pixelSize: 9
-                                font.bold: isSelected
-                                color: isSelected ? Theme.textPrimary : Theme.textSecondary
-                            }
-
-                            Rectangle {
-                                visible: Boolean(modelData.count && modelData.count > 0)
-                                implicitWidth: 14
-                                implicitHeight: 14
-                                radius: 7
-                                color: isSelected ? Theme.accent : Theme.bgCard
                                 Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.count ? String(modelData.count) : "0"
+                                    text: modelData.icon
                                     font.family: Theme.fontMono
-                                    font.pixelSize: 8
-                                    font.bold: true
-                                    color: isSelected ? "#ffffff" : Theme.textSecondary
+                                    font.pixelSize: 11
+                                    color: isSelected ? (modelData.id === "sinks" ? (audioWindow.sinkVol > 1.0 ? Theme.accent : Theme.statusOk) : (modelData.id === "sources" ? "#38bdf8" : "#a855f7")) : (tabSegArea.containsMouse ? Theme.textPrimary : Theme.textMuted)
+                                }
+
+                                Text {
+                                    text: modelData.label
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 10
+                                    font.weight: isSelected ? Font.DemiBold : Font.Normal
+                                    color: isSelected ? Theme.textPrimary : (tabSegArea.containsMouse ? Theme.textSecondary : Theme.textMuted)
+                                }
+
+                                Rectangle {
+                                    visible: Boolean(modelData.count && modelData.count > 0)
+                                    implicitWidth: 14
+                                    implicitHeight: 14
+                                    radius: 7
+                                    color: isSelected ? Theme.accent : Theme.bgElevated
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.count ? String(modelData.count) : "0"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 8
+                                        font.bold: true
+                                        color: isSelected ? "#ffffff" : Theme.textSecondary
+                                    }
                                 }
                             }
-                        }
 
-                        MouseArea {
-                            id: tabArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: audioWindow.activeTab = modelData.id
+                            MouseArea {
+                                id: tabSegArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: audioWindow.activeTab = modelData.id
+                            }
                         }
                     }
                 }
@@ -411,113 +413,133 @@ PanelWindow {
                 Layout.fillWidth: true
                 spacing: 10
 
-                // Active Output Master Slider Card
+                // ControlCenter Style Integrated Master Volume Slider
                 Rectangle {
+                    id: masterVolSlider
                     Layout.fillWidth: true
-                    implicitHeight: 80
-                    radius: Theme.radiusMd
+                    implicitHeight: 38
+                    radius: 10
                     color: Theme.bgElevated
-                    border.color: Theme.borderSubtle
+                    border.color: masterVolArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
                     border.width: 1
+                    clip: true
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Text {
-                                text: audioWindow.sinkMuted ? "󰝟" : (audioWindow.sinkVol > 1.0 ? "󰓃" : "󰕾")
-                                font.family: Theme.fontMono
-                                font.pixelSize: 14
-                                color: audioWindow.sinkMuted ? Theme.accent : (audioWindow.sinkVol > 1.0 ? Theme.accent : Theme.statusOk)
+                    // Filled Progress Bar
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        readonly property real maxLimit: audioWindow.overdrive ? 1.5 : 1.0
+                        width: Math.max(0, Math.min(parent.width, (audioWindow.sinkVol / maxLimit) * parent.width))
+                        radius: 10
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop {
+                                position: 0.0
+                                color: audioWindow.sinkMuted ? "#221111" : (audioWindow.sinkVol > 1.0 ? "#40ff2b2b" : "#2534d399")
                             }
-
-                            Text {
-                                text: audioWindow.defaultSink ? (audioWindow.defaultSink.description || audioWindow.defaultSink.name || "Altavoces") : "Dispositivo de Salida"
-                                font.family: Theme.fontSans
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: Theme.textPrimary
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                text: audioWindow.sinkMuted ? "MUT" : (Math.round(audioWindow.sinkVol * 100) + "%" + (audioWindow.sinkVol > 1.0 ? " BOOST" : ""))
-                                font.family: Theme.fontMono
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: audioWindow.sinkMuted ? Theme.accent : (audioWindow.sinkVol > 1.0 ? Theme.accent : Theme.textPrimary)
+                            GradientStop {
+                                position: 1.0
+                                color: audioWindow.sinkMuted ? "#381818" : (audioWindow.sinkVol > 1.0 ? "#e6ff2b2b" : "#9934d399")
                             }
                         }
+                        Behavior on width { NumberAnimation { duration: 50 } }
 
-                        // Master Volume Slider Track
+                        // Vertical Thumb Line
                         Rectangle {
-                            id: sinkSliderTrack
+                            visible: audioWindow.sinkVol > 0.03
+                            anchors.right: parent.right
+                            anchors.rightMargin: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 3
+                            height: 18
+                            radius: 1.5
+                            color: audioWindow.sinkMuted ? Theme.textMuted : "#ffffff"
+                        }
+                    }
+
+                    // 100% Mark Line when Overdrive is enabled
+                    Rectangle {
+                        visible: audioWindow.overdrive
+                        width: 1
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        x: Math.round(parent.width * (1.0 / 1.5))
+                        color: "#44ffffff"
+                    }
+
+                    // Foreground Content (Icon + Name + Value)
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 14
+                        spacing: 8
+
+                        Text {
+                            text: audioWindow.sinkMuted ? "󰝟" : (audioWindow.sinkVol <= 0.01 ? "󰕿" : (audioWindow.sinkVol > 1.0 ? "󰓃" : "󰕾"))
+                            font.family: Theme.fontMono
+                            font.pixelSize: 14
+                            color: audioWindow.sinkMuted ? Theme.accent : (audioWindow.sinkVol > 1.0 ? Theme.accent : Theme.textPrimary)
+                        }
+
+                        Text {
+                            text: audioWindow.defaultSink ? (audioWindow.defaultSink.description || audioWindow.defaultSink.name || "Altavoces") : "Dispositivo de Salida"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: audioWindow.sinkMuted ? Theme.textMuted : Theme.textPrimary
                             Layout.fillWidth: true
-                            implicitHeight: 22
-                            radius: 6
-                            color: "#0a0b10"
-                            border.color: Theme.borderSubtle
-                            border.width: 1
-                            clip: true
+                            elide: Text.ElideRight
+                        }
 
-                            // Active Fill
-                            Rectangle {
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.left: parent.left
-                                readonly property real maxLimit: audioWindow.overdrive ? 1.5 : 1.0
-                                width: Math.max(0, Math.min(parent.width, (audioWindow.sinkVol / maxLimit) * parent.width))
-                                radius: 5
-                                color: audioWindow.sinkMuted ? "#451a1a" : (audioWindow.sinkVol > 1.0 ? Theme.accent : "#34d399")
-                                Behavior on width { NumberAnimation { duration: 60 } }
+                        Text {
+                            text: audioWindow.sinkMuted ? "MUTE" : (Math.round(audioWindow.sinkVol * 100) + "%" + (audioWindow.sinkVol > 1.0 ? " BOOST" : ""))
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: audioWindow.sinkMuted ? Theme.accent : (audioWindow.sinkVol > 1.0 ? Theme.accent : Theme.textPrimary)
+                        }
+                    }
+
+                    MouseArea {
+                        id: masterVolArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        function setVol(mx) {
+                            let maxL = audioWindow.overdrive ? 1.5 : 1.0;
+                            let ratio = Math.max(0.0, Math.min(maxL, (mx / masterVolSlider.width) * maxL));
+                            if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
+                                audioWindow.defaultSink.audio.volume = ratio;
+                                if (audioWindow.defaultSink.audio.muted && ratio > 0.01) {
+                                    audioWindow.defaultSink.audio.muted = false;
+                                }
                             }
-
-                            // 100% Mark Line when Overdrive is enabled
-                            Rectangle {
-                                visible: audioWindow.overdrive
-                                width: 1
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                x: Math.round(parent.width * (1.0 / 1.5))
-                                color: "#44ffffff"
+                        }
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                                if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
+                                    audioWindow.defaultSink.audio.muted = !audioWindow.defaultSink.audio.muted;
+                                }
+                            } else {
+                                setVol(mouse.x);
                             }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                function setVol(mx) {
-                                    let maxL = audioWindow.overdrive ? 1.5 : 1.0;
-                                    let ratio = Math.max(0.0, Math.min(maxL, (mx / sinkSliderTrack.width) * maxL));
-                                    if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
-                                        audioWindow.defaultSink.audio.volume = ratio;
-                                        if (audioWindow.defaultSink.audio.muted && ratio > 0.01) {
-                                            audioWindow.defaultSink.audio.muted = false;
-                                        }
-                                    }
-                                }
-                                onClicked: (mouse) => setVol(mouse.x)
-                                onPositionChanged: (mouse) => {
-                                    if (pressed) setVol(mouse.x);
-                                }
-                                onWheel: (wheel) => {
-                                    if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
-                                        let maxL = audioWindow.overdrive ? 1.5 : 1.0;
-                                        let step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                                        audioWindow.defaultSink.audio.volume = Math.max(0.0, Math.min(maxL, audioWindow.defaultSink.audio.volume + step));
-                                    }
-                                }
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (pressed && mouse.x >= 32) setVol(mouse.x);
+                        }
+                        onWheel: (wheel) => {
+                            if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
+                                let maxL = audioWindow.overdrive ? 1.5 : 1.0;
+                                let step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                audioWindow.defaultSink.audio.volume = Math.max(0.0, Math.min(maxL, audioWindow.defaultSink.audio.volume + step));
                             }
                         }
                     }
                 }
 
-                // Available Output Devices List
+                // Available Output Devices Section Header
                 Text {
                     text: I18n.audioOutputDevices.toUpperCase()
                     font.family: Theme.fontMono
@@ -526,6 +548,7 @@ PanelWindow {
                     color: Theme.textMuted
                 }
 
+                // Available Devices List
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 4
@@ -535,8 +558,8 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 7
+                            implicitHeight: 38
+                            radius: 8
                             color: modelData.isDefault ? Theme.bgElevated : (sinkRowArea.containsMouse ? Theme.bgHover : "#0affffff")
                             border.color: modelData.isDefault ? Theme.borderGlass : Theme.borderSubtle
                             border.width: 1
@@ -546,11 +569,21 @@ PanelWindow {
                                 anchors.margins: 8
                                 spacing: 8
 
-                                Text {
-                                    text: modelData.icon || "󰕾"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 13
-                                    color: modelData.isDefault ? Theme.statusOk : Theme.textSecondary
+                                Rectangle {
+                                    implicitWidth: 24
+                                    implicitHeight: 24
+                                    radius: 6
+                                    color: modelData.isDefault ? "#1434d399" : Theme.bgElevated
+                                    border.color: modelData.isDefault ? "#3334d399" : Theme.borderSubtle
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.icon || "󰕾"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 12
+                                        color: modelData.isDefault ? Theme.statusOk : Theme.textSecondary
+                                    }
                                 }
 
                                 Text {
@@ -617,112 +650,126 @@ PanelWindow {
                 Layout.fillWidth: true
                 spacing: 10
 
-                // Active Mic & Gain Card
+                // Integrated Microphone Gain Slider
+                Rectangle {
+                    id: masterSrcSlider
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    radius: 10
+                    color: Theme.bgElevated
+                    border.color: masterSrcArea.containsMouse ? "#28ffffff" : Theme.borderSubtle
+                    border.width: 1
+                    clip: true
+
+                    // Filled Progress Bar
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: Math.max(0, Math.min(parent.width, audioWindow.srcVol * parent.width))
+                        radius: 10
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop {
+                                position: 0.0
+                                color: audioWindow.srcMuted ? "#221111" : "#1e38bdf8"
+                            }
+                            GradientStop {
+                                position: 1.0
+                                color: audioWindow.srcMuted ? "#381818" : "#8038bdf8"
+                            }
+                        }
+                        Behavior on width { NumberAnimation { duration: 50 } }
+
+                        Rectangle {
+                            visible: audioWindow.srcVol > 0.03
+                            anchors.right: parent.right
+                            anchors.rightMargin: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 3
+                            height: 18
+                            radius: 1.5
+                            color: audioWindow.srcMuted ? Theme.textMuted : "#ffffff"
+                        }
+                    }
+
+                    // Foreground Content
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 14
+                        spacing: 8
+
+                        Text {
+                            text: audioWindow.srcMuted ? "󰍭" : "󰍬"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 14
+                            color: audioWindow.srcMuted ? Theme.accent : "#38bdf8"
+                        }
+
+                        Text {
+                            text: audioWindow.defaultSource ? (audioWindow.defaultSource.description || audioWindow.defaultSource.name || "Micrófono") : "Micrófono"
+                            font.family: Theme.fontSans
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: audioWindow.srcMuted ? Theme.textMuted : Theme.textPrimary
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: audioWindow.srcMuted ? "MUT" : Math.round(audioWindow.srcVol * 100) + "%"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            color: audioWindow.srcMuted ? Theme.accent : Theme.textPrimary
+                        }
+                    }
+
+                    MouseArea {
+                        id: masterSrcArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        function setVol(mx) {
+                            let ratio = Math.max(0.0, Math.min(1.0, mx / masterSrcSlider.width));
+                            if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
+                                audioWindow.defaultSource.audio.volume = ratio;
+                                if (audioWindow.defaultSource.audio.muted && ratio > 0.01) {
+                                    audioWindow.defaultSource.audio.muted = false;
+                                }
+                            }
+                        }
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                                if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
+                                    audioWindow.defaultSource.audio.muted = !audioWindow.defaultSource.audio.muted;
+                                }
+                            } else {
+                                setVol(mouse.x);
+                            }
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (pressed && mouse.x >= 32) setVol(mouse.x);
+                        }
+                    }
+                }
+
+                // Dynamic Live Voice VU Meter Card
                 Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 110
-                    radius: Theme.radiusMd
+                    implicitHeight: 34
+                    radius: 8
                     color: Theme.bgElevated
                     border.color: Theme.borderSubtle
                     border.width: 1
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
+                        anchors.margins: 7
+                        spacing: 4
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Text {
-                                text: audioWindow.srcMuted ? "󰍭" : "󰍬"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 14
-                                color: audioWindow.srcMuted ? Theme.accent : Theme.statusOk
-                            }
-
-                            Text {
-                                text: audioWindow.defaultSource ? (audioWindow.defaultSource.description || audioWindow.defaultSource.name || "Micrófono") : "Micrófono"
-                                font.family: Theme.fontSans
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: Theme.textPrimary
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-
-                            // Mute Toggle Button
-                            Rectangle {
-                                implicitHeight: 20
-                                implicitWidth: 44
-                                radius: 5
-                                color: audioWindow.srcMuted ? Theme.accentDim : Theme.bgCard
-                                border.color: audioWindow.srcMuted ? Theme.accentBorder : Theme.borderSubtle
-                                border.width: 1
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: audioWindow.srcMuted ? "MUT" : Math.round(audioWindow.srcVol * 100) + "%"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 8
-                                    font.bold: true
-                                    color: audioWindow.srcMuted ? Theme.accent : Theme.textPrimary
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
-                                            audioWindow.defaultSource.audio.muted = !audioWindow.defaultSource.audio.muted;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Gain Slider
-                        Rectangle {
-                            id: srcSliderTrack
-                            Layout.fillWidth: true
-                            implicitHeight: 20
-                            radius: 5
-                            color: "#0a0b10"
-                            border.color: Theme.borderSubtle
-                            border.width: 1
-                            clip: true
-
-                            Rectangle {
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.left: parent.left
-                                width: Math.max(0, Math.min(parent.width, audioWindow.srcVol * parent.width))
-                                radius: 4
-                                color: audioWindow.srcMuted ? "#451a1a" : "#38bdf8"
-                                Behavior on width { NumberAnimation { duration: 60 } }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                function setVol(mx) {
-                                    let ratio = Math.max(0.0, Math.min(1.0, mx / srcSliderTrack.width));
-                                    if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
-                                        audioWindow.defaultSource.audio.volume = ratio;
-                                        if (audioWindow.defaultSource.audio.muted && ratio > 0.01) {
-                                            audioWindow.defaultSource.audio.muted = false;
-                                        }
-                                    }
-                                }
-                                onClicked: (mouse) => setVol(mouse.x)
-                                onPositionChanged: (mouse) => {
-                                    if (pressed) setVol(mouse.x);
-                                }
-                            }
-                        }
-
-                        // Dynamic Real-time Voice VU Meter
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -745,11 +792,11 @@ PanelWindow {
                             }
                         }
 
-                        // VU Meter Physical Bar
+                        // Physical VU Meter Bar
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 8
-                            radius: 4
+                            implicitHeight: 6
+                            radius: 3
                             color: "#0a0b10"
                             border.color: Theme.borderSubtle
                             border.width: 1
@@ -762,13 +809,13 @@ PanelWindow {
                                 width: Math.max(0, Math.min(parent.width, (micPeakMon.peak * 2.2) * parent.width))
                                 radius: 3
                                 color: audioWindow.srcMuted ? "transparent" : (micPeakMon.peak > 0.85 ? Theme.accent : (micPeakMon.peak > 0.60 ? "#fbbf24" : Theme.statusOk))
-                                Behavior on width { NumberAnimation { duration: 50 } }
+                                Behavior on width { NumberAnimation { duration: 45 } }
                             }
                         }
                     }
                 }
 
-                // Available Input Devices List
+                // Available Input Devices Section Header
                 Text {
                     text: I18n.audioInputDevices.toUpperCase()
                     font.family: Theme.fontMono
@@ -786,8 +833,8 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 36
-                            radius: 7
+                            implicitHeight: 38
+                            radius: 8
                             color: modelData.isDefault ? Theme.bgElevated : (srcRowArea.containsMouse ? Theme.bgHover : "#0affffff")
                             border.color: modelData.isDefault ? Theme.borderGlass : Theme.borderSubtle
                             border.width: 1
@@ -797,11 +844,21 @@ PanelWindow {
                                 anchors.margins: 8
                                 spacing: 8
 
-                                Text {
-                                    text: modelData.icon || "󰍬"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 13
-                                    color: modelData.isDefault ? Theme.statusOk : Theme.textSecondary
+                                Rectangle {
+                                    implicitWidth: 24
+                                    implicitHeight: 24
+                                    radius: 6
+                                    color: modelData.isDefault ? "#1438bdf8" : Theme.bgElevated
+                                    border.color: modelData.isDefault ? "#3338bdf8" : Theme.borderSubtle
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: modelData.icon || "󰍬"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: 12
+                                        color: modelData.isDefault ? "#38bdf8" : Theme.textSecondary
+                                    }
                                 }
 
                                 Text {
@@ -919,7 +976,7 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 56
+                            implicitHeight: 52
                             radius: Theme.radiusMd
                             color: Theme.bgElevated
                             border.color: Theme.borderSubtle
