@@ -2128,10 +2128,29 @@ def run_gui():
             self.lbl_tx_status = QLabel("⏳ Ejecutando comandos de actualización...")
             footer_box.addWidget(self.lbl_tx_status, stretch=2)
 
-            self.btn_tx_reboot = QPushButton("🔄 Reiniciar Sistema")
+            self.btn_tx_reboot = QPushButton("⚡ Reiniciar Ahora")
             self.btn_tx_reboot.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_tx_reboot.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #b91c1c);
+                    color: #ffffff;
+                    border: 1px solid #f87171;
+                    border-radius: 8px;
+                    padding: 10px 24px;
+                    font-weight: 800;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f87171, stop:1 #dc2626);
+                    border: 1px solid #fca5a5;
+                }
+                QPushButton:pressed {
+                    background: #991b1b;
+                    border: 1px solid #b91c1c;
+                }
+            """)
             self.btn_tx_reboot.setVisible(False)
-            self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot"))
+            self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot 2>/dev/null || sudo systemctl reboot"))
             footer_box.addWidget(self.btn_tx_reboot)
 
             self.btn_tx_done = QPushButton("Procesando...")
