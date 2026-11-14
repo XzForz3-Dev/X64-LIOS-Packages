@@ -210,7 +210,11 @@ PanelWindow {
                     teleWindow.gpuUtil = data.gpuUtil || 0;
                     teleWindow.gpus = data.gpus || [];
                     if (data.topList && data.topList.length > 0) {
-                        teleWindow.topList = data.topList;
+                        if (typeof procListView !== "undefined" && procListView && procListView.applyNewList) {
+                            procListView.applyNewList(data.topList);
+                        } else {
+                            teleWindow.topList = data.topList;
+                        }
                     }
                 } catch (e) {}
             }
@@ -238,6 +242,10 @@ PanelWindow {
             card.scale = 1.0;
             card.y = 0;
             card.opacity = 1.0;
+            if (typeof procListView !== "undefined" && procListView) {
+                procListView.stickyY = 0;
+                procListView.contentY = 0;
+            }
         }
     }
 
@@ -878,6 +886,32 @@ PanelWindow {
                         spacing: 3
                         boundsBehavior: Flickable.StopAtBounds
                         model: teleWindow.topList
+
+                        property real stickyY: 0
+                        property bool updatingModel: false
+
+                        onContentYChanged: {
+                            if (!updatingModel) {
+                                stickyY = Math.max(0, contentY);
+                            }
+                        }
+
+                        function applyNewList(newList) {
+                            if (procScrollBar && procScrollBar.pressed) {
+                                return;
+                            }
+                            if (moving || dragging || flicking) {
+                                return;
+                            }
+                            updatingModel = true;
+                            let savedY = stickyY;
+                            teleWindow.topList = newList;
+                            contentY = Math.min(savedY, Math.max(0, contentHeight - height));
+                            Qt.callLater(() => {
+                                contentY = Math.min(savedY, Math.max(0, contentHeight - height));
+                                updatingModel = false;
+                            });
+                        }
 
                         ScrollBar.vertical: ScrollBar {
                             id: procScrollBar
