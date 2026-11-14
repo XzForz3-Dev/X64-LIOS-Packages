@@ -705,7 +705,7 @@ PanelWindow {
                             delegate: Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: 1
-                                implicitHeight: 56
+                                implicitHeight: 58
                                 radius: Theme.radiusSm
                                 color: Theme.bgElevated
                                 border.color: (modelData.temp >= 78 || modelData.util >= 85) ? Theme.borderAccent : Theme.borderSubtle
@@ -740,14 +740,14 @@ PanelWindow {
                                         Text {
                                             text: (I18n.isEs ? "Carga: " : "Load: ") + modelData.util + "%"
                                             font.family: Theme.fontMono
-                                            font.pixelSize: 9
+                                            font.pixelSize: 8
                                             color: modelData.util >= 85 ? Theme.accent : (modelData.util >= 65 ? Theme.statusWarn : Theme.textMuted)
                                         }
                                         Item { Layout.fillWidth: true }
                                         Text {
-                                            text: "VRAM: " + modelData.vramUsed
+                                            text: "VRAM: " + modelData.vramUsed + (modelData.vramTotal ? (" / " + modelData.vramTotal) : "")
                                             font.family: Theme.fontMono
-                                            font.pixelSize: 9
+                                            font.pixelSize: 8
                                             color: Theme.textMuted
                                         }
                                     }
@@ -848,10 +848,11 @@ PanelWindow {
                     id: topProcCol
                     anchors.fill: parent
                     anchors.margins: 10
-                    spacing: 5
+                    spacing: 6
 
                     RowLayout {
                         Layout.fillWidth: true
+                        Layout.rightMargin: 6
                         Text {
                             text: I18n.teleActiveProcesses
                             font.family: Theme.fontMono
@@ -869,44 +870,73 @@ PanelWindow {
                         }
                     }
 
-                    Repeater {
+                    ListView {
+                        id: procListView
+                        Layout.fillWidth: true
+                        implicitHeight: 147
+                        clip: true
+                        spacing: 3
+                        boundsBehavior: Flickable.StopAtBounds
                         model: teleWindow.topList
-                        delegate: RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
 
-                            Text {
-                                text: (index + 1) + "."
-                                font.family: Theme.fontMono
-                                font.pixelSize: 10
-                                color: Theme.textMuted
+                        ScrollBar.vertical: ScrollBar {
+                            id: procScrollBar
+                            policy: procListView.count > 6 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                            implicitWidth: 4
+                            contentItem: Rectangle {
+                                implicitWidth: 4
+                                radius: 2
+                                color: procScrollBar.pressed ? Theme.accent : (procScrollBar.hovered ? Theme.textPrimary : Theme.textMuted)
                             }
-
-                            Text {
-                                text: modelData.name || "proc"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: Theme.textPrimary
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
+                            background: Rectangle {
+                                implicitWidth: 4
+                                radius: 2
+                                color: Theme.borderSubtle
                             }
+                        }
 
-                            Text {
-                                text: modelData.mem || "0 MB"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 10
-                                color: Theme.textSecondary
-                            }
+                        delegate: Item {
+                            width: procListView.width - (procScrollBar.visible ? 8 : 0)
+                            height: 22
 
-                            Text {
-                                text: modelData.cpu || "0.0%"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 10
-                                font.bold: true
-                                color: Theme.textPrimary
-                                Layout.preferredWidth: 46
-                                horizontalAlignment: Text.AlignRight
+                            RowLayout {
+                                anchors.fill: parent
+                                spacing: 8
+
+                                Text {
+                                    text: (index + 1) + "."
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: Theme.textMuted
+                                    Layout.preferredWidth: 22
+                                }
+
+                                Text {
+                                    text: modelData.name || "proc"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: Theme.textPrimary
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: modelData.mem || "0 MB"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: Theme.textSecondary
+                                }
+
+                                Text {
+                                    text: modelData.cpu || "0.0%"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    color: Theme.textPrimary
+                                    Layout.preferredWidth: 46
+                                    horizontalAlignment: Text.AlignRight
+                                }
                             }
                         }
                     }

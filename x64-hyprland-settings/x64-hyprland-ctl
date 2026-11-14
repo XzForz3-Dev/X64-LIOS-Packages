@@ -769,11 +769,11 @@ cmd_status() {
         }' /proc/uptime 2>/dev/null)
     fi
 
-    # 6. Top 5 Processes by CPU + Memory (Structured JSON Array & Legacy String)
+    # 6. Top 15 Processes by CPU + Memory (Structured JSON Array & Legacy String)
     local top_procs top_list_json
     top_procs=$(ps -eo comm,%cpu --sort=-%cpu,-rss 2>/dev/null | awk 'NR>1 && $1 !~ /^(ps|awk|sh|bash|x64-hyprland)/ && c<5 {c++; printf "%s%s (%.1f%%)", (c>1?" • ":""), $1, $2}')
     [ -z "$top_procs" ] && top_procs="Hyprland • quickshell"
-    top_list_json=$(ps -eo comm,%cpu,rss --sort=-%cpu,-rss 2>/dev/null | awk 'BEGIN{printf "["} NR>1 && $1 !~ /^(ps|awk|sh|bash|x64-hyprland)/ && c<5 {
+    top_list_json=$(ps -eo comm,%cpu,rss --sort=-%cpu,-rss 2>/dev/null | awk 'BEGIN{printf "["} NR>1 && $1 !~ /^(ps|awk|sh|bash|x64-hyprland)/ && c<15 {
         c++;
         gsub(/"/,"",$1);
         printf "%s{\"name\":\"%s\",\"cpu\":\"%.1f%%\",\"mem\":\"%.0f MB\"}", (c>1?",":""), $1, $2, $3/1024
