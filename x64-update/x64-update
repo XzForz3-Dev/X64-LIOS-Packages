@@ -149,6 +149,49 @@ def check_official_repos():
             line = line.strip()
             if line:
                 repo_pkgs.append(line)
+
+        # Capturar reemplazos (replaces) y dependencias que checkupdates (pacman -Qu) omite
+        db_to_use = tmp_db if os.path.isdir(os.path.join(tmp_db, "sync")) else None
+        sup_cmd = ["pacman", "-Sup", "--print-format", "%n %v"]
+        if db_to_use:
+            sup_cmd.extend(["--dbpath", db_to_use])
+
+        res_sup = subprocess.run(
+            sup_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=25
+        )
+        if res_sup.returncode == 0:
+            existing_names = {line.split()[0] for line in repo_pkgs if line.split()}
+            for sup_line in res_sup.stdout.strip().splitlines():
+                parts = sup_line.strip().split()
+                if len(parts) >= 2:
+                    p_name, p_ver = parts[0], parts[1]
+                    if p_name not in existing_names:
+                        old_pkg = None
+                        old_ver = ""
+                        si_cmd = ["pacman", "-Si", p_name]
+                        if db_to_use:
+                            si_cmd.extend(["--dbpath", db_to_use])
+                        si_res = subprocess.run(si_cmd, stdout=subprocess.PIPE, text=True, timeout=5)
+                        for si_line in si_res.stdout.splitlines():
+                            if si_line.startswith("Remplaza a") or si_line.startswith("Replaces"):
+                                rep_val = si_line.split(":", 1)[1].strip()
+                                if rep_val and rep_val not in ("Nada", "None"):
+                                    old_pkg = rep_val.split()[0]
+                                    break
+                        if old_pkg:
+                            q_res = subprocess.run(["pacman", "-Q", old_pkg], stdout=subprocess.PIPE, text=True, timeout=5)
+                            if q_res.returncode == 0:
+                                old_ver = q_res.stdout.strip().split()[1]
+                                repo_pkgs.append(f"{p_name} {old_ver} -> {p_ver}")
+                            else:
+                                repo_pkgs.append(f"{p_name} [reemplazo] -> {p_ver}")
+                        else:
+                            repo_pkgs.append(f"{p_name} [nuevo] -> {p_ver}")
+                        existing_names.add(p_name)
     except Exception:
         pass
     finally:

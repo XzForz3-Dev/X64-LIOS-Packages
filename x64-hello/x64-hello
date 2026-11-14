@@ -87,20 +87,45 @@ def get_static_hw_info():
 
     gpu_model = "VGA / DRM Graphics"
     try:
+        import re
         res = subprocess.run(
-            ["lspci"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5
+            ["lspci"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.0
         )
+        detected_gpus = []
         for line in res.stdout.splitlines():
-            if "VGA compatible controller:" in line or "3D controller:" in line or "Display controller:" in line:
-                part = line.split(":", 2)[-1].strip()
-                part = part.split("(rev")[0].strip()
-                for token in ["Corporation", "Incorporated"]:
-                    part = part.replace(token, "")
-                part = " ".join(part.split())
-                if len(part) > 40:
-                    part = part[:37] + "..."
-                gpu_model = part
-                break
+            if any(k in line for k in ["VGA compatible controller:", "3D controller:", "Display controller:"]):
+                raw = re.split(r"(?:VGA compatible controller|3D controller|Display controller):\s*", line)[-1].strip()
+                raw = raw.split("(rev")[0].strip()
+                for token in ["Corporation", "Incorporated", "Ltd.", "Co.", ", Inc.", "[AMD/ATI]"]:
+                    raw = raw.replace(token, "")
+                brand = ""
+                if "nvidia" in raw.lower():
+                    brand = "NVIDIA"
+                elif "amd" in raw.lower() or "radeon" in raw.lower():
+                    brand = "AMD"
+                elif "intel" in raw.lower():
+                    brand = "Intel"
+
+                bracket_match = re.search(r"\[(.*?)\]", raw)
+                if bracket_match:
+                    friendly = bracket_match.group(1).strip()
+                    if brand and not friendly.lower().startswith(brand.lower()):
+                        clean = f"{brand} {friendly}"
+                    else:
+                        clean = friendly
+                else:
+                    clean = " ".join(raw.split())
+                detected_gpus.append(clean)
+
+        if detected_gpus:
+            if len(detected_gpus) == 2 and detected_gpus[0] == detected_gpus[1]:
+                gpu_model = f"{detected_gpus[0]} (x2 SLI)"
+            elif len(detected_gpus) > 1 and "Intel" in detected_gpus[0] and "NVIDIA" in detected_gpus[1]:
+                gpu_model = f"{detected_gpus[1]} + {detected_gpus[0]}"
+            else:
+                gpu_model = detected_gpus[0]
+            if len(gpu_model) > 42:
+                gpu_model = gpu_model[:39] + "..."
     except Exception:
         pass
 
