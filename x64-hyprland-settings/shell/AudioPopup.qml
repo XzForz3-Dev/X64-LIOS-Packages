@@ -164,7 +164,22 @@ PanelWindow {
                     let json = JSON.parse(audioDataCollector.text.trim());
                     if (json.sinks) audioWindow.sinks = json.sinks;
                     if (json.sources) audioWindow.sources = json.sources;
-                    if (json.streams && !audioWindow.isInteractingWithStreams) audioWindow.streams = json.streams;
+                    if (json.streams && !audioWindow.isInteractingWithStreams) {
+                        let needReplace = false;
+                        if (!audioWindow.streams || audioWindow.streams.length !== json.streams.length) {
+                            needReplace = true;
+                        } else {
+                            for (let i = 0; i < json.streams.length; i++) {
+                                if (audioWindow.streams[i].index !== json.streams[i].index) {
+                                    needReplace = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (needReplace) {
+                            audioWindow.streams = json.streams;
+                        }
+                    }
                     if (json.overdrive !== undefined) audioWindow.overdrive = Boolean(json.overdrive);
                 } catch (e) {
                 }
@@ -186,7 +201,7 @@ PanelWindow {
     }
 
     function setStreamVolumeDirect(idx, pct) {
-        let cmd = ["/usr/bin/x64-hyprland-ctl", "audio", "set-stream-volume", String(idx), String(pct)];
+        let cmd = ["/usr/bin/pactl", "set-sink-input-volume", String(idx), String(pct) + "%"];
         if (streamVolProc.running) {
             streamVolProc.pendingCmd = cmd;
         } else {
@@ -764,6 +779,12 @@ PanelWindow {
                         onPositionChanged: (mouse) => {
                             if (pressed) setVol(mouse.x);
                         }
+                        onWheel: (wheel) => {
+                            if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
+                                let step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                                audioWindow.defaultSource.audio.volume = Math.max(0.0, Math.min(1.0, audioWindow.defaultSource.audio.volume + step));
+                            }
+                        }
                     }
                 }
 
@@ -1000,19 +1021,15 @@ PanelWindow {
                             border.width: 1
                             clip: true
 
-                            property real serverVol: (modelData && modelData.volume !== undefined) ? (modelData.volume / 100.0) : 1.0
-                            property real userVol: -1.0
-                            readonly property real liveVol: userVol >= 0.0 ? userVol : serverVol
-                            property bool userMuted: false
-                            property bool hasUserMute: false
-                            readonly property bool isMuted: hasUserMute ? userMuted : Boolean(modelData && modelData.muted)
+                            property real currentVol: (modelData && modelData.volume !== undefined) ? (modelData.volume / 100.0) : 1.0
+                            property bool isMuted: Boolean(modelData && modelData.muted)
 
                             // Filled Progress Bar with smooth animation
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
-                                width: Math.max(0, Math.min(parent.width, appStreamRow.liveVol * parent.width))
+                                width: Math.max(0, Math.min(parent.width, appStreamRow.currentVol * parent.width))
                                 radius: 10
                                 gradient: Gradient {
                                     orientation: Gradient.Horizontal
@@ -1025,11 +1042,11 @@ PanelWindow {
                                         color: appStreamRow.isMuted ? "#381818" : "#80818cf8"
                                     }
                                 }
-                                Behavior on width { NumberAnimation { duration: appDragArea.pressed ? 0 : 50 } }
+                                Behavior on width { NumberAnimation { duration: appDragArea.pressed ? 0 : 40 } }
 
                                 // Vertical White Thumb Indicator Line
                                 Rectangle {
-                                    visible: appStreamRow.liveVol > 0.03
+                                    visible: appStreamRow.currentVol > 0.03
                                     anchors.right: parent.right
                                     anchors.rightMargin: 2
                                     anchors.verticalCenter: parent.verticalCenter
@@ -1048,14 +1065,14 @@ PanelWindow {
                                 spacing: 8
 
                                 Text {
-                                    text: appStreamRow.isMuted ? "󰝟" : (appStreamRow.liveVol <= 0.01 ? "󰕿" : (appStreamRow.liveVol < 0.5 ? "󰖀" : "󰕾"))
+                                    text: appStreamRow.isMuted ? "󰝟" : (appStreamRow.currentVol <= 0.01 ? "󰕿" : (appStreamRow.currentVol < 0.5 ? "󰖀" : "󰕾"))
                                     font.family: Theme.fontMono
                                     font.pixelSize: 14
                                     color: appStreamRow.isMuted ? Theme.accent : "#818cf8"
                                 }
 
                                 Text {
-                                    text: modelData.name
+                                    text: modelData.name || "App"
                                     font.family: Theme.fontSans
                                     font.pixelSize: 11
                                     font.weight: Font.DemiBold
@@ -1065,7 +1082,7 @@ PanelWindow {
                                 }
 
                                 Text {
-                                    text: appStreamRow.isMuted ? "MUTE" : Math.round(appStreamRow.liveVol * 100) + "%"
+                                    text: appStreamRow.isMuted ? "MUTE" : Math.round(appStreamRow.currentVol * 100) + "%"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 10
                                     font.bold: true
@@ -1075,23 +1092,20 @@ PanelWindow {
 
                             Timer {
                                 id: applyTimer
-                                interval: 35
+                                interval: 30
                                 repeat: false
                                 onTriggered: {
-                                    let pct = Math.round(appStreamRow.liveVol * 100);
+                                    let pct = Math.round(appStreamRow.currentVol * 100);
                                     audioWindow.setStreamVolumeDirect(modelData.index, pct);
                                 }
                             }
 
                             Timer {
-                                id: resetTimer
-                                interval: 1500
+                                id: idleTimer
+                                interval: 800
                                 repeat: false
                                 onTriggered: {
-                                    if (!appDragArea.pressed) {
-                                        appStreamRow.userVol = -1.0;
-                                        appStreamRow.hasUserMute = false;
-                                    }
+                                    audioWindow.isInteractingWithStreams = false;
                                 }
                             }
 
@@ -1101,41 +1115,49 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                function updateVol(mx) {
+                                function applyVol(mx) {
+                                    audioWindow.isInteractingWithStreams = true;
                                     let ratio = Math.max(0.0, Math.min(1.0, mx / appStreamRow.width));
-                                    appStreamRow.userVol = ratio;
+                                    appStreamRow.currentVol = ratio;
+                                    if (modelData) modelData.volume = Math.round(ratio * 100);
                                     if (appStreamRow.isMuted && ratio > 0.01) {
-                                        appStreamRow.hasUserMute = true;
-                                        appStreamRow.userMuted = false;
+                                        appStreamRow.isMuted = false;
+                                        if (modelData) modelData.muted = false;
                                     }
                                     applyTimer.restart();
+                                    idleTimer.restart();
                                 }
                                 onPressed: (mouse) => {
                                     audioWindow.isInteractingWithStreams = true;
                                     if (mouse.button === Qt.RightButton) {
-                                        appStreamRow.hasUserMute = true;
-                                        appStreamRow.userMuted = !appStreamRow.isMuted;
+                                        appStreamRow.isMuted = !appStreamRow.isMuted;
+                                        if (modelData) modelData.muted = appStreamRow.isMuted;
                                         audioWindow.runAudioCmd(["toggle-stream-mute", String(modelData.index)]);
-                                        resetTimer.restart();
+                                        idleTimer.restart();
                                     } else {
-                                        updateVol(mouse.x);
+                                        applyVol(mouse.x);
                                     }
                                 }
                                 onPositionChanged: (mouse) => {
-                                    if (pressed) updateVol(mouse.x);
+                                    if (pressed) applyVol(mouse.x);
                                 }
                                 onReleased: {
-                                    audioWindow.isInteractingWithStreams = false;
-                                    let pct = Math.round(appStreamRow.liveVol * 100);
+                                    let pct = Math.round(appStreamRow.currentVol * 100);
                                     audioWindow.setStreamVolumeDirect(modelData.index, pct);
-                                    resetTimer.restart();
+                                    idleTimer.restart();
                                 }
                                 onWheel: (wheel) => {
+                                    audioWindow.isInteractingWithStreams = true;
                                     let step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                                    let cur = appStreamRow.liveVol;
-                                    appStreamRow.userVol = Math.max(0.0, Math.min(1.0, cur + step));
+                                    let next = Math.max(0.0, Math.min(1.0, appStreamRow.currentVol + step));
+                                    appStreamRow.currentVol = next;
+                                    if (modelData) modelData.volume = Math.round(next * 100);
+                                    if (appStreamRow.isMuted && next > 0.01) {
+                                        appStreamRow.isMuted = false;
+                                        if (modelData) modelData.muted = false;
+                                    }
                                     applyTimer.restart();
-                                    resetTimer.restart();
+                                    idleTimer.restart();
                                 }
                             }
                         }
