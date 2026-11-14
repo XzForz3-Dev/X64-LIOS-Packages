@@ -1,14 +1,30 @@
 sync_kde_user_configs() {
     local mode="${1:-install}"
 
+    # Si x64-hyprland-settings no está instalado, limpiar sesiones SDDM y entorno huérfano de Hyprland
+    if [ ! -f /usr/bin/x64-hyprland-ctl ]; then
+        rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop /etc/environment.d/10-qt.conf 2>/dev/null || true
+    fi
+
     for udir in /home/*; do
         if [ -d "$udir" ]; then
             local ug
             ug=$(stat -c "%u:%g" "$udir" 2>/dev/null || echo "1000:1000")
             mkdir -p "$udir/.config/kdedefaults" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0" "$udir/.config/autostart"
 
+            local needs_full_heal=0
             if [ "$mode" = "install" ]; then
-                # En instalación limpia o mutación desde otro escritorio: aplicar suite completa de configs KDE
+                needs_full_heal=1
+            elif [ -f "$udir/.config/kdeglobals" ] && grep -q "Theme=Papirus" "$udir/.config/kdeglobals" 2>/dev/null; then
+                needs_full_heal=1
+            elif [ -f "$udir/.config/user-dirs.dirs" ] && grep -q 'XDG_DESKTOP_DIR="\$HOME/\?"' "$udir/.config/user-dirs.dirs" 2>/dev/null; then
+                needs_full_heal=1
+            elif [ ! -f "$udir/.config/plasma-org.kde.plasma.desktop-appletsrc" ]; then
+                needs_full_heal=1
+            fi
+
+            if [ "$needs_full_heal" -eq 1 ]; then
+                # En instalación limpia o auto-reparación OTA tras mutar desde otro escritorio: aplicar suite completa de configs KDE
                 for f in kdeglobals plasmashellrc plasma-org.kde.plasma.desktop-appletsrc plasmarc kwinrc kscreenlockerrc baloofilerc ksmserverrc; do
                     if [ -f "/etc/skel/.config/$f" ]; then
                         cp -f "/etc/skel/.config/$f" "$udir/.config/$f"
@@ -22,13 +38,12 @@ sync_kde_user_configs() {
                 [ -f /etc/skel/.config/gtk-3.0/settings.ini ] && cp -f /etc/skel/.config/gtk-3.0/settings.ini "$udir/.config/gtk-3.0/settings.ini"
                 [ -f /etc/skel/.config/gtk-4.0/settings.ini ] && cp -f /etc/skel/.config/gtk-4.0/settings.ini "$udir/.config/gtk-4.0/settings.ini"
                 rm -f "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
-            else
-                # En actualización: corregir kdeglobals si quedó con Papirus-Dark de Hyprland sin existir el tema
-                if [ -f "$udir/.config/kdeglobals" ] && grep -q "Theme=Papirus" "$udir/.config/kdeglobals" 2>/dev/null; then
-                    if [ ! -d /usr/share/icons/Papirus-Dark ]; then
-                        cp -f /etc/skel/.config/kdeglobals "$udir/.config/kdeglobals"
-                    fi
-                fi
+            fi
+
+            if [ ! -f /usr/bin/x64-hyprland-ctl ]; then
+                rm -rf "$udir/.config/hypr" "$udir/.config/quickshell" "$udir/.config/uwsm" \
+                       "$udir/.local/state/x64-hyprland" "$udir/.local/state/omarchy" "$udir/.config/omarchy" 2>/dev/null || true
+                rmdir "$udir/Fondos" "$udir/Temas" "$udir/Work/tries" "$udir/Work" 2>/dev/null || true
             fi
 
             # Limpiar sesiones previas y asegurar emptySession
@@ -59,6 +74,45 @@ sync_kde_user_configs() {
                         sed -i 's|XDG_TEMPLATES_DIR="\$HOME/\?"|XDG_TEMPLATES_DIR="\$HOME/Templates"|g' "$udir/.config/user-dirs.dirs"
                         sed -i 's|XDG_PUBLICSHARE_DIR="\$HOME/\?"|XDG_PUBLICSHARE_DIR="\$HOME/Public"|g' "$udir/.config/user-dirs.dirs"
                         chown "$ug" "$udir/Desktop" "$udir/Templates" "$udir/Public" 2>/dev/null || true
+                    fi
+                fi
+
+                # Si las carpetas XDG del usuario están en español, fusionar y eliminar duplicados vacíos en inglés
+                if grep -q 'XDG_DOWNLOAD_DIR="\$HOME/Descargas"' "$udir/.config/user-dirs.dirs" 2>/dev/null || [ -d "$udir/Descargas" ]; then
+                    local pairs=(
+                        "Downloads:Descargas"
+                        "Documents:Documentos"
+                        "Pictures:Imágenes"
+                        "Videos:Vídeos"
+                        "Music:Música"
+                        "Desktop:Escritorio"
+                        "Templates:Plantillas"
+                        "Public:Público"
+                        "Projects:Proyectos"
+                    )
+                    for pair in "${pairs[@]}"; do
+                        local en_dir="${pair%%:*}"
+                        local es_dir="${pair##*:}"
+                        if [ -d "$udir/$en_dir" ] && [ -d "$udir/$es_dir" ] && [ "$en_dir" != "$es_dir" ]; then
+                            if [ -n "$(ls -A "$udir/$en_dir" 2>/dev/null)" ]; then
+                                mv -n "$udir/$en_dir"/* "$udir/$es_dir"/ 2>/dev/null || true
+                                mv -n "$udir/$en_dir"/.[!.]* "$udir/$es_dir"/ 2>/dev/null || true
+                            fi
+                            rmdir "$udir/$en_dir" 2>/dev/null || true
+                        fi
+                    done
+                    if [ -f "$udir/.config/gtk-3.0/bookmarks" ]; then
+                        sed -i \
+                            -e "s|file://$udir/Downloads|file://$udir/Descargas|g" \
+                            -e "s|file://$udir/Documents|file://$udir/Documentos|g" \
+                            -e "s|file://$udir/Pictures|file://$udir/Imágenes|g" \
+                            -e "s|file://$udir/Videos|file://$udir/Vídeos|g" \
+                            -e "s|file://$udir/Music|file://$udir/Música|g" \
+                            -e "s|file://$udir/Projects|file://$udir/Proyectos|g" \
+                            "$udir/.config/gtk-3.0/bookmarks" 2>/dev/null || true
+                        awk '!seen[$0]++' "$udir/.config/gtk-3.0/bookmarks" > "$udir/.config/gtk-3.0/bookmarks.tmp" && \
+                            mv "$udir/.config/gtk-3.0/bookmarks.tmp" "$udir/.config/gtk-3.0/bookmarks"
+                        chown "$ug" "$udir/.config/gtk-3.0/bookmarks" 2>/dev/null || true
                     fi
                 fi
             fi

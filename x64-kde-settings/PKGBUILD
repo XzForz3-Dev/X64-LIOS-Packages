@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=18
+pkgrel=19
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -35,7 +35,35 @@ source=('01-monolith.jpg'
         'x64-theme-init.sh'
         'set-default-wallpaper.sh'
         'x64-kde-wallpaper-defaults.hook')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('5212eb679eafcc0bda672c2fa19e5fc337d0cb2736b14c0e216fc73d2a0a692d'
+            'd21d9ae2e0c42c237aabd29aa0dc53b21c82742fc6a7da80307f8b9cb926ba27'
+            '1faf9ff4dcc80a95b0bbf79c81cba140bece4d97eefc00c07c9cdc5e430be11e'
+            '4d55fc89de15c1214fa58afb66199ba0678679615fb7023f2ee1d2363db5e7bf'
+            'ae13fea6ea04e4e06d87c7566e37eb1caf85c9dd04c2fc25c273b5e8c68e51b9'
+            '41c433e4560d26e26a4eaee9074e1c35becf2be137a39b8103d970564d6a27d4'
+            'c276bc694924d971247cdcc89c69a0a09e06319b7c720b7e37815177598815e1'
+            'd4c7e3d78d262f9aa96445af95cfdcc64f12c95d5a659f22d92b78f826381898'
+            '171048a737bb3a92d3113e63a52b3e7f6dae08320850d1ed1f4691cccb7f89f7'
+            'e50df8df5cb84b06f0ae795b420dca78f926071ef197ccdfe3ecd59249837b5b'
+            'e722a7c2a3abaa4cddd70e6465f0118ebb6f7047455769eb8beedaa2f2d2d677'
+            '2f8fe8b9161cf3171a30b16c712d5ea5b11a8194a8de35ccd08065105bba19df'
+            '3b53fc2fdfda52678e5d91bd5bfcfdc34c441f6ef9d5fc22593701c27dff86c3'
+            'c679c314c4a3c9ac0c24779ecbe29af6ccf410297e0ba3c6028b5aa0e2ebea0c'
+            '7f7588dda01f6269a52909483b21b995cc8a6d2a2b150a624630750da9bd2f43'
+            '99658f030f43af94a9a9793f9e3eaf25d578a2fe6253a50379b0050687a78b04'
+            '954d38bde84410f4e6e5115bf67b4ff4a8fd80a8c660d8ea2e97d4944eb85362'
+            '65a79abb162b952c3eac27e7d299a24b8350c24d0b2a14e5800a83333cdc9b58'
+            'a2ebc57909a27c4fea95f56b92a0dccbf6df551a0c44697151d983777e45cb2a'
+            'c5a6472caa04faa941f77a9b1cce94cdc6e69acd16ce7d21129206d499620325'
+            '3c4ba89084d37ce7140eae690406adff0b8f0dfde851ae99a8d4b497815a7172'
+            '26265a81e527ae725483e46a8f6b202e7937f0dc5fbc9ac4686f489a70b4c5d3'
+            'd7f0a2650304048366f03c5544b8cfd9b4e5e57fdff02bdf9bc4e8f1f5d4c924'
+            'e660057f7556620ef8e96497698713344a6273a134c9db29bd897b4df11c7a76'
+            '152af287268008f3b4820eb876c2e241453d58f65440b2e30e4f552c1e9bebc0'
+            'f95780de7f5fb975eed8368045538d5fd3bb8a8822830ac6af142d0e248b7316'
+            '0be38ec50da3e6a0c40f8e46b15e0306e061d892499947b59cf2b0fb0708caa9'
+            'f122602836fc58951ca2a798374fa10d529bceff6955fee365f45e25b5f6d0f1'
+            '86503514e0196dbe88dfb2c9640ff26db6044fc8c9ade3cff3bb608fca9c5578')
 
 package() {
     # Instalar colección oficial de fondos de pantalla de X64 LIOS
