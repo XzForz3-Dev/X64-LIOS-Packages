@@ -159,6 +159,71 @@ function draw_dashboard
         set -a desktop_dms "lightdm"
     end
 
+    # Prioritize currently running graphical session to index 1
+    set -l active_de_idx 0
+    if pgrep -x plasmashell >/dev/null; or pgrep -x kwin_wayland >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*KDE*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -x gnome-shell >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*GNOME*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -x cosmic-comp >/dev/null; or pgrep -x cosmic-session >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*COSMIC*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -x niri >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*Niri*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -x cinnamon-session >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*Cinnamon*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -x xfce4-session >/dev/null
+        for i in (seq (count $desktop_names))
+            if string match -q "*Xfce4*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    else if pgrep -xi Hyprland >/dev/null
+        for i in (seq (count $desktop_names))
+            if test -d /usr/share/omarchy; and string match -q "*Omarchy*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            else if string match -q "*Hyprland*" "$desktop_names[$i]"
+                set active_de_idx $i
+                break
+            end
+        end
+    end
+
+    if test $active_de_idx -gt 1
+        set -l top_name $desktop_names[$active_de_idx]
+        set -l top_dm $desktop_dms[$active_de_idx]
+        set -e desktop_names[$active_de_idx]
+        set -e desktop_dms[$active_de_idx]
+        set -p desktop_names "$top_name"
+        set -p desktop_dms "$top_dm"
+    end
+
     set -g has_desktop (count $desktop_names)
     set -l dm_active ""
     set -l short_de ""
@@ -341,6 +406,11 @@ function configure_desktop_boot_mode -a dm_service desktop_name
     read -l -P (echo -e "$prompt_boot") boot_choice
 
     if test "$boot_choice" = "2"
+        for other_dm in sddm gdm lightdm cosmic-greeter
+            if test "$other_dm" != "$dm_service"
+                sudo systemctl disable $other_dm 2>/dev/null
+            end
+        end
         sudo systemctl enable $dm_service
         sudo systemctl set-default graphical.target
         if test $is_es -eq 1
@@ -571,7 +641,7 @@ except Exception:
         end
     end
 
-    if test "$target_id" = "8"
+    if test "$target_id" = "9"
         if test $is_es -eq 1
             echo -e "  \e[0;37m-> Desinstalando gestores de pantalla y navegador gráfico (Chromium)...\e[0m"
         else
@@ -1123,7 +1193,7 @@ while true
                         echo -e "    \e[0;37mEl sistema iniciará el gestor de pantalla con integración completa de\e[0m"
                         echo -e "    \e[0;37mseguridad PAM, D-Bus de sesión y aceleración gráfica en unos segundos.\e[0m\n"
                         echo -e "    \e[1;33m[Tip]\e[0m \e[0;37mPara volver a este Centro de Mando en cualquier momento:\e[0m"
-                        echo -e "          \e[1;37mPresiona Ctrl + Alt + F1\e[0m\n"
+                        echo -e "          \e[1;37mPresiona Ctrl + Alt + F3\e[0m\n"
                         echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
                         echo -e -n "\n  \e[1;32mIniciando $desktop_dms[1]...\e[0m\n"
                     else
@@ -1134,7 +1204,7 @@ while true
                         echo -e "    \e[0;37mThe system will start the display manager with full PAM security,\e[0m"
                         echo -e "    \e[0;37msession D-Bus and hardware acceleration in a few seconds.\e[0m\n"
                         echo -e "    \e[1;33m[Tip]\e[0m \e[0;37mTo return to this Control Center at any time:\e[0m"
-                        echo -e "          \e[1;37mPress Ctrl + Alt + F1\e[0m\n"
+                        echo -e "          \e[1;37mPress Ctrl + Alt + F3\e[0m\n"
                         echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
                         echo -e -n "\n  \e[1;32mStarting $desktop_dms[1]...\e[0m\n"
                     end
@@ -1318,7 +1388,11 @@ while true
                 else
                     echo -e "\n    \e[1;36mConnecting to repositories and updating packages...\e[0m\n"
                 end
-                sudo pacman -Syu
+                if type -q x64-update
+                    x64-update
+                else
+                    sudo pacman -Syu
+                end
                 if test -d /usr/share/omarchy/.git
                     if test $is_es -eq 1
                         echo -e "\n    \e[1;36mActualizando shell X64 LIOS + Omarchy desde el repositorio oficial...\e[0m"

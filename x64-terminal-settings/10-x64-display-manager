@@ -10,3 +10,4 @@
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop sddm gdm lightdm cosmic-greeter
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable sddm gdm lightdm cosmic-greeter
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/chvt
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff, /usr/bin/reboot, /usr/bin/poweroff
