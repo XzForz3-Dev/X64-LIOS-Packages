@@ -4,6 +4,18 @@ post_install() {
     ln -sf /dev/null /etc/systemd/system/system.slice.d/10-oomd-per-slice-defaults.conf
     ln -sf /dev/null /etc/systemd/system/user-.slice.d/10-oomd-per-slice-defaults.conf
 
+    # Neutralizar systemd-backlight en GPUs Nvidia que fallan al escribir en sysfs
+    for bl in /sys/class/backlight/nvidia_*; do
+        if [ -d "$bl" ]; then
+            devname=$(basename "$bl")
+            systemctl mask "systemd-backlight@backlight:${devname}.service" 2>/dev/null || true
+            systemctl stop "systemd-backlight@backlight:${devname}.service" 2>/dev/null || true
+            systemctl reset-failed "systemd-backlight@backlight:${devname}.service" 2>/dev/null || true
+        fi
+    done
+    systemctl reset-failed 2>/dev/null || true
+
+
     # Eliminar cualquier rastro de systemd-oomd generado por cachyos-settings
     rm -f /etc/systemd/system/multi-user.target.wants/systemd-oomd.service 2>/dev/null || true
     rm -f /etc/systemd/system/sockets.target.wants/systemd-oomd.socket 2>/dev/null || true

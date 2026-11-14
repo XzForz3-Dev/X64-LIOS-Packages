@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -37,6 +37,7 @@ source=(
     'opencode.svg'
     'opencode.desktop'
     '10-x64-display-manager'
+    '99-z-x64-nvidia-backlight.rules'
 )
 sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             'b727fde05cbd61b3a0be086c02445a63d90b75d63147b827e878f61e365bd417'
@@ -59,11 +60,12 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '7d46a20d2f882a26851aa731a4bf03b208b26a3562ecddb379b89743a3ffdff5'
             '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
             '6bf718270636a86861b098ef20db507f90948a96cd7d93322224d30f51323700'
-            'd6b912cf652d0c72d666b85667fac4eac2881f613a5d3189677de3e7a3400036'
+            'bb4c8928c40265a6f7ef8de6b3638b3a9a3a92408c9bcf4a31676ccb960bb030'
             '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
             'cbef6edab7ed9826c87bfae01b595ce6d2eff0ed5923250ead5584304530d0af'
             '0e9bfa271366a5d92265165f5c802a1f50a7ea266b455ad1392711299b6e67e8'
-            '47e53021aa806b4848bcd4c4367a86bc4ac30f2d00215b670dabb59bb2624c40')
+            'ea8dd487d1ddc433bdf55e03f0cf4c72dc45eea40ecd8109f954a1f5e09b4e89'
+            '5504ec854ebe1899bc0bcc2c48218471f92590b39783db2d3afcf91553460e8e')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
@@ -176,5 +178,9 @@ package() {
     # Sudoers Rule: Allow wheel users to control Display Managers and switch VTs from x64-dashboard without password prompt
     install -dm750 "${pkgdir}/etc/sudoers.d"
     install -m440 "${srcdir}/10-x64-display-manager" "${pkgdir}/etc/sudoers.d/10-x64-display-manager"
+
+    # Neutralize systemd-backlight on Nvidia GPUs (prevent EINVAL false-positive logs)
+    install -d "${pkgdir}/usr/lib/udev/rules.d"
+    install -m644 "${srcdir}/99-z-x64-nvidia-backlight.rules" "${pkgdir}/usr/lib/udev/rules.d/99-z-x64-nvidia-backlight.rules"
 }
 

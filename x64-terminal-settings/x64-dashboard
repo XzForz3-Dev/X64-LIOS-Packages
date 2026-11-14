@@ -1842,13 +1842,25 @@ while true
                                 echo -e "    \e[1;32m[OK] No services are currently in a failed state.\e[0m"
                                 echo -e "    All systemd units are running properly.\n"
                             end
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                            set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
+                            read -l -P "$prompt_back" dummy
                         else
                             systemctl --failed -l --no-pager | sed 's/^/    /'
                             echo ""
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                            set -l prompt_reset (test $is_es -eq 1; and echo "  ¿Deseas resetear el estado de fallos (systemctl reset-failed)? [s/N]: "; or echo "  Do you want to reset failed status (systemctl reset-failed)? [y/N]: ")
+                            read -l -P "$prompt_reset" do_reset
+                            if test "$do_reset" = "s" -o "$do_reset" = "S" -o "$do_reset" = "y" -o "$do_reset" = "Y"
+                                sudo systemctl reset-failed
+                                if test $is_es -eq 1
+                                    echo -e "  \e[1;32m[OK] Contador de fallos de systemd reseteado.\e[0m"
+                                else
+                                    echo -e "  \e[1;32m[OK] Systemd failed units counter reset.\e[0m"
+                                end
+                                sleep 1
+                            end
                         end
-                        echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
-                        set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
-                        read -l -P "$prompt_back" dummy
                     case 3
                         journalctl -b
                     case 4

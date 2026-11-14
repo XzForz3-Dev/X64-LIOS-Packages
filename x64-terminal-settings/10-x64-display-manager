@@ -16,3 +16,4 @@
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/ufw
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/journalctl --vacuum-time=1w
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/pacman -Sc --noconfirm
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl reset-failed
