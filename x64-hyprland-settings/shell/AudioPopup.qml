@@ -139,13 +139,15 @@ PanelWindow {
         }
     }
 
+    property bool isInteractingWithStreams: false
+
     Timer {
         id: pollTimer
         interval: 2000
         repeat: true
         running: false
         onTriggered: {
-            if (audioWindow.visible && !audioDataProc.running) {
+            if (audioWindow.visible && !audioDataProc.running && !audioWindow.isInteractingWithStreams && !masterVolArea.pressed && !masterSrcArea.pressed) {
                 audioDataProc.running = true;
             }
         }
@@ -162,7 +164,7 @@ PanelWindow {
                     let json = JSON.parse(audioDataCollector.text.trim());
                     if (json.sinks) audioWindow.sinks = json.sinks;
                     if (json.sources) audioWindow.sources = json.sources;
-                    if (json.streams) audioWindow.streams = json.streams;
+                    if (json.streams && !audioWindow.isInteractingWithStreams) audioWindow.streams = json.streams;
                     if (json.overdrive !== undefined) audioWindow.overdrive = Boolean(json.overdrive);
                 } catch (e) {
                 }
@@ -171,11 +173,36 @@ PanelWindow {
     }
 
     Process {
+        id: streamVolProc
+        property var pendingCmd: null
+        onExited: {
+            if (pendingCmd) {
+                let next = pendingCmd;
+                pendingCmd = null;
+                command = next;
+                running = true;
+            }
+        }
+    }
+
+    function setStreamVolumeDirect(idx, pct) {
+        let cmd = ["/usr/bin/x64-hyprland-ctl", "audio", "set-stream-volume", String(idx), String(pct)];
+        if (streamVolProc.running) {
+            streamVolProc.pendingCmd = cmd;
+        } else {
+            streamVolProc.command = cmd;
+            streamVolProc.running = true;
+        }
+    }
+
+    Process {
         id: audioCmdProc
         stdout: StdioCollector {
             id: audioCmdCollector
             onStreamFinished: {
-                audioWindow.refreshAudio();
+                if (!audioWindow.isInteractingWithStreams) {
+                    audioWindow.refreshAudio();
+                }
             }
         }
     }
@@ -344,7 +371,7 @@ PanelWindow {
                         model: [
                             { id: "sinks",   icon: "󰕾", label: I18n.audioTabSinks },
                             { id: "sources", icon: "󰍬", label: I18n.audioTabSources },
-                            { id: "streams", icon: "󰎆", label: I18n.audioTabStreams, count: audioWindow.streams ? audioWindow.streams.length : 0 }
+                            { id: "streams", icon: "󰎆", label: I18n.audioTabStreams }
                         ]
 
                         Rectangle {
@@ -374,22 +401,6 @@ PanelWindow {
                                     font.pixelSize: 10
                                     font.weight: isSelected ? Font.DemiBold : Font.Normal
                                     color: isSelected ? Theme.textPrimary : (tabSegArea.containsMouse ? Theme.textSecondary : Theme.textMuted)
-                                }
-
-                                Rectangle {
-                                    visible: Boolean(modelData.count && modelData.count > 0)
-                                    implicitWidth: 14
-                                    implicitHeight: 14
-                                    radius: 7
-                                    color: isSelected ? Theme.accent : Theme.bgElevated
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: modelData.count ? String(modelData.count) : "0"
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: 8
-                                        font.bold: true
-                                        color: isSelected ? "#ffffff" : Theme.textSecondary
-                                    }
                                 }
                             }
 
@@ -443,7 +454,7 @@ PanelWindow {
                                 color: audioWindow.sinkMuted ? "#381818" : (audioWindow.sinkVol > 1.0 ? "#e6ff2b2b" : "#9934d399")
                             }
                         }
-                        Behavior on width { NumberAnimation { duration: 50 } }
+                        Behavior on width { NumberAnimation { duration: masterVolArea.pressed ? 0 : 50 } }
 
                         // Vertical Thumb Line
                         Rectangle {
@@ -517,8 +528,8 @@ PanelWindow {
                                 }
                             }
                         }
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                        onPressed: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
                                 if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
                                     audioWindow.defaultSink.audio.muted = !audioWindow.defaultSink.audio.muted;
                                 }
@@ -527,7 +538,7 @@ PanelWindow {
                             }
                         }
                         onPositionChanged: (mouse) => {
-                            if (pressed && mouse.x >= 32) setVol(mouse.x);
+                            if (pressed) setVol(mouse.x);
                         }
                         onWheel: (wheel) => {
                             if (audioWindow.defaultSink && audioWindow.defaultSink.audio) {
@@ -679,7 +690,7 @@ PanelWindow {
                                 color: audioWindow.srcMuted ? "#381818" : "#8038bdf8"
                             }
                         }
-                        Behavior on width { NumberAnimation { duration: 50 } }
+                        Behavior on width { NumberAnimation { duration: masterSrcArea.pressed ? 0 : 50 } }
 
                         Rectangle {
                             visible: audioWindow.srcVol > 0.03
@@ -741,8 +752,8 @@ PanelWindow {
                                 }
                             }
                         }
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                        onPressed: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
                                 if (audioWindow.defaultSource && audioWindow.defaultSource.audio) {
                                     audioWindow.defaultSource.audio.muted = !audioWindow.defaultSource.audio.muted;
                                 }
@@ -751,7 +762,7 @@ PanelWindow {
                             }
                         }
                         onPositionChanged: (mouse) => {
-                            if (pressed && mouse.x >= 32) setVol(mouse.x);
+                            if (pressed) setVol(mouse.x);
                         }
                     }
                 }
@@ -809,7 +820,12 @@ PanelWindow {
                                 width: Math.max(0, Math.min(parent.width, (micPeakMon.peak * 2.2) * parent.width))
                                 radius: 3
                                 color: audioWindow.srcMuted ? "transparent" : (micPeakMon.peak > 0.85 ? Theme.accent : (micPeakMon.peak > 0.60 ? "#fbbf24" : Theme.statusOk))
-                                Behavior on width { NumberAnimation { duration: 45 } }
+                                Behavior on width {
+                                    SmoothedAnimation {
+                                        velocity: 1200
+                                        reversingMode: SmoothedAnimation.Immediate
+                                    }
+                                }
                             }
                         }
                     }
@@ -1009,7 +1025,7 @@ PanelWindow {
                                         color: appStreamRow.isMuted ? "#381818" : "#80818cf8"
                                     }
                                 }
-                                Behavior on width { NumberAnimation { duration: 50 } }
+                                Behavior on width { NumberAnimation { duration: appDragArea.pressed ? 0 : 50 } }
 
                                 // Vertical White Thumb Indicator Line
                                 Rectangle {
@@ -1059,17 +1075,17 @@ PanelWindow {
 
                             Timer {
                                 id: applyTimer
-                                interval: 40
+                                interval: 35
                                 repeat: false
                                 onTriggered: {
                                     let pct = Math.round(appStreamRow.liveVol * 100);
-                                    audioWindow.runAudioCmd(["set-stream-volume", String(modelData.index), String(pct)]);
+                                    audioWindow.setStreamVolumeDirect(modelData.index, pct);
                                 }
                             }
 
                             Timer {
                                 id: resetTimer
-                                interval: 1000
+                                interval: 1500
                                 repeat: false
                                 onTriggered: {
                                     if (!appDragArea.pressed) {
@@ -1088,14 +1104,15 @@ PanelWindow {
                                 function updateVol(mx) {
                                     let ratio = Math.max(0.0, Math.min(1.0, mx / appStreamRow.width));
                                     appStreamRow.userVol = ratio;
-                                    if (appStreamRow.isMuted) {
+                                    if (appStreamRow.isMuted && ratio > 0.01) {
                                         appStreamRow.hasUserMute = true;
                                         appStreamRow.userMuted = false;
                                     }
                                     applyTimer.restart();
                                 }
-                                onClicked: (mouse) => {
-                                    if (mouse.button === Qt.RightButton || mouse.x < 32) {
+                                onPressed: (mouse) => {
+                                    audioWindow.isInteractingWithStreams = true;
+                                    if (mouse.button === Qt.RightButton) {
                                         appStreamRow.hasUserMute = true;
                                         appStreamRow.userMuted = !appStreamRow.isMuted;
                                         audioWindow.runAudioCmd(["toggle-stream-mute", String(modelData.index)]);
@@ -1105,9 +1122,12 @@ PanelWindow {
                                     }
                                 }
                                 onPositionChanged: (mouse) => {
-                                    if (pressed && mouse.x >= 32) updateVol(mouse.x);
+                                    if (pressed) updateVol(mouse.x);
                                 }
                                 onReleased: {
+                                    audioWindow.isInteractingWithStreams = false;
+                                    let pct = Math.round(appStreamRow.liveVol * 100);
+                                    audioWindow.setStreamVolumeDirect(modelData.index, pct);
                                     resetTimer.restart();
                                 }
                                 onWheel: (wheel) => {
