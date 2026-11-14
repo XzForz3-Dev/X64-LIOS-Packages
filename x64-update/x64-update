@@ -2453,11 +2453,22 @@ def run_gui():
             if not hasattr(self, "vt_screen"):
                 return
             self.vt_last_render = time.time()
-            self.log_view.setHtml(self.vt_screen.to_html())
+
+            # Sticky scroll (terminal-like): only follow new output if the user is already at the bottom.
+            # If the user scrolled up to read, keep their exact vertical and horizontal position.
             vbar = self.log_view.verticalScrollBar()
-            vbar.setValue(vbar.maximum())
             hbar = self.log_view.horizontalScrollBar()
-            hbar.setValue(0)
+            prev_v = vbar.value()
+            prev_h = hbar.value()
+            was_at_bottom = prev_v >= vbar.maximum() - 8
+
+            self.log_view.setHtml(self.vt_screen.to_html())
+
+            if was_at_bottom:
+                vbar.setValue(vbar.maximum())
+            else:
+                vbar.setValue(min(prev_v, vbar.maximum()))
+            hbar.setValue(min(prev_h, hbar.maximum()))
 
         def on_tx_output(self, raw_text):
             if not hasattr(self, "vt_screen"):
