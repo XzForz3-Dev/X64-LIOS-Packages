@@ -5,6 +5,17 @@ import Quickshell.Io
 ShellRoot {
     id: root
 
+    // Discover Primary Laptop Display (eDP / LVDS) or fallback to first available screen
+    readonly property var primaryScreen: {
+        for (var i = 0; i < Quickshell.screens.length; i++) {
+            var s = Quickshell.screens[i];
+            if (s && s.name && (s.name.indexOf("eDP") !== -1 || s.name.indexOf("LVDS") !== -1)) {
+                return s;
+            }
+        }
+        return (Quickshell.screens.length > 0) ? Quickshell.screens[0] : null;
+    }
+
     function closeAllExcept(targetName) {
         if (targetName !== "launcher") launcher.visible = false;
         if (targetName !== "calendar") calendarPopup.visible = false;
@@ -231,6 +242,7 @@ ShellRoot {
     // Top Bar Floating Island
     Bar {
         id: mainBar
+        screen: root.primaryScreen
 
         onToggleLauncher: {
             launcher.visible = !launcher.visible;
@@ -290,6 +302,7 @@ ShellRoot {
     // Cyberpunk Dashboard App Launcher
     AppLauncher {
         id: launcher
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: launcher.visible = false
     }
@@ -297,6 +310,7 @@ ShellRoot {
     // Cyberpunk Calendar & Date Dropdown Popup
     CalendarPopup {
         id: calendarPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: calendarPopup.visible = false
     }
@@ -304,6 +318,7 @@ ShellRoot {
     // Expanded Hardware Telemetry Popup
     TelemetryPopup {
         id: telemetryPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: telemetryPopup.visible = false
     }
@@ -311,6 +326,7 @@ ShellRoot {
     // Native Network & Wi-Fi Popup (Omarchy 4 Quattro style)
     NetworkPopup {
         id: networkPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: networkPopup.visible = false
     }
@@ -318,6 +334,7 @@ ShellRoot {
     // Control Center Sliding Panel
     ControlCenter {
         id: controlCenter
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: controlCenter.visible = false
         onDndToggled: (active) => {
@@ -346,11 +363,13 @@ ShellRoot {
     // Unified On-Screen Display for Volume / Mute / Brightness Changes
     VolumeOsd {
         id: volumeOsd
+        screen: root.primaryScreen
     }
 
     // Native Notification Server & Toast Overlay (Respects DND No Molestar)
     NotificationPopup {
         id: notifPopup
+        screen: root.primaryScreen
         dndEnabled: mainBar.dndActive
         sidePanelOpen: controlCenter.visible || networkPopup.visible
     }
@@ -358,6 +377,7 @@ ShellRoot {
     // Native Interactive Shortcuts Guide & HUD (SUPER + F1)
     ShortcutsPopup {
         id: shortcutsPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: shortcutsPopup.visible = false
     }
@@ -365,6 +385,7 @@ ShellRoot {
     // Native Wayland Clipboard History Manager (SUPER + V)
     ClipboardPopup {
         id: clipboardPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: clipboardPopup.visible = false
     }
@@ -372,6 +393,7 @@ ShellRoot {
     // Native Wayland Workspaces Overview / Mission Control (SUPER + TAB)
     OverviewPopup {
         id: overviewPopup
+        screen: root.primaryScreen
         visible: false
         onCloseRequested: overviewPopup.visible = false
     }

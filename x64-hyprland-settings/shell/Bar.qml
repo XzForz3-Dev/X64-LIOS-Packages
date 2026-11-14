@@ -11,6 +11,16 @@ import Quickshell.Services.Mpris
 PanelWindow {
     id: barWindow
 
+    screen: {
+        for (var i = 0; i < Quickshell.screens.length; i++) {
+            var s = Quickshell.screens[i];
+            if (s && s.name && (s.name.indexOf("eDP") !== -1 || s.name.indexOf("LVDS") !== -1)) {
+                return s;
+            }
+        }
+        return (Quickshell.screens.length > 0) ? Quickshell.screens[0] : null;
+    }
+
     signal toggleLauncher()
     signal toggleCalendar()
     signal toggleControl()
