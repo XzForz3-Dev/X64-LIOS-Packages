@@ -1,0 +1,12 @@
+# X64 LIOS - Control de Display Managers y VT desde x64-dashboard sin contrasena
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start sddm, /usr/bin/systemctl stop sddm, /usr/bin/systemctl restart sddm, /usr/bin/systemctl status sddm
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start sddm.service, /usr/bin/systemctl stop sddm.service, /usr/bin/systemctl restart sddm.service, /usr/bin/systemctl status sddm.service
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start gdm, /usr/bin/systemctl stop gdm, /usr/bin/systemctl restart gdm, /usr/bin/systemctl status gdm
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start gdm.service, /usr/bin/systemctl stop gdm.service, /usr/bin/systemctl restart gdm.service, /usr/bin/systemctl status gdm.service
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start lightdm, /usr/bin/systemctl stop lightdm, /usr/bin/systemctl restart lightdm, /usr/bin/systemctl status lightdm
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start lightdm.service, /usr/bin/systemctl stop lightdm.service, /usr/bin/systemctl restart lightdm.service, /usr/bin/systemctl status lightdm.service
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start cosmic-greeter, /usr/bin/systemctl stop cosmic-greeter, /usr/bin/systemctl restart cosmic-greeter, /usr/bin/systemctl status cosmic-greeter
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start cosmic-greeter.service, /usr/bin/systemctl stop cosmic-greeter.service, /usr/bin/systemctl restart cosmic-greeter.service, /usr/bin/systemctl status cosmic-greeter.service
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop sddm gdm lightdm cosmic-greeter
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable sddm gdm lightdm cosmic-greeter
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/chvt
