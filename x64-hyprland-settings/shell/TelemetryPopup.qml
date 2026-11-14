@@ -627,11 +627,11 @@ PanelWindow {
                             text: "󰢮"
                             font.family: Theme.fontMono
                             font.pixelSize: 12
-                            color: Theme.accent
+                            color: Theme.textSecondary
                         }
 
                         Text {
-                            text: teleWindow.gpuCount > 1 ? "GPU MULTI-PROCESADOR (SLI)" : "GPU DEDICADA"
+                            text: teleWindow.gpuCount > 1 ? (I18n.isEs ? "GRÁFICOS DUAL (SLI)" : "DUAL GPU (SLI)") : (I18n.isEs ? "GRÁFICOS DEDICADOS" : "DEDICATED GPU")
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             font.bold: true
@@ -646,8 +646,8 @@ PanelWindow {
                             implicitHeight: 18
                             implicitWidth: sliBadgeRow.implicitWidth + 10
                             radius: 9
-                            color: Theme.accentDim
-                            border.color: Theme.accentBorder
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
                             border.width: 1
 
                             RowLayout {
@@ -655,11 +655,11 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 spacing: 4
                                 Text {
-                                    text: "⚡ 2x SLI"
+                                    text: "2x SLI"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 8
                                     font.bold: true
-                                    color: Theme.accent
+                                    color: Theme.textSecondary
                                 }
                             }
                         }
@@ -709,10 +709,10 @@ PanelWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text {
-                                            text: "Carga: " + modelData.util + "%"
+                                            text: (I18n.isEs ? "Carga: " : "Load: ") + modelData.util + "%"
                                             font.family: Theme.fontMono
                                             font.pixelSize: 9
-                                            color: modelData.util >= 85 ? Theme.accent : Theme.textMuted
+                                            color: modelData.util >= 85 ? Theme.accent : (modelData.util >= 65 ? Theme.statusWarn : Theme.textMuted)
                                         }
                                         Item { Layout.fillWidth: true }
                                         Text {
@@ -723,7 +723,7 @@ PanelWindow {
                                         }
                                     }
 
-                                    // VRAM Usage Progress Bar
+                                    // VRAM Usage Progress Bar (Monochromatic neutral silver at rest)
                                     Rectangle {
                                         Layout.fillWidth: true
                                         height: 4
@@ -734,7 +734,7 @@ PanelWindow {
                                             width: Math.max(3, parent.width * (Math.min(100, modelData.vramPct) / 100.0))
                                             height: parent.height
                                             radius: 2
-                                            color: modelData.vramPct >= 85 ? Theme.accent : (modelData.vramPct >= 65 ? Theme.statusWarn : "#38bdf8")
+                                            color: modelData.vramPct >= 85 ? Theme.accent : (modelData.vramPct >= 65 ? Theme.statusWarn : "#c8c6c0")
                                         }
                                     }
                                 }
@@ -786,6 +786,7 @@ PanelWindow {
                             }
                         }
 
+                        // VRAM Progress Bar (Monochromatic neutral silver at rest)
                         Rectangle {
                             Layout.fillWidth: true
                             height: 4
@@ -796,7 +797,7 @@ PanelWindow {
                                 width: Math.max(3, parent.width * (Math.min(100, (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].vramPct : 0)) / 100.0))
                                 height: parent.height
                                 radius: 2
-                                color: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 85) ? Theme.accent : "#38bdf8"
+                                color: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 85) ? Theme.accent : ((teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 65) ? Theme.statusWarn : "#c8c6c0")
                             }
                         }
                     }

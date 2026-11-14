@@ -825,7 +825,7 @@ PanelWindow {
 
                         Text {
                             visible: barWindow.gpuCount > 0
-                            text: (barWindow.gpuCount > 1 ? "SLI " : "") + barWindow.gpuTemp + "°C"
+                            text: barWindow.gpuTemp + "°C"
                             font.family: Theme.fontMono
                             font.pixelSize: 10
                             font.bold: true
