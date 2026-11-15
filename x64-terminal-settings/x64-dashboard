@@ -453,7 +453,7 @@ function clean_previous_desktops -a target_id
             echo -e "  \e[0;37m-> Uninstalling Native Hyprland and components...\e[0m"
         end
         if test "$target_id" = "8"
-            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings papirus-icon-theme 2>/dev/null | sort -u)
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings papirus-icon-theme dolphin ark hyprpwcenter swaybg loupe gnome-text-editor kdegraphics-thumbnailers ffmpegthumbs 2>/dev/null | sort -u)
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
