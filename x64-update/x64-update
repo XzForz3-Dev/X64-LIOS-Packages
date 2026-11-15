@@ -1938,6 +1938,10 @@ def run_gui():
             header_layout.addWidget(self.btn_refresh)
             header_layout.addSpacing(6)
             header_layout.addWidget(self.btn_close)
+            desktop_name = (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower()
+            session_name = (os.environ.get("DESKTOP_SESSION") or "").lower()
+            is_tiling = any(k in desktop_name or k in session_name for k in ["hyprland", "niri", "sway", "i3", "river", "bspwm", "qtile", "dwm"])
+            self.btn_close.setVisible(is_tiling)
             layout.addLayout(header_layout)
 
             # Search & Filter Chips Bar
@@ -2648,6 +2652,8 @@ def run_gui():
         sys.exit(0)
 
     app = QApplication(sys.argv)
+    app.setDesktopFileName("x64-update")
+    app.setApplicationName("x64-update")
     app.setStyle("Fusion")
     _palette = load_theme_palette()
     _pal = app.palette()
