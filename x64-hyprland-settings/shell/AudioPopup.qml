@@ -54,7 +54,7 @@ PanelWindow {
     }
 
     implicitWidth: 360
-    implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 50)
+    implicitHeight: 380
 
     color: "transparent"
 
@@ -1164,6 +1164,8 @@ PanelWindow {
                     }
                 }
             }
+
+            Item { Layout.fillHeight: true }
 
             // =========================================================
             // 6. ADVANCED AUDIO SETTINGS BUTTON (pavucontrol)
