@@ -519,6 +519,8 @@ function clean_previous_desktops -a target_id
         sudo fc-cache -f /usr/share/fonts 2>/dev/null
 
         # 3. Eliminar servicios systemd y drop-ins
+        systemctl --user stop omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
+        systemctl --user disable omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
         sudo rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service 2>/dev/null
         sudo rm -rf /usr/lib/systemd/user/owed.service.d /etc/systemd/user/owed.service.d 2>/dev/null
         sudo rm -f /usr/lib/systemd/user/wireplumber.service.d/10-omarchy-camera-access.conf 2>/dev/null
@@ -574,6 +576,8 @@ except Exception:
                 rm -f $udir/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua 2>/dev/null
                 find $udir/.config -name "com.omarchy.*" -delete 2>/dev/null
                 rm -rf $udir/.agents/skills/omarchy* $udir/.claude/skills/omarchy* $udir/.claude/themes/omarchy* $udir/.codex/skills/omarchy* $udir/.pi/agent/skills/omarchy* $udir/.pi/agent/themes/omarchy* $udir/.gemini/config/skills/omarchy* $udir/.hermes/skills/omarchy* 2>/dev/null
+                rm -f $udir/.gemini/config/skills/diagnose-crash 2>/dev/null
+                test -d $udir/.gemini/config/skills; and find -L $udir/.gemini/config/skills -xtype l -delete 2>/dev/null
                 rmdir $udir/Fondos $udir/Temas $udir/Work/tries $udir/Work 2>/dev/null
             end
         end
