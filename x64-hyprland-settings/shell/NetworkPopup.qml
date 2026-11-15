@@ -39,12 +39,12 @@ PanelWindow {
     }
 
     margins {
-        top: 36
+        top: 44
         right: 96
     }
 
-    implicitWidth: 360
-    implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 50)
+    implicitWidth: 400
+    implicitHeight: Math.min(cardLayout.implicitHeight + 30, (screen ? screen.height : 1080) - 56)
 
     color: "transparent"
 

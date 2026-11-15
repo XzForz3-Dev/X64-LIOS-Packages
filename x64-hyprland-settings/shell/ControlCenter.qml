@@ -40,12 +40,12 @@ PanelWindow {
     }
 
     margins {
-        top: 36
+        top: 44
         right: 8
     }
 
-    implicitWidth: 368
-    implicitHeight: Math.min(735, (screen ? screen.height : 1080) - 44)
+    implicitWidth: 400
+    implicitHeight: Math.min(745, (screen ? screen.height : 1080) - 52)
 
     color: "transparent"
 

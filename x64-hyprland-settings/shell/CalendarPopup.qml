@@ -16,10 +16,10 @@ PanelWindow {
     }
 
     margins {
-        top: 36
+        top: 44
     }
 
-    implicitWidth: 350
+    implicitWidth: 380
     implicitHeight: cardLayout.implicitHeight + 32
 
     color: "transparent"

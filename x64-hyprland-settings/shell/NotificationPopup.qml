@@ -54,7 +54,7 @@ PanelWindow {
     }
 
     margins {
-        top: 38
+        top: 46
         right: notifWindow.sidePanelOpen ? 380 : 12
     }
 

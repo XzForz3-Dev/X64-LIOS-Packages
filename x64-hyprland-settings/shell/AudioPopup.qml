@@ -49,12 +49,12 @@ PanelWindow {
     }
 
     margins {
-        top: 36
+        top: 44
         right: 48
     }
 
-    implicitWidth: 360
-    implicitHeight: 380
+    implicitWidth: 400
+    implicitHeight: 410
 
     color: "transparent"
 
