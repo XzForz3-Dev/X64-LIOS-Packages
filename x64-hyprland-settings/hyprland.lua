@@ -184,6 +184,15 @@ hl.window_rule({
     size   = "1100 680",
 })
 
+-- X64 Update Floating Centered Window
+hl.window_rule({
+    name   = "x64-update-float",
+    match  = { class = "x64-update" },
+    float  = true,
+    center = true,
+    size   = "1020 680",
+})
+
 -- X64 AI Hub & Dropdown Scratchpad (SUPER + S / SUPER + A)
 hl.window_rule({
     name      = "x64-scratchpad-float",
