@@ -4176,7 +4176,7 @@ class DnsOptimizerPanel(QFrame):
         conn_row.addWidget(self.btn_ping)
 
         self.status_lbl = FitLabel("", min_ratio=0.85)
-        self.status_lbl.setStyleSheet("color: #10b981; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         conn_row.addSpacing(6)
         conn_row.addWidget(self.status_lbl, 1)
         layout.addLayout(conn_row)
@@ -4397,7 +4397,7 @@ class DnsOptimizerPanel(QFrame):
             self.select_provider(best_idx)
             self.status_lbl.setStyleSheet("color: #d4d4d8; font-size: 12px; font-weight: bold; background: transparent; border: none;")
             self.status_lbl.setTextFormat(Qt.TextFormat.RichText)
-            self.status_lbl.setText(f"<span style='color:#10b981;'>✓</span> {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
+            self.status_lbl.setText(f"<span style='color:#ef4444;'>✓</span> {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
         else:
             self.status_lbl.setText("")
 
@@ -4408,7 +4408,7 @@ class DnsOptimizerPanel(QFrame):
 
         def _on_done(exit_code, _exit_status):
             if exit_code == 0:
-                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+                self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
             else:
                 self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12px; font-weight: bold; background: transparent; border: none;")
@@ -4612,8 +4612,13 @@ class ScxSchedulerPanel(QFrame):
         lbl_act_title.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
         top_bar.addWidget(lbl_act_title)
 
-        self.lbl_active_pill = QLabel("<span style='color:#10b981;'>●</span> BORE")
+        self.lbl_active_pill = QLabel("<span style='color:#ef4444;'>●</span> BORE")
         self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_active_pill.setStyleSheet("""
+            color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
+            border: 1px solid rgba(239, 68, 68, 0.40); border-radius: 6px;
+            padding: 3px 10px; font-weight: bold; font-size: 11.5px;
+        """)
         top_bar.addWidget(self.lbl_active_pill)
         top_bar.addStretch(1)
 
@@ -4706,7 +4711,7 @@ class ScxSchedulerPanel(QFrame):
         btm_row.addWidget(self.chk_persist)
 
         self.status_lbl = FitLabel("", min_ratio=0.85)
-        self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setFixedHeight(16)
         btm_row.addStretch(1)
 
@@ -4771,15 +4776,15 @@ class ScxSchedulerPanel(QFrame):
         self.active_sched_id = s_id
         self.active_mode_id = m_id
         self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
-        self.lbl_active_pill.setText(f"<span style='color:#10b981;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{pretty}</span>")
+        self.lbl_active_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{pretty}</span>")
         self.lbl_active_pill.setToolTip(format_rich_tooltip(
             pretty,
             tr("ACTIVE"),
             guide_key=f"scx_{s_id}"
         ))
         self.lbl_active_pill.setStyleSheet("""
-            color: #ffffff; background-color: rgba(16, 185, 129, 0.13);
-            border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
+            color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
+            border: 1px solid rgba(239, 68, 68, 0.40); border-radius: 6px;
             padding: 3px 10px; font-weight: bold; font-size: 11.5px;
         """)
 
@@ -4788,10 +4793,10 @@ class ScxSchedulerPanel(QFrame):
             if s_info["id"] == s_id:
                 found_idx = i
                 lbl_badge.setTextFormat(Qt.TextFormat.RichText)
-                lbl_badge.setText(f"● {tr('ACTIVE')}")
+                lbl_badge.setText(f"<span style='color:#ef4444;'>●</span> {tr('ACTIVE')}")
                 lbl_badge.setStyleSheet("""
-                    color: #10b981; background-color: rgba(16, 185, 129, 0.13);
-                    border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
+                    color: #ffffff; background-color: rgba(239, 68, 68, 0.18);
+                    border: 1px solid rgba(239, 68, 68, 0.50); border-radius: 6px;
                     padding: 2px 7px; font-weight: bold; font-size: 10px;
                 """)
             else:
@@ -4930,7 +4935,7 @@ class ScxSchedulerPanel(QFrame):
                 _SCX_OVERRIDE_CACHE["sched"] = target_cache
                 _SCX_OVERRIDE_CACHE["mode"] = mode_id
                 _SCX_OVERRIDE_CACHE["until"] = time.monotonic() + 3.5
-                self.status_lbl.setStyleSheet("color: #2ecc71; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+                self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
                 self.refresh_runtime_state(select_active=False)
                 QTimer.singleShot(1800, lambda: self.refresh_runtime_state(select_active=False))
@@ -5030,13 +5035,13 @@ class KernelStatusCard(QFrame):
         vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
 
-        lbl_badge = QLabel(f"● {badge_text}")
+        lbl_badge = QLabel(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{badge_text}")
         lbl_badge.setTextFormat(Qt.TextFormat.RichText)
         lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_badge.setStyleSheet("""
-            color: #10b981;
-            background-color: rgba(16, 185, 129, 0.13);
-            border: 1px solid rgba(16, 185, 129, 0.42);
+            color: #ffffff;
+            background-color: rgba(220, 38, 38, 0.10);
+            border: 1px solid rgba(239, 68, 68, 0.38);
             border-radius: 7px;
             padding: 4px 10px;
             font-weight: bold;
@@ -5412,22 +5417,22 @@ class MitigationsSwitchCard(QFrame):
         self.status_pill.setTextFormat(Qt.TextFormat.RichText)
         self.toggle_btn.set_checked(not self._disabled_state)
         if self._disabled_state:
-            self.status_pill.setText(f"● {tr('MITIGATIONS OFF (+FPS)')}")
+            self.status_pill.setText(f"<span style='color:#f59e0b;'>▲</span>&nbsp;&nbsp;<span style='color:#f59e0b;'>{tr('MITIGATIONS OFF (+FPS)')}</span>")
             self.status_pill.setStyleSheet("""
                 color: #f59e0b;
-                background-color: rgba(245, 158, 11, 0.13);
-                border: 1px solid rgba(245, 158, 11, 0.42);
+                background-color: rgba(245, 158, 11, 0.08);
+                border: 1px solid rgba(245, 158, 11, 0.30);
                 border-radius: 6px;
                 padding: 0 10px;
                 font-weight: bold;
                 font-size: 10px;
             """)
         else:
-            self.status_pill.setText(f"● {tr('MITIGATIONS ACTIVE (SECURE)')}")
+            self.status_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{tr('MITIGATIONS ACTIVE (SECURE)')}</span>")
             self.status_pill.setStyleSheet("""
-                color: #10b981;
-                background-color: rgba(16, 185, 129, 0.13);
-                border: 1px solid rgba(16, 185, 129, 0.42);
+                color: #ffffff;
+                background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(239, 68, 68, 0.38);
                 border-radius: 6px;
                 padding: 0 10px;
                 font-weight: bold;
@@ -5455,7 +5460,7 @@ class MitigationsSwitchCard(QFrame):
             self.refresh_state()
             if exit_code == 0:
                 self.lbl_desc.setText(f"✓ {tr('Bootloader updated. Please restart your PC to apply kernel changes.')}")
-                self.lbl_desc.setStyleSheet("color: #2ecc71; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
+                self.lbl_desc.setStyleSheet("color: #ef4444; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             else:
                 self.lbl_desc.setText(tr("Operation cancelled."))
                 self.lbl_desc.setStyleSheet("color: #ff9999; font-size: 10.5px; border: none; background: transparent;")
@@ -5812,17 +5817,17 @@ class GamingInstallCard(QFrame):
             self.btn_action.setToolTip(self._rich_tip)
             self.btn_action.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(16, 185, 129, 0.13);
-                    color: #10b981;
-                    border: 1px solid rgba(16, 185, 129, 0.42);
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #e4e4e7;
+                    border: 1px solid rgba(255, 255, 255, 0.14);
                     border-radius: 8px;
                     padding: 0 12px;
                     font-weight: bold;
                     font-size: 11px;
                 }
                 QPushButton:hover {
-                    background-color: rgba(16, 185, 129, 0.22);
-                    border: 1px solid #10b981;
+                    background-color: rgba(255, 255, 255, 0.09);
+                    border: 1px solid rgba(255, 255, 255, 0.25);
                     color: #ffffff;
                 }
             """)
@@ -6342,10 +6347,10 @@ class X64Hello(QWidget):
     def set_hero_pill_state(self, pill, name, is_active):
         pill.setTextFormat(Qt.TextFormat.RichText)
         if is_active:
-            pill.setText(f"<span style='color:#10b981;'>●</span>&nbsp;&nbsp;{name}: <span style='color:#ffffff;'>{tr('ACTIVE')}</span>")
+            pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{name}: <span style='color:#ffffff;'>{tr('ACTIVE')}</span>")
             pill.setStyleSheet("""
-                color: #e4e4e7; background-color: rgba(16, 185, 129, 0.13);
-                border: 1px solid rgba(16, 185, 129, 0.42); border-radius: 6px;
+                color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(239, 68, 68, 0.38); border-radius: 6px;
                 font-size: 10.5px; font-weight: bold; padding: 3px 10px;
             """)
         else:
