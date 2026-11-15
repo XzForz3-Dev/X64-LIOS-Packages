@@ -457,12 +457,18 @@ function clean_previous_desktops -a target_id
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
+            sudo rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null
+            if test -f /usr/share/wayland-sessions/hyprland.desktop
+                if not grep -q "NoDisplay=true" /usr/share/wayland-sessions/hyprland.desktop
+                    sudo sh -c 'echo "NoDisplay=true" >> /usr/share/wayland-sessions/hyprland.desktop'
+                end
+            end
         else
             set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk loupe papers gnome-text-editor gnome-disk-utility adw-gtk-theme xdg-terminal-exec hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
-            sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
+            sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null
         end
         sudo rm -rf /etc/skel/.config/hypr /etc/skel/.config/quickshell /etc/xdg/hypr 2>/dev/null
         sudo rm -f /etc/environment.d/10-qt.conf /usr/lib/environment.d/10-qt.conf /usr/bin/papirus-folders 2>/dev/null
@@ -498,6 +504,11 @@ function clean_previous_desktops -a target_id
         end
         if test "$target_id" != "1"
             sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
+        else
+            if test -f /usr/share/wayland-sessions/hyprland.desktop
+                sudo sed -i '/NoDisplay=true/d' /usr/share/wayland-sessions/hyprland.desktop 2>/dev/null
+            end
+            sudo rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
         end
 
         # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema
