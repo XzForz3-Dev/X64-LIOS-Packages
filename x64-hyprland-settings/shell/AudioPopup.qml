@@ -287,41 +287,55 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Overdrive Boost Label
-                Text {
-                    text: "BOOST 150%"
-                    font.family: Theme.fontMono
-                    font.pixelSize: 8
-                    font.bold: true
-                    color: audioWindow.overdrive ? "#ff4d4d" : Theme.textMuted
-                }
+                // Overdrive Boost Interactive Control (Label + Physical Switch)
+                Item {
+                    implicitWidth: boostRow.implicitWidth
+                    implicitHeight: 24
 
-                // x64-hello Physical Toggle Switch
-                Rectangle {
-                    id: boostSwitchTrack
-                    implicitWidth: 38
-                    implicitHeight: 20
-                    radius: 10
-                    color: audioWindow.overdrive ? "#b80000" : "#1a1a20"
-                    border.color: audioWindow.overdrive ? "#ff3333" : "#383842"
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 150 } }
-                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                    RowLayout {
+                        id: boostRow
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 7
 
-                    Rectangle {
-                        id: boostSwitchThumb
-                        width: 14
-                        height: 14
-                        radius: 7
-                        y: 3
-                        x: audioWindow.overdrive ? 21 : 3
-                        color: audioWindow.overdrive ? "#ffffff" : "#777782"
-                        Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Text {
+                            text: I18n.audioOverdrive
+                            font.family: Theme.fontSans
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: audioWindow.overdrive ? "#ffffff" : (boostMouseArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+
+                        // x64-hello Physical Toggle Switch
+                        Rectangle {
+                            id: boostSwitchTrack
+                            implicitWidth: 38
+                            implicitHeight: 20
+                            radius: 10
+                            color: audioWindow.overdrive ? "#b80000" : "#1a1a20"
+                            border.color: audioWindow.overdrive ? "#ff3333" : (boostMouseArea.containsMouse ? "#555562" : "#383842")
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                            Rectangle {
+                                id: boostSwitchThumb
+                                width: 14
+                                height: 14
+                                radius: 7
+                                y: 3
+                                x: audioWindow.overdrive ? 21 : 3
+                                color: audioWindow.overdrive ? "#ffffff" : "#777782"
+                                Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                            }
+                        }
                     }
 
                     MouseArea {
+                        id: boostMouseArea
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             audioWindow.overdrive = !audioWindow.overdrive;
