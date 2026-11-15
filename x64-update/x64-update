@@ -1494,6 +1494,16 @@ def run_gui():
             self.load_cached_state()
             self.trigger_refresh()
 
+        def mousePressEvent(self, event):
+            if event.button() == Qt.MouseButton.LeftButton:
+                if event.pos().y() <= 80:
+                    wh = self.window().windowHandle()
+                    if wh:
+                        wh.startSystemMove()
+                        event.accept()
+                        return
+            super().mousePressEvent(event)
+
         def setup_theme_watcher(self):
             self.theme_watcher = QFileSystemWatcher(self)
             self._last_theme_mtime = 0
@@ -1858,6 +1868,7 @@ def run_gui():
                     lbl_hdr_icon.setPixmap(pix)
                     break
             hib_layout.addWidget(lbl_hdr_icon)
+            self.hdr_icon_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             header_layout.addWidget(self.hdr_icon_box)
 
             title_vbox = QVBoxLayout()
@@ -1866,12 +1877,15 @@ def run_gui():
             title_row = QHBoxLayout()
             title_row.setSpacing(8)
             self.lbl_badge = QLabel("X64")
+            self.lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             self.lbl_title = QLabel("LIOS UPDATE")
+            self.lbl_title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             title_row.addWidget(self.lbl_badge)
             title_row.addWidget(self.lbl_title)
             title_row.addStretch()
 
             self.lbl_sub = QLabel("Centro de Actualizaciones y Mantenimiento del Sistema")
+            self.lbl_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
             title_vbox.addLayout(title_row)
             title_vbox.addWidget(self.lbl_sub)
@@ -1893,9 +1907,37 @@ def run_gui():
             self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_refresh.clicked.connect(self.trigger_refresh)
 
+            self.btn_close = QPushButton("✕")
+            self.btn_close.setFixedSize(30, 30)
+            self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_close.setToolTip("Cerrar")
+            self.btn_close.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    color: #a1a1aa;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 15px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #ef4444;
+                    color: #ffffff;
+                    border: 1px solid #ef4444;
+                }
+                QPushButton:pressed {
+                    background-color: #dc2626;
+                    color: #ffffff;
+                    border: 1px solid #dc2626;
+                }
+            """)
+            self.btn_close.clicked.connect(self.close)
+
             header_layout.addWidget(self.lbl_kernel)
             header_layout.addWidget(self.lbl_uptime)
             header_layout.addWidget(self.btn_refresh)
+            header_layout.addSpacing(6)
+            header_layout.addWidget(self.btn_close)
             layout.addLayout(header_layout)
 
             # Search & Filter Chips Bar

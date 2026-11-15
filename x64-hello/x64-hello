@@ -6433,6 +6433,7 @@ class X64Hello(QWidget):
         if not pixmap.isNull():
             logo_label.setPixmap(pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         logo_label.setStyleSheet("background: transparent; border: none;")
         sidebar_layout.addWidget(logo_label)
         sidebar_layout.addSpacing(16)
@@ -6606,6 +6607,53 @@ class X64Hello(QWidget):
         self.stacked_widget.addWidget(self.create_page_philosophy())
 
         self.change_page(initial_page)
+
+        if hasattr(self, "btn_close") and self.btn_close:
+            self.btn_close.deleteLater()
+        self.btn_close = QPushButton("✕", self)
+        self.btn_close.setFixedSize(30, 30)
+        self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_close.setToolTip(tr("Close"))
+        self.btn_close.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #a1a1aa;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 15px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ef4444;
+                color: #ffffff;
+                border: 1px solid #ef4444;
+            }
+            QPushButton:pressed {
+                background-color: #dc2626;
+                color: #ffffff;
+                border: 1px solid #dc2626;
+            }
+        """)
+        self.btn_close.clicked.connect(self.close)
+        self.btn_close.move(self.width() - 44, 12)
+        self.btn_close.show()
+        self.btn_close.raise_()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if event.pos().y() <= 60 or event.pos().x() <= 270:
+                wh = self.window().windowHandle()
+                if wh:
+                    wh.startSystemMove()
+                    event.accept()
+                    return
+        super().mousePressEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "btn_close") and self.btn_close:
+            self.btn_close.move(self.width() - 44, 12)
+            self.btn_close.raise_()
 
     def is_autostart_enabled(self):
         return os.path.exists(AUTOSTART_PATH)
