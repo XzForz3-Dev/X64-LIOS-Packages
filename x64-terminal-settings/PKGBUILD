@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.1.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -32,6 +32,7 @@ source=(
     '50-x64-scx-loader.rules'
     '00-x64-lios.preset'
     '99-x64-branding.hook'
+    '90-x64-wayland-sessions.hook'
     'x64-dashboard'
     'issue'
     'opencode.svg'
@@ -62,6 +63,7 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '7d46a20d2f882a26851aa731a4bf03b208b26a3562ecddb379b89743a3ffdff5'
             '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
             '6bf718270636a86861b098ef20db507f90948a96cd7d93322224d30f51323700'
+            'c848efb713a710ca29f0d3c6b15ef01cbfc1d5d7c96c256077c9606996eb8a7a'
             'c688e6964b839c9aa2c8fe3d3789fc3a5a09eae18341e2d794ef679bed57ca27'
             '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
             'cbef6edab7ed9826c87bfae01b595ce6d2eff0ed5923250ead5584304530d0af'
@@ -165,6 +167,7 @@ package() {
     # Enforce X64 LIOS identity across filesystem / lsb-release / cachyos-hooks upgrades
     install -d "${pkgdir}/usr/share/libalpm/hooks"
     install -m644 "${srcdir}/99-x64-branding.hook" "${pkgdir}/usr/share/libalpm/hooks/99-x64-branding.hook"
+    install -m644 "${srcdir}/90-x64-wayland-sessions.hook" "${pkgdir}/usr/share/libalpm/hooks/90-x64-wayland-sessions.hook"
 
     # Sovereign Console & Server Dashboard
     install -d "${pkgdir}/usr/bin"
