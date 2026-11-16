@@ -7,12 +7,12 @@
       <property name="button-icon" type="string" value="/usr/share/pixmaps/x64-logo.png"/>
       <property name="show-button-title" type="bool" value="false"/>
       <property name="show-button-icon" type="bool" value="true"/>
-      <property name="position-search-alternate" type="bool" value="true"/>
+      <property name="position-search-alternate" type="bool" value="false"/>
       <property name="position-categories-alternate" type="bool" value="true"/>
-      <property name="position-commands-alternate" type="bool" value="true"/>
+      <property name="position-commands-alternate" type="bool" value="false"/>
       <property name="hover-switch-category" type="bool" value="true"/>
-      <property name="menu-width" type="int" value="500"/>
-      <property name="menu-height" type="int" value="560"/>
+      <property name="menu-width" type="int" value="580"/>
+      <property name="menu-height" type="int" value="540"/>
       <property name="favorites" type="array">
         <value type="string" value="x64-hello.desktop"/>
         <value type="string" value="x64-update.desktop"/>
@@ -22,6 +22,16 @@
         <value type="string" value="org.xfce.mousepad.desktop"/>
         <value type="string" value="opencode.desktop"/>
       </property>
+      <property name="launcher-show-description" type="bool" value="false"/>
+      <property name="launcher-show-name" type="bool" value="true"/>
+      <property name="launcher-icon-size" type="int" value="3"/>
+      <property name="category-icon-size" type="int" value="2"/>
+      <property name="show-command-lockscreen" type="bool" value="true"/>
+      <property name="show-command-logout" type="bool" value="true"/>
+      <property name="show-command-restart" type="bool" value="true"/>
+      <property name="show-command-shutdown" type="bool" value="true"/>
+      <property name="show-command-settings" type="bool" value="true"/>
+      <property name="view-mode" type="int" value="1"/>
     </property>
     <property name="plugin-2" type="string" value="tasklist">
       <property name="grouping" type="uint" value="1"/>
