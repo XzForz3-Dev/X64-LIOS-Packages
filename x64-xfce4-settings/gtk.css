@@ -120,13 +120,16 @@ window#whiskermenu-window .search-area entry image,
     padding-right: 8px;
 }
 
-/* Category Sidebar */
+/* -------------------------------------------------------------------
+ * Category Sidebar - Fixed Rock-Solid Width (No Shrinking, No Jumping)
+ * ------------------------------------------------------------------- */
 window#whiskermenu-window .categories,
 #whiskermenu-window .categories {
     background-color: rgba(0, 0, 0, 0.22);
     border-radius: 12px;
     padding: 6px 4px;
     margin-right: 8px;
+    min-width: 220px;
 }
 
 window#whiskermenu-window .category-button,
@@ -134,14 +137,20 @@ window#whiskermenu-window .category-button,
     background-image: none;
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 7px 12px;
-    margin: 2px 2px;
+    border-radius: 6px;
+    padding: 5px 10px;
+    margin: 1px 2px;
     color: rgba(255, 255, 255, 0.75);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
+    min-width: 208px;
     box-shadow: none;
-    transition: all 120ms ease;
+    transition: background-color 100ms ease;
+}
+
+window#whiskermenu-window .category-button label,
+#whiskermenu-window .category-button label {
+    font-weight: 500;
 }
 
 window#whiskermenu-window .category-button:hover,
@@ -149,22 +158,26 @@ window#whiskermenu-window .category-button:hover,
     background-color: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.06);
     color: #ffffff;
+    font-weight: 500;
 }
 
 window#whiskermenu-window .category-button:checked,
 #whiskermenu-window .category-button:checked {
     background-color: rgba(255, 43, 43, 0.16);
-    border: 1px solid rgba(255, 43, 43, 0.3);
+    border-color: rgba(255, 43, 43, 0.3);
     box-shadow: inset 3px 0 0 0 #ff2b2b;
-    border-radius: 4px 8px 8px 4px;
+    border-radius: 4px 6px 6px 4px;
     color: #ffffff;
-    font-weight: 600;
+    font-weight: 500;
 }
 
-/* Applications TreeView / Launcher Area */
+/* -------------------------------------------------------------------
+ * Applications TreeView / Launcher Area (Stable Rigid Dimensions)
+ * ------------------------------------------------------------------- */
 window#whiskermenu-window .launchers-pane,
 #whiskermenu-window .launchers-pane {
     background-color: transparent;
+    min-width: 360px;
 }
 
 window#whiskermenu-window treeview,
@@ -174,6 +187,7 @@ window#whiskermenu-window treeview,
     padding: 4px;
     font-size: 13px;
     border-radius: 8px;
+    min-width: 340px;
 }
 
 window#whiskermenu-window treeview:hover,
@@ -190,7 +204,9 @@ window#whiskermenu-window treeview:selected:focus,
     border-radius: 8px;
 }
 
-/* Footer (Title & Commands Area) */
+/* -------------------------------------------------------------------
+ * Footer (Title & Commands Area)
+ * ------------------------------------------------------------------- */
 window#whiskermenu-window .title-area,
 #whiskermenu-window .title-area {
     margin-top: 8px;
@@ -243,21 +259,31 @@ window#whiskermenu-window button.command-button:active,
     border-color: rgba(255, 43, 43, 0.5);
 }
 
-/* Scrolled Windows & Clean Scrollbars */
+/* -------------------------------------------------------------------
+ * Floating Hairline Scrollbars (Never Shift Layout or Contents)
+ * ------------------------------------------------------------------- */
+window#whiskermenu-window scrolledwindow,
 #whiskermenu-window scrolledwindow {
     border: none;
+    -GtkScrolledWindow-overlay-scrolling: true;
 }
 
 #whiskermenu-window scrollbar {
     background-color: transparent;
+    border: none;
+    min-width: 4px;
+    margin: 0;
+    padding: 0;
 }
 
 #whiskermenu-window scrollbar slider {
     background-color: rgba(255, 255, 255, 0.15);
     border-radius: 10px;
     min-width: 4px;
+    border: none;
+    margin: 0;
 }
 
 #whiskermenu-window scrollbar slider:hover {
-    background-color: rgba(255, 43, 43, 0.5);
+    background-color: rgba(255, 43, 43, 0.6);
 }

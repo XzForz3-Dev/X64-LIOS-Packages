@@ -12,7 +12,7 @@
       <property name="position-commands-alternate" type="bool" value="false"/>
       <property name="hover-switch-category" type="bool" value="true"/>
       <property name="menu-width" type="int" value="640"/>
-      <property name="menu-height" type="int" value="560"/>
+      <property name="menu-height" type="int" value="580"/>
       <property name="favorites" type="array">
         <value type="string" value="x64-hello.desktop"/>
         <value type="string" value="x64-update.desktop"/>
@@ -34,6 +34,7 @@
       <property name="view-mode" type="int" value="1"/>
       <property name="position-profile-alternate" type="bool" value="true"/>
       <property name="show-command-profile" type="bool" value="false"/>
+      <property name="default-category" type="int" value="0"/>
     </property>
     <property name="plugin-2" type="string" value="tasklist">
       <property name="grouping" type="uint" value="1"/>
