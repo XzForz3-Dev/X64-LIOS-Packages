@@ -4,7 +4,7 @@
   <property name="configver" type="int" value="2"/>
   <property name="plugins" type="empty">
     <property name="plugin-1" type="string" value="whiskermenu">
-      <property name="button-icon" type="string" value="x64-cube"/>
+      <property name="button-icon" type="string" value="/usr/share/pixmaps/x64-logo.png"/>
       <property name="show-button-title" type="bool" value="false"/>
       <property name="show-button-icon" type="bool" value="true"/>
     </property>
