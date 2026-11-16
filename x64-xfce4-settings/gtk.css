@@ -1,55 +1,263 @@
+/* ===================================================================
+ *  X64 LIOS - Master Obsidian Desktop Theme (Xfce 4.20 + KDE Kickoff)
+ * =================================================================== */
+
 @define-color accent_color #ff2b2b;
 @define-color accent_fg_color #ffffff;
 @define-color accent_bg_color #ff2b2b;
-@define-color window_bg_color #0a0b10;
+@define-color window_bg_color #0e1017;
 @define-color window_fg_color #f0f2f8;
-@define-color headerbar_bg_color #0d1017;
+@define-color headerbar_bg_color #0e1017;
 @define-color headerbar_fg_color #f0f2f8;
-@define-color popover_bg_color #0d1017;
+@define-color popover_bg_color #0e1017;
 @define-color popover_fg_color #f0f2f8;
-@define-color view_bg_color #12151f;
+@define-color view_bg_color #12141e;
 @define-color view_fg_color #f0f2f8;
-@define-color card_bg_color #12151f;
+@define-color card_bg_color #12141e;
 @define-color card_fg_color #f0f2f8;
-@define-color sidebar_bg_color @window_bg_color;
+@define-color sidebar_bg_color #08090d;
 @define-color sidebar_fg_color @window_fg_color;
-@define-color sidebar_border_color @window_bg_color;
-@define-color sidebar_backdrop_color @window_bg_color;
-@define-color theme_selected_bg_color alpha(@accent_color, 0.15);
+@define-color sidebar_border_color rgba(255, 255, 255, 0.08);
+@define-color sidebar_backdrop_color #08090d;
+@define-color theme_selected_bg_color alpha(@accent_color, 0.2);
 @define-color theme_selected_fg_color @accent_color;
 
+/* -------------------------------------------------------------------
+ * 1. Bottom Xfce Panel (Obsidian Dark Glass with Crimson Indicator)
+ * ------------------------------------------------------------------- */
+.xfce4-panel.background,
+.xfce4-panel {
+    background-color: #0e1017;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
 
-/* X64 LIOS Whisker Menu Styling */
+.xfce4-panel button {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    margin: 3px 2px;
+    padding: 0 10px;
+    color: rgba(255, 255, 255, 0.85);
+    box-shadow: none;
+    transition: all 120ms ease-in-out;
+}
+
+.xfce4-panel button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+.xfce4-panel button:checked,
+.xfce4-panel button:active {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 -2px 0 0 #ff2b2b;
+    border-radius: 6px 6px 2px 2px;
+    color: #ffffff;
+}
+
+#whiskermenu-button {
+    background-color: transparent;
+    border-color: transparent;
+    margin-left: 4px;
+    margin-right: 4px;
+    border-radius: 8px;
+    padding: 2px 6px;
+}
+
+#whiskermenu-button:hover,
+#whiskermenu-button:checked {
+    background-color: rgba(255, 43, 43, 0.16);
+    border-color: rgba(255, 43, 43, 0.35);
+}
+
+/* -------------------------------------------------------------------
+ * 2. Whisker Menu (KDE Kickoff Proportions + Obsidian Clean Aesthetic)
+ * ------------------------------------------------------------------- */
+window#whiskermenu-window,
 #whiskermenu-window {
     background-color: #0e1017;
     color: #f0f2f8;
-    border: 1px solid #2b2b2e;
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+    padding: 12px;
 }
 
-#whiskermenu-window entry {
-    background-color: #161a24;
+/* Modern Clean Search Bar */
+window#whiskermenu-window .search-area,
+#whiskermenu-window .search-area {
+    margin: 2px 4px 10px 4px;
+    padding: 0;
+}
+
+window#whiskermenu-window .search-area entry,
+#whiskermenu-window .search-area entry {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.05);
     color: #ffffff;
-    border: 1px solid #2b2b2e;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 13px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: all 150ms ease-in-out;
+}
+
+window#whiskermenu-window .search-area entry:focus,
+#whiskermenu-window .search-area entry:focus {
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 2px rgba(255, 43, 43, 0.25);
+    color: #ffffff;
+}
+
+window#whiskermenu-window .search-area entry image,
+#whiskermenu-window .search-area entry image {
+    color: rgba(255, 255, 255, 0.6);
+    padding-right: 8px;
+}
+
+/* Category Sidebar */
+window#whiskermenu-window .categories,
+#whiskermenu-window .categories {
+    background-color: rgba(0, 0, 0, 0.22);
+    border-radius: 12px;
+    padding: 6px 4px;
+    margin-right: 8px;
+}
+
+window#whiskermenu-window .category-button,
+#whiskermenu-window .category-button {
+    background-image: none;
+    background-color: transparent;
+    border: 1px solid transparent;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 7px 12px;
+    margin: 2px 2px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: none;
+    transition: all 120ms ease;
 }
 
-#whiskermenu-window entry:focus {
-    border-color: #ff2b2b;
+window#whiskermenu-window .category-button:hover,
+#whiskermenu-window .category-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
 }
 
+window#whiskermenu-window .category-button:checked,
+#whiskermenu-window .category-button:checked {
+    background-color: rgba(255, 43, 43, 0.16);
+    border: 1px solid rgba(255, 43, 43, 0.3);
+    box-shadow: inset 3px 0 0 0 #ff2b2b;
+    border-radius: 4px 8px 8px 4px;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Applications TreeView / Launcher Area */
+window#whiskermenu-window .launchers-pane,
+#whiskermenu-window .launchers-pane {
+    background-color: transparent;
+}
+
+window#whiskermenu-window treeview,
 #whiskermenu-window treeview {
     background-color: transparent;
-    color: #f0f2f8;
+    color: #e6e8ee;
+    padding: 4px;
+    font-size: 13px;
+    border-radius: 8px;
 }
 
+window#whiskermenu-window treeview:hover,
 #whiskermenu-window treeview:hover {
-    background-color: rgba(255, 43, 43, 0.12);
+    background-color: rgba(255, 255, 255, 0.04);
 }
 
-#whiskermenu-window treeview:selected {
-    background-color: rgba(255, 43, 43, 0.25);
+window#whiskermenu-window treeview:selected,
+window#whiskermenu-window treeview:selected:focus,
+#whiskermenu-window treeview:selected,
+#whiskermenu-window treeview:selected:focus {
+    background-color: rgba(255, 43, 43, 0.2);
     color: #ffffff;
-    border-radius: 6px;
+    border-radius: 8px;
+}
+
+/* Footer (Title & Commands Area) */
+window#whiskermenu-window .title-area,
+#whiskermenu-window .title-area {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+window#whiskermenu-window .profile-username,
+#whiskermenu-window .profile-username {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    padding-left: 8px;
+}
+
+window#whiskermenu-window .profile-picture,
+#whiskermenu-window .profile-picture {
+    border-radius: 50%;
+}
+
+window#whiskermenu-window .commands-area button,
+window#whiskermenu-window button.command-button,
+#whiskermenu-window .commands-area button,
+#whiskermenu-window button.command-button {
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin: 0 2px;
+    color: rgba(255, 255, 255, 0.85);
+    box-shadow: none;
+    transition: all 120ms ease;
+}
+
+window#whiskermenu-window .commands-area button:hover,
+window#whiskermenu-window button.command-button:hover,
+#whiskermenu-window .commands-area button:hover,
+#whiskermenu-window button.command-button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+window#whiskermenu-window .commands-area button:active,
+window#whiskermenu-window button.command-button:active,
+#whiskermenu-window .commands-area button:active,
+#whiskermenu-window button.command-button:active {
+    background-color: rgba(255, 43, 43, 0.25);
+    border-color: rgba(255, 43, 43, 0.5);
+}
+
+/* Scrolled Windows & Clean Scrollbars */
+#whiskermenu-window scrolledwindow {
+    border: none;
+}
+
+#whiskermenu-window scrollbar {
+    background-color: transparent;
+}
+
+#whiskermenu-window scrollbar slider {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    min-width: 4px;
+}
+
+#whiskermenu-window scrollbar slider:hover {
+    background-color: rgba(255, 43, 43, 0.5);
 }

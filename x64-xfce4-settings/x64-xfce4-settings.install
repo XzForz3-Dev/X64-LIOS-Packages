@@ -72,6 +72,23 @@ post_install() {
             mkdir -p "$user_dir/.config/gtk-3.0"
             [ -f /etc/skel/.config/gtk-3.0/gtk.css ] && cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css"
 
+            # Avatar oficial X64 si no existe uno personalizado
+            [ ! -f "$user_dir/.face" ] && [ -f /etc/skel/.face ] && cp -f /etc/skel/.face "$user_dir/.face"
+            [ ! -f "$user_dir/.face.icon" ] && [ -f /etc/skel/.face.icon ] && cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            chown "$u:$g" "$user_dir/.face" "$user_dir/.face.icon" 2>/dev/null || true
+
+            # Sincronizar AccountsService para icono de perfil
+            if [ -d "/var/lib/AccountsService/users" ]; then
+                mkdir -p /var/lib/AccountsService/icons
+                cp -f /usr/share/pixmaps/x64-logo.png /var/lib/AccountsService/icons/"$u" 2>/dev/null || true
+                cat << ACC_EOF > /var/lib/AccountsService/users/"$u" 2>/dev/null || true
+[User]
+Icon=/var/lib/AccountsService/icons/${u}
+Session=
+XSession=
+ACC_EOF
+            fi
+
             # Labwc dark themerc override y rc.xml (Super abre Whisker)
             mkdir -p "$user_dir/.config/xfce4/labwc" "$user_dir/.config/labwc"
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/xfce4/labwc/"

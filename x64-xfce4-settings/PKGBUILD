@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -71,6 +71,11 @@ package() {
     install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/pixmaps/x64-logo.png"
     install -d "${pkgdir}/usr/share/icons/hicolor/512x512/apps"
     install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/x64-logo.png"
+
+    # 2.1 Avatar por defecto para perfil de usuario en Whisker Menu
+    install -d "${pkgdir}/etc/skel"
+    install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/etc/skel/.face"
+    install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/etc/skel/.face.icon"
 
     # 3. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
     install -d "${pkgdir}/etc/lightdm/lightdm.conf.d"
