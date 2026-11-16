@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -12,9 +12,13 @@ depends=(
     'lightdm'
     'lightdm-slick-greeter'
     'papirus-icon-theme'
+    'noto-fonts'
+    'xfce4-whiskermenu-plugin'
+    'xfce4-pulseaudio-plugin'
     'kitty'
 )
 source=(
+    '01-monolith.jpg'
     '07-slick-greeter-dock.jpg'
     '60-slick-greeter.conf'
     'slick-greeter.conf'
@@ -26,6 +30,9 @@ source=(
     'themerc-override'
     'xfwm4.xml'
     'keyboard-layout.xml'
+    'xfce4-panel.xml'
+    'xfce4-desktop.xml'
+    'rc.xml'
     'environment'
     'screenshot.png'
 )
@@ -43,11 +50,16 @@ sha256sums=(
     'SKIP'
     'SKIP'
     'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
 )
 
 package() {
-    # 1. Fondo oficial X64 LIOS para Login Slick Greeter
+    # 1. Fondos oficiales X64 LIOS (Monolith para escritorio, Slick dock para greeter)
     install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
     install -m644 "${srcdir}/07-slick-greeter-dock.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/07-slick-greeter-dock.jpg"
 
     # 2. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
@@ -63,9 +75,9 @@ package() {
     install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
     install -m644 "${srcdir}/20-xkb.conf" "${pkgdir}/etc/environment.d/20-xkb.conf"
 
-    # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark, Papirus-Dark y layout es)
+    # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro, Monolith, Whisker, panel inferior, Papirus-Dark y layout es)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml; do
+    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml; do
         install -m644 "${srcdir}/${conf}" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${conf}"
     done
 
@@ -73,14 +85,18 @@ package() {
     install -d "${pkgdir}/etc/skel/.config/xfce4"
     install -m644 "${srcdir}/helpers.rc" "${pkgdir}/etc/skel/.config/xfce4/helpers.rc"
 
-    # 7. Tema oscuro de decoracion de ventanas para Labwc (themerc-override)
+    # 7. Tema oscuro y atajos para Labwc (themerc-override y rc.xml)
     install -d "${pkgdir}/etc/skel/.config/xfce4/labwc"
     install -d "${pkgdir}/etc/skel/.config/labwc"
+    install -d "${pkgdir}/etc/xdg/xfce4/labwc"
     install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/xfce4/labwc/themerc-override"
     install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/labwc/themerc-override"
+    install -m644 "${srcdir}/rc.xml" "${pkgdir}/etc/skel/.config/xfce4/labwc/rc.xml"
+    install -m644 "${srcdir}/rc.xml" "${pkgdir}/etc/xdg/xfce4/labwc/rc.xml"
 
     # 8. Entorno inicial para labwc en skeleton de nuevos usuarios (soporte español Wayland + cursor)
     install -m644 "${srcdir}/environment" "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
+    install -m644 "${srcdir}/environment" "${pkgdir}/etc/xdg/xfce4/labwc/environment"
 
     # 9. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-xfce4-settings"

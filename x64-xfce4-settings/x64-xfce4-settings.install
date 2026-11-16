@@ -58,21 +58,21 @@ post_install() {
             u=$(basename "$user_dir")
             g=$(id -gn "$u" 2>/dev/null || echo "$u")
 
-            # Xfconf configs
+            # Xfconf configs (tema, terminal, panel inferior, fondo Monolith, Whisker)
             target_xfconf="$user_dir/.config/xfce4/xfconf/xfce-perchannel-xml"
             mkdir -p "$target_xfconf"
-            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml "$target_xfconf/"
-            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml "$target_xfconf/"
-            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml "$target_xfconf/"
-            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml "$target_xfconf/"
+            for xconf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml; do
+                [ -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${xconf}" ] && cp -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${xconf}" "$target_xfconf/"
+            done
 
             # Preferred applications (Kitty default)
             [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
 
-            # Labwc dark themerc override
+            # Labwc dark themerc override y rc.xml (Super abre Whisker)
             mkdir -p "$user_dir/.config/xfce4/labwc" "$user_dir/.config/labwc"
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/xfce4/labwc/"
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/labwc/"
+            [ -f /etc/skel/.config/xfce4/labwc/rc.xml ] && cp -f /etc/skel/.config/xfce4/labwc/rc.xml "$user_dir/.config/xfce4/labwc/"
 
             # Labwc cursor workaround + teclado español
             [ -f /etc/skel/.config/xfce4/labwc/environment ] && cp -f /etc/skel/.config/xfce4/labwc/environment "$user_dir/.config/xfce4/labwc/"
@@ -91,7 +91,7 @@ post_install() {
                 " 2>/dev/null || true
             fi
 
-            # Recargar labwc en vivo si está activo
+            # Recargar componentes Xfce y Labwc en vivo si están activos
             pid=$(pgrep -u "$u" -x labwc 2>/dev/null | head -n1 || true)
             if [ -n "$pid" ] && [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
                 su - "$u" -c "
@@ -100,6 +100,8 @@ post_install() {
                     export XDG_RUNTIME_DIR=/run/user/$uid
                     labwc --reconfigure 2>/dev/null || true
                     kill -SIGHUP $pid 2>/dev/null || true
+                    xfdesktop --reload 2>/dev/null || true
+                    xfce4-panel -r 2>/dev/null || true
                 " 2>/dev/null || true
             fi
         fi
