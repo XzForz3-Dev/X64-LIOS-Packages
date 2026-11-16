@@ -19,6 +19,7 @@ source=(
     '60-slick-greeter.conf'
     'slick-greeter.conf'
     '10-wlroots.conf'
+    '20-xkb.conf'
     'xsettings.xml'
     'xfce4-terminal.xml'
     'helpers.rc'
@@ -29,6 +30,7 @@ source=(
     'screenshot.png'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -56,9 +58,10 @@ package() {
     install -d "${pkgdir}/etc/lightdm"
     install -m644 "${srcdir}/slick-greeter.conf" "${pkgdir}/etc/lightdm/slick-greeter.conf"
 
-    # 4. Forzar cursor por software en compositores wlroots/labwc (evita cursor invertido)
+    # 4. Forzar cursor por software y teclado español en compositores wlroots/labwc
     install -d "${pkgdir}/etc/environment.d"
     install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
+    install -m644 "${srcdir}/20-xkb.conf" "${pkgdir}/etc/environment.d/20-xkb.conf"
 
     # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark, Papirus-Dark y layout es)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
