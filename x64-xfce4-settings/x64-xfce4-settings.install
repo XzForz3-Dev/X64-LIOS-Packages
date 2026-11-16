@@ -68,6 +68,10 @@ post_install() {
             # Preferred applications (Kitty default)
             [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
 
+            # GTK 3 CSS styles for Whisker Menu
+            mkdir -p "$user_dir/.config/gtk-3.0"
+            [ -f /etc/skel/.config/gtk-3.0/gtk.css ] && cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css"
+
             # Labwc dark themerc override y rc.xml (Super abre Whisker)
             mkdir -p "$user_dir/.config/xfce4/labwc" "$user_dir/.config/labwc"
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/xfce4/labwc/"
@@ -77,7 +81,7 @@ post_install() {
             # Labwc cursor workaround + teclado español
             [ -f /etc/skel/.config/xfce4/labwc/environment ] && cp -f /etc/skel/.config/xfce4/labwc/environment "$user_dir/.config/xfce4/labwc/"
 
-            chown -R "$u:$g" "$user_dir/.config/xfce4" "$user_dir/.config/labwc" 2>/dev/null || true
+            chown -R "$u:$g" "$user_dir/.config/xfce4" "$user_dir/.config/labwc" "$user_dir/.config/gtk-3.0" 2>/dev/null || true
 
             # Aplicar configuracion xfconf en caliente si hay xfconfd activo
             uid=$(id -u "$u" 2>/dev/null || true)

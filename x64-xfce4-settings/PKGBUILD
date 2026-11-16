@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -34,10 +34,12 @@ source=(
     'xfce4-panel.xml'
     'xfce4-desktop.xml'
     'rc.xml'
+    'gtk.css'
     'environment'
     'screenshot.png'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -83,11 +85,15 @@ package() {
     install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
     install -m644 "${srcdir}/20-xkb.conf" "${pkgdir}/etc/environment.d/20-xkb.conf"
 
-    # 6. Configuracion de usuario por defecto en /etc/skel (tema oscuro, Monolith, Whisker, panel inferior, Papirus-Dark y layout es)
+    # 6. Configuracion de usuario por defecto en /etc/skel (tema oscuro, Monolith, Whisker mejorado, panel inferior, Papirus-Dark y layout es)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
     for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml; do
         install -m644 "${srcdir}/${conf}" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${conf}"
     done
+
+    # 6.1. Estilos GTK para Whisker Menu Dark Glass
+    install -d "${pkgdir}/etc/skel/.config/gtk-3.0"
+    install -m644 "${srcdir}/gtk.css" "${pkgdir}/etc/skel/.config/gtk-3.0/gtk.css"
 
     # 7. Aplicaciones preferidas (Kitty como terminal predeterminada) en /etc/skel
     install -d "${pkgdir}/etc/skel/.config/xfce4"
