@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -24,9 +24,13 @@ source=(
     'helpers.rc'
     'themerc-override'
     'xfwm4.xml'
+    'keyboard-layout.xml'
+    'environment'
     'screenshot.png'
 )
 sha256sums=(
+    'SKIP'
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -56,9 +60,9 @@ package() {
     install -d "${pkgdir}/etc/environment.d"
     install -m644 "${srcdir}/10-wlroots.conf" "${pkgdir}/etc/environment.d/10-wlroots.conf"
 
-    # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark y Papirus-Dark)
+    # 5. Configuracion de usuario por defecto en /etc/skel (tema oscuro Adwaita-dark, Papirus-Dark y layout es)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml; do
+    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml; do
         install -m644 "${srcdir}/${conf}" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${conf}"
     done
 
@@ -72,9 +76,8 @@ package() {
     install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/xfce4/labwc/themerc-override"
     install -m644 "${srcdir}/themerc-override" "${pkgdir}/etc/skel/.config/labwc/themerc-override"
 
-    # 8. Entorno inicial para labwc en skeleton de nuevos usuarios
-    echo "WLR_NO_HARDWARE_CURSORS=1" > "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
-    chmod 644 "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
+    # 8. Entorno inicial para labwc en skeleton de nuevos usuarios (soporte español Wayland + cursor)
+    install -m644 "${srcdir}/environment" "${pkgdir}/etc/skel/.config/xfce4/labwc/environment"
 
     # 9. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-xfce4-settings"

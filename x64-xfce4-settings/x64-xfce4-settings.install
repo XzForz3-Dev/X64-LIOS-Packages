@@ -8,20 +8,51 @@ post_install() {
         fi
     fi
 
-    # 2. Parchear plantilla de entorno labwc si existe
+    # 2. Detectar distribución de teclado del sistema (localectl / vconsole)
+    sys_layout="es"
+    sys_variant="winkeys"
+    sys_model="pc105"
+    if command -v localectl >/dev/null 2>&1; then
+        _l=$(localectl status 2>/dev/null | awk -F': ' '/X11 Layout/{print $2}' | tr -d ' ')
+        [ -n "$_l" ] && sys_layout="$_l"
+        _v=$(localectl status 2>/dev/null | awk -F': ' '/X11 Variant/{print $2}' | tr -d ' ')
+        [ -n "$_v" ] && sys_variant="$_v"
+        _m=$(localectl status 2>/dev/null | awk -F': ' '/X11 Model/{print $2}' | tr -d ' ')
+        [ -n "$_m" ] && sys_model="$_m"
+    fi
+
+    # 3. Parchear plantilla de entorno labwc si existe
     if [ -f /usr/share/xfce4/labwc/labwc-environment ]; then
         if ! grep -q "WLR_NO_HARDWARE_CURSORS" /usr/share/xfce4/labwc/labwc-environment; then
             echo "WLR_NO_HARDWARE_CURSORS=1" >> /usr/share/xfce4/labwc/labwc-environment
         fi
+        sed -i -e "s|^XKB_DEFAULT_LAYOUT=.*|XKB_DEFAULT_LAYOUT=${sys_layout}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
+        sed -i -e "s|^XKB_DEFAULT_MODEL=.*|XKB_DEFAULT_MODEL=${sys_model}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
+        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=${sys_variant}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
     fi
 
-    # 3. Parchear helpers globales del sistema de forma segura
+    # 4. Parchear helpers globales del sistema de forma segura
     if [ -f /etc/xdg/xfce4/helpers.rc ]; then
         sed -i 's/^TerminalEmulator=.*/TerminalEmulator=kitty/' /etc/xdg/xfce4/helpers.rc 2>/dev/null || true
         sed -i 's/^WebBrowser=.*/WebBrowser=chromium/' /etc/xdg/xfce4/helpers.rc 2>/dev/null || true
     fi
 
-    # 4. Propagar configuraciones soberanas a usuarios existentes en /home/*
+    # 5. Sincronizar skeleton con el layout detectado
+    skel_env="/etc/skel/.config/xfce4/labwc/environment"
+    if [ -f "$skel_env" ]; then
+        sed -i -e "s|^XKB_DEFAULT_LAYOUT=.*|XKB_DEFAULT_LAYOUT=${sys_layout}|g" "$skel_env"
+        sed -i -e "s|^XKB_DEFAULT_MODEL=.*|XKB_DEFAULT_MODEL=${sys_model}|g" "$skel_env"
+        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=${sys_variant}|g" "$skel_env"
+    fi
+
+    skel_kb="/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml"
+    if [ -f "$skel_kb" ]; then
+        sed -i -e "s|value=\"[^\"]*\"\(.*name=\"XkbLayout\"\)|value=\"${sys_layout}\"\1|" "$skel_kb" 2>/dev/null || true
+        sed -i -e "s|value=\"[^\"]*\"\(.*name=\"XkbVariant\"\)|value=\"${sys_variant}\"\1|" "$skel_kb" 2>/dev/null || true
+        sed -i -e "s|value=\"[^\"]*\"\(.*name=\"XkbModel\"\)|value=\"${sys_model}\"\1|" "$skel_kb" 2>/dev/null || true
+    fi
+
+    # 6. Propagar configuraciones soberanas a usuarios existentes en /home/*
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
             u=$(basename "$user_dir")
@@ -33,6 +64,7 @@ post_install() {
             [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml "$target_xfconf/"
             [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml "$target_xfconf/"
             [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml "$target_xfconf/"
+            [ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml ] && cp -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml "$target_xfconf/"
 
             # Preferred applications (Kitty default)
             [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
@@ -42,20 +74,32 @@ post_install() {
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/xfce4/labwc/"
             [ -f /etc/skel/.config/xfce4/labwc/themerc-override ] && cp -f /etc/skel/.config/xfce4/labwc/themerc-override "$user_dir/.config/labwc/"
 
-            # Labwc cursor workaround
+            # Labwc cursor workaround + teclado español
             [ -f /etc/skel/.config/xfce4/labwc/environment ] && cp -f /etc/skel/.config/xfce4/labwc/environment "$user_dir/.config/xfce4/labwc/"
 
             chown -R "$u:$g" "$user_dir/.config/xfce4" "$user_dir/.config/labwc" 2>/dev/null || true
 
+            # Aplicar configuracion xfconf en caliente si hay xfconfd activo
+            uid=$(id -u "$u" 2>/dev/null || true)
+            if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                su - "$u" -c "
+                    export XDG_RUNTIME_DIR=/run/user/$uid
+                    xfconf-query -c keyboard-layout -p '/Default/XkbDisable' -n -t bool -s false 2>/dev/null || true
+                    xfconf-query -c keyboard-layout -p '/Default/XkbLayout' -n -t string -s '${sys_layout}' 2>/dev/null || true
+                    xfconf-query -c keyboard-layout -p '/Default/XkbVariant' -n -t string -s '${sys_variant}' 2>/dev/null || true
+                    xfconf-query -c keyboard-layout -p '/Default/XkbModel' -n -t string -s '${sys_model}' 2>/dev/null || true
+                " 2>/dev/null || true
+            fi
+
             # Recargar labwc en vivo si está activo
             pid=$(pgrep -u "$u" -x labwc 2>/dev/null | head -n1 || true)
-            uid=$(id -u "$u" 2>/dev/null || true)
             if [ -n "$pid" ] && [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
                 su - "$u" -c "
                     export LABWC_PID=$pid
                     export WAYLAND_DISPLAY=\$(ls /run/user/$uid/wayland-* 2>/dev/null | head -n1 | xargs -r basename || echo 'wayland-0')
                     export XDG_RUNTIME_DIR=/run/user/$uid
                     labwc --reconfigure 2>/dev/null || true
+                    kill -SIGHUP $pid 2>/dev/null || true
                 " 2>/dev/null || true
             fi
         fi
