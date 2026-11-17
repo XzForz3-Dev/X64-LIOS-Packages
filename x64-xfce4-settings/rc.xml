@@ -34,22 +34,28 @@
     </keybind>
 
     <!-- Screenshots (Full, Region Snipping, Active Window, Interactive) -->
-    <keybind key="Print">
+    <keybind key="Print" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot full"/>
     </keybind>
-    <keybind key="S-Print">
+    <keybind key="S-Print" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot region"/>
     </keybind>
-    <keybind key="W-S-s">
+    <keybind key="W-S-s" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot region"/>
     </keybind>
-    <keybind key="W-S-S">
+    <keybind key="W-S-S" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot region"/>
     </keybind>
-    <keybind key="A-Print">
+    <keybind key="C-S-s" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot region"/>
     </keybind>
-    <keybind key="C-Print">
+    <keybind key="C-S-S" overrideInhibition="yes">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="A-Print" overrideInhibition="yes">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="C-Print" overrideInhibition="yes">
       <action name="Execute" command="/usr/bin/x64-screenshot gui"/>
     </keybind>
 

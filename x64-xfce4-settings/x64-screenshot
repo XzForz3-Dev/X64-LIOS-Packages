@@ -1,0 +1,65 @@
+#!/bin/bash
+# -----------------------------------------------------------------------------
+# X64 LIOS - Official Screenshot & Region Snipping Tool (Wayland / Labwc)
+# -----------------------------------------------------------------------------
+
+mode="${1:-region}"
+target_dir="${XDG_PICTURES_DIR:-$HOME/Imágenes}/Capturas de pantalla"
+mkdir -p "$target_dir"
+timestamp=$(date +%Y%m%d_%H%M%S)
+
+case "$mode" in
+    full)
+        filepath="$target_dir/captura_${timestamp}.png"
+        grim "$filepath"
+        wl-copy --type image/png < "$filepath"
+        notify-send -i camera-photo "Captura de Pantalla" "Pantalla completa guardada y copiada al portapapeles"
+        ;;
+    region|crop)
+        # Snapshot the full screen FIRST so open menus, tooltips and popups are preserved!
+        tmp_shot="/tmp/x64_snap_${timestamp}_$$.png"
+        grim "$tmp_shot"
+
+        if command -v satty >/dev/null 2>&1; then
+            filepath="$target_dir/recorte_${timestamp}.png"
+            satty --filename "$tmp_shot" \
+                  --fullscreen \
+                  --initial-tool crop \
+                  --early-exit all \
+                  --copy-command "wl-copy --type image/png" \
+                  --actions-on-enter save-to-clipboard,save-to-file,exit \
+                  --actions-on-escape exit \
+                  --output-filename "$filepath" \
+                  --save-after-copy
+            rm -f "$tmp_shot"
+            if [ -f "$filepath" ]; then
+                notify-send -i camera-photo "Recorte de Pantalla" "Recorte guardado y copiado al portapapeles"
+            fi
+        else
+            geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+            if [ -n "$geom" ]; then
+                filepath="$target_dir/recorte_${timestamp}.png"
+                magick "$tmp_shot" -crop "$geom" "$filepath"
+                wl-copy --type image/png < "$filepath"
+                notify-send -i camera-photo "Recorte de Pantalla" "Área guardada y copiada al portapapeles"
+            fi
+            rm -f "$tmp_shot"
+        fi
+        ;;
+    gui)
+        if command -v xfce4-screenshooter >/dev/null 2>&1; then
+            xfce4-screenshooter
+        else
+            tmp_shot="/tmp/x64_snap_${timestamp}_$$.png"
+            grim "$tmp_shot"
+            satty --filename "$tmp_shot" --fullscreen
+            rm -f "$tmp_shot"
+        fi
+        ;;
+    *)
+        filepath="$target_dir/captura_${timestamp}.png"
+        grim "$filepath"
+        wl-copy --type image/png < "$filepath"
+        notify-send -i camera-photo "Captura de Pantalla" "Captura copiada al portapapeles"
+        ;;
+esac
