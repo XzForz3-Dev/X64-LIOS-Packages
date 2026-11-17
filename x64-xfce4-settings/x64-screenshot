@@ -16,40 +16,35 @@ case "$mode" in
         notify-send -i camera-photo "Captura de Pantalla" "Pantalla completa guardada y copiada al portapapeles"
         ;;
     region|crop)
-        # Snapshot the full screen FIRST so open menus, tooltips and popups are preserved!
-        tmp_shot="/tmp/x64_snap_${timestamp}_$$.png"
-        grim "$tmp_shot"
-
-        if command -v satty >/dev/null 2>&1; then
-            filepath="$target_dir/recorte_${timestamp}.png"
-            satty --filename "$tmp_shot" \
-                  --fullscreen \
-                  --initial-tool crop \
-                  --early-exit all \
-                  --copy-command "wl-copy --type image/png" \
-                  --actions-on-enter save-to-clipboard,save-to-file,exit \
-                  --actions-on-escape exit \
-                  --output-filename "$filepath" \
-                  --save-after-copy
-            rm -f "$tmp_shot"
-            if [ -f "$filepath" ]; then
-                notify-send -i camera-photo "Recorte de Pantalla" "Recorte guardado y copiado al portapapeles"
+        # Freeze physical screens 1:1 so menus/popups stay visible, then drag-to-crop directly on screen
+        if command -v wayfreeze >/dev/null 2>&1; then
+            wayfreeze &
+            freeze_pid=$!
+            trap 'kill $freeze_pid 2>/dev/null || true' EXIT INT TERM
+            sleep 0.1
+            geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+            if [ -n "$geom" ]; then
+                filepath="$target_dir/recorte_${timestamp}.png"
+                grim -g "$geom" "$filepath"
+                wl-copy --type image/png < "$filepath"
+                notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
             fi
+            kill $freeze_pid 2>/dev/null || true
+            trap - EXIT INT TERM
         else
             geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
             if [ -n "$geom" ]; then
                 filepath="$target_dir/recorte_${timestamp}.png"
-                magick "$tmp_shot" -crop "$geom" "$filepath"
+                grim -g "$geom" "$filepath"
                 wl-copy --type image/png < "$filepath"
-                notify-send -i camera-photo "Recorte de Pantalla" "Área guardada y copiada al portapapeles"
+                notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
             fi
-            rm -f "$tmp_shot"
         fi
         ;;
     gui)
         if command -v xfce4-screenshooter >/dev/null 2>&1; then
             xfce4-screenshooter
-        else
+        elif command -v satty >/dev/null 2>&1; then
             tmp_shot="/tmp/x64_snap_${timestamp}_$$.png"
             grim "$tmp_shot"
             satty --filename "$tmp_shot" --fullscreen
