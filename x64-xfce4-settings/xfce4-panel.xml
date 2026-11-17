@@ -10,7 +10,7 @@
       <property name="position-search-alternate" type="bool" value="false"/>
       <property name="position-categories-alternate" type="bool" value="true"/>
       <property name="position-commands-alternate" type="bool" value="false"/>
-      <property name="hover-switch-category" type="bool" value="true"/>
+      <property name="hover-switch-category" type="bool" value="false"/>
       <property name="menu-width" type="int" value="640"/>
       <property name="menu-height" type="int" value="580"/>
       <property name="favorites" type="array">
@@ -54,6 +54,7 @@
     <property name="plugin-5" type="string" value="pulseaudio">
       <property name="style" type="uint" value="0"/>
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>
+      <property name="known-players" type="string" value="Chromium"/>
     </property>
     <property name="plugin-6" type="string" value="separator">
       <property name="square-icons" type="bool" value="true"/>
