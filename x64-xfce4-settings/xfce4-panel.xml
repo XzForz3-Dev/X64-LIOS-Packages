@@ -78,22 +78,22 @@
     <property name="plugin-12" type="string" value="separator"/>
     <property name="plugin-13" type="string" value="launcher">
       <property name="items" type="array">
-        <value type="string" value="17947909501.desktop"/>
+        <value type="string" value="xfce4-web-browser.desktop"/>
       </property>
     </property>
     <property name="plugin-14" type="string" value="launcher">
       <property name="items" type="array">
-        <value type="string" value="17947909502.desktop"/>
+        <value type="string" value="xfce4-terminal-emulator.desktop"/>
       </property>
     </property>
     <property name="plugin-15" type="string" value="launcher">
       <property name="items" type="array">
-        <value type="string" value="17947909503.desktop"/>
+        <value type="string" value="xfce4-file-manager.desktop"/>
       </property>
     </property>
     <property name="plugin-16" type="string" value="launcher">
       <property name="items" type="array">
-        <value type="string" value="17947909504.desktop"/>
+        <value type="string" value="xfce4-appfinder.desktop"/>
       </property>
     </property>
     <property name="plugin-17" type="string" value="separator"/>
@@ -106,6 +106,9 @@
     <property name="panel-1" type="empty">
       <property name="plugin-ids" type="array">
         <value type="int" value="1"/>
+        <value type="int" value="13"/>
+        <value type="int" value="14"/>
+        <value type="int" value="15"/>
         <value type="int" value="2"/>
         <value type="int" value="3"/>
         <value type="int" value="4"/>
