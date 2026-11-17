@@ -72,15 +72,20 @@ post_install() {
             mkdir -p "$user_dir/.config/gtk-3.0"
             [ -f /etc/skel/.config/gtk-3.0/gtk.css ] && cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css"
 
-            # Avatar oficial X64 si no existe uno personalizado
-            [ ! -f "$user_dir/.face" ] && [ -f /etc/skel/.face ] && cp -f /etc/skel/.face "$user_dir/.face"
-            [ ! -f "$user_dir/.face.icon" ] && [ -f /etc/skel/.face.icon ] && cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            # Avatar neutral oficial si no existe uno personalizado o si aún tiene el logo x64 redundante
+            if [ -f "$user_dir/.face" ] && cmp -s "$user_dir/.face" /usr/share/pixmaps/x64-logo.png; then
+                cp -f /etc/skel/.face "$user_dir/.face"
+                cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            elif [ ! -f "$user_dir/.face" ] && [ -f /etc/skel/.face ]; then
+                cp -f /etc/skel/.face "$user_dir/.face"
+                cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            fi
             chown "$u:$g" "$user_dir/.face" "$user_dir/.face.icon" 2>/dev/null || true
 
             # Sincronizar AccountsService para icono de perfil
             if [ -d "/var/lib/AccountsService/users" ]; then
                 mkdir -p /var/lib/AccountsService/icons
-                cp -f /usr/share/pixmaps/x64-logo.png /var/lib/AccountsService/icons/"$u" 2>/dev/null || true
+                cp -f /usr/share/pixmaps/default-avatar.png /var/lib/AccountsService/icons/"$u" 2>/dev/null || true
                 cat << ACC_EOF > /var/lib/AccountsService/users/"$u" 2>/dev/null || true
 [User]
 Icon=/var/lib/AccountsService/icons/${u}

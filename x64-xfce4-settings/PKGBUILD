@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=17
+pkgrel=18
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -30,6 +30,7 @@ source=(
     '10-wlroots.conf'
     '20-xkb.conf'
     'x64-logo.png'
+    'default-avatar.png'
     'xsettings.xml'
     'xfce4-terminal.xml'
     'helpers.rc'
@@ -65,6 +66,7 @@ sha256sums=(
     'SKIP'
     'SKIP'
     'SKIP'
+    'SKIP'
 )
 
 package() {
@@ -79,10 +81,11 @@ package() {
     install -d "${pkgdir}/usr/share/icons/hicolor/512x512/apps"
     install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/x64-logo.png"
 
-    # 2.1 Avatar por defecto para perfil de usuario en Whisker Menu
+    # 2.1 Avatar por defecto para perfil de usuario en Whisker Menu (silueta circular Glass neutral)
+    install -m644 "${srcdir}/default-avatar.png" "${pkgdir}/usr/share/pixmaps/default-avatar.png"
     install -d "${pkgdir}/etc/skel"
-    install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/etc/skel/.face"
-    install -m644 "${srcdir}/x64-logo.png" "${pkgdir}/etc/skel/.face.icon"
+    install -m644 "${srcdir}/default-avatar.png" "${pkgdir}/etc/skel/.face"
+    install -m644 "${srcdir}/default-avatar.png" "${pkgdir}/etc/skel/.face.icon"
 
     # 3. Drop-in de LightDM para forzar slick-greeter (evita pantalla negra en boot)
     install -d "${pkgdir}/etc/lightdm/lightdm.conf.d"
