@@ -19,14 +19,43 @@
 
   <keyboard>
     <default/>
-    <!-- Super key to open Whisker Menu -->
+    <!-- Super and fallback keys to toggle Whisker Menu -->
     <keybind key="Super_L" onRelease="yes">
-      <action name="Execute" command="xfce4-popup-whiskermenu"/>
+      <action name="Execute" command="/usr/bin/xfce4-popup-whiskermenu"/>
+    </keybind>
+    <keybind key="Super_R" onRelease="yes">
+      <action name="Execute" command="/usr/bin/xfce4-popup-whiskermenu"/>
+    </keybind>
+    <keybind key="C-Escape">
+      <action name="Execute" command="/usr/bin/xfce4-popup-whiskermenu"/>
+    </keybind>
+    <keybind key="W-space">
+      <action name="Execute" command="/usr/bin/xfce4-popup-whiskermenu"/>
+    </keybind>
+
+    <!-- Screenshots (Full, Region Snipping, Active Window, Interactive) -->
+    <keybind key="Print">
+      <action name="Execute" command="/usr/bin/x64-screenshot full"/>
+    </keybind>
+    <keybind key="S-Print">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="W-S-s">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="W-S-S">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="A-Print">
+      <action name="Execute" command="/usr/bin/x64-screenshot region"/>
+    </keybind>
+    <keybind key="C-Print">
+      <action name="Execute" command="/usr/bin/x64-screenshot gui"/>
     </keybind>
 
     <!-- Official X64 Kitty terminal emulator -->
     <keybind key="W-Return">
-      <action name="Execute" command="kitty"/>
+      <action name="Execute" command="/usr/bin/kitty"/>
     </keybind>
     <!--
       Remove a previously defined keybind
@@ -74,7 +103,7 @@
   </keyboard>
 
   <snapping>
-    <range>10</range>
+    <range inner="10" outer="10" />
   </snapping>
 
 </labwc_config>

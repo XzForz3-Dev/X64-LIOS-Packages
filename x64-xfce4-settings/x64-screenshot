@@ -1,0 +1,38 @@
+#!/bin/bash
+# -----------------------------------------------------------------------------
+# X64 LIOS - Official Screenshot & Region Snipping Tool (Wayland / Labwc)
+# -----------------------------------------------------------------------------
+
+mode="${1:-region}"
+target_dir="${XDG_PICTURES_DIR:-$HOME/Imágenes}/Capturas de pantalla"
+mkdir -p "$target_dir"
+timestamp=$(date +%Y%m%d_%H%M%S)
+
+case "$mode" in
+    full)
+        filepath="$target_dir/captura_${timestamp}.png"
+        grim - | tee "$filepath" | wl-copy --type image/png
+        notify-send -i camera-photo "Captura de Pantalla" "Pantalla completa guardada y copiada al portapapeles"
+        ;;
+    region)
+        geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+        if [ -n "$geom" ]; then
+            filepath="$target_dir/recorte_${timestamp}.png"
+            grim -g "$geom" - | tee "$filepath" | wl-copy --type image/png
+            notify-send -i camera-photo "Recorte de Pantalla" "Área guardada y copiada al portapapeles"
+        fi
+        ;;
+    gui)
+        if command -v xfce4-screenshooter >/dev/null 2>&1; then
+            xfce4-screenshooter
+        else
+            geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+            [ -n "$geom" ] && grim -g "$geom" "$target_dir/recorte_${timestamp}.png"
+        fi
+        ;;
+    *)
+        filepath="$target_dir/captura_${timestamp}.png"
+        grim - | tee "$filepath" | wl-copy --type image/png
+        notify-send -i camera-photo "Captura de Pantalla" "Captura copiada al portapapeles"
+        ;;
+esac

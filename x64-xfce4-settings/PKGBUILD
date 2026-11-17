@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=13
+pkgrel=14
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -16,6 +16,9 @@ depends=(
     'xfce4-whiskermenu-plugin'
     'xfce4-pulseaudio-plugin'
     'kitty'
+    'grim'
+    'slurp'
+    'wl-clipboard'
 )
 source=(
     '01-monolith.jpg'
@@ -37,8 +40,10 @@ source=(
     'gtk.css'
     'environment'
     'screenshot.png'
+    'x64-screenshot'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -120,4 +125,8 @@ package() {
     # 10. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-xfce4-settings"
     install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-xfce4-settings/screenshot.png"
+
+    # 11. Script oficial de captura y recorte Wayland (grim + slurp + wl-clipboard)
+    install -d "${pkgdir}/usr/bin"
+    install -m755 "${srcdir}/x64-screenshot" "${pkgdir}/usr/bin/x64-screenshot"
 }
