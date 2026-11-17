@@ -287,3 +287,46 @@ window#whiskermenu-window scrolledwindow,
 #whiskermenu-window scrollbar slider:hover {
     background-color: rgba(255, 43, 43, 0.6);
 }
+
+/* -------------------------------------------------------------------
+ * Eradicate GTK Overshoot & Undershoot Edge Glow Effects
+ * ------------------------------------------------------------------- */
+overshoot,
+overshoot.top,
+overshoot.bottom,
+overshoot.left,
+overshoot.right,
+undershoot,
+undershoot.top,
+undershoot.bottom,
+undershoot.left,
+undershoot.right {
+    background-image: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+scrolledwindow overshoot.top,
+scrolledwindow overshoot.bottom,
+scrolledwindow overshoot.left,
+scrolledwindow overshoot.right,
+scrolledwindow undershoot.top,
+scrolledwindow undershoot.bottom,
+scrolledwindow undershoot.left,
+scrolledwindow undershoot.right {
+    background-image: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+#whiskermenu-window overshoot,
+#whiskermenu-window undershoot,
+#whiskermenu-window scrolledwindow overshoot,
+#whiskermenu-window scrolledwindow undershoot {
+    background-image: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
