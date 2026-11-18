@@ -21,13 +21,18 @@ EOF
         chown -R cosmic-greeter:cosmic-greeter /var/lib/cosmic-greeter/.config 2>/dev/null || true
     fi
 
-    # Configurar auto-desbloqueo de gnome-keyring en greetd (cosmic-greeter)
-    if [ -f /etc/pam.d/greetd ]; then
-        if ! grep -q "pam_gnome_keyring.so" /etc/pam.d/greetd; then
-            sed -i '/auth.*include.*system-local-login/a -auth      optional     pam_gnome_keyring.so' /etc/pam.d/greetd 2>/dev/null || true
-            sed -i '/session.*include.*system-local-login/a -session   optional     pam_gnome_keyring.so auto_start' /etc/pam.d/greetd 2>/dev/null || true
+    # Configurar auto-desbloqueo de gnome-keyring en greetd y login (cosmic-greeter usa service = "login")
+    for pam_file in /etc/pam.d/greetd /etc/pam.d/login; do
+        if [ -f "$pam_file" ]; then
+            if ! grep -q "pam_gnome_keyring.so" "$pam_file"; then
+                sed -i '/auth.*include.*system-local-login/a -auth      optional     pam_gnome_keyring.so' "$pam_file" 2>/dev/null || true
+                sed -i '/session.*include.*system-local-login/a -session   optional     pam_gnome_keyring.so auto_start' "$pam_file" 2>/dev/null || true
+                if grep -q "^password.*include.*system-local-login" "$pam_file"; then
+                    sed -i '/password.*include.*system-local-login/a -password  optional     pam_gnome_keyring.so' "$pam_file" 2>/dev/null || true
+                fi
+            fi
         fi
-    fi
+    done
 
     # Propagar configuraciones soberanas de COSMIC a usuarios existentes en /home/*
     for user_dir in /home/*; do
