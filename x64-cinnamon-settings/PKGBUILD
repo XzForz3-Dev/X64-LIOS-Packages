@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -76,9 +76,7 @@ package() {
     install -m644 "${srcdir}/default-avatar.png" "${pkgdir}/etc/skel/.face"
     install -m644 "${srcdir}/default-avatar.png" "${pkgdir}/etc/skel/.face.icon"
 
-    # 6. Compatibilidad GTK3 Adwaita-dark -> adw-gtk3-dark y enlaces de icono Antigravity IDE
-    install -d "${pkgdir}/usr/share/themes"
-    ln -sf adw-gtk3-dark "${pkgdir}/usr/share/themes/Adwaita-dark"
+    # 6. Enlaces de icono Antigravity IDE en Papirus
     for size in 16x16 22x22 24x24 32x32 48x48 64x64; do
         install -d "${pkgdir}/usr/share/icons/Papirus/${size}/apps"
         ln -sf antigravity.svg "${pkgdir}/usr/share/icons/Papirus/${size}/apps/antigravity-ide.svg"

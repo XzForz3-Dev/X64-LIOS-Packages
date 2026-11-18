@@ -630,6 +630,7 @@ except Exception:
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
         end
         sudo rm -rf /etc/skel/.config/cosmic /var/lib/cosmic-greeter 2>/dev/null
+        test -L /usr/share/themes/Adwaita-dark; and sudo rm -f /usr/share/themes/Adwaita-dark 2>/dev/null
         for udir in /home/*
             if test -d $udir
                 sudo rm -rf $udir/.config/cosmic $udir/.local/state/cosmic $udir/.local/state/cosmic-comp 2>/dev/null
