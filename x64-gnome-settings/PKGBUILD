@@ -1,6 +1,6 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=8
+pkgrel=9
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
@@ -14,8 +14,10 @@ source=('gdm-stealth-chassis.jpg'
         '00-x64-logo'
         'apply-gdm-theme.py'
         '90-x64-gdm-theme.hook'
-        'x64-gdm-theme.service')
+        'x64-gdm-theme.service'
+        'org.fcitx.Fcitx5.desktop')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -58,4 +60,8 @@ package() {
     mkdir -p "${pkgdir}/usr/lib/systemd/system/gdm.service.wants"
     install -m644 "${srcdir}/x64-gdm-theme.service" "${pkgdir}/usr/lib/systemd/system/x64-gdm-theme.service"
     ln -sf ../x64-gdm-theme.service "${pkgdir}/usr/lib/systemd/system/gdm.service.wants/x64-gdm-theme.service"
+
+    # 8. Desactivar Fcitx5 en GNOME para suprimir notificaciones de Wayland Diagnose
+    mkdir -p "${pkgdir}/etc/skel/.config/autostart"
+    install -m644 "${srcdir}/org.fcitx.Fcitx5.desktop" "${pkgdir}/etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop"
 }

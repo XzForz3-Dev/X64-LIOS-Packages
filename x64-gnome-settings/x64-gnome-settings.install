@@ -6,6 +6,16 @@ post_install() {
     if [ -x /usr/lib/x64-lios/apply-gdm-theme.py ]; then
         /usr/lib/x64-lios/apply-gdm-theme.py 2>/dev/null || true
     fi
+
+    # Desactivar Fcitx5 en GNOME para todos los usuarios
+    for user_home in /home/*; do
+        if [ -d "$user_home" ]; then
+            username=$(basename "$user_home")
+            mkdir -p "$user_home/.config/autostart" 2>/dev/null || true
+            cp -f /etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop "$user_home/.config/autostart/" 2>/dev/null || true
+            chown -R "$username:$username" "$user_home/.config/autostart/org.fcitx.Fcitx5.desktop" 2>/dev/null || true
+        fi
+    done
 }
 
 post_upgrade() {
