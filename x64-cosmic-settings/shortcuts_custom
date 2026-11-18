@@ -1,0 +1,4 @@
+{
+    (modifiers: [Super], key: "Return"): Spawn("kitty"),
+    (modifiers: [Super, Shift], key: "s"): System(Screenshot),
+}
