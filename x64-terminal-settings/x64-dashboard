@@ -701,9 +701,14 @@ except Exception:
         end
     end
     if not contains "$target_id" "1" "8"
-        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils 2>/dev/null | sort -u)
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool 2>/dev/null | sort -u)
         if test (count $unused_hypr) -gt 0
             sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/fcitx5 $udir/.local/share/fcitx5 2>/dev/null
+            end
         end
     end
     if contains "$target_id" "2" "3" "4"
