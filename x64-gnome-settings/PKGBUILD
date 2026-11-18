@@ -1,11 +1,11 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
 install='x64-gnome-settings.install'
-depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme' 'gnome-backgrounds' 'gnome-shell-extension-appindicator' 'papirus-icon-theme')
+depends=('glib2' 'glib2-devel' 'python' 'python-pillow' 'adw-gtk-theme' 'gnome-backgrounds' 'gnome-shell-extension-appindicator' 'papirus-icon-theme')
 source=('gdm-stealth-chassis.jpg'
         '01-monolith.jpg'
         'x64-lios-cube-160.png'
@@ -13,8 +13,10 @@ source=('gdm-stealth-chassis.jpg'
         'zzz_x64.org.gnome.desktop.interface.gschema.override'
         '00-x64-logo'
         'apply-gdm-theme.py'
-        '90-x64-gdm-theme.hook')
+        '90-x64-gdm-theme.hook'
+        'x64-gdm-theme.service')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -51,4 +53,9 @@ package() {
     # 6. Hook ALPM para persistencia en actualizaciones de gnome-shell
     mkdir -p "${pkgdir}/usr/share/libalpm/hooks"
     install -m644 "${srcdir}/90-x64-gdm-theme.hook" "${pkgdir}/usr/share/libalpm/hooks/90-x64-gdm-theme.hook"
+
+    # 7. Servicio Systemd para optimización dinámica multi-monitor antes de GDM
+    mkdir -p "${pkgdir}/usr/lib/systemd/system/gdm.service.wants"
+    install -m644 "${srcdir}/x64-gdm-theme.service" "${pkgdir}/usr/lib/systemd/system/x64-gdm-theme.service"
+    ln -sf ../x64-gdm-theme.service "${pkgdir}/usr/lib/systemd/system/gdm.service.wants/x64-gdm-theme.service"
 }

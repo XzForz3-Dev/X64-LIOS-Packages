@@ -1,0 +1,12 @@
+[Unit]
+Description=X64 LIOS Dynamic GDM Theme Optimizer
+Before=gdm.service
+ConditionPathExists=/usr/lib/x64-lios/apply-gdm-theme.py
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/x64-lios/apply-gdm-theme.py
+RemainAfterExit=yes
+
+[Install]
+WantedBy=gdm.service
