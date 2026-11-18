@@ -31,13 +31,14 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Default panel buttons: Seamless flat in resting state, soft glass pill on hover */
 .xfce4-panel button {
     background-image: none;
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: transparent;
+    border: 1px solid transparent;
     border-radius: 6px;
-    margin: 3px 2px;
-    padding: 0 10px;
+    margin: 2px 1px;
+    padding: 0 6px;
     color: rgba(255, 255, 255, 0.85);
     box-shadow: none;
     transition: all 120ms ease-in-out;
@@ -53,9 +54,77 @@
 .xfce4-panel button:active {
     background-color: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+
+/* Launchers: Crisp dock aesthetic with soft pill hover */
+.xfce4-panel .launcher button,
+#launcher-button {
+    background-color: transparent;
+    border-color: transparent;
+    margin: 2px 2px;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.xfce4-panel .launcher button:hover,
+#launcher-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Open Tasks (Tasklist): Sleek rounded capsules with crimson bottom accent when active */
+.xfce4-panel .tasklist button {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    margin: 3px 2px;
+    padding: 0 10px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.xfce4-panel .tasklist button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+.xfce4-panel .tasklist button:checked,
+.xfce4-panel .tasklist button:active {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.15);
     box-shadow: inset 0 -2px 0 0 #ff2b2b;
     border-radius: 6px 6px 2px 2px;
     color: #ffffff;
+}
+
+/* Status Area (Systray, Volume, Clock, Desktop): Flat modern tray */
+#pulseaudio-button,
+#sn-button,
+#clock-button,
+#showdesktop-button {
+    background-color: transparent;
+    border-color: transparent;
+    border-radius: 6px;
+    margin: 2px 2px;
+    color: #ffffff;
+}
+
+#pulseaudio-button:hover,
+#sn-button:hover,
+#clock-button:hover,
+#showdesktop-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+#clock-button {
+    padding: 1px 8px;
+}
+
+#clock-button label {
+    color: #ffffff;
+    font-weight: 500;
 }
 
 #whiskermenu-button {
