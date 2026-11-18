@@ -594,6 +594,11 @@ except Exception:
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
         sudo rm -f /usr/share/gnome-shell/gnome-shell-theme.gresource* 2>/dev/null
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/nautilus $udir/.config/goa-1.0 $udir/.config/.gsd-keyboard.settings-ported $udir/.config/monitors.xml $udir/.config/ibus 2>/dev/null
+            end
+        end
     end
 
     if test "$target_id" != "3"; and is_kde_installed
@@ -607,6 +612,11 @@ except Exception:
             sudo pacman -Rcs --noconfirm $kde_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $kde_pkgs 2>/dev/null
         end
         sudo rm -f /usr/share/wayland-sessions/plasma.desktop /usr/share/xsessions/plasma.desktop 2>/dev/null
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/KDE $udir/.config/kdeconnect $udir/.config/kdedefaults $udir/.config/kdeglobals $udir/.config/kwinrc $udir/.config/kwinoutputconfig.json $udir/.config/kglobalshortcutsrc $udir/.config/plasmarc $udir/.config/plasmashellrc $udir/.config/plasma-localerc $udir/.config/plasmanotifyrc $udir/.config/plasma-org.kde.plasma.desktop-appletsrc $udir/.config/plasmaparc $udir/.config/powermanagementprofilesrc $udir/.config/spectaclerc $udir/.config/konsolerc $udir/.config/konsolesshconfig $udir/.config/kwalletrc $udir/.config/kscreenlockerrc $udir/.config/ksmserverrc $udir/.config/ktimezonedrc $udir/.config/kaccessrc $udir/.config/kactivitymanagerdrc $udir/.config/kconf_updaterc $udir/.config/kded5rc $udir/.config/trashrc $udir/.config/autostart/org.kde.* 2>/dev/null
+            end
+        end
     end
 
     if test "$target_id" != "4"; and type -q cosmic-session
@@ -618,6 +628,11 @@ except Exception:
         set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
         if test (count $cosmic_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/cosmic 2>/dev/null
+            end
         end
     end
 
@@ -631,6 +646,11 @@ except Exception:
         if test (count $niri_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $niri_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $niri_pkgs 2>/dev/null
         end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/niri $udir/.config/noctalia 2>/dev/null
+            end
+        end
     end
 
     if test "$target_id" != "6"; and type -q cinnamon-session
@@ -642,6 +662,11 @@ except Exception:
         set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
         if test (count $cin_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cin_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cin_pkgs 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/cinnamon $udir/.config/nemo 2>/dev/null
+            end
         end
     end
 
@@ -657,8 +682,34 @@ except Exception:
         end
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/xfce4 $udir/.config/Thunar 2>/dev/null
+                rm -rf $udir/.config/xfce4 $udir/.config/Thunar $udir/.config/labwc $udir/.config/pavucontrol.ini 2>/dev/null
             end
+        end
+    end
+
+    # Purga transversal de Display Managers y paquetes satélite compartidos no requeridos por el entorno destino
+    if not contains "$target_id" "1" "3" "5" "8"
+        set -l unused_sddm (pacman -Qq sddm x64-sddm-theme 2>/dev/null | sort -u)
+        if test (count $unused_sddm) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_sddm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_sddm 2>/dev/null
+        end
+    end
+    if not contains "$target_id" "6" "7"
+        set -l unused_lightdm (pacman -Qq lightdm lightdm-slick-greeter lightdm-gtk-greeter 2>/dev/null | sort -u)
+        if test (count $unused_lightdm) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_lightdm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_lightdm 2>/dev/null
+        end
+    end
+    if not contains "$target_id" "1" "8"
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils 2>/dev/null | sort -u)
+        if test (count $unused_hypr) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
+        end
+    end
+    if contains "$target_id" "2" "3" "4"
+        set -l unused_nm_applet (pacman -Qq network-manager-applet 2>/dev/null | sort -u)
+        if test (count $unused_nm_applet) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_nm_applet 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_nm_applet 2>/dev/null
         end
     end
 
