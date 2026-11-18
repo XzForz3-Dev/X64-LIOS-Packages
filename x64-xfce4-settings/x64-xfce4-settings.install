@@ -28,7 +28,7 @@ post_install() {
         fi
         sed -i -e "s|^XKB_DEFAULT_LAYOUT=.*|XKB_DEFAULT_LAYOUT=${sys_layout}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
         sed -i -e "s|^XKB_DEFAULT_MODEL=.*|XKB_DEFAULT_MODEL=${sys_model}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
-        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=${sys_variant}|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
+        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=|g" /usr/share/xfce4/labwc/labwc-environment 2>/dev/null || true
     fi
 
     # 4. Parchear helpers globales del sistema de forma segura
@@ -51,13 +51,21 @@ esac
 EOF
     chmod +x /usr/local/bin/nm-applet 2>/dev/null || true
 
-    # 5. Sincronizar skeleton con el layout detectado
+    # 5. Sincronizar skeleton con el layout detectado (VARIANT vacía para evitar duplicación con startxfce4)
     skel_env="/etc/skel/.config/xfce4/labwc/environment"
     if [ -f "$skel_env" ]; then
         sed -i -e "s|^XKB_DEFAULT_LAYOUT=.*|XKB_DEFAULT_LAYOUT=${sys_layout}|g" "$skel_env"
         sed -i -e "s|^XKB_DEFAULT_MODEL=.*|XKB_DEFAULT_MODEL=${sys_model}|g" "$skel_env"
-        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=${sys_variant}|g" "$skel_env"
+        sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=|g" "$skel_env"
     fi
+
+    # 5.1. Sincronizar entornos de usuarios existentes
+    for user_home in /home/*; do
+        u_env="${user_home}/.config/xfce4/labwc/environment"
+        if [ -f "$u_env" ]; then
+            sed -i -e "s|^XKB_DEFAULT_VARIANT=.*|XKB_DEFAULT_VARIANT=|g" "$u_env" 2>/dev/null || true
+        fi
+    done
 
     skel_kb="/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/keyboard-layout.xml"
     if [ -f "$skel_kb" ]; then
