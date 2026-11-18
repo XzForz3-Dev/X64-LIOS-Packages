@@ -34,6 +34,7 @@ EOF
             mkdir -p "$target_cosmic/com.system76.CosmicTerm/v1"
             mkdir -p "$target_cosmic/com.system76.CosmicBackground/v1"
             mkdir -p "$target_cosmic/com.system76.CosmicSettings.Shortcuts/v1"
+            mkdir -p "$target_cosmic/com.system76.CosmicIdle/v1"
 
             # Copiar configs de skeleton
             if [ -d /etc/skel/.config/cosmic ]; then
@@ -43,6 +44,7 @@ EOF
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicAppList/v1/* "$target_cosmic/com.system76.CosmicAppList/v1/" 2>/dev/null || true
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicTerm/v1/* "$target_cosmic/com.system76.CosmicTerm/v1/" 2>/dev/null || true
                 cp -f /etc/skel/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/* "$target_cosmic/com.system76.CosmicSettings.Shortcuts/v1/" 2>/dev/null || true
+                cp -f /etc/skel/.config/cosmic/com.system76.CosmicIdle/v1/* "$target_cosmic/com.system76.CosmicIdle/v1/" 2>/dev/null || true
 
                 # Fondo: solo si no existe o esta vacio, para respetar elecciones del usuario
                 if [ ! -f "$target_cosmic/com.system76.CosmicBackground/v1/all" ]; then

@@ -1,0 +1,12 @@
+#!/bin/sh
+# X64 LIOS - Safe NVIDIA UVM & Suspend Handler
+# Unloads nvidia_uvm prior to suspend to prevent _raw_q_flush NULL pointer dereference in 580xx/Maxwell SLI
+case "$1" in
+    pre)
+        /usr/bin/modprobe -r nvidia_uvm 2>/dev/null || true
+        ;;
+    post)
+        /usr/bin/modprobe nvidia_uvm 2>/dev/null || true
+        ;;
+esac
+exit 0

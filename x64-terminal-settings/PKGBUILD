@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.1.0
-pkgrel=16
+pkgrel=17
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -41,6 +41,7 @@ source=(
     '99-z-x64-nvidia-backlight.rules'
     '99-x64-nvidia-power.conf'
     '20-x64-nvidia.conf'
+    'x64-nvidia-sleep'
 )
 sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             'b727fde05cbd61b3a0be086c02445a63d90b75d63147b827e878f61e365bd417'
@@ -70,8 +71,9 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '0e9bfa271366a5d92265165f5c802a1f50a7ea266b455ad1392711299b6e67e8'
             'ea8dd487d1ddc433bdf55e03f0cf4c72dc45eea40ecd8109f954a1f5e09b4e89'
             '5504ec854ebe1899bc0bcc2c48218471f92590b39783db2d3afcf91553460e8e'
-            '8c681f9bfc57788433a09233756ff7446882938e1af1ec1075e13185ebef5c87'
-            '98608697f5a115ecaae5afc3cfc16c62985b3d078ba26eaa330afb760c72736a')
+            'e5db9a742aabae20ca0a0370806c958d073b1c8d36fac08c3374e8c42970adcd'
+            '98608697f5a115ecaae5afc3cfc16c62985b3d078ba26eaa330afb760c72736a'
+            'b637e5d6dac27b47587428b83cc24ec6c20bc90a1d7a4babcc3a15254d81f887')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
@@ -190,9 +192,16 @@ package() {
     install -d "${pkgdir}/usr/lib/udev/rules.d"
     install -m644 "${srcdir}/99-z-x64-nvidia-backlight.rules" "${pkgdir}/usr/lib/udev/rules.d/99-z-x64-nvidia-backlight.rules"
 
-    # Nvidia DRM KMS & Power Management Drop-in
+    # Nvidia DRM KMS & Power Management Drop-in (zzz- ensures override after nvidia-580xx-utils.conf)
     install -d "${pkgdir}/usr/lib/modprobe.d"
     install -m644 "${srcdir}/99-x64-nvidia-power.conf" "${pkgdir}/usr/lib/modprobe.d/99-x64-nvidia-power.conf"
+    install -m644 "${srcdir}/99-x64-nvidia-power.conf" "${pkgdir}/usr/lib/modprobe.d/zzz-x64-nvidia-power.conf"
+    install -d "${pkgdir}/etc/modprobe.d"
+    install -m644 "${srcdir}/99-x64-nvidia-power.conf" "${pkgdir}/etc/modprobe.d/zzz-x64-nvidia-power.conf"
+
+    # Systemd System-Sleep Hook to safely unload nvidia_uvm before S3 suspend
+    install -d "${pkgdir}/usr/lib/systemd/system-sleep"
+    install -m755 "${srcdir}/x64-nvidia-sleep" "${pkgdir}/usr/lib/systemd/system-sleep/x64-nvidia-sleep"
 
     # Early KMS Modules for Nvidia in Initramfs
     install -d "${pkgdir}/etc/mkinitcpio.conf.d"

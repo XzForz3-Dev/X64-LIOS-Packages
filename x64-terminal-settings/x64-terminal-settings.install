@@ -92,8 +92,8 @@ EOF
         usermod -aG i2c "$u" 2>/dev/null || true
     done
 
-    # Habilitar servicios de suspensión y reanudación de Nvidia
-    systemctl enable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service 2>/dev/null || true
+    # Desactivar servicios nvidia-suspend/resume (evita Kernel Oops en nvidia-sleep.sh / uvm_suspend y delega al kernel + hook system-sleep)
+    systemctl disable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service 2>/dev/null || true
 
     # Regenerar initramfs para aplicar Early KMS de Nvidia
     if command -v mkinitcpio >/dev/null 2>&1; then

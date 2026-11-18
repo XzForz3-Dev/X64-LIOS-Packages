@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -75,6 +75,11 @@ package() {
     install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
     install -m644 "${srcdir}/shortcuts_custom" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
 
+    # Politica de energia en skeleton: solo apagar pantalla (DPMS), nunca auto-suspender S3
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicIdle/v1"
+    echo "None" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time"
+    echo "None" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_battery_time"
+
     # 2. Configuracion global de respaldo en /etc/xdg/cosmic
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2"
     install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
@@ -96,6 +101,11 @@ package() {
     # Atajos de teclado soberanos en xdg
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
     install -m644 "${srcdir}/shortcuts_custom" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom"
+
+    # Politica de energia en xdg: solo apagar pantalla (DPMS), nunca auto-suspender S3
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1"
+    echo "None" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time"
+    echo "None" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1/suspend_on_battery_time"
 
     # 3. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-cosmic-settings"
