@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -10,6 +10,8 @@ depends=(
     'cosmic-terminal'
     'kitty'
     'ttf-jetbrains-mono-nerd'
+    'adw-gtk-theme'
+    'papirus-icon-theme'
 )
 source=(
     'theme_v2_accent'
@@ -80,6 +82,13 @@ package() {
     echo "None" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time"
     echo "None" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicIdle/v1/suspend_on_battery_time"
 
+    # Modo oscuro global para GTK3/GTK4 y tema de iconos Papirus-Dark en skeleton
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTk/v1"
+    echo "true" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTk/v1/apply_theme_global"
+    echo '"Papirus-Dark"' > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTk/v1/icon_theme"
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Mode/v1"
+    echo "true" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Mode/v1/is_dark"
+
     # 2. Configuracion global de respaldo en /etc/xdg/cosmic
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2"
     install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
@@ -106,6 +115,23 @@ package() {
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1"
     echo "None" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1/suspend_on_ac_time"
     echo "None" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicIdle/v1/suspend_on_battery_time"
+
+    # Modo oscuro global para GTK3/GTK4 y tema de iconos Papirus-Dark en xdg
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTk/v1"
+    echo "true" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTk/v1/apply_theme_global"
+    echo '"Papirus-Dark"' > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTk/v1/icon_theme"
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Mode/v1"
+    echo "true" > "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Mode/v1/is_dark"
+
+    # Compatibilidad GTK3 Adwaita-dark -> adw-gtk3-dark y enlaces de icono Antigravity IDE
+    install -d "${pkgdir}/usr/share/themes"
+    ln -sf adw-gtk3-dark "${pkgdir}/usr/share/themes/Adwaita-dark"
+    for size in 16x16 22x22 24x24 32x32 48x48 64x64; do
+        install -d "${pkgdir}/usr/share/icons/Papirus/${size}/apps"
+        ln -sf antigravity.svg "${pkgdir}/usr/share/icons/Papirus/${size}/apps/antigravity-ide.svg"
+    done
+    install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
+    ln -sf /usr/share/icons/Papirus/64x64/apps/antigravity.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/antigravity-ide.svg"
 
     # 3. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-cosmic-settings"
