@@ -11,6 +11,8 @@
     <property name="click_to_focus" type="bool" value="true"/>
     <property name="cycle_preview" type="bool" value="true"/>
     <property name="use_compositing" type="bool" value="true"/>
+    <property name="scroll_workspaces" type="bool" value="false"/>
+    <property name="workspace_count" type="int" value="1"/>
   </property>
 </channel>
 
