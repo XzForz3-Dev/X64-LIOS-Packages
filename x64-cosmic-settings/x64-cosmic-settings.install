@@ -69,6 +69,11 @@ EOF
             # Asegurar tipografía JetBrainsMono Nerd Font en el usuario
             echo '"JetBrainsMono Nerd Font"' > "$target_cosmic/com.system76.CosmicTerm/v1/font_name"
 
+            # Limpiar variante redundante winkeys en xkb_config de COSMIC si existe
+            if [ -f "$target_cosmic/com.system76.CosmicComp/v1/xkb_config" ]; then
+                sed -i 's/variant: "winkeys"/variant: ""/g' "$target_cosmic/com.system76.CosmicComp/v1/xkb_config" 2>/dev/null || true
+            fi
+
             # Fijar tema oscuro GTK3/GTK4 en gsettings del usuario
             su - "$u" -c "$dbus_env gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' && $dbus_env gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' && $dbus_env gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark'" 2>/dev/null || true
 
@@ -92,7 +97,10 @@ EOF
         fi
     done
 
-    # Refrescar cosmic-bg en caliente si esta corriendo
+    # Refrescar cosmic-bg en caliente si esta corriendo y cerrar applets heredados
+    sed -i '/XKBVARIANT=winkeys/d' /etc/vconsole.conf 2>/dev/null || true
+    sed -i '/Option "XkbVariant" "winkeys"/d' /etc/X11/xorg.conf.d/00-keyboard.conf 2>/dev/null || true
+    killall -q nm-applet 2>/dev/null || true
     killall -q cosmic-bg 2>/dev/null || true
 }
 

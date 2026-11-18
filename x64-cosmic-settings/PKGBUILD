@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
