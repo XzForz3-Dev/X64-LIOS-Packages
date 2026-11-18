@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=14
+pkgrel=15
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -30,8 +30,12 @@ source=(
     'bg_all_greeter'
     'chromium-flags.conf'
     'shortcuts_custom'
+    'x64-cosmic-outputs'
+    'x64-cosmic-outputs.desktop'
 )
 sha256sums=(
+    'SKIP'
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -142,7 +146,11 @@ package() {
     install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
     ln -sf /usr/share/icons/Papirus/64x64/apps/antigravity.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/antigravity-ide.svg"
 
-    # 3. Screenshot oficial de referencia
+    # 3. Auto-calibrador inteligente multi-monitor para portátiles (LVDS/eDP primario a la izquierda)
+    install -Dm755 "${srcdir}/x64-cosmic-outputs" "${pkgdir}/usr/bin/x64-cosmic-outputs"
+    install -Dm644 "${srcdir}/x64-cosmic-outputs.desktop" "${pkgdir}/etc/xdg/autostart/x64-cosmic-outputs.desktop"
+
+    # 4. Screenshot oficial de referencia
     install -d "${pkgdir}/usr/share/x64-cosmic-settings"
     install -m644 "${srcdir}/screenshot.png" "${pkgdir}/usr/share/x64-cosmic-settings/screenshot.png"
 }

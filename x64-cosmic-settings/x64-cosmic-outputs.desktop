@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=X64 COSMIC Display Calibrator
+Comment=Ensures laptop internal display is primary and at left (0,0) on first COSMIC login
+Exec=/usr/bin/x64-cosmic-outputs
+OnlyShowIn=COSMIC;
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

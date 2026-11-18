@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""
+X64 LIOS - Smart Laptop-First Multi-Monitor Calibrator for COSMIC Desktop
+Fixes cosmic-comp's alphabetical connector sorting (where "HDMI-A-1" < "LVDS-1" or "DP-1" < "eDP-1"),
+placing the internal laptop panel at (0, 0) as Primary and external monitors to its right on first boot.
+Respects user customizations via a one-time calibration marker (.x64-calibrated).
+"""
+import os
+import re
+import subprocess
+import time
+
+STATE_DIR = os.path.expanduser("~/.local/state/cosmic-comp")
+OUTPUTS_RON = os.path.join(STATE_DIR, "outputs.ron")
+MARKER = os.path.join(STATE_DIR, ".x64-calibrated")
+
+INTERNAL_PREFIXES = ("LVDS", "eDP", "EDP", "DSI")
+EXTERNAL_PREFIXES = ("HDMI", "DP", "DisplayPort", "DVI", "VGA")
+
+def is_internal(conn: str) -> bool:
+    return conn.upper().startswith(tuple(p.upper() for p in INTERNAL_PREFIXES))
+
+def is_external(conn: str) -> bool:
+    return conn.upper().startswith(tuple(p.upper() for p in EXTERNAL_PREFIXES)) and not is_internal(conn)
+
+def main():
+    if os.path.exists(MARKER):
+        return
+
+    # Wait briefly for cosmic-comp to write outputs.ron on first login
+    for _ in range(15):
+        if os.path.exists(OUTPUTS_RON):
+            break
+        time.sleep(0.3)
+
+    if not os.path.exists(OUTPUTS_RON):
+        return
+
+    try:
+        with open(OUTPUTS_RON, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        connectors = re.findall(r'connector:\s*"([^"]+)"', content)
+        modes = re.findall(r'mode:\s*\(\((\d+),\s*(\d+)\)', content)
+        positions = re.findall(r'position:\s*\((-?\d+),\s*(-?\d+)\)', content)
+
+        if len(connectors) >= 2 and len(connectors) == len(positions) and len(connectors) == len(modes):
+            internals = [i for i, c in enumerate(connectors) if is_internal(c)]
+            externals = [i for i, c in enumerate(connectors) if is_external(c)]
+
+            if len(internals) == 1 and len(externals) >= 1:
+                int_idx = internals[0]
+                int_conn = connectors[int_idx]
+                int_w = int(modes[int_idx][0])
+                int_x = int(positions[int_idx][0])
+
+                # If internal laptop panel is not at x=0 (because alphabetical sort put HDMI/DP first at 0,0)
+                if int_x > 0:
+                    subprocess.run(["cosmic-randr", "position", int_conn, "0", "0"], check=False)
+                    cur_x = int_w
+                    for ext_idx in externals:
+                        ext_conn = connectors[ext_idx]
+                        ext_w = int(modes[ext_idx][0])
+                        subprocess.run(["cosmic-randr", "position", ext_conn, str(cur_x), "0"], check=False)
+                        cur_x += ext_w
+                subprocess.run(["cosmic-randr", "xwayland", "--primary", int_conn], check=False)
+
+        os.makedirs(STATE_DIR, exist_ok=True)
+        with open(MARKER, "w", encoding="utf-8") as f:
+            f.write("calibrated\n")
+    except Exception:
+        pass
+
+if __name__ == "__main__":
+    main()

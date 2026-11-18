@@ -110,6 +110,13 @@ EOF
             chown root:root "$state_bg_dir" "$state_bg_dir/wallpapers" 2>/dev/null || true
             chmod 755 "$state_bg_dir" 2>/dev/null || true
             chmod 644 "$state_bg_dir/wallpapers" 2>/dev/null || true
+
+            # Sincronizar disposicion multimonitor (outputs.ron) del usuario hacia cosmic-greeter
+            if [ -f "$user_dir/.local/state/cosmic-comp/outputs.ron" ] && [ -d /var/lib/cosmic-greeter ]; then
+                mkdir -p /var/lib/cosmic-greeter/.local/state/cosmic-comp 2>/dev/null || true
+                cp -f "$user_dir/.local/state/cosmic-comp/outputs.ron" /var/lib/cosmic-greeter/.local/state/cosmic-comp/outputs.ron 2>/dev/null || true
+                chown -R cosmic-greeter:cosmic-greeter /var/lib/cosmic-greeter/.local 2>/dev/null || true
+            fi
         fi
     done
 
