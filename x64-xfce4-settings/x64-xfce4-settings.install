@@ -37,6 +37,20 @@ post_install() {
         sed -i 's/^WebBrowser=.*/WebBrowser=chromium/' /etc/xdg/xfce4/helpers.rc 2>/dev/null || true
     fi
 
+    # 4.1. Garantizar que nm-applet siempre use --indicator para mantener x64-update al extremo izquierdo del tray
+    if [ -f /etc/xdg/autostart/nm-applet.desktop ]; then
+        sed -i 's|^Exec=nm-applet$|Exec=nm-applet --indicator|' /etc/xdg/autostart/nm-applet.desktop 2>/dev/null || true
+    fi
+    mkdir -p /usr/local/bin
+    cat << "EOF" > /usr/local/bin/nm-applet
+#!/bin/sh
+case " $* " in
+    *" --indicator "*) exec /usr/bin/nm-applet "$@" ;;
+    *) exec /usr/bin/nm-applet --indicator "$@" ;;
+esac
+EOF
+    chmod +x /usr/local/bin/nm-applet 2>/dev/null || true
+
     # 5. Sincronizar skeleton con el layout detectado
     skel_env="/etc/skel/.config/xfce4/labwc/environment"
     if [ -f "$skel_env" ]; then
@@ -67,6 +81,11 @@ post_install() {
 
             # Preferred applications (Kitty default)
             [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
+
+            # Autostart nm-applet con --indicator para orden de tray soberano
+            mkdir -p "$user_dir/.config/autostart"
+            [ -f /etc/skel/.config/autostart/nm-applet.desktop ] && cp -f /etc/skel/.config/autostart/nm-applet.desktop "$user_dir/.config/autostart/nm-applet.desktop"
+            chown "$u:$g" "$user_dir/.config/autostart/nm-applet.desktop" 2>/dev/null || true
 
             # Flags de compatibilidad Ozone híbrida (Wayland y X11) para navegadores
             for f in chromium-flags.conf chrome-flags.conf; do

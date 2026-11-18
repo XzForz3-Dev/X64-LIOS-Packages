@@ -1,0 +1,10 @@
+#!/bin/sh
+# -----------------------------------------------------------------------------
+# X64 LIOS - NetworkManager Applet Indicator Enforcer
+# Guarantees that nm-applet runs with --indicator so it registers as a
+# StatusNotifierItem / AppIndicator, keeping x64-update at the far left.
+# -----------------------------------------------------------------------------
+case " $* " in
+    *" --indicator "*) exec /usr/bin/nm-applet "$@" ;;
+    *) exec /usr/bin/nm-applet --indicator "$@" ;;
+esac

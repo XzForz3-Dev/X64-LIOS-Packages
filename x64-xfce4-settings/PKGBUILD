@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=25
+pkgrel=26
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -50,8 +50,10 @@ source=(
     'x64-xcape.desktop'
     'chromium-flags.conf'
     'chrome-flags.conf'
+    'nm-applet.desktop'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -160,4 +162,8 @@ package() {
     # 13. Autostart de xcape para mapear tecla Super a Whisker Menu en sesion X11
     install -d "${pkgdir}/etc/xdg/autostart"
     install -m644 "${srcdir}/x64-xcape.desktop" "${pkgdir}/etc/xdg/autostart/x64-xcape.desktop"
+
+    # 14. Override de autostart para nm-applet con --indicator (mantiene x64-update al extremo izquierdo)
+    install -d "${pkgdir}/etc/skel/.config/autostart"
+    install -m644 "${srcdir}/nm-applet.desktop" "${pkgdir}/etc/skel/.config/autostart/nm-applet.desktop"
 }
