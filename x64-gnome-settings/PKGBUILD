@@ -1,6 +1,6 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=12
+pkgrel=13
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
@@ -15,8 +15,10 @@ source=('gdm-stealth-chassis.jpg'
         'apply-gdm-theme.py'
         '90-x64-gdm-theme.hook'
         'x64-gdm-theme.service'
-        'org.fcitx.Fcitx5.desktop')
+        'org.fcitx.Fcitx5.desktop'
+        'x64-monolith.xml')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
@@ -74,4 +76,8 @@ package() {
     done
     mkdir -p "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
     ln -sf /usr/share/icons/Papirus/64x64/apps/antigravity.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/antigravity-ide.svg"
+
+    # 10. Propiedad oficial de fondo de pantalla para GNOME Settings
+    mkdir -p "${pkgdir}/usr/share/gnome-background-properties"
+    install -m644 "${srcdir}/x64-monolith.xml" "${pkgdir}/usr/share/gnome-background-properties/x64-monolith.xml"
 }
