@@ -24,6 +24,23 @@ post_install() {
     if [ -f /usr/share/icons/Papirus/64x64/apps/antigravity.svg ] && which rsvg-convert >/dev/null 2>&1; then
         rsvg-convert -w 1024 -h 1024 /usr/share/icons/Papirus/64x64/apps/antigravity.svg -o /usr/share/pixmaps/antigravity-ide.png 2>/dev/null || true
     fi
+
+    # Ocultar utilidades redundantes o residuales en GNOME
+    if [ -f /usr/share/applications/nm-connection-editor.desktop ]; then
+        if ! grep -q "NotShowIn" /usr/share/applications/nm-connection-editor.desktop; then
+            echo "NotShowIn=GNOME;" >> /usr/share/applications/nm-connection-editor.desktop
+        fi
+    fi
+    if [ -f /usr/share/applications/fcitx5-configtool.desktop ]; then
+        sed -i 's/^NotShowIn=.*/NotShowIn=KDE;GNOME;/' /usr/share/applications/fcitx5-configtool.desktop 2>/dev/null || true
+    fi
+    for qt_app in assistant designer linguist qdbusviewer qv4l2 qvidcap; do
+        if [ -f "/usr/share/applications/${qt_app}.desktop" ]; then
+            if ! grep -q "NoDisplay" "/usr/share/applications/${qt_app}.desktop"; then
+                echo "NoDisplay=true" >> "/usr/share/applications/${qt_app}.desktop"
+            fi
+        fi
+    done
 }
 
 post_upgrade() {

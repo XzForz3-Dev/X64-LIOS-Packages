@@ -651,9 +651,14 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Xfce4 suite...\e[0m"
         end
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm-slick-greeter lightdm-gtk-greeter labwc 2>/dev/null | sort -u)
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm lightdm-slick-greeter lightdm-gtk-greeter labwc pavucontrol 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/xfce4 $udir/.config/Thunar 2>/dev/null
+            end
         end
     end
 
