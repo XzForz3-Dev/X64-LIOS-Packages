@@ -77,8 +77,30 @@ class X64UpdateTray(QSystemTrayIcon):
         # Load initial state from disk
         self.load_state_from_disk()
 
-        # Build context menu (DBus native SNI menu)
+        # Build context menu once (Fixed actions to prevent D-Bus ID churn/overflow)
         self.menu = QMenu()
+        self.header_act = self.menu.addAction("")
+        self.header_act.setEnabled(False)
+
+        self.pkg_menu = self.menu.addMenu("")
+        self.pkg_menu.menuAction().setVisible(False)
+
+        self.check_info_act = self.menu.addAction("")
+        self.check_info_act.setEnabled(False)
+
+        self.sep1 = self.menu.addSeparator()
+
+        self.run_act = self.menu.addAction("Ejecutar X64-Update")
+        self.run_act.triggered.connect(self.launch_updater)
+
+        self.search_act = self.menu.addAction("Buscar actualizaciones")
+        self.search_act.triggered.connect(self.trigger_background_check)
+
+        self.sep2 = self.menu.addSeparator()
+
+        self.exit_act = self.menu.addAction("Salir")
+        self.exit_act.triggered.connect(self.on_exit)
+
         self.setContextMenu(self.menu)
 
         # Connect click triggers
@@ -110,17 +132,27 @@ class X64UpdateTray(QSystemTrayIcon):
         if self.last_check == 0.0 or (time.time() - self.last_check > 7200):
             QTimer.singleShot(3000, self.trigger_background_check)
 
-        # Health watchdog: reconnect if systemtray/plasma restarts
+        # Health watchdog: reconnect if systemtray/plasma restarts (does NOT churn menu)
         self.watchdog = QTimer(self)
         self.watchdog.timeout.connect(self.check_tray_health)
         self.watchdog.start(5000)
+
+        # Relative time ticker: updates text every 60s without touching menu structure
+        self.clock_timer = QTimer(self)
+        self.clock_timer.timeout.connect(self.update_relative_time)
+        self.clock_timer.start(60000)
 
     def check_tray_health(self):
         try:
             if QSystemTrayIcon.isSystemTrayAvailable():
                 if not self.isVisible():
                     self.show()
-                self.update_ui()
+        except Exception:
+            pass
+
+    def update_relative_time(self):
+        try:
+            self.check_info_act.setText(f"Última comprobación {self.human_time_ago()}")
         except Exception:
             pass
 
@@ -203,56 +235,28 @@ class X64UpdateTray(QSystemTrayIcon):
             if self.count == 0:
                 self.setIcon(self.get_icon("ok"))
                 self.setToolTip("X64 LIOS: Sistema actualizado")
+                self.header_act.setText("Sistema actualizado")
+                self.pkg_menu.menuAction().setVisible(False)
             else:
                 self.setIcon(self.get_icon("pending"))
                 msg = "1 actualización disponible" if self.count == 1 else f"{self.count} actualizaciones disponibles"
                 self.setToolTip(f"X64 LIOS: {msg}")
+                self.header_act.setText(msg)
 
-            # Rebuild context menu
-            self.menu.clear()
-
-            # 1. Header status
-            if self.count == 0:
-                header_act = self.menu.addAction("Sistema actualizado")
-                header_act.setEnabled(False)
-            else:
-                msg = "1 actualización disponible" if self.count == 1 else f"{self.count} actualizaciones disponibles"
-                header_act = self.menu.addAction(msg)
-                header_act.setEnabled(False)
-
-                # 2. Packages submenu
-                sub_title = f"Paquetes ({self.count})"
-                pkg_menu = self.menu.addMenu(sub_title)
-                
-                # Show up to 35 packages
+                # Update packages submenu
+                self.pkg_menu.setTitle(f"Paquetes ({self.count})")
+                self.pkg_menu.clear()
                 shown_pkgs = self.packages[:35]
                 for p in shown_pkgs:
-                    act = pkg_menu.addAction(p)
+                    act = self.pkg_menu.addAction(p)
                     act.setEnabled(False)
                 if len(self.packages) > 35:
                     extra = len(self.packages) - 35
-                    act = pkg_menu.addAction(f"... y {extra} paquetes más")
+                    act = self.pkg_menu.addAction(f"... y {extra} paquetes más")
                     act.setEnabled(False)
+                self.pkg_menu.menuAction().setVisible(True)
 
-            # 3. Last check info
-            check_info = self.menu.addAction(f"Última comprobación {self.human_time_ago()}")
-            check_info.setEnabled(False)
-
-            self.menu.addSeparator()
-
-            # 4. Action: Ejecutar X64-Update
-            run_act = self.menu.addAction("Ejecutar X64-Update")
-            run_act.triggered.connect(self.launch_updater)
-
-            # 5. Action: Buscar actualizaciones
-            search_act = self.menu.addAction("Buscar actualizaciones")
-            search_act.triggered.connect(self.trigger_background_check)
-
-            self.menu.addSeparator()
-
-            # 6. Action: Salir (Cierre limpio intencional)
-            exit_act = self.menu.addAction("Salir")
-            exit_act.triggered.connect(self.on_exit)
+            self.update_relative_time()
         except Exception:
             pass
 
@@ -272,6 +276,8 @@ class X64UpdateTray(QSystemTrayIcon):
                 self.launch_updater()
             else:
                 self.trigger_background_check()
+        elif reason == QSystemTrayIcon.ActivationReason.Context:
+            self.menu.popup(QCursor.pos())
 
     def launch_updater(self):
         try:
