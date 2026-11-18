@@ -1,6 +1,6 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=10
+pkgrel=11
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
@@ -64,4 +64,14 @@ package() {
     # 8. Desactivar Fcitx5 en GNOME para suprimir notificaciones de Wayland Diagnose
     mkdir -p "${pkgdir}/etc/skel/.config/autostart"
     install -m644 "${srcdir}/org.fcitx.Fcitx5.desktop" "${pkgdir}/etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop"
+
+    # 9. Enlaces de icono de alta fidelidad transparente para Antigravity IDE
+    for theme in Papirus Papirus-Dark; do
+        for size in 16x16 22x22 24x24 32x32 48x48 64x64; do
+            mkdir -p "${pkgdir}/usr/share/icons/${theme}/${size}/apps"
+            ln -sf antigravity.svg "${pkgdir}/usr/share/icons/${theme}/${size}/apps/antigravity-ide.svg"
+        done
+    done
+    mkdir -p "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
+    ln -sf /usr/share/icons/Papirus/64x64/apps/antigravity.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/antigravity-ide.svg"
 }

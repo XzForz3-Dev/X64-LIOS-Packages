@@ -7,15 +7,23 @@ post_install() {
         /usr/lib/x64-lios/apply-gdm-theme.py 2>/dev/null || true
     fi
 
-    # Desactivar Fcitx5 en GNOME para todos los usuarios
+    # Desactivar Fcitx5 en GNOME y actualizar favoritos para todos los usuarios
     for user_home in /home/*; do
         if [ -d "$user_home" ]; then
             username=$(basename "$user_home")
             mkdir -p "$user_home/.config/autostart" 2>/dev/null || true
             cp -f /etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop "$user_home/.config/autostart/" 2>/dev/null || true
             chown -R "$username:$username" "$user_home/.config/autostart/org.fcitx.Fcitx5.desktop" 2>/dev/null || true
+            su - "$username" -c "gsettings set org.gnome.shell favorite-apps \"['x64-hello.desktop', 'chromium.desktop', 'kitty.desktop', 'org.gnome.Nautilus.desktop']\"" 2>/dev/null || true
         fi
     done
+
+    # Actualizar caché de iconos para Papirus y Papirus-Dark
+    gtk-update-icon-cache -f /usr/share/icons/Papirus 2>/dev/null || true
+    gtk-update-icon-cache -f /usr/share/icons/Papirus-Dark 2>/dev/null || true
+    if [ -f /usr/share/icons/Papirus/64x64/apps/antigravity.svg ] && which rsvg-convert >/dev/null 2>&1; then
+        rsvg-convert -w 1024 -h 1024 /usr/share/icons/Papirus/64x64/apps/antigravity.svg -o /usr/share/pixmaps/antigravity-ide.png 2>/dev/null || true
+    fi
 }
 
 post_upgrade() {
