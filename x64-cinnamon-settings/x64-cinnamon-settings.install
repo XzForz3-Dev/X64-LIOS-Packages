@@ -1,6 +1,40 @@
 post_install() {
     glib-compile-schemas /usr/share/glib-2.0/schemas 2>/dev/null || true
     gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    gtk-update-icon-cache -f /usr/share/icons/Papirus 2>/dev/null || true
+    gtk-update-icon-cache -f /usr/share/icons/Papirus-Dark 2>/dev/null || true
+
+    # Auto-desbloqueo transparente de gnome-keyring en LightDM
+    for pam_file in /etc/pam.d/lightdm /etc/pam.d/lightdm-autologin /etc/pam.d/login; do
+        if [ -f "$pam_file" ]; then
+            if ! grep -q "pam_gnome_keyring.so" "$pam_file"; then
+                sed -i '/auth.*include.*system-local-login/a -auth      optional     pam_gnome_keyring.so' "$pam_file" 2>/dev/null || true
+                sed -i '/session.*include.*system-local-login/a -session   optional     pam_gnome_keyring.so auto_start' "$pam_file" 2>/dev/null || true
+                if grep -q "^password.*include.*system-local-login" "$pam_file"; then
+                    sed -i '/password.*include.*system-local-login/a -password  optional     pam_gnome_keyring.so' "$pam_file" 2>/dev/null || true
+                fi
+            fi
+        fi
+    done
+
+    # Ocultar utilidades redundantes o de desarrollo Qt en el Menu de Aplicaciones de Cinnamon
+    if [ -f /usr/share/applications/fcitx5-configtool.desktop ]; then
+        sed -i 's/^NotShowIn=.*/NotShowIn=KDE;GNOME;COSMIC;X-Cinnamon;/' /usr/share/applications/fcitx5-configtool.desktop 2>/dev/null || true
+    fi
+    if [ -f /usr/share/applications/nm-connection-editor.desktop ]; then
+        if grep -q "^NotShowIn=" /usr/share/applications/nm-connection-editor.desktop; then
+            sed -i 's/^NotShowIn=.*/NotShowIn=GNOME;COSMIC;KDE;X-Cinnamon;/' /usr/share/applications/nm-connection-editor.desktop 2>/dev/null || true
+        else
+            echo "NotShowIn=GNOME;COSMIC;KDE;X-Cinnamon;" >> /usr/share/applications/nm-connection-editor.desktop
+        fi
+    fi
+    for qt_app in assistant designer linguist qdbusviewer qv4l2 qvidcap; do
+        if [ -f "/usr/share/applications/${qt_app}.desktop" ]; then
+            if ! grep -q "NoDisplay" "/usr/share/applications/${qt_app}.desktop"; then
+                echo "NoDisplay=true" >> "/usr/share/applications/${qt_app}.desktop"
+            fi
+        fi
+    done
 
     # Propagar configuracion del boton de inicio y panel a los usuarios existentes
     for user_dir in /home/*; do
@@ -15,39 +49,80 @@ post_install() {
                 cp -f /etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json "$target_menu/0.json"
             fi
 
-            # 2. Panel con lanzadores oficiales (Nemo, Chromium, Kitty)
+            # 2. Panel con lanzadores oficiales (X64 Hello, Chromium, Kitty, Nemo)
             target_panel="$user_dir/.config/cinnamon/spices/grouped-window-list@cinnamon.org"
             mkdir -p "$target_panel"
             if [ -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json ]; then
                 cp -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json "$target_panel/2.json"
             fi
 
+            # 3. Avatar neutral oficial si no existe uno personalizado
+            if [ -f "$user_dir/.face" ] && cmp -s "$user_dir/.face" /usr/share/pixmaps/x64-logo.png; then
+                cp -f /etc/skel/.face "$user_dir/.face"
+                cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            elif [ ! -f "$user_dir/.face" ] && [ -f /etc/skel/.face ]; then
+                cp -f /etc/skel/.face "$user_dir/.face"
+                cp -f /etc/skel/.face.icon "$user_dir/.face.icon"
+            fi
+            chown "$u:$g" "$user_dir/.face" "$user_dir/.face.icon" 2>/dev/null || true
+
+            if [ -d "/var/lib/AccountsService/users" ]; then
+                mkdir -p /var/lib/AccountsService/icons
+                cp -f /usr/share/pixmaps/default-avatar.png /var/lib/AccountsService/icons/"$u" 2>/dev/null || true
+                cat << ACC_EOF > /var/lib/AccountsService/users/"$u" 2>/dev/null || true
+[User]
+Icon=/var/lib/AccountsService/icons/${u}
+Session=cinnamon
+XSession=cinnamon
+ACC_EOF
+            fi
+
             chown -R "$u:$g" "$user_dir/.config/cinnamon" 2>/dev/null || true
 
-            # 3. Inyectar dconf para sesiones activas si el usuario tiene bus de sesión
+            # 4. Inyectar dconf para usuarios existentes (incluso si el bus de sesión aún no está activo, usando dbus-run-session)
             uid=$(id -u "$u" 2>/dev/null || true)
-            if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
-                su - "$u" -c "
-                    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus 2>/dev/null || true
-                    dconf write /org/cinnamon/desktop/default-applications/terminal/exec \"'kitty'\" 2>/dev/null || true
-                    dconf write /org/cinnamon/desktop/default-applications/terminal/exec-arg \"'-e'\" 2>/dev/null || true
-                    dconf write /org/gnome/terminal/legacy/default-show-menubar false 2>/dev/null || true
-                    dconf write /org/gnome/terminal/legacy/theme-variant \"'dark'\" 2>/dev/null || true
-                    P='/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/'
-                    dconf write \${P}use-system-font false 2>/dev/null || true
-                    dconf write \${P}font \"'JetBrainsMono Nerd Font 11'\" 2>/dev/null || true
-                    dconf write \${P}use-theme-colors false 2>/dev/null || true
-                    dconf write \${P}background-color \"'#08080a'\" 2>/dev/null || true
-                    dconf write \${P}foreground-color \"'#c0c0c0'\" 2>/dev/null || true
-                    dconf write \${P}bold-color-same-as-fg true 2>/dev/null || true
-                    dconf write \${P}cursor-colors-set true 2>/dev/null || true
-                    dconf write \${P}cursor-background-color \"'#ff2b2b'\" 2>/dev/null || true
-                    dconf write \${P}cursor-foreground-color \"'#ffffff'\" 2>/dev/null || true
-                    dconf write \${P}default-size-columns 105 2>/dev/null || true
-                    dconf write \${P}default-size-rows 28 2>/dev/null || true
-                    dconf write \${P}palette \"['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']\" 2>/dev/null || true
-                " 2>/dev/null || true
-            fi
+            su - "$u" -c "
+                if [ -n \"$uid\" ] && [ -S \"/run/user/$uid/bus\" ]; then
+                    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus
+                    DCONF_CMD=\"dconf\"
+                else
+                    DCONF_CMD=\"dbus-run-session -- dconf\"
+                fi
+                \$DCONF_CMD write /org/cinnamon/desktop/background/picture-uri \"'file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/background/picture-options \"'zoom'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/interface/gtk-theme \"'adw-gtk3-dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/interface/icon-theme \"'Papirus-Dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/wm/preferences/theme \"'adw-gtk3-dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/x/apps/portal/color-scheme \"'prefer-dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/gnome/desktop/interface/gtk-theme \"'adw-gtk3-dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/gnome/desktop/interface/color-scheme \"'prefer-dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/gnome/desktop/interface/icon-theme \"'Papirus-Dark'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec \"'kitty'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec-arg \"'-e'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/terminal \"['<Primary><Alt>t', '<Super>Return']\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot \"['<Shift>Print', '<Super><Shift>s']\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot-clip \"['<Control><Shift>Print', '<Ctrl><Shift>s']\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-type \"'nothing'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-timeout 0 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-type \"'nothing'\" 2>/dev/null || true
+                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/idle-dim-ac false 2>/dev/null || true
+                \$DCONF_CMD write /org/gnome/terminal/legacy/default-show-menubar false 2>/dev/null || true
+                \$DCONF_CMD write /org/gnome/terminal/legacy/theme-variant \"'dark'\" 2>/dev/null || true
+                P='/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/'
+                \$DCONF_CMD write \${P}use-system-font false 2>/dev/null || true
+                \$DCONF_CMD write \${P}font \"'JetBrainsMono Nerd Font 11'\" 2>/dev/null || true
+                \$DCONF_CMD write \${P}use-theme-colors false 2>/dev/null || true
+                \$DCONF_CMD write \${P}background-color \"'#08080a'\" 2>/dev/null || true
+                \$DCONF_CMD write \${P}foreground-color \"'#c0c0c0'\" 2>/dev/null || true
+                \$DCONF_CMD write \${P}bold-color-same-as-fg true 2>/dev/null || true
+                \$DCONF_CMD write \${P}cursor-colors-set true 2>/dev/null || true
+                \$DCONF_CMD write \${P}cursor-background-color \"'#ff2b2b'\" 2>/dev/null || true
+                \$DCONF_CMD write \${P}cursor-foreground-color \"'#ffffff'\" 2>/dev/null || true
+                \$DCONF_CMD write \${P}default-size-columns 105 2>/dev/null || true
+                \$DCONF_CMD write \${P}default-size-rows 28 2>/dev/null || true
+                \$DCONF_CMD write \${P}palette \"['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']\" 2>/dev/null || true
+            " 2>/dev/null || true
         fi
     done
 }
