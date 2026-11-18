@@ -11,6 +11,8 @@ show-battery-percentage=true
 picture-uri='file:///usr/share/backgrounds/x64-lios/01-monolith.jpg'
 picture-uri-dark='file:///usr/share/backgrounds/x64-lios/01-monolith.jpg'
 picture-options='zoom'
+primary-color='#0b0b0d'
+secondary-color='#0b0b0d'
 
 [org.gnome.desktop.screensaver]
 picture-uri='file:///usr/share/backgrounds/x64-lios/01-monolith.jpg'

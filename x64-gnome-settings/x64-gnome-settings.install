@@ -11,16 +11,18 @@ post_install() {
     for user_home in /home/*; do
         if [ -d "$user_home" ]; then
             username=$(basename "$user_home")
+            uid=$(id -u "$username" 2>/dev/null || echo "1000")
+            dbus_env="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid}/bus"
             mkdir -p "$user_home/.config/autostart" 2>/dev/null || true
             cp -f /etc/skel/.config/autostart/org.fcitx.Fcitx5.desktop "$user_home/.config/autostart/" 2>/dev/null || true
             chown -R "$username:$username" "$user_home/.config/autostart/org.fcitx.Fcitx5.desktop" 2>/dev/null || true
-            su - "$username" -c "gsettings set org.gnome.shell favorite-apps \"['x64-hello.desktop', 'chromium.desktop', 'kitty.desktop', 'org.gnome.Nautilus.desktop']\"" 2>/dev/null || true
+            su - "$username" -c "$dbus_env gsettings set org.gnome.shell favorite-apps \"['x64-hello.desktop', 'chromium.desktop', 'kitty.desktop', 'org.gnome.Nautilus.desktop']\"" 2>/dev/null || true
             # Desactivar suspensión automática por inactividad (solo apagar pantalla vía DPMS)
-            su - "$username" -c "gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' && gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' && gsettings set org.gnome.settings-daemon.plugins.power idle-dim false" 2>/dev/null || true
-            # Respetar personalizaciones del usuario: solo fijar Monolith si está en blanco o con el fondo stock de Adwaita
-            current_bg=$(su - "$username" -c "gsettings get org.gnome.desktop.background picture-uri" 2>/dev/null || true)
-            if [ -z "$current_bg" ] || echo "$current_bg" | grep -q "adwaita"; then
-                su - "$username" -c "gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && gsettings set org.gnome.desktop.background picture-options 'zoom' && gsettings set org.gnome.desktop.screensaver picture-uri 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && gsettings set org.gnome.desktop.screensaver picture-options 'zoom'" 2>/dev/null || true
+            su - "$username" -c "$dbus_env gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' && $dbus_env gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' && $dbus_env gsettings set org.gnome.settings-daemon.plugins.power idle-dim false" 2>/dev/null || true
+            # Respetar personalizaciones del usuario: solo fijar/refrescar Monolith si está en blanco, Adwaita o ya usa 01-monolith.jpg
+            current_bg=$(su - "$username" -c "$dbus_env gsettings get org.gnome.desktop.background picture-uri" 2>/dev/null || true)
+            if [ -z "$current_bg" ] || echo "$current_bg" | grep -qE "adwaita|01-monolith\.jpg"; then
+                su - "$username" -c "$dbus_env gsettings set org.gnome.desktop.background primary-color '#0b0b0d' && $dbus_env gsettings set org.gnome.desktop.background secondary-color '#0b0b0d' && $dbus_env gsettings set org.gnome.desktop.background picture-uri '' && $dbus_env gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && $dbus_env gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && $dbus_env gsettings set org.gnome.desktop.background picture-options 'zoom' && $dbus_env gsettings set org.gnome.desktop.screensaver picture-uri 'file:///usr/share/backgrounds/x64-lios/01-monolith.jpg' && $dbus_env gsettings set org.gnome.desktop.screensaver picture-options 'zoom'" 2>/dev/null || true
             fi
         fi
     done
