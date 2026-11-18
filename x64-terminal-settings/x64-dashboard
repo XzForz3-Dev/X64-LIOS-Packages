@@ -956,7 +956,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS GNOME (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" baobab decibels file-roller gdm gnome-backgrounds gnome-bluetooth-3.0 gnome-calculator gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell gnome-shell-extensions gnome-text-editor gnome-tweaks gnome-user-docs gnome-user-share gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb loupe mutter nautilus papers resources showtime simple-scan snapshot sushi xdg-user-dirs-gtk x64-gnome-settings adw-gtk-theme kitty chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" baobab decibels file-roller gdm gnome-backgrounds gnome-bluetooth-3.0 gnome-calculator gnome-color-manager gnome-control-center gnome-disk-utility gnome-keyring gnome-menus gnome-session gnome-settings-daemon gnome-shell gnome-shell-extensions gnome-shell-extension-appindicator gnome-text-editor gnome-tweaks gnome-user-docs gnome-user-share gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb loupe mutter nautilus papers resources showtime simple-scan snapshot sushi xdg-user-dirs-gtk x64-gnome-settings adw-gtk-theme kitty chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode gdm "GNOME (X64 Stealth Edition)"

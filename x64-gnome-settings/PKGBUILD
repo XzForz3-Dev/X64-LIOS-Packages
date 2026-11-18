@@ -1,12 +1,13 @@
 pkgname=x64-gnome-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Official X64 LIOS GNOME Desktop & GDM Lock Screen Configuration"
 arch=('any')
 license=('GPL')
 install='x64-gnome-settings.install'
-depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme' 'gnome-backgrounds')
+depends=('glib2' 'glib2-devel' 'python' 'adw-gtk-theme' 'gnome-backgrounds' 'gnome-shell-extension-appindicator' 'papirus-icon-theme')
 source=('gdm-stealth-chassis.jpg'
+        '01-monolith.jpg'
         'x64-lios-cube-160.png'
         'zzz_x64.org.gnome.login-screen.gschema.override'
         'zzz_x64.org.gnome.desktop.interface.gschema.override'
@@ -19,11 +20,13 @@ sha256sums=('SKIP'
             'SKIP'
             'SKIP'
             'SKIP'
+            'SKIP'
             'SKIP')
 
 package() {
-    # 1. Fondo oficial de GDM / Pantalla de Bloqueo
+    # 1. Fondo oficial de GDM y Escritorio GNOME (Monolith y Stealth Chassis)
     mkdir -p "${pkgdir}/usr/share/backgrounds/x64-lios"
+    install -m644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
     install -m644 "${srcdir}/gdm-stealth-chassis.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/gdm-stealth-chassis.jpg"
 
     # 2. Logotipo oficial del Cubo 3D de X64 LIOS (160px)
