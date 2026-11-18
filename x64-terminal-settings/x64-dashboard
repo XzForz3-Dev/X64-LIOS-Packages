@@ -614,7 +614,7 @@ except Exception:
         sudo rm -f /usr/share/wayland-sessions/plasma.desktop /usr/share/xsessions/plasma.desktop 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/KDE $udir/.config/kdeconnect $udir/.config/kdedefaults $udir/.config/kdeglobals $udir/.config/kwinrc $udir/.config/kwinoutputconfig.json $udir/.config/kglobalshortcutsrc $udir/.config/plasmarc $udir/.config/plasmashellrc $udir/.config/plasma-localerc $udir/.config/plasmanotifyrc $udir/.config/plasma-org.kde.plasma.desktop-appletsrc $udir/.config/plasmaparc $udir/.config/powermanagementprofilesrc $udir/.config/spectaclerc $udir/.config/konsolerc $udir/.config/konsolesshconfig $udir/.config/kwalletrc $udir/.config/kscreenlockerrc $udir/.config/ksmserverrc $udir/.config/ktimezonedrc $udir/.config/kaccessrc $udir/.config/kactivitymanagerdrc $udir/.config/kconf_updaterc $udir/.config/kded5rc $udir/.config/trashrc $udir/.config/autostart/org.kde.* 2>/dev/null
+                rm -rf $udir/.config/KDE $udir/.config/kdeconnect $udir/.config/kdedefaults $udir/.config/kdeglobals $udir/.config/kwinrc $udir/.config/kwinoutputconfig.json $udir/.config/kglobalshortcutsrc $udir/.config/plasmarc $udir/.config/plasmashellrc $udir/.config/plasma-localerc $udir/.config/plasmanotifyrc $udir/.config/plasma-org.kde.plasma.desktop-appletsrc $udir/.config/plasmaparc $udir/.config/powermanagementprofilesrc $udir/.config/spectaclerc $udir/.config/konsolerc $udir/.config/konsolesshconfig $udir/.config/kwalletrc $udir/.config/kscreenlockerrc $udir/.config/ksmserverrc $udir/.config/ktimezonedrc $udir/.config/kaccessrc $udir/.config/kactivitymanagerdrc $udir/.config/kconf_updaterc $udir/.config/kded5rc $udir/.config/trashrc $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.config/autostart/org.kde.* 2>/dev/null
             end
         end
     end
@@ -700,14 +700,36 @@ except Exception:
             sudo pacman -Rcs --noconfirm $unused_lightdm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_lightdm 2>/dev/null
         end
     end
+    if test "$target_id" != "7"
+        systemctl --user stop xfce4-panel.service 2>/dev/null
+        systemctl --user disable xfce4-panel.service 2>/dev/null
+        sudo rm -f /usr/lib/systemd/user/xfce4-panel.service 2>/dev/null
+        for udir in /home/*
+            if test -d $udir
+                rm -f $udir/.config/systemd/user/*.wants/xfce4-panel.service 2>/dev/null
+            end
+        end
+    end
+    if test "$target_id" != "3"
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib 2>/dev/null
+            end
+        end
+    end
     if not contains "$target_id" "1" "8"
-        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool 2>/dev/null | sort -u)
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools 2>/dev/null | sort -u)
         if test (count $unused_hypr) -gt 0
             sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
         end
+        systemctl --user stop bt-agent.service 2>/dev/null
+        systemctl --user disable bt-agent.service 2>/dev/null
+        sudo rm -f /etc/systemd/user/bt-agent.service /etc/systemd/user/default.target.wants/bt-agent.service 2>/dev/null
+        sudo rm -rf /etc/skel/.config/alacritty /etc/skel/.config/fcitx5 /etc/skel/.config/foot /etc/skel/.config/ghostty /etc/skel/.config/herdr /etc/skel/.config/hyprland-mimeapps.list /etc/skel/.config/hyprland-preview-share-picker /etc/skel/.config/imv /etc/skel/.config/lazygit /etc/skel/.config/obsidian /etc/skel/.config/qtengine /etc/skel/.config/tmux /etc/skel/.config/wofi-x64 /etc/skel/.config/xdg-desktop-portal 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/fcitx5 $udir/.local/share/fcitx5 2>/dev/null
+                rm -f $udir/.config/systemd/user/default.target.wants/bt-agent.service 2>/dev/null
+                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper 2>/dev/null
             end
         end
     end

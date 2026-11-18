@@ -128,6 +128,13 @@ EOF
     if [ -f /usr/share/applications/fcitx5-configtool.desktop ]; then
         sed -i 's/^NotShowIn=.*/NotShowIn=KDE;GNOME;COSMIC;/' /usr/share/applications/fcitx5-configtool.desktop 2>/dev/null || true
     fi
+    if [ -f /usr/share/applications/nm-connection-editor.desktop ]; then
+        if grep -q "^NotShowIn=" /usr/share/applications/nm-connection-editor.desktop; then
+            sed -i 's/^NotShowIn=.*/NotShowIn=GNOME;COSMIC;KDE;/' /usr/share/applications/nm-connection-editor.desktop 2>/dev/null || true
+        else
+            echo "NotShowIn=GNOME;COSMIC;KDE;" >> /usr/share/applications/nm-connection-editor.desktop
+        fi
+    fi
     for qt_app in assistant designer linguist qdbusviewer qv4l2 qvidcap; do
         if [ -f "/usr/share/applications/${qt_app}.desktop" ]; then
             if ! grep -q "NoDisplay" "/usr/share/applications/${qt_app}.desktop"; then
