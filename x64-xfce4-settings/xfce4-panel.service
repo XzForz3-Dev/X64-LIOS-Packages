@@ -1,0 +1,12 @@
+[Unit]
+Description=Xfce Panel
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/xfce4-panel
+Restart=always
+RestartSec=1s
+
+[Install]
+WantedBy=default.target

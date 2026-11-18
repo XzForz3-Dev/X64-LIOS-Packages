@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=19
+pkgrel=20
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -44,8 +44,10 @@ source=(
     'environment'
     'screenshot.png'
     'x64-screenshot'
+    'xfce4-panel.service'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -134,4 +136,10 @@ package() {
     # 11. Script oficial de captura y recorte Wayland (grim + slurp + wl-clipboard)
     install -d "${pkgdir}/usr/bin"
     install -m755 "${srcdir}/x64-screenshot" "${pkgdir}/usr/bin/x64-screenshot"
+
+    # 12. Servicio systemd de usuario para supervisar xfce4-panel (Restart=always)
+    install -d "${pkgdir}/usr/lib/systemd/user"
+    install -m644 "${srcdir}/xfce4-panel.service" "${pkgdir}/usr/lib/systemd/user/xfce4-panel.service"
+    install -d "${pkgdir}/usr/lib/systemd/user/default.target.wants"
+    ln -sf ../xfce4-panel.service "${pkgdir}/usr/lib/systemd/user/default.target.wants/xfce4-panel.service"
 }

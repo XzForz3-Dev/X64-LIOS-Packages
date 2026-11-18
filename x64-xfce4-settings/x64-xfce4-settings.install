@@ -127,7 +127,8 @@ ACC_EOF
                     labwc --reconfigure 2>/dev/null || true
                     kill -SIGHUP $pid 2>/dev/null || true
                     xfdesktop --reload 2>/dev/null || true
-                    xfce4-panel -r 2>/dev/null || true
+                    systemctl --user daemon-reload 2>/dev/null || true
+                    systemctl --user restart xfce4-panel.service 2>/dev/null || xfce4-panel -r 2>/dev/null || true
                 " 2>/dev/null || true
             fi
         fi
