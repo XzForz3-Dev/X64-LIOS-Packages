@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=12
+pkgrel=13
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -14,6 +14,7 @@ depends=(
     'papirus-icon-theme'
 )
 source=(
+    'theme_v1_accent'
     'theme_v2_accent'
     'theme_v2_background'
     'app_list_favorites'
@@ -46,6 +47,7 @@ sha256sums=(
     'SKIP'
     'SKIP'
     'SKIP'
+    'SKIP'
 )
 
 package() {
@@ -59,6 +61,8 @@ package() {
     install -Dm644 "${srcdir}/chromium-flags.conf" "${pkgdir}/etc/chromium-flags.conf"
 
     # 1. Configuracion en /etc/skel/.config/cosmic (Nuevos usuarios)
+    install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v1"
+    install -m644 "${srcdir}/theme_v1_accent" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v1/accent"
     install -d "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2"
     install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
     install -m644 "${srcdir}/theme_v2_background" "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Dark/v2/background"
@@ -93,6 +97,8 @@ package() {
     echo "true" > "${pkgdir}/etc/skel/.config/cosmic/com.system76.CosmicTheme.Mode/v1/is_dark"
 
     # 2. Configuracion global de respaldo en /etc/xdg/cosmic
+    install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v1"
+    install -m644 "${srcdir}/theme_v1_accent" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v1/accent"
     install -d "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2"
     install -m644 "${srcdir}/theme_v2_accent" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/accent"
     install -m644 "${srcdir}/theme_v2_background" "${pkgdir}/etc/xdg/cosmic/com.system76.CosmicTheme.Dark/v2/background"
