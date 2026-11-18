@@ -75,26 +75,27 @@
 
 /* Open Tasks (Tasklist): Sleek rounded capsules with crimson bottom accent when active */
 .xfce4-panel .tasklist button {
-    background-color: rgba(255, 255, 255, 0.04);
+    background-color: rgba(255, 255, 255, 0.035);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 6px;
-    margin: 3px 2px;
-    padding: 0 10px;
+    border-radius: 8px;
+    margin: 3px 3px;
+    padding: 0 12px;
     color: rgba(255, 255, 255, 0.85);
+    transition: all 120ms ease-in-out;
 }
 
 .xfce4-panel .tasklist button:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.14);
     color: #ffffff;
 }
 
 .xfce4-panel .tasklist button:checked,
 .xfce4-panel .tasklist button:active {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 -2px 0 0 #ff2b2b;
-    border-radius: 6px 6px 2px 2px;
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    box-shadow: inset 0 -2px 0 0 #ff2b2b, 0 1px 4px rgba(255, 43, 43, 0.25);
     color: #ffffff;
 }
 
