@@ -589,7 +589,7 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full GNOME suite...\e[0m"
         end
-        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme gnome-screenshot gnome-themes-extra gnome-desktop-4 gnome-desktop-common 2>/dev/null | sort -u)
+        set -l gnome_pkgs (pacman -Qq x64-gnome-settings gnome-shell gdm gnome-session gnome-control-center gnome-tweaks gnome-shell-extensions gnome-shell-extension-appindicator nautilus loupe papers showtime decibels simple-scan snapshot sushi baobab file-roller gnome-calculator gnome-text-editor gnome-disk-utility gnome-backgrounds gnome-user-docs gnome-user-share gnome-color-manager gnome-bluetooth-3.0 mutter gnome-menus resources gvfs gvfs-afc gvfs-dnssd gvfs-goa gvfs-gphoto2 gvfs-mtp gvfs-nfs gvfs-smb adw-gtk-theme gnome-screenshot gnome-themes-extra gnome-desktop-4 gnome-desktop-common 2>/dev/null | sort -u)
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
