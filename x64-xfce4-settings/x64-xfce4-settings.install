@@ -68,6 +68,14 @@ post_install() {
             # Preferred applications (Kitty default)
             [ -f /etc/skel/.config/xfce4/helpers.rc ] && cp -f /etc/skel/.config/xfce4/helpers.rc "$user_dir/.config/xfce4/helpers.rc"
 
+            # Flags de compatibilidad Ozone híbrida (Wayland y X11) para navegadores
+            for f in chromium-flags.conf chrome-flags.conf; do
+                if [ -f "/etc/skel/.config/${f}" ]; then
+                    cp -f "/etc/skel/.config/${f}" "$user_dir/.config/${f}"
+                    chown "$u:$g" "$user_dir/.config/${f}" 2>/dev/null || true
+                fi
+            done
+
             # GTK 3 CSS styles for Whisker Menu
             mkdir -p "$user_dir/.config/gtk-3.0"
             [ -f /etc/skel/.config/gtk-3.0/gtk.css ] && cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css"
