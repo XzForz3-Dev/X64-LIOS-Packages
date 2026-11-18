@@ -128,19 +128,32 @@
     font-weight: 500;
 }
 
-#whiskermenu-button {
+#whiskermenu-button,
+.xfce4-panel #whiskermenu-button {
     background-color: transparent;
-    border-color: transparent;
+    border: 1px solid transparent;
     margin-left: 4px;
     margin-right: 4px;
     border-radius: 8px;
     padding: 2px 6px;
+    transition: all 120ms ease-in-out;
 }
 
 #whiskermenu-button:hover,
-#whiskermenu-button:checked {
-    background-color: rgba(255, 43, 43, 0.16);
-    border-color: rgba(255, 43, 43, 0.35);
+.xfce4-panel #whiskermenu-button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+#whiskermenu-button:checked,
+#whiskermenu-button:active,
+.xfce4-panel #whiskermenu-button:checked,
+.xfce4-panel #whiskermenu-button:active {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    box-shadow: inset 0 -2px 0 0 #ff2b2b, 0 1px 4px rgba(255, 43, 43, 0.25);
+    color: #ffffff;
 }
 
 /* -------------------------------------------------------------------
