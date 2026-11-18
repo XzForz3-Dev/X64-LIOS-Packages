@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=22
+pkgrel=23
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -21,6 +21,7 @@ depends=(
     'wayfreeze'
     'satty'
     'wl-clipboard'
+    'xcape'
 )
 source=(
     '01-monolith.jpg'
@@ -39,14 +40,18 @@ source=(
     'keyboard-layout.xml'
     'xfce4-panel.xml'
     'xfce4-desktop.xml'
+    'xfce4-keyboard-shortcuts.xml'
     'rc.xml'
     'gtk.css'
     'environment'
     'screenshot.png'
     'x64-screenshot'
     'xfce4-panel.service'
+    'x64-xcape.desktop'
 )
 sha256sums=(
+    'SKIP'
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -104,7 +109,7 @@ package() {
 
     # 6. Configuracion de usuario por defecto en /etc/skel (tema oscuro, Monolith, Whisker mejorado, panel inferior, Papirus-Dark y layout es)
     install -d "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml; do
+    for conf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml xfce4-keyboard-shortcuts.xml; do
         install -m644 "${srcdir}/${conf}" "${pkgdir}/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${conf}"
     done
 
@@ -142,4 +147,8 @@ package() {
     install -m644 "${srcdir}/xfce4-panel.service" "${pkgdir}/usr/lib/systemd/user/xfce4-panel.service"
     install -d "${pkgdir}/usr/lib/systemd/user/default.target.wants"
     ln -sf ../xfce4-panel.service "${pkgdir}/usr/lib/systemd/user/default.target.wants/xfce4-panel.service"
+
+    # 13. Autostart de xcape para mapear tecla Super a Whisker Menu en sesion X11
+    install -d "${pkgdir}/etc/xdg/autostart"
+    install -m644 "${srcdir}/x64-xcape.desktop" "${pkgdir}/etc/xdg/autostart/x64-xcape.desktop"
 }

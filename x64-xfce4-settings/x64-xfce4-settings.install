@@ -61,7 +61,7 @@ post_install() {
             # Xfconf configs (tema, terminal, panel inferior, fondo Monolith, Whisker)
             target_xfconf="$user_dir/.config/xfce4/xfconf/xfce-perchannel-xml"
             mkdir -p "$target_xfconf"
-            for xconf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml; do
+            for xconf in xsettings.xml xfce4-terminal.xml xfwm4.xml keyboard-layout.xml xfce4-panel.xml xfce4-desktop.xml xfce4-keyboard-shortcuts.xml; do
                 [ -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${xconf}" ] && cp -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${xconf}" "$target_xfconf/"
             done
 
@@ -129,6 +129,20 @@ ACC_EOF
                     xfdesktop --reload 2>/dev/null || true
                     systemctl --user daemon-reload 2>/dev/null || true
                     systemctl --user restart xfce4-panel.service 2>/dev/null || xfce4-panel -r 2>/dev/null || true
+                " 2>/dev/null || true
+            fi
+
+            # Recargar componentes Xfce en vivo si la sesión activa es X11 (xfwm4)
+            xpid=$(pgrep -u "$u" -x xfwm4 2>/dev/null | head -n1 || true)
+            if [ -n "$xpid" ] && [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                su - "$u" -c "
+                    export DISPLAY=\$(ls /tmp/.X11-unix/X* 2>/dev/null | head -n1 | sed 's|.*X|:|' || echo ':0')
+                    export XDG_RUNTIME_DIR=/run/user/$uid
+                    xfdesktop --reload 2>/dev/null || true
+                    systemctl --user daemon-reload 2>/dev/null || true
+                    systemctl --user restart xfce4-panel.service 2>/dev/null || xfce4-panel -r 2>/dev/null || true
+                    pkill -x xcape 2>/dev/null || true
+                    xcape -e 'Super_L=Control_L|Escape;Super_R=Control_L|Escape' 2>/dev/null || true
                 " 2>/dev/null || true
             fi
         fi

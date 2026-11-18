@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=X64 LIOS Xcape (Super Key Listener for X11)
+Comment=Maps Super key to Whisker Menu under X11
+Exec=sh -c '[ -z "$WAYLAND_DISPLAY" ] && pkill -x xcape 2>/dev/null; xcape -e "Super_L=Control_L|Escape;Super_R=Control_L|Escape"'
+Terminal=false
+NoDisplay=true
+OnlyShowIn=XFCE;

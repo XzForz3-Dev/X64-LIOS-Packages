@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------------
-# X64 LIOS - Official Screenshot & Region Snipping Tool (Wayland / Labwc)
+# X64 LIOS - Official Screenshot & Region Snipping Tool (Wayland & X11)
 # -----------------------------------------------------------------------------
 
 mode="${1:-region}"
@@ -8,53 +8,82 @@ target_dir="${XDG_PICTURES_DIR:-$HOME/Imágenes}/Capturas de pantalla"
 mkdir -p "$target_dir"
 timestamp=$(date +%Y%m%d_%H%M%S)
 
+is_wayland=false
+if [ -n "$WAYLAND_DISPLAY" ]; then
+    is_wayland=true
+fi
+
 case "$mode" in
     full)
         filepath="$target_dir/captura_${timestamp}.png"
-        grim "$filepath"
-        wl-copy --type image/png < "$filepath"
+        if [ "$is_wayland" = true ]; then
+            grim "$filepath"
+            wl-copy --type image/png < "$filepath"
+        else
+            xfce4-screenshooter -f -c -s "$filepath"
+        fi
         notify-send -i camera-photo "Captura de Pantalla" "Pantalla completa guardada y copiada al portapapeles"
         ;;
     region|crop)
-        # Freeze physical screens 1:1 so menus/popups stay visible, then drag-to-crop directly on screen
-        if command -v wayfreeze >/dev/null 2>&1; then
-            wayfreeze &
-            freeze_pid=$!
-            trap 'kill $freeze_pid 2>/dev/null || true' EXIT INT TERM
-            sleep 0.1
-            geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
-            if [ -n "$geom" ]; then
-                filepath="$target_dir/recorte_${timestamp}.png"
-                grim -g "$geom" "$filepath"
-                wl-copy --type image/png < "$filepath"
-                notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
+        filepath="$target_dir/recorte_${timestamp}.png"
+        if [ "$is_wayland" = true ]; then
+            if command -v wayfreeze >/dev/null 2>&1; then
+                wayfreeze &
+                freeze_pid=$!
+                trap 'kill $freeze_pid 2>/dev/null || true' EXIT INT TERM
+                sleep 0.1
+                geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+                if [ -n "$geom" ]; then
+                    grim -g "$geom" "$filepath"
+                    wl-copy --type image/png < "$filepath"
+                    notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
+                fi
+                kill $freeze_pid 2>/dev/null || true
+                trap - EXIT INT TERM
+            else
+                geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
+                if [ -n "$geom" ]; then
+                    grim -g "$geom" "$filepath"
+                    wl-copy --type image/png < "$filepath"
+                    notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
+                fi
             fi
-            kill $freeze_pid 2>/dev/null || true
-            trap - EXIT INT TERM
         else
-            geom=$(slurp -d -b "#00000088" -c "#ff2b2b" -s "#ff2b2b22" -w 2)
-            if [ -n "$geom" ]; then
-                filepath="$target_dir/recorte_${timestamp}.png"
-                grim -g "$geom" "$filepath"
-                wl-copy --type image/png < "$filepath"
+            # X11 Native: interactive rectangle drag selection, auto-save and copy to clipboard
+            xfce4-screenshooter -r -c -s "$filepath"
+            if [ -f "$filepath" ]; then
                 notify-send -i camera-photo "Recorte de Pantalla" "Área recortada guardada y copiada al portapapeles"
             fi
         fi
         ;;
+    window)
+        filepath="$target_dir/ventana_${timestamp}.png"
+        if [ "$is_wayland" = true ]; then
+            grim "$filepath"
+            wl-copy --type image/png < "$filepath"
+        else
+            xfce4-screenshooter -w -c -s "$filepath"
+        fi
+        notify-send -i camera-photo "Captura de Ventana" "Ventana activa guardada y copiada al portapapeles"
+        ;;
     gui)
-        if command -v xfce4-screenshooter >/dev/null 2>&1; then
-            xfce4-screenshooter
-        elif command -v satty >/dev/null 2>&1; then
+        if [ "$is_wayland" = true ] && command -v satty >/dev/null 2>&1; then
             tmp_shot="/tmp/x64_snap_${timestamp}_$$.png"
             grim "$tmp_shot"
             satty --filename "$tmp_shot" --fullscreen
             rm -f "$tmp_shot"
+        elif command -v xfce4-screenshooter >/dev/null 2>&1; then
+            xfce4-screenshooter
         fi
         ;;
     *)
         filepath="$target_dir/captura_${timestamp}.png"
-        grim "$filepath"
-        wl-copy --type image/png < "$filepath"
+        if [ "$is_wayland" = true ]; then
+            grim "$filepath"
+            wl-copy --type image/png < "$filepath"
+        else
+            xfce4-screenshooter -f -c -s "$filepath"
+        fi
         notify-send -i camera-photo "Captura de Pantalla" "Captura copiada al portapapeles"
         ;;
 esac
