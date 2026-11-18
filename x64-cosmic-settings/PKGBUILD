@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -23,6 +23,7 @@ source=(
     'screenshot.png'
     '01-monolith.jpg'
     'x64-limine-splash.png'
+    'cosmic-greeter-chassis.jpg'
     'bg_all_desktop'
     'bg_same_on_all'
     'bg_all_greeter'
@@ -44,6 +45,7 @@ sha256sums=(
     'SKIP'
     'SKIP'
     'SKIP'
+    'SKIP'
 )
 
 package() {
@@ -51,6 +53,7 @@ package() {
     install -d "${pkgdir}/usr/share/backgrounds/x64-lios"
     install -m644 "${srcdir}/01-monolith.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/01-monolith.jpg"
     install -m644 "${srcdir}/x64-limine-splash.png" "${pkgdir}/usr/share/backgrounds/x64-lios/x64-limine-splash.png"
+    install -m644 "${srcdir}/cosmic-greeter-chassis.jpg" "${pkgdir}/usr/share/backgrounds/x64-lios/cosmic-greeter-chassis.jpg"
 
     # Chromium Wayland & Hardware Acceleration Flags
     install -Dm644 "${srcdir}/chromium-flags.conf" "${pkgdir}/etc/chromium-flags.conf"
