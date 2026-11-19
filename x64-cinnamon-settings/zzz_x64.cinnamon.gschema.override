@@ -18,7 +18,7 @@ icon-theme='Papirus-Dark'
 theme='adw-gtk3-dark'
 
 [org.cinnamon.theme]
-name='cinnamon'
+name='X64-Stealth'
 
 [org.cinnamon.desktop.keybindings]
 custom-list=['custom-x64-area-screenshot', 'custom-x64-area-screenshot-clip']

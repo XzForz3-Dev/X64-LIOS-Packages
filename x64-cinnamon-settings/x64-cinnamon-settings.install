@@ -145,6 +145,7 @@ $DCONF_CMD write /org/cinnamon/desktop/background/picture-options "'zoom'" 2>/de
 $DCONF_CMD write /org/cinnamon/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/interface/icon-theme "'Papirus-Dark'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/wm/preferences/theme "'adw-gtk3-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/theme/name "'X64-Stealth'" 2>/dev/null || true
 $DCONF_CMD write /org/x/apps/portal/color-scheme "'prefer-dark'" 2>/dev/null || true
 $DCONF_CMD write /org/gnome/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true
 $DCONF_CMD write /org/gnome/desktop/interface/color-scheme "'prefer-dark'" 2>/dev/null || true
@@ -202,6 +203,10 @@ $DCONF_CMD write "${P}cursor-foreground-color" "'#ffffff'" 2>/dev/null || true
 $DCONF_CMD write "${P}default-size-columns" 105 2>/dev/null || true
 $DCONF_CMD write "${P}default-size-rows" 28 2>/dev/null || true
 $DCONF_CMD write "${P}palette" "['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']" 2>/dev/null || true
+if [ "$DCONF_CMD" = "dconf" ]; then
+    gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadTheme >/dev/null 2>&1 || true
+    gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet "menu@cinnamon.org" "APPLET" >/dev/null 2>&1 || true
+fi
 EOF_DCONF
         fi
     done

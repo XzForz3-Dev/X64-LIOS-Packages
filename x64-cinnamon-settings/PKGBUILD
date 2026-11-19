@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=13
+pkgrel=14
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -30,11 +30,13 @@ source=(
     'default-avatar.png'
     'chromium-flags.conf'
     'menu-0.json'
+    'menu-settings-override.json'
     'grouped-window-list-2.json'
     'sound-settings-override.json'
     'x64-cinnamon-screenshot'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -91,9 +93,11 @@ package() {
     install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
     ln -sf /usr/share/icons/Papirus/64x64/apps/antigravity.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/antigravity-ide.svg"
 
-    # 7. Template de spices Cinnamon para menu con emblema X oficial
+    # 7. Template de spices Cinnamon para menu modernizado con emblema X oficial + override persistente
     install -d "${pkgdir}/etc/skel/.config/cinnamon/spices/menu@cinnamon.org"
     install -m644 "${srcdir}/menu-0.json" "${pkgdir}/etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json"
+    install -d "${pkgdir}/usr/share/cinnamon/applets/menu@cinnamon.org"
+    install -m644 "${srcdir}/menu-settings-override.json" "${pkgdir}/usr/share/cinnamon/applets/menu@cinnamon.org/settings-override.json"
 
     # 8. Template de spices Cinnamon para panel con pines oficiales (X64 Hello, Chromium, Kitty, Nemo)
     install -d "${pkgdir}/etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org"
@@ -105,4 +109,9 @@ package() {
 
     # 10. Helper X64 Freeze-Frame Area Screenshot (captura menus abiertos y popups en Wayland/X11)
     install -Dm755 "${srcdir}/x64-cinnamon-screenshot" "${pkgdir}/usr/bin/x64-cinnamon-screenshot"
+
+    # 11. Tema oficial de Shell X64-Stealth (Dark Cyber Glass + Acento Rojo Carmesi #ff2b2b)
+    install -d "${pkgdir}/usr/share/themes/X64-Stealth/cinnamon"
+    install -m644 "${startdir}/x64-stealth-theme/index.theme" "${pkgdir}/usr/share/themes/X64-Stealth/index.theme"
+    install -m644 "${startdir}/x64-stealth-theme/cinnamon/"* "${pkgdir}/usr/share/themes/X64-Stealth/cinnamon/"
 }

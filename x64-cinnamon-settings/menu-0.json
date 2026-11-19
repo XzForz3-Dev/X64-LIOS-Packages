@@ -128,7 +128,7 @@
         "units": "px",
         "description": "Icon size",
         "dependency": "menu-custom",
-        "value": 32
+        "value": 28
     },
     "menu-label": {
         "type": "entry",
@@ -151,7 +151,7 @@
         "step": 1,
         "units": "px",
         "description": "Categories icon size",
-        "value": 16
+        "value": 18
     },
     "application-icon-size": {
         "type": "spinbutton",
@@ -241,7 +241,7 @@
             "At the top": "top",
             "At the bottom": "bottom"
         },
-        "value": "bottom"
+        "value": "top"
     },
     "sidebar-icon-size": {
         "type": "spinbutton",
@@ -261,7 +261,7 @@
         "max": 600,
         "step": 1,
         "description": "Maximum sidebar width (px)",
-        "value": 180
+        "value": 215
     },
     "show-favorites": {
         "type": "switch",
@@ -317,7 +317,7 @@
         "default": false,
         "description": "Use menu animations",
         "tooltip": "Allow the menu to animate on open and close",
-        "value": false
+        "value": true
     },
     "menu-editor-button": {
         "type": "button",
@@ -328,12 +328,12 @@
     "popup-width": {
         "type": "generic",
         "default": 665,
-        "value": 665
+        "value": 790
     },
     "popup-height": {
         "type": "generic",
         "default": 425,
-        "value": 425
+        "value": 500
     },
     "reset-menu-size-button": {
         "type": "button",

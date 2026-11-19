@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=X64-Stealth
+Comment=X64 LIOS Official Dark Cyber Glass & Crimson Shell Theme for Cinnamon
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=adw-gtk3-dark
+MetacityTheme=adw-gtk3-dark
+IconTheme=Papirus-Dark
+CursorTheme=Adwaita

@@ -1,0 +1,46 @@
+{
+    "menu-custom": {
+        "override-props": true,
+        "default": true
+    },
+    "menu-icon": {
+        "override-props": true,
+        "default": "/usr/share/pixmaps/x64-logo.png"
+    },
+    "menu-icon-size": {
+        "override-props": true,
+        "default": 28
+    },
+    "menu-label": {
+        "override-props": true,
+        "default": ""
+    },
+    "search-position": {
+        "override-props": true,
+        "default": "top"
+    },
+    "enable-animation": {
+        "override-props": true,
+        "default": true
+    },
+    "category-icon-size": {
+        "override-props": true,
+        "default": 18
+    },
+    "application-icon-size": {
+        "override-props": true,
+        "default": 32
+    },
+    "sidebar-max-width": {
+        "override-props": true,
+        "default": 215
+    },
+    "popup-width": {
+        "override-props": true,
+        "default": 790
+    },
+    "popup-height": {
+        "override-props": true,
+        "default": 500
+    }
+}
