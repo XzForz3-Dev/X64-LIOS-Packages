@@ -673,13 +673,13 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Cinnamon suite...\e[0m"
         end
-        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
+        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo nemo-fileroller file-roller blueman xed xviewer xreader gnome-calculator gnome-disk-utility gnome-system-monitor gnome-screenshot lightdm lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
         if test (count $cin_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cin_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cin_pkgs 2>/dev/null
         end
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/cinnamon $udir/.config/nemo 2>/dev/null
+                rm -rf $udir/.config/cinnamon $udir/.config/nemo $udir/.config/xed $udir/.config/xviewer $udir/.config/xreader 2>/dev/null
             end
         end
     end

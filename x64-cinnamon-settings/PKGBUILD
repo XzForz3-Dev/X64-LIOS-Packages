@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=16
+pkgrel=17
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -19,6 +19,15 @@ depends=(
     'python-cairo'
     'python-gobject'
     'wl-clipboard'
+    'blueman'
+    'file-roller'
+    'nemo-fileroller'
+    'xed'
+    'xviewer'
+    'xreader'
+    'gnome-calculator'
+    'gnome-disk-utility'
+    'gnome-system-monitor'
 )
 source=(
     'cinnamon-login.jpg'
