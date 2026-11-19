@@ -1,6 +1,6 @@
 pkgname=x64-hello
 pkgver=1.0.0
-pkgrel=35
+pkgrel=36
 pkgdesc="X64 LIOS Official Post-Installation Welcome, System Tweaks & Gaming Center"
 arch=('any')
 license=('GPL')
@@ -8,15 +8,21 @@ depends=('python' 'python-pyqt6' 'qt6-svg' 'openssl' 'nss')
 source=('x64-hello'
         'x64-toggle-mitigations'
         'x64-waydroid-launcher'
+        'x64-waydroid-hide-apps'
+        'x64-waydroid-hide-apps.path'
+        'x64-waydroid-hide-apps.service'
         'x64-sunshine-launcher'
         'x64-sunshine.svg'
         'x64-hello.desktop'
         'x64-hello-icon.png'
         'x64-hello-icon.svg'
         'x64-cube.png')
-sha256sums=('0bbbdc64ae9ac31b48fff0f54f79c0f2b12ab4879ba923384f4f35890b68470f'
+sha256sums=('eca2b05de8a11c481a0b5f3f9fd2991e1938373017a51a07b13a2377bbbd85cd'
             '4a4dc4bd0202b573591246e494073e8d1d5127e90d05430226169900f762a0ae'
-            '6347c5c37b229234fa387b18d777436df77695f6fb5ad858d9d6e34a88eb4bb6'
+            'd4a7fa7a0ab934cd71dbc2ae036c2caacb8d4abf6f54a5174dddc6331068592f'
+            '4fd57b89b5510834609892549487f0889d914342f4be174f7e7bc68a2c1deb51'
+            '4e20e3279cd0e8eb5397ed65d5136fd9db4c6ed6811886634184112701b754ff'
+            '3a9ff64ecb6b5b2257f4ba4248cf7b96d53a86414a4beb1334272ec6285c2b72'
             '1690592c0a60cff457794ad782fc2b2d49011153f0b4bd86527a18c00ebb405c'
             '3c2755ca907b77d12d900a255488424c0a8059bfb556556866d64348ae56e71b'
             '77bc0a482b7dc076f0f7f3872c6febb527ec19698020df683400e5a086715acf'
@@ -29,7 +35,14 @@ package() {
     install -Dm755 "${srcdir}/x64-hello" "${pkgdir}/usr/bin/x64-hello"
     install -Dm755 "${srcdir}/x64-toggle-mitigations" "${pkgdir}/usr/bin/x64-toggle-mitigations"
     install -Dm755 "${srcdir}/x64-waydroid-launcher" "${pkgdir}/usr/bin/x64-waydroid-launcher"
+    install -Dm755 "${srcdir}/x64-waydroid-hide-apps" "${pkgdir}/usr/bin/x64-waydroid-hide-apps"
     install -Dm755 "${srcdir}/x64-sunshine-launcher" "${pkgdir}/usr/bin/x64-sunshine-launcher"
+
+    # Vigilante ligero systemd --user para ocultar apps individuales de Waydroid (solo activo si waydroid existe)
+    install -Dm644 "${srcdir}/x64-waydroid-hide-apps.path" "${pkgdir}/usr/lib/systemd/user/x64-waydroid-hide-apps.path"
+    install -Dm644 "${srcdir}/x64-waydroid-hide-apps.service" "${pkgdir}/usr/lib/systemd/user/x64-waydroid-hide-apps.service"
+    install -d "${pkgdir}/usr/lib/systemd/user/default.target.wants"
+    ln -sf ../x64-waydroid-hide-apps.path "${pkgdir}/usr/lib/systemd/user/default.target.wants/x64-waydroid-hide-apps.path"
     
     # Instalar acceso directo en menú de aplicaciones
     install -Dm644 "${srcdir}/x64-hello.desktop" "${pkgdir}/usr/share/applications/x64-hello.desktop"

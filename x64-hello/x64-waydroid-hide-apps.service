@@ -1,0 +1,7 @@
+[Unit]
+Description=X64 LIOS - Hide individual Waydroid Android app entries
+ConditionPathExists=/usr/bin/waydroid
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/x64-waydroid-hide-apps

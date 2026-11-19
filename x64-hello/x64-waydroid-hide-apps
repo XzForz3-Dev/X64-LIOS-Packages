@@ -1,0 +1,59 @@
+#!/bin/bash
+# X64 LIOS - Hide individual Waydroid Android app entries from the Linux app launcher
+# Keeps only the main Waydroid icon visible while preserving Waydroid's desktop files.
+
+set -u
+
+APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+[ -d "$APPS_DIR" ] || exit 0
+
+shopt -s nullglob
+changed=0
+
+for f in "$APPS_DIR"/waydroid.*.desktop; do
+    [ -f "$f" ] || continue
+    # Check whether NoDisplay=true already exists inside the [Desktop Entry] section
+    if awk '
+        /^\[Desktop Entry\]/ { in_de=1; next }
+        /^\[/                { in_de=0 }
+        in_de && /^NoDisplay=true[[:space:]]*$/ { found=1; exit }
+        END { exit(found ? 0 : 1) }
+    ' "$f"; then
+        continue
+    fi
+
+    tmp="${f}.x64tmp.$$"
+    awk '
+        /^\[Desktop Entry\]/ {
+            print
+            in_de=1
+            next
+        }
+        /^\[/ {
+            if (in_de && !done) {
+                print "NoDisplay=true"
+                done=1
+            }
+            in_de=0
+            print
+            next
+        }
+        in_de && /^NoDisplay=/ {
+            print "NoDisplay=true"
+            done=1
+            next
+        }
+        { print }
+        END {
+            if (in_de && !done) {
+                print "NoDisplay=true"
+            }
+        }
+    ' "$f" > "$tmp" && mv -f "$tmp" "$f"
+    changed=1
+done
+
+if [ "$changed" -eq 1 ] && command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+fi
+exit 0

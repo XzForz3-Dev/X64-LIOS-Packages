@@ -7424,7 +7424,7 @@ class X64Hello(QWidget):
                 "waydroid",
                 "waydroid",
                 "android",
-                "sudo systemctl enable --now waydroid-container.service; /usr/bin/x64-waydroid-launcher --configure-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Waydroid instalado en modo Bajo Demanda (0 MB RAM en reposo).\\033[0m\\nHaz clic en \\033[1;37mABRIR\\033[0m en X64 Hello para inicializar o arrancar Android.\\n'",
+                "sudo systemctl enable --now waydroid-container.service; systemctl --user daemon-reload 2>/dev/null || true; systemctl --user start x64-waydroid-hide-apps.path 2>/dev/null || true; /usr/bin/x64-waydroid-hide-apps 2>/dev/null || true; /usr/bin/x64-waydroid-launcher --configure-only 2>/dev/null || true; printf '\\n\\033[1;32m[✓] Waydroid instalado en modo Bajo Demanda (0 MB RAM en reposo).\\033[0m\\nHaz clic en \\033[1;37mABRIR\\033[0m en X64 Hello para inicializar o arrancar Android.\\n'",
                 "x64-waydroid-launcher"
             ),
             (

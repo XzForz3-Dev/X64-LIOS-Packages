@@ -1,0 +1,10 @@
+[Unit]
+Description=X64 LIOS - Keep Waydroid Android app entries hidden from Linux launcher
+ConditionPathExists=/usr/bin/waydroid
+
+[Path]
+PathChanged=%h/.local/share/applications
+MakeDirectory=no
+
+[Install]
+WantedBy=default.target

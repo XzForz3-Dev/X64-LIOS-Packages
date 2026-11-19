@@ -86,11 +86,16 @@ if ! systemctl is-active --quiet waydroid-container.service; then
     pkexec systemctl start waydroid-container.service 2>/dev/null || sudo systemctl start waydroid-container.service 2>/dev/null || true
 fi
 
+# Mantener ocultas las apps internas de Android para mostrar solo el icono principal de Waydroid
+systemctl --user start x64-waydroid-hide-apps.path 2>/dev/null || true
+/usr/bin/x64-waydroid-hide-apps 2>/dev/null || true
+
 # Lanzar la interfaz gráfica completa y asegurar propiedad de auto-suspensión/parada al cerrar ventana
 waydroid show-full-ui &
 (
     for _ in $(seq 1 20); do
         sleep 2
+        /usr/bin/x64-waydroid-hide-apps 2>/dev/null || true
         if waydroid status 2>/dev/null | grep -q "RUNNING"; then
             waydroid prop set persist.waydroid.suspend true >/dev/null 2>&1 || true
             break
