@@ -62,6 +62,24 @@ def _copy_pixbuf_persistent(pixbuf):
     util.copy_pixbuf_to_clipboard(pixbuf)
 
 
+def _dismiss_cinnamon_modals():
+    """Release any open Cinnamon popup/menu modal grab immediately after freezing
+    the stage so pointer and keyboard focus transfer instantly to our overlay."""
+    try:
+        proxy = Gio.DBusProxy.new_for_bus_sync(
+            Gio.BusType.SESSION,
+            Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES,
+            None,
+            'org.Cinnamon',
+            '/org/Cinnamon',
+            'org.Cinnamon',
+            None,
+        )
+        proxy.call_sync('DismissInternalModals', None, Gio.DBusCallFlags.NONE, 1000, None)
+    except GLib.Error:
+        pass
+
+
 def _capture_frozen_stage(include_pointer):
     """Snap the full compositor stage immediately via Cinnamon DBus before
     any window opens or focus changes (preserves open menus & popups)."""
@@ -132,14 +150,18 @@ class MonitorOverlay(Gtk.Window):
             Gdk.EventMask.BUTTON_PRESS_MASK
             | Gdk.EventMask.BUTTON_RELEASE_MASK
             | Gdk.EventMask.POINTER_MOTION_MASK
+            | Gdk.EventMask.ENTER_NOTIFY_MASK
         )
+        self.area.connect('realize', self._apply_crosshair)
+        self.area.connect('enter-notify-event', self._apply_crosshair)
         self.area.connect('draw', self._on_draw)
         self.area.connect('button-press-event', self._on_button_press)
         self.area.connect('motion-notify-event', self._on_motion)
         self.area.connect('button-release-event', self._on_button_release)
         self.add(self.area)
 
-        self.connect('realize', self._on_realize)
+        self.connect('realize', self._apply_crosshair)
+        self.connect('map-event', self._apply_crosshair)
         self.connect('key-press-event', self._on_key_press)
         self.connect('delete-event', lambda *_: self.controller.cancel() or True)
 
@@ -148,13 +170,17 @@ class MonitorOverlay(Gtk.Window):
         self.resize(mon_geom.width, mon_geom.height)
         self.fullscreen_on_monitor(screen, monitor_index)
 
-    def _on_realize(self, _widget):
-        gdk_win = self.get_window()
-        if gdk_win:
-            cursor = Gdk.Cursor.new_for_display(
-                Gdk.Display.get_default(), Gdk.CursorType.CROSSHAIR
-            )
-            gdk_win.set_cursor(cursor)
+    def _apply_crosshair(self, *_args):
+        display = Gdk.Display.get_default()
+        if not display:
+            return False
+        cursor = Gdk.Cursor.new_from_name(display, 'crosshair')
+        if cursor is None:
+            cursor = Gdk.Cursor.new_for_display(display, Gdk.CursorType.CROSSHAIR)
+        for target in (self.get_window(), self.area.get_window()):
+            if target is not None:
+                target.set_cursor(cursor)
+        return False
 
     def _on_key_press(self, _widget, event):
         if event.keyval == Gdk.KEY_Escape:
@@ -441,6 +467,10 @@ def main():
                 cmd.append('--clipboard')
             os.execv(cmd[0], cmd)
             return 1
+
+        # Release any open Cinnamon menu/popup modal grab right after freezing
+        # so the fullscreen overlay receives immediate crosshair & Esc focus.
+        _dismiss_cinnamon_modals()
 
         app = X64FrozenScreenshotApp(args, frozen, on_overlay_closed=release_lock)
         return app.run()
