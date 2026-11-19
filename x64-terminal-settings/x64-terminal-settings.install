@@ -80,7 +80,7 @@ EOF
         ln -sf /usr/bin/x64-gamemode /usr/local/bin/gamemoderun
     fi
 
-    # Configurar parámetros de kernel (Nvidia + preempt=full) en Limine si no están presentes
+    # Configurar parámetros de kernel (Nvidia + preempt=full) en los 4 bootloaders oficiales (Limine, GRUB, systemd-boot, rEFInd)
     if [ -f /etc/default/limine ]; then
         limine_changed=0
         if ! grep -q "nvidia-drm.modeset=1" /etc/default/limine 2>/dev/null; then
@@ -99,6 +99,31 @@ EOF
         if [ "$limine_changed" -eq 1 ] && command -v limine-update >/dev/null 2>&1; then
             limine-update 2>/dev/null || true
         fi
+    fi
+
+    # GRUB: asegurar preempt=full si el equipo usa GRUB
+    if [ -f /etc/default/grub ] && [ -f /boot/grub/grub.cfg ]; then
+        if ! grep -q "preempt=full" /etc/default/grub 2>/dev/null; then
+            sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 preempt=full"/' /etc/default/grub 2>/dev/null || true
+            if command -v grub-mkconfig >/dev/null 2>&1; then
+                grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
+            fi
+        fi
+    fi
+
+    # systemd-boot: asegurar preempt=full en /etc/kernel/cmdline y entradas loader/entries/*.conf
+    if [ -f /etc/kernel/cmdline ] && ! grep -q "preempt=full" /etc/kernel/cmdline 2>/dev/null; then
+        sed -i 's/[[:space:]]*$/ preempt=full/' /etc/kernel/cmdline 2>/dev/null || true
+    fi
+    for entry in /boot/efi/loader/entries/*.conf /boot/loader/entries/*.conf; do
+        if [ -f "$entry" ] && ! grep -q "preempt=full" "$entry" 2>/dev/null; then
+            sed -i '/^options / s/[[:space:]]*$/ preempt=full/' "$entry" 2>/dev/null || true
+        fi
+    done
+
+    # rEFInd: asegurar preempt=full en /boot/refind_linux.conf
+    if [ -f /boot/refind_linux.conf ] && ! grep -q "preempt=full" /boot/refind_linux.conf 2>/dev/null; then
+        sed -i '/^[[:space:]]*"/ s/"$/ preempt=full"/' /boot/refind_linux.conf 2>/dev/null || true
     fi
 
     # Asegurar grupo i2c para usuarios reales (DDC/CI sin errores en powerdevil)

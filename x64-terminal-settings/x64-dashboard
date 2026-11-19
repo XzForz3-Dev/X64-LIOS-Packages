@@ -2044,11 +2044,11 @@ while true
                             set -l nvme_sched (cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null | grep -o '\[[^]]*\]' | tr -d '[]')
                             test -z "$nvme_sched"; and set nvme_sched "N/A"
                             set -l has_mit_off 0
-                            if grep -q "mitigations=off" /etc/default/limine /etc/default/grub 2>/dev/null
+                            if sudo bash -c 'shopt -s nullglob; grep -q "mitigations=off" /etc/default/limine /etc/default/grub /etc/kernel/cmdline /boot/efi/loader/entries/*.conf /boot/loader/entries/*.conf /boot/refind_linux.conf 2>/dev/null'
                                 set has_mit_off 1
                             end
                             set -l has_preempt 0
-                            if grep -q "preempt=full" /etc/default/limine /etc/default/grub /proc/cmdline 2>/dev/null
+                            if sudo bash -c 'shopt -s nullglob; grep -q "preempt=full" /etc/default/limine /etc/default/grub /etc/kernel/cmdline /boot/efi/loader/entries/*.conf /boot/loader/entries/*.conf /boot/refind_linux.conf /proc/cmdline 2>/dev/null'
                                 set has_preempt 1
                             end
 
@@ -2114,11 +2114,14 @@ while true
                                 case 1
                                     if test $has_mit_off -eq 1
                                         echo -e "\n  \e[1;36m[*] Restaurando mitigaciones de seguridad de CPU...\e[0m"
-                                        test -f /etc/default/limine; and sudo sed -i 's/ mitigations=off//g; s/mitigations=off //g' /etc/default/limine
-                                        test -f /etc/default/grub; and sudo sed -i 's/ mitigations=off//g; s/mitigations=off //g' /etc/default/grub
-                                        type -q limine-update; and sudo limine-update
-                                        test -f /boot/grub/grub.cfg; and type -q grub-mkconfig; and sudo grub-mkconfig -o /boot/grub/grub.cfg
-                                        echo -e "  \e[1;32m[OK] Mitigaciones restauradas. Reinicia para aplicar el cambio.\e[0m"
+                                        sudo bash -c 'shopt -s nullglob
+                                            for f in /etc/default/limine /etc/default/grub /etc/kernel/cmdline /boot/efi/loader/entries/*.conf /boot/loader/entries/*.conf /boot/refind_linux.conf; do
+                                                [ -f "$f" ] && sed -i "s/ mitigations=off//g; s/mitigations=off //g" "$f"
+                                            done
+                                            [ -f /etc/default/limine ] && command -v limine-update >/dev/null 2>&1 && limine-update
+                                            [ -f /etc/default/grub ] && [ -f /boot/grub/grub.cfg ] && command -v grub-mkconfig >/dev/null 2>&1 && grub-mkconfig -o /boot/grub/grub.cfg
+                                        '
+                                        echo -e "  \e[1;32m[OK] Mitigaciones restauradas en tu gestor de arranque. Reinicia para aplicar.\e[0m"
                                         sleep 2
                                     else
                                         echo ""
@@ -2136,15 +2139,28 @@ while true
                                             read -l -P "  Confirm enabling mitigations=off? [y/N]: " confirm_mit
                                         end
                                         if test "$confirm_mit" = "s" -o "$confirm_mit" = "S" -o "$confirm_mit" = "y" -o "$confirm_mit" = "Y"
-                                            if test -f /etc/default/limine
-                                                sudo sed -i 's/^\(KERNEL_CMDLINE\[default\]+="[^"]*\)"/\1 mitigations=off"/' /etc/default/limine
-                                                type -q limine-update; and sudo limine-update
-                                            end
-                                            if test -f /etc/default/grub
-                                                sudo sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 mitigations=off"/' /etc/default/grub
-                                                test -f /boot/grub/grub.cfg; and type -q grub-mkconfig; and sudo grub-mkconfig -o /boot/grub/grub.cfg
-                                            end
-                                            echo -e "  \e[1;32m[OK] Perfil CPU Extremo configurado. Reinicia para activar mitigations=off.\e[0m"
+                                            sudo bash -c 'shopt -s nullglob
+                                                if [ -f /etc/default/limine ] && ! grep -q "mitigations=off" /etc/default/limine; then
+                                                    sed -i "s/^\(KERNEL_CMDLINE\[default\]+=\"[^\"]*\)\"/\1 mitigations=off\"/" /etc/default/limine
+                                                    command -v limine-update >/dev/null 2>&1 && limine-update
+                                                fi
+                                                if [ -f /etc/default/grub ] && [ -f /boot/grub/grub.cfg ] && ! grep -q "mitigations=off" /etc/default/grub; then
+                                                    sed -i "s/^\(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*\)\"/\1 mitigations=off\"/" /etc/default/grub
+                                                    command -v grub-mkconfig >/dev/null 2>&1 && grub-mkconfig -o /boot/grub/grub.cfg
+                                                fi
+                                                if [ -f /etc/kernel/cmdline ] && ! grep -q "mitigations=off" /etc/kernel/cmdline; then
+                                                    sed -i "s/[[:space:]]*$/ mitigations=off/" /etc/kernel/cmdline
+                                                fi
+                                                for entry in /boot/efi/loader/entries/*.conf /boot/loader/entries/*.conf; do
+                                                    if [ -f "$entry" ] && ! grep -q "mitigations=off" "$entry"; then
+                                                        sed -i "/^options / s/[[:space:]]*$/ mitigations=off/" "$entry"
+                                                    fi
+                                                done
+                                                if [ -f /boot/refind_linux.conf ] && ! grep -q "mitigations=off" /boot/refind_linux.conf; then
+                                                    sed -i "/^[[:space:]]*\"/ s/\"$/ mitigations=off\"/" /boot/refind_linux.conf
+                                                fi
+                                            '
+                                            echo -e "  \e[1;32m[OK] Perfil CPU Extremo configurado en tu gestor de arranque. Reinicia para activar.\e[0m"
                                             sleep 2
                                         end
                                     end
