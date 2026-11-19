@@ -1,6 +1,6 @@
 pkgname=x64-cosmic-settings
 pkgver=1.0.0
-pkgrel=16
+pkgrel=17
 pkgdesc="Configuracion oficial de X64 LIOS para COSMIC Desktop (Rust), Cosmic-Term y Cosmic-Panel"
 arch=('any')
 license=('GPL')
@@ -12,6 +12,10 @@ depends=(
     'ttf-jetbrains-mono-nerd'
     'adw-gtk-theme'
     'papirus-icon-theme'
+    'file-roller'
+    'papers'
+    'gnome-calculator'
+    'gnome-disk-utility'
 )
 source=(
     'theme_v1_accent'

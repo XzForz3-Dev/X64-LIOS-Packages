@@ -637,7 +637,7 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full COSMIC Desktop suite...\e[0m"
         end
-        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers cosmic-idle xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
+        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers cosmic-idle xdg-desktop-portal-cosmic file-roller papers gnome-calculator gnome-disk-utility 2>/dev/null | sort -u)
         if test (count $cosmic_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
         end
@@ -656,7 +656,7 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling Niri and components...\e[0m"
         end
-        set -l niri_pkgs (pacman -Qq x64-niri-settings niri noctalia nautilus dolphin fuzzel waybar 2>/dev/null | sort -u)
+        set -l niri_pkgs (pacman -Qq x64-niri-settings niri noctalia nautilus file-roller loupe papers gnome-text-editor gnome-calculator gnome-disk-utility gnome-system-monitor dolphin fuzzel waybar 2>/dev/null | sort -u)
         if test (count $niri_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $niri_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $niri_pkgs 2>/dev/null
         end
@@ -690,13 +690,13 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Xfce4 suite...\e[0m"
         end
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm lightdm-slick-greeter lightdm-gtk-greeter labwc pavucontrol satty wayfreeze xcape 2>/dev/null | sort -u)
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller blueman xreader gnome-calculator gnome-disk-utility lightdm lightdm-slick-greeter lightdm-gtk-greeter labwc pavucontrol satty wayfreeze xcape 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
         end
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/xfce4 $udir/.config/Thunar $udir/.config/labwc $udir/.config/pavucontrol.ini $udir/.cache/xfce4 $udir/.cache/sessions 2>/dev/null
+                rm -rf $udir/.config/xfce4 $udir/.config/Thunar $udir/.config/labwc $udir/.config/xreader $udir/.config/pavucontrol.ini $udir/.cache/xfce4 $udir/.cache/sessions 2>/dev/null
             end
         end
     end
@@ -748,12 +748,18 @@ except Exception:
         sudo bash -c 'shopt -s nullglob; rm -rf /var/lib/gdm /etc/systemd/system/gdm.service.wants /etc/xdg/monitors.xml /var/lib/x64-lios/gdm-theme.state' 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/{gnome-settings-daemon,gnome-shell,nautilus,org.gnome.TextEditor} "$u"/.local/state/gnome-session* "$u"/.cache/{gnome-settings-daemon,tracker3}' _ "$udir" 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/{gnome-settings-daemon,gnome-shell} "$u"/.local/state/gnome-session* "$u"/.cache/{gnome-settings-daemon,tracker3}' _ "$udir" 2>/dev/null
+                if test "$target_id" != "5"
+                    bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/{nautilus,org.gnome.TextEditor}' _ "$udir" 2>/dev/null
+                end
             end
         end
         if type -q dconf
-            for p in /org/gnome/shell/ /org/gnome/nautilus/ /org/gnome/settings-daemon/ /org/gnome/desktop/app-folders/ /org/gnome/desktop/notifications/ /org/gnome/desktop/screensaver/
+            for p in /org/gnome/shell/ /org/gnome/settings-daemon/ /org/gnome/desktop/app-folders/ /org/gnome/desktop/notifications/ /org/gnome/desktop/screensaver/
                 dconf reset -f $p 2>/dev/null
+            end
+            if test "$target_id" != "5"
+                dconf reset -f /org/gnome/nautilus/ 2>/dev/null
             end
         end
     end
@@ -1146,7 +1152,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS COSMIC Desktop (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers gnome-keyring xdg-desktop-portal-cosmic xdg-desktop-portal-gtk xorg-xwayland x64-cosmic-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers file-roller papers gnome-calculator gnome-disk-utility gnome-keyring xdg-desktop-portal-cosmic xdg-desktop-portal-gtk xorg-xwayland x64-cosmic-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode cosmic-greeter "COSMIC Desktop (System76 Rust Edition)"
@@ -1157,7 +1163,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Niri (Full Noctalia Shell Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" niri sddm x64-sddm-theme kitty nautilus noctalia xdg-desktop-portal-gnome x64-niri-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" niri sddm x64-sddm-theme kitty nautilus noctalia file-roller loupe papers gnome-text-editor gnome-calculator gnome-disk-utility gnome-system-monitor xdg-desktop-portal-gnome x64-niri-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Niri (X64 Noctalia Shell Edition)"
@@ -1168,7 +1174,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Cinnamon (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" cinnamon cinnamon-translations nemo lightdm lightdm-slick-greeter gnome-keyring gnome-terminal kitty x64-cinnamon-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" cinnamon cinnamon-translations nemo nemo-fileroller file-roller blueman xed xviewer xreader gnome-calculator gnome-disk-utility gnome-system-monitor lightdm lightdm-slick-greeter gnome-keyring gnome-terminal kitty x64-cinnamon-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Cinnamon (X64 Classic Edition)"
@@ -1179,7 +1185,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Xfce4 (Full Calamares Suite)...\e[0m"
             end
-            sudo pacman -S --needed --noconfirm --overwrite "*" xfce4 xfce4-goodies labwc xorg-xwayland lightdm lightdm-slick-greeter thunar file-roller ristretto network-manager-applet x64-xfce4-settings chromium
+            sudo pacman -S --needed --noconfirm --overwrite "*" xfce4 xfce4-goodies labwc xorg-xwayland lightdm lightdm-slick-greeter thunar file-roller ristretto blueman xreader gnome-calculator gnome-disk-utility network-manager-applet x64-xfce4-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode lightdm "Xfce4 (X64 Ultra-Lightweight Edition)"

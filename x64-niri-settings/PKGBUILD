@@ -1,10 +1,25 @@
 pkgname=x64-niri-settings
 pkgver=1.0.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Official X64 LIOS Niri Desktop Settings and Integration with Noctalia Shell"
 arch=('any')
 license=('GPL')
-depends=('niri' 'noctalia' 'kitty' 'nautilus' 'xwayland-satellite' 'wl-clipboard' 'xdg-desktop-portal-gnome')
+depends=(
+    'niri'
+    'noctalia'
+    'kitty'
+    'nautilus'
+    'xwayland-satellite'
+    'wl-clipboard'
+    'xdg-desktop-portal-gnome'
+    'file-roller'
+    'loupe'
+    'papers'
+    'gnome-text-editor'
+    'gnome-calculator'
+    'gnome-disk-utility'
+    'gnome-system-monitor'
+)
 source=('config.kdl'
         'config.toml')
 sha256sums=('SKIP'

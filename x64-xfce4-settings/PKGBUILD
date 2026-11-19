@@ -1,6 +1,6 @@
 pkgname=x64-xfce4-settings
 pkgver=1.0.0
-pkgrel=28
+pkgrel=29
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Xfce 4.20 (X11 & Wayland), Kitty/Xfce4-Terminal y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -22,6 +22,12 @@ depends=(
     'satty'
     'wl-clipboard'
     'xcape'
+    'file-roller'
+    'ristretto'
+    'blueman'
+    'xreader'
+    'gnome-calculator'
+    'gnome-disk-utility'
 )
 source=(
     '01-monolith.jpg'
