@@ -22,8 +22,8 @@ name='cinnamon'
 
 [org.cinnamon.desktop.keybindings.media-keys]
 terminal=['<Primary><Alt>t', '<Super>Return']
-area-screenshot=['<Shift>Print', '<Super><Shift>s']
-area-screenshot-clip=['<Control><Shift>Print', '<Ctrl><Shift>s']
+area-screenshot=['<Shift>Print', '<Shift><Super>s']
+area-screenshot-clip=['<Control><Shift>Print', '<Control><Shift>s']
 
 [org.cinnamon.settings-daemon.plugins.power]
 sleep-inactive-ac-timeout=0

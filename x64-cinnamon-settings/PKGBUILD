@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=10
+pkgrel=11
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -28,8 +28,10 @@ source=(
     'chromium-flags.conf'
     'menu-0.json'
     'grouped-window-list-2.json'
+    'sound-settings-override.json'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -91,4 +93,8 @@ package() {
     # 8. Template de spices Cinnamon para panel con pines oficiales (X64 Hello, Chromium, Kitty, Nemo)
     install -d "${pkgdir}/etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org"
     install -m644 "${srcdir}/grouped-window-list-2.json" "${pkgdir}/etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json"
+
+    # 9. Override oficial de Cinnamon para applet de sonido (libera <Shift><Super>s para Captura de Area en cualquier instancia/usuario)
+    install -d "${pkgdir}/usr/share/cinnamon/applets/sound@cinnamon.org"
+    install -m644 "${srcdir}/sound-settings-override.json" "${pkgdir}/usr/share/cinnamon/applets/sound@cinnamon.org/settings-override.json"
 }

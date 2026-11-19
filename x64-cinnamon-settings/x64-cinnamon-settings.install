@@ -63,6 +63,28 @@ post_install() {
                 cp -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json "$target_panel/2.json"
             fi
 
+            # 2.0 Liberar atajo <Shift><Super>s del applet de sonido (sound@cinnamon.org) en perfiles existentes
+            target_sound="$user_dir/.config/cinnamon/spices/sound@cinnamon.org"
+            if [ -d "$target_sound" ]; then
+                python3 -c '
+import glob, json, sys
+for path in glob.glob(sys.argv[1] + "/*.json"):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ko = data.get("keyOpen")
+        if isinstance(ko, dict):
+            val = str(ko.get("value", ""))
+            low = val.lower()
+            if "<super>" in low and "<shift>" in low and low.endswith("s"):
+                ko["value"] = ""
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception:
+        pass
+' "$target_sound" 2>/dev/null || true
+            fi
+
             # 2.1 Limpiar residuos GTK3/GTK4 de KDE/COSMIC/Xfce y portales heredados
             rm -rf "$user_dir/.config/gtk-3.0/assets" "$user_dir/.config/gtk-3.0/colors.css" "$user_dir/.config/gtk-3.0/window_decorations.css" "$user_dir/.config/gtk-3.0/gtk.css" "$user_dir/.config/gtk-3.0/gtk.css.bak" 2>/dev/null || true
             rm -rf "$user_dir/.config/gtk-4.0/assets" "$user_dir/.config/gtk-4.0/colors.css" "$user_dir/.config/gtk-4.0/window_decorations.css" "$user_dir/.config/gtk-4.0/cosmic" "$user_dir/.config/gtk-4.0/gtk.css" "$user_dir/.config/gtk-4.0/gtk.css.bak" 2>/dev/null || true
@@ -101,50 +123,64 @@ ACC_EOF
 
             chown -R "$u:$g" "$user_dir/.config/cinnamon" 2>/dev/null || true
 
-            # 4. Inyectar dconf para usuarios existentes (incluso si el bus de sesión aún no está activo, usando dbus-run-session)
+            # 4. Inyectar dconf y notificar a Cinnamon vivo para usuarios existentes (siempre via /bin/bash aunque el shell del usuario sea Fish)
             uid=$(id -u "$u" 2>/dev/null || true)
-            su - "$u" -c "
-                if [ -n \"$uid\" ] && [ -S \"/run/user/$uid/bus\" ]; then
-                    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus
-                    DCONF_CMD=\"dconf\"
-                else
-                    DCONF_CMD=\"dbus-run-session -- dconf\"
-                fi
-                \$DCONF_CMD write /org/cinnamon/desktop/background/picture-uri \"'file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/background/picture-options \"'zoom'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/interface/gtk-theme \"'adw-gtk3-dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/interface/icon-theme \"'Papirus-Dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/wm/preferences/theme \"'adw-gtk3-dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/x/apps/portal/color-scheme \"'prefer-dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/gnome/desktop/interface/gtk-theme \"'adw-gtk3-dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/gnome/desktop/interface/color-scheme \"'prefer-dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/gnome/desktop/interface/icon-theme \"'Papirus-Dark'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec \"'kitty'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec-arg \"'-e'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/terminal \"['<Primary><Alt>t', '<Super>Return']\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot \"['<Shift>Print', '<Super><Shift>s']\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot-clip \"['<Control><Shift>Print', '<Ctrl><Shift>s']\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-type \"'nothing'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-timeout 0 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-type \"'nothing'\" 2>/dev/null || true
-                \$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/idle-dim-ac false 2>/dev/null || true
-                \$DCONF_CMD write /org/gnome/terminal/legacy/default-show-menubar false 2>/dev/null || true
-                \$DCONF_CMD write /org/gnome/terminal/legacy/theme-variant \"'dark'\" 2>/dev/null || true
-                P='/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/'
-                \$DCONF_CMD write \${P}use-system-font false 2>/dev/null || true
-                \$DCONF_CMD write \${P}font \"'JetBrainsMono Nerd Font 11'\" 2>/dev/null || true
-                \$DCONF_CMD write \${P}use-theme-colors false 2>/dev/null || true
-                \$DCONF_CMD write \${P}background-color \"'#08080a'\" 2>/dev/null || true
-                \$DCONF_CMD write \${P}foreground-color \"'#c0c0c0'\" 2>/dev/null || true
-                \$DCONF_CMD write \${P}bold-color-same-as-fg true 2>/dev/null || true
-                \$DCONF_CMD write \${P}cursor-colors-set true 2>/dev/null || true
-                \$DCONF_CMD write \${P}cursor-background-color \"'#ff2b2b'\" 2>/dev/null || true
-                \$DCONF_CMD write \${P}cursor-foreground-color \"'#ffffff'\" 2>/dev/null || true
-                \$DCONF_CMD write \${P}default-size-columns 105 2>/dev/null || true
-                \$DCONF_CMD write \${P}default-size-rows 28 2>/dev/null || true
-                \$DCONF_CMD write \${P}palette \"['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']\" 2>/dev/null || true
-            " 2>/dev/null || true
+            runuser -u "$u" -- /bin/bash -s "$uid" "$user_dir" <<'EOF_DCONF' 2>/dev/null || true
+uid="$1"
+user_dir="$2"
+export HOME="$user_dir"
+if [ -n "$uid" ] && [ -S "/run/user/$uid/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus"
+    DCONF_CMD="dconf"
+    for sj in "$user_dir/.config/cinnamon/spices/sound@cinnamon.org"/*.json; do
+        [ -f "$sj" ] || continue
+        inst_id=$(basename "$sj" .json)
+        gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.updateSetting "sound@cinnamon.org" "$inst_id" "keyOpen" "'\"\"'" >/dev/null 2>&1 || true
+    done
+else
+    DCONF_CMD="dbus-run-session -- dconf"
+fi
+$DCONF_CMD write /org/cinnamon/desktop/background/picture-uri "'file:///usr/share/backgrounds/x64-lios/cinnamon-desktop.jpg'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/background/picture-options "'zoom'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/interface/icon-theme "'Papirus-Dark'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/wm/preferences/theme "'adw-gtk3-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/x/apps/portal/color-scheme "'prefer-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/gnome/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/gnome/desktop/interface/color-scheme "'prefer-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/gnome/desktop/interface/icon-theme "'Papirus-Dark'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec "'kitty'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec-arg "'-e'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/terminal "['<Primary><Alt>t', '<Super>Return']" 2>/dev/null || true
+# Re-registrar area-screenshot tras liberar sound@cinnamon.org (fuerza a Muffin a re-vincular <Shift><Super>s en vivo)
+if [ "$DCONF_CMD" = "dconf" ]; then
+    sleep 0.2
+    $DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot "['<Shift>Print']" 2>/dev/null || true
+    sleep 0.2
+fi
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot "['<Shift>Print', '<Shift><Super>s']" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot-clip "['<Control><Shift>Print', '<Control><Shift>s']" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-type "'nothing'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-timeout 0 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-type "'nothing'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/idle-dim-ac false 2>/dev/null || true
+$DCONF_CMD write /org/gnome/terminal/legacy/default-show-menubar false 2>/dev/null || true
+$DCONF_CMD write /org/gnome/terminal/legacy/theme-variant "'dark'" 2>/dev/null || true
+P='/org/gnome/terminal/legacy/profiles:/:b1dcc9dd-5262-4d8d-a863-c897e6d979b9/'
+$DCONF_CMD write "${P}use-system-font" false 2>/dev/null || true
+$DCONF_CMD write "${P}font" "'JetBrainsMono Nerd Font 11'" 2>/dev/null || true
+$DCONF_CMD write "${P}use-theme-colors" false 2>/dev/null || true
+$DCONF_CMD write "${P}background-color" "'#08080a'" 2>/dev/null || true
+$DCONF_CMD write "${P}foreground-color" "'#c0c0c0'" 2>/dev/null || true
+$DCONF_CMD write "${P}bold-color-same-as-fg" true 2>/dev/null || true
+$DCONF_CMD write "${P}cursor-colors-set" true 2>/dev/null || true
+$DCONF_CMD write "${P}cursor-background-color" "'#ff2b2b'" 2>/dev/null || true
+$DCONF_CMD write "${P}cursor-foreground-color" "'#ffffff'" 2>/dev/null || true
+$DCONF_CMD write "${P}default-size-columns" 105 2>/dev/null || true
+$DCONF_CMD write "${P}default-size-rows" 28 2>/dev/null || true
+$DCONF_CMD write "${P}palette" "['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#a8a8a8', '#4d4d4d', '#ff4d4d', '#40e0d0', '#f5c211', '#1e90ff', '#ff00ff', '#00ffff', '#ffffff']" 2>/dev/null || true
+EOF_DCONF
         fi
     done
 }
