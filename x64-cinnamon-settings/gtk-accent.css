@@ -6,3 +6,16 @@
 @define-color theme_selected_fg_color #ffffff;
 @define-color theme_unfocused_selected_bg_color #c82222;
 @define-color theme_unfocused_selected_fg_color #ffffff;
+
+/* Desktop & File Manager Selection Box (Rubberband) in X64 Crimson */
+.rubberband,
+rubberband,
+.nemo-desktop.rubberband,
+.nemo-desktop .rubberband,
+.content-view rubberband,
+.content-view .rubberband,
+treeview.view rubberband,
+flowbox rubberband {
+    border: 1px solid #ff2b2b;
+    background-color: rgba(255, 43, 43, 0.20);
+}

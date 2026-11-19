@@ -221,6 +221,7 @@ $DCONF_CMD write "${P}palette" "['#1c1c1c', '#ff2b2b', '#40e0d0', '#f5c211', '#1
 if [ "$DCONF_CMD" = "dconf" ]; then
     gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadTheme >/dev/null 2>&1 || true
     gdbus call --session --dest org.Cinnamon --object-path /org/Cinnamon --method org.Cinnamon.ReloadXlet "menu@cinnamon.org" "APPLET" >/dev/null 2>&1 || true
+    pkill -x nemo-desktop 2>/dev/null || true
 fi
 EOF_DCONF
         fi
