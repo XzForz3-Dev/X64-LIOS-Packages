@@ -567,8 +567,8 @@ except Exception:
     pass
 " 2>/dev/null
 
-        # 6. Limpiar /etc/skel/.config/hypr de módulos Lua residuales de Omarchy
-        sudo bash -c 'shopt -s nullglob; rm -f /etc/skel/.config/hypr/autostart.lua /etc/skel/.config/hypr/bindings.lua /etc/skel/.config/hypr/input.lua /etc/skel/.config/hypr/looknfeel.lua /etc/skel/.config/hypr/monitors.lua /etc/skel/.config/hypr/xdph.conf /etc/skel/.config/hypr/.luarc.json /etc/skel/.config/hypr/hyprsunset.conf' 2>/dev/null
+        # 6. Limpiar /etc/skel/.config/hypr y overrides .desktop residuales de Omarchy
+        sudo bash -c 'shopt -s nullglob; rm -f /etc/skel/.config/hypr/autostart.lua /etc/skel/.config/hypr/bindings.lua /etc/skel/.config/hypr/input.lua /etc/skel/.config/hypr/looknfeel.lua /etc/skel/.config/hypr/monitors.lua /etc/skel/.config/hypr/xdph.conf /etc/skel/.config/hypr/.luarc.json /etc/skel/.config/hypr/hyprsunset.conf /etc/skel/.local/share/applications/opencode.desktop' 2>/dev/null
 
         # 7. Limpiar en los directorios de usuario (/home/*) las WebApps, configs, shims, skills, temas y symlinks rotos
         for udir in /home/*
@@ -576,9 +576,9 @@ except Exception:
                 bash -c 'shopt -s nullglob
                     u="$1"
                     for wapp in "$u"/.local/share/applications/*.desktop; do
-                        grep -q "omarchy" "$wapp" 2>/dev/null && rm -f "$wapp"
+                        grep -qi "omarchy" "$wapp" 2>/dev/null && rm -f "$wapp"
                     done
-                    rm -f "$u"/.local/share/applications/{foot.desktop,imv.desktop,mpv.desktop,intent.cache}
+                    rm -f "$u"/.local/share/applications/{foot.desktop,imv.desktop,mpv.desktop,opencode.desktop,intent.cache}
                     update-desktop-database "$u/.local/share/applications" 2>/dev/null || true
                     rm -rf "$u"/.config/omarchy "$u"/.local/state/omarchy "$u"/.cache/omarchy
                     rm -rf "$u"/.local/share/mise "$u"/.config/mise "$u"/.local/state/mise "$u"/.cache/mise
