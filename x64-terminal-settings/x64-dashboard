@@ -511,34 +511,39 @@ function clean_previous_desktops -a target_id
             sudo rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop 2>/dev/null
         end
 
-        # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema
-        sudo rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop 2>/dev/null
-        sudo rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal /usr/share/bash-completion/completions-fallback/mise.bash 2>/dev/null
-        sudo rm -rf /etc/skel/.config/omarchy /etc/skel/.local/state/omarchy /etc/skel/Fondos /etc/skel/Temas /usr/share/fonts/omarchy 2>/dev/null
-        sudo rm -rf /etc/mise /var/lib/pacman/sync/omarchy.* 2>/dev/null
-        sudo fc-cache -f /usr/share/fonts 2>/dev/null
+        # 2. Eliminar directorios, wrappers maestros, symlinks en /usr/bin y assets del sistema (usando bash + nullglob como root para evitar fallos de glob en Fish)
+        sudo bash -c 'shopt -s nullglob
+            rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop
+            rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal /usr/share/bash-completion/completions-fallback/mise.bash
+            rm -rf /etc/skel/.config/omarchy /etc/skel/.config/btop /etc/skel/.config/chromium /etc/skel/.config/git /etc/skel/.config/opencode /etc/skel/.config/wireplumber /etc/skel/.config/autostart/limine-snapper-notify.desktop /etc/skel/.config/autostart/print-applet.desktop /etc/skel/.local /etc/skel/Fondos /etc/skel/Temas /usr/share/fonts/omarchy /usr/share/xdg-terminal-exec
+            rm -rf /etc/mise /var/lib/pacman/sync/omarchy.*
+            fc-cache -f /usr/share/fonts
+        ' 2>/dev/null
 
-        # 3. Eliminar servicios systemd y drop-ins
+        # 3. Eliminar servicios systemd y drop-ins (ejecutado en bash como root con nullglob)
         systemctl --user stop omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
         systemctl --user disable omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
-        sudo rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service 2>/dev/null
-        sudo rm -rf /usr/lib/systemd/user/owed.service.d /etc/systemd/user/owed.service.d 2>/dev/null
-        sudo rm -f /usr/lib/systemd/user/wireplumber.service.d/10-omarchy-camera-access.conf 2>/dev/null
-        sudo rm -f /etc/systemd/user.conf.d/20-omarchy-nofile.conf /etc/systemd/oomd.conf.d/10-omarchy.conf /etc/systemd/system.conf.d/20-omarchy-nofile.conf 2>/dev/null
-        sudo rm -rf /etc/systemd/system/cups-browsed.service.d/10-omarchy.conf /etc/systemd/system/proc-sys-fs-binfmt_misc.mount.d/10-omarchy-conditions.conf 2>/dev/null
-        sudo rm -f /etc/systemd/user/graphical-session.target.wants/owed.service 2>/dev/null
-        sudo rm -f /etc/systemd/logind.conf.d/20-inhibit-delay.conf 2>/dev/null
-        sudo rm -f /usr/lib/systemd/system-sleep/force-igpu /usr/lib/systemd/system-sleep/fprintd-resume /usr/lib/systemd/system-sleep/keyboard-backlight /usr/lib/systemd/system-sleep/unmount-fuse 2>/dev/null
-        sudo systemctl daemon-reload 2>/dev/null
+        sudo bash -c 'shopt -s nullglob
+            rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service
+            rm -rf /usr/lib/systemd/user/owed.service.d /etc/systemd/user/owed.service.d /usr/lib/systemd/user/app.slice.d/10-oomd.conf /usr/lib/systemd/user/wireplumber.service.d
+            rmdir /usr/lib/systemd/user/app.slice.d 2>/dev/null || true
+            rm -rf /etc/systemd/user/wayland-wm@hyprland.desktop.service.d
+            rm -f /etc/systemd/user.conf.d/20-omarchy-nofile.conf /etc/systemd/oomd.conf.d/10-omarchy.conf /etc/systemd/system.conf.d/20-omarchy-nofile.conf /etc/systemd/system.conf.d/10-faster-shutdown.conf /etc/systemd/system.conf.d/20-mount-events.conf
+            rm -rf /etc/systemd/system/cups-browsed.service.d/10-omarchy.conf /etc/systemd/system/proc-sys-fs-binfmt_misc.mount.d/10-omarchy-conditions.conf /etc/systemd/system/plocate-updatedb.service.d/ac-only.conf /etc/systemd/system/docker.service.d/no-block-boot.conf /etc/systemd/system/systemd-binfmt.service.d/10-eager-mount.conf /etc/systemd/system/user@.service.d/10-faster-shutdown.conf
+            rm -f /etc/systemd/user/graphical-session.target.wants/owed.service
+            rm -f /etc/systemd/logind.conf.d/20-inhibit-delay.conf /etc/systemd/logind.conf.d/10-ignore-power-button.conf
+            rm -f /etc/systemd/resolved.conf.d/10-disable-multicast.conf /etc/systemd/resolved.conf.d/20-docker-dns.conf
+            rm -f /usr/lib/systemd/system-sleep/force-igpu /usr/lib/systemd/system-sleep/fprintd-resume /usr/lib/systemd/system-sleep/keyboard-backlight /usr/lib/systemd/system-sleep/unmount-fuse /usr/lib/systemd/system-sleep/yoga-slim7x-lid-wake
+            systemctl daemon-reload
+        ' 2>/dev/null
 
-        # 4. Eliminar sudoers, tmpfiles, sysctl, udev, modprobe, pam y hooks
-        sudo rm -f /etc/pam.d/omarchy-* 2>/dev/null
-        sudo rm -f /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol 2>/dev/null
-        sudo rm -f /etc/tmpfiles.d/omarchy-*.conf 2>/dev/null
-        sudo rm -f /usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook 2>/dev/null
-        sudo rm -f /etc/modprobe.d/omarchy-usb-autosuspend.conf 2>/dev/null
-        sudo rm -f /etc/sysctl.d/90-omarchy-*.conf /etc/sysctl.d/99-omarchy-sysctl.conf 2>/dev/null
-        sudo rm -f /etc/udev/rules.d/60-omarchy-*.rules 2>/dev/null
+        # 4. Eliminar sudoers (0750 root:root), tmpfiles, sysctl, udev, modprobe, pam y hooks
+        sudo bash -c 'shopt -s nullglob
+            rm -f /etc/pam.d/omarchy-* /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol /etc/tmpfiles.d/omarchy-*.conf
+            rm -f /usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook /etc/modprobe.d/omarchy-usb-autosuspend.conf
+            rm -f /etc/sysctl.d/90-omarchy-*.conf /etc/sysctl.d/99-omarchy-sysctl.conf /etc/udev/rules.d/60-omarchy-*.rules
+            git config --system --unset-all safe.directory /usr/share/omarchy 2>/dev/null || true
+        ' 2>/dev/null
 
         # 5. Limpiar /etc/environment y repositorio [omarchy] en /etc/pacman.conf
         sudo sed -i '/OMARCHY_PATH/d' /etc/environment 2>/dev/null
@@ -555,30 +560,34 @@ except Exception:
 " 2>/dev/null
 
         # 6. Limpiar /etc/skel/.config/hypr de módulos Lua residuales de Omarchy
-        sudo rm -f /etc/skel/.config/hypr/autostart.lua /etc/skel/.config/hypr/bindings.lua /etc/skel/.config/hypr/input.lua /etc/skel/.config/hypr/looknfeel.lua /etc/skel/.config/hypr/monitors.lua /etc/skel/.config/hypr/xdph.conf /etc/skel/.config/hypr/.luarc.json /etc/skel/.config/hypr/hyprsunset.conf 2>/dev/null
+        sudo bash -c 'shopt -s nullglob; rm -f /etc/skel/.config/hypr/autostart.lua /etc/skel/.config/hypr/bindings.lua /etc/skel/.config/hypr/input.lua /etc/skel/.config/hypr/looknfeel.lua /etc/skel/.config/hypr/monitors.lua /etc/skel/.config/hypr/xdph.conf /etc/skel/.config/hypr/.luarc.json /etc/skel/.config/hypr/hyprsunset.conf' 2>/dev/null
 
-        # 7. Limpiar en los directorios de usuario (/home/*) las WebApps, configs, shims, skills y temas
+        # 7. Limpiar en los directorios de usuario (/home/*) las WebApps, configs, shims, skills, temas y symlinks rotos
         for udir in /home/*
             if test -d $udir
-                for wapp in (find $udir/.local/share/applications -maxdepth 1 -name "*.desktop" 2>/dev/null)
-                    if grep -q "omarchy" $wapp 2>/dev/null
-                        rm -f $wapp 2>/dev/null
-                    end
-                end
-                rm -f $udir/.local/share/applications/foot.desktop $udir/.local/share/applications/imv.desktop $udir/.local/share/applications/mpv.desktop $udir/.local/share/applications/intent.cache 2>/dev/null
-                update-desktop-database $udir/.local/share/applications 2>/dev/null
-                rm -rf $udir/.config/omarchy $udir/.local/state/omarchy $udir/.cache/omarchy 2>/dev/null
-                rm -rf $udir/.local/share/mise $udir/.config/mise $udir/.local/state/mise $udir/.cache/mise 2>/dev/null
-                rm -rf $udir/.local/share/fcitx5/themes/omarchy 2>/dev/null
-                rm -f $udir/.config/hypr/autostart.lua $udir/.config/hypr/bindings.lua $udir/.config/hypr/input.lua $udir/.config/hypr/looknfeel.lua $udir/.config/hypr/monitors.lua $udir/.config/hypr/xdph.conf $udir/.config/hypr/.luarc.json $udir/.config/hypr/hyprsunset.conf 2>/dev/null
-                rm -f $udir/.config/systemd/user/*.wants/omarchy-* $udir/.config/systemd/user/*/*.wants/omarchy-* 2>/dev/null
-                rm -f $udir/.config/uwsm/env.d/*omarchy* 2>/dev/null
-                rm -f $udir/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua 2>/dev/null
-                find $udir/.config -name "com.omarchy.*" -delete 2>/dev/null
-                rm -rf $udir/.agents/skills/omarchy* $udir/.claude/skills/omarchy* $udir/.claude/themes/omarchy* $udir/.codex/skills/omarchy* $udir/.pi/agent/skills/omarchy* $udir/.pi/agent/themes/omarchy* $udir/.gemini/config/skills/omarchy* $udir/.hermes/skills/omarchy* 2>/dev/null
-                rm -f $udir/.gemini/config/skills/diagnose-crash 2>/dev/null
-                test -d $udir/.gemini/config/skills; and find -L $udir/.gemini/config/skills -xtype l -delete 2>/dev/null
-                rmdir $udir/Fondos $udir/Temas $udir/Work/tries $udir/Work 2>/dev/null
+                bash -c 'shopt -s nullglob
+                    u="$1"
+                    for wapp in "$u"/.local/share/applications/*.desktop; do
+                        grep -q "omarchy" "$wapp" 2>/dev/null && rm -f "$wapp"
+                    done
+                    rm -f "$u"/.local/share/applications/{foot.desktop,imv.desktop,mpv.desktop,intent.cache}
+                    update-desktop-database "$u/.local/share/applications" 2>/dev/null || true
+                    rm -rf "$u"/.config/omarchy "$u"/.local/state/omarchy "$u"/.cache/omarchy
+                    rm -rf "$u"/.local/share/mise "$u"/.config/mise "$u"/.local/state/mise "$u"/.cache/mise
+                    rm -rf "$u"/.local/share/fcitx5/themes/omarchy "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service
+                    rm -f "$u"/.XCompose "$u"/.local/bin/superwhisper "$u"/.config/btop/themes/current.theme "$u"/.config/nvim/lua/plugins/theme.lua "$u"/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua
+                    rm -rf "$u"/.config/opencode/herdr-opencode "$u"/.config/opencode/herdr-tui-session.js "$u"/.config/opencode/tui.jsonc "$u"/.config/opencode/plugins/herdr-agent-state.js
+                    rm -rf "$u"/.config/wireplumber/wireplumber.conf.d/kef-lsx-no-suspend.conf "$u"/.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf
+                    rm -rf "$u"/.config/BraveSoftware "$u"/.config/google-chrome "$u"/.config/google-chrome-beta "$u"/.config/google-chrome-unstable "$u"/.config/microsoft-edge "$u"/.config/microsoft-edge-dev
+                    rm -f "$u"/.config/hypr/{autostart.lua,bindings.lua,input.lua,looknfeel.lua,monitors.lua,xdph.conf,.luarc.json,hyprsunset.conf}
+                    rm -f "$u"/.config/systemd/user/*.wants/omarchy-* "$u"/.config/systemd/user/*.wants/superwhisper.service "$u"/.config/uwsm/env.d/*omarchy*
+                    rm -f "$u"/.pi/agent/themes/omarchy-system.json "$u"/.pi/agent/settings.json
+                    find "$u/.config" -name "com.omarchy.*" -delete 2>/dev/null || true
+                    for sdir in "$u/.agents/skills" "$u/.claude/skills" "$u/.codex/skills" "$u/.pi/agent/skills" "$u/.hermes/skills" "$u/.gemini/config/skills" "$u/.local/share/icons/hicolor/scalable/apps" "$u/.config/systemd/user"; do
+                        [ -d "$sdir" ] && find "$sdir" -xtype l -delete 2>/dev/null || true
+                    done
+                    rmdir "$u/Fondos" "$u/Temas" "$u/Work/tries" "$u/Work" 2>/dev/null || true
+                ' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -593,10 +602,10 @@ except Exception:
         if test (count $gnome_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $gnome_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $gnome_pkgs 2>/dev/null
         end
-        sudo rm -f /usr/share/gnome-shell/gnome-shell-theme.gresource* 2>/dev/null
+        sudo bash -c 'shopt -s nullglob; rm -f /usr/share/gnome-shell/gnome-shell-theme.gresource*; rm -rf /etc/systemd/system/gdm.service.wants /etc/xdg/monitors.xml /var/lib/x64-lios/gdm-theme.state' 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/nautilus $udir/.config/goa-1.0 $udir/.config/.gsd-keyboard.settings-ported $udir/.config/monitors.xml $udir/.config/ibus 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.config/{nautilus,goa-1.0,.gsd-keyboard.settings-ported,monitors.xml,ibus}' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -614,7 +623,7 @@ except Exception:
         sudo rm -f /usr/share/wayland-sessions/plasma.desktop /usr/share/xsessions/plasma.desktop 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/KDE $udir/.config/kdeconnect $udir/.config/kdedefaults $udir/.config/kdeglobals $udir/.config/kwinrc $udir/.config/kwinoutputconfig.json $udir/.config/kglobalshortcutsrc $udir/.config/plasmarc $udir/.config/plasmashellrc $udir/.config/plasma-localerc $udir/.config/plasmanotifyrc $udir/.config/plasma-org.kde.plasma.desktop-appletsrc $udir/.config/plasmaparc $udir/.config/powermanagementprofilesrc $udir/.config/spectaclerc $udir/.config/konsolerc $udir/.config/konsolesshconfig $udir/.config/kwalletrc $udir/.config/kscreenlockerrc $udir/.config/ksmserverrc $udir/.config/ktimezonedrc $udir/.config/kaccessrc $udir/.config/kactivitymanagerdrc $udir/.config/kconf_updaterc $udir/.config/kded5rc $udir/.config/trashrc $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.config/autostart/org.kde.* 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.config/{KDE,kdeconnect,kdedefaults,kdeglobals,kwinrc,kwinoutputconfig.json,kglobalshortcutsrc,plasmarc,plasmashellrc,plasma-localerc,plasmanotifyrc,plasma-org.kde.plasma.desktop-appletsrc,plasmaparc,powermanagementprofilesrc,spectaclerc,konsolerc,konsolesshconfig,kwalletrc,kscreenlockerrc,ksmserverrc,ktimezonedrc,kaccessrc,kactivitymanagerdrc,kconf_updaterc,kded5rc,trashrc,baloofilerc,bluedevilglobalrc,dolphinrc,libaccounts-glib} "$u"/.config/autostart/org.kde.*' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -695,7 +704,7 @@ except Exception:
         if test (count $unused_sddm) -gt 0
             sudo pacman -Rcs --noconfirm $unused_sddm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_sddm 2>/dev/null
         end
-        sudo rm -rf /var/lib/sddm /etc/pam.d/sddm*.pacsave* 2>/dev/null
+        sudo bash -c 'shopt -s nullglob; rm -rf /var/lib/sddm /etc/pam.d/sddm*.pacsave*' 2>/dev/null
     end
     if not contains "$target_id" "6" "7"
         set -l unused_lightdm (pacman -Qq lightdm lightdm-slick-greeter lightdm-gtk-greeter 2>/dev/null | sort -u)
@@ -716,8 +725,7 @@ except Exception:
         sudo rm -f /usr/lib/systemd/user/xfce4-panel.service /usr/local/bin/nm-applet 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -f $udir/.config/systemd/user/*.wants/xfce4-panel.service $udir/.config/gtk-3.0/gtk.css.bak $udir/.config/gtk-4.0/gtk.css.bak 2>/dev/null
-                rm -rf $udir/.cache/xfce4 $udir/.cache/sessions 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -f "$u"/.config/systemd/user/xfce4-panel.service "$u"/.config/systemd/user/*.wants/xfce4-panel.service "$u"/.config/gtk-3.0/gtk.css.bak "$u"/.config/gtk-4.0/gtk.css.bak; rm -rf "$u"/.cache/xfce4 "$u"/.cache/sessions' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -726,49 +734,66 @@ except Exception:
         if test (count $unused_cosmic) -gt 0
             sudo pacman -Rcs --noconfirm $unused_cosmic 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_cosmic 2>/dev/null
         end
-        sudo rm -f /etc/pam.d/greetd.pacsave* 2>/dev/null
+        sudo bash -c 'shopt -s nullglob; rm -f /etc/pam.d/greetd.pacsave*' 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/state/pop-launcher $udir/.cache/pop-launcher $udir/.config/gtk-4.0/cosmic 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/state/pop-launcher "$u"/.cache/pop-launcher "$u"/.config/gtk-4.0/cosmic "$u"/.config/dconf/cosmic "$u"/.config/qt5ct "$u"/.config/qt6ct' _ "$udir" 2>/dev/null
             end
         end
     end
     if test "$target_id" != "2"
-        sudo rm -rf /var/lib/gdm 2>/dev/null
+        sudo bash -c 'shopt -s nullglob; rm -rf /var/lib/gdm /etc/systemd/system/gdm.service.wants /etc/xdg/monitors.xml /var/lib/x64-lios/gdm-theme.state' 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/share/gnome-settings-daemon $udir/.local/share/gnome-shell $udir/.local/share/nautilus $udir/.local/share/org.gnome.TextEditor $udir/.local/state/gnome-session* $udir/.cache/gnome-settings-daemon $udir/.cache/tracker3 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/{gnome-settings-daemon,gnome-shell,nautilus,org.gnome.TextEditor} "$u"/.local/state/gnome-session* "$u"/.cache/{gnome-settings-daemon,tracker3}' _ "$udir" 2>/dev/null
+            end
+        end
+        if type -q dconf
+            for p in /org/gnome/shell/ /org/gnome/nautilus/ /org/gnome/settings-daemon/ /org/gnome/desktop/app-folders/ /org/gnome/desktop/notifications/ /org/gnome/desktop/screensaver/
+                dconf reset -f $p 2>/dev/null
             end
         end
     end
     if test "$target_id" != "5"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/state/noctalia $udir/.cache/noctalia 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/state/noctalia "$u"/.cache/noctalia' _ "$udir" 2>/dev/null
             end
         end
     end
     if test "$target_id" != "3"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.local/share/dolphin $udir/.local/share/kactivitymanagerd $udir/.local/share/klipper $udir/.local/share/konsole $udir/.local/share/kwalletd $udir/.local/share/libkunitconversion $udir/.local/share/sddm $udir/.local/share/user-places.xbel* $udir/.local/state/dolphinstaterc $udir/.local/state/kactivitymanagerdstaterc $udir/.local/state/kglobalshortcutsstaterc $udir/.local/state/kickerstaterc $udir/.local/state/konsolestaterc $udir/.local/state/kscreenlockerrc $udir/.local/state/plasmashellstaterc $udir/.local/state/UserFeedback.org.kde.* $udir/.local/state/xdg-desktop-portal-kdestaterc $udir/.config/gtk-3.0/assets $udir/.config/gtk-3.0/colors.css $udir/.config/gtk-3.0/window_decorations.css $udir/.config/gtk-4.0/assets $udir/.config/gtk-4.0/colors.css $udir/.config/gtk-4.0/window_decorations.css $udir/.gtkrc-2.0 $udir/.cache/bookmarksrunner $udir/.cache/kscreenlocker_greet $udir/.cache/kscreen_osd_service $udir/.cache/ksmserver-logout-greeter $udir/.cache/ksplash $udir/.cache/ksvg-elements $udir/.cache/kwin $udir/.cache/kwinsession.kcache $udir/.cache/org.kde.unitconversion $udir/.cache/plasma_theme_default.kcache $udir/.cache/polkit-kde-authentication-agent-1 $udir/.cache/spectacle $udir/.cache/systemsettings 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.config/{baloofilerc,bluedevilglobalrc,dolphinrc,libaccounts-glib} "$u"/.local/share/{dolphin,kactivitymanagerd,klipper,konsole,kwalletd,libkunitconversion,sddm} "$u"/.local/share/user-places.xbel* "$u"/.local/state/{dolphinstaterc,kactivitymanagerdstaterc,kglobalshortcutsstaterc,kickerstaterc,konsolestaterc,kscreenlockerrc,plasmashellstaterc,xdg-desktop-portal-kdestaterc} "$u"/.local/state/UserFeedback.org.kde.* "$u"/.config/gtk-3.0/{assets,colors.css,window_decorations.css} "$u"/.config/gtk-4.0/{assets,colors.css,window_decorations.css} "$u"/.gtkrc-2.0 "$u"/.cache/{bookmarksrunner,kscreenlocker_greet,kscreen_osd_service,ksmserver-logout-greeter,ksplash,ksvg-elements,kwin,kwinsession.kcache,org.kde.unitconversion,plasma_theme_default.kcache,polkit-kde-authentication-agent-1,spectacle,systemsettings}' _ "$udir" 2>/dev/null
             end
         end
     end
     if not contains "$target_id" "1" "8"
-        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools 2>/dev/null | sort -u)
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools pamixer udiskie gum luarocks usage 2>/dev/null | sort -u)
         if test (count $unused_hypr) -gt 0
             sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
         end
         systemctl --user stop bt-agent.service 2>/dev/null
         systemctl --user disable bt-agent.service 2>/dev/null
-        sudo rm -f /etc/systemd/user/bt-agent.service /etc/systemd/user/default.target.wants/bt-agent.service 2>/dev/null
-        sudo rm -rf /etc/skel/.config/alacritty /etc/skel/.config/fcitx5 /etc/skel/.config/foot /etc/skel/.config/ghostty /etc/skel/.config/herdr /etc/skel/.config/hyprland-mimeapps.list /etc/skel/.config/hyprland-preview-share-picker /etc/skel/.config/imv /etc/skel/.config/lazygit /etc/skel/.config/obsidian /etc/skel/.config/qtengine /etc/skel/.config/tmux /etc/skel/.config/wofi-x64 /etc/skel/.config/xdg-desktop-portal 2>/dev/null
+        sudo bash -c 'shopt -s nullglob
+            rm -f /etc/systemd/user/bt-agent.service /etc/systemd/user/default.target.wants/bt-agent.service /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol
+            rm -rf /etc/systemd/user/wayland-wm@hyprland.desktop.service.d /usr/lib/systemd/user/app.slice.d/10-oomd.conf /usr/lib/systemd/user/wireplumber.service.d /usr/share/xdg-terminal-exec
+            rmdir /usr/lib/systemd/user/app.slice.d 2>/dev/null || true
+            rm -f /etc/systemd/logind.conf.d/10-ignore-power-button.conf /etc/systemd/resolved.conf.d/10-disable-multicast.conf /etc/systemd/resolved.conf.d/20-docker-dns.conf /etc/systemd/system.conf.d/10-faster-shutdown.conf /etc/systemd/system.conf.d/20-mount-events.conf /etc/systemd/system/docker.service.d/no-block-boot.conf /etc/systemd/system/plocate-updatedb.service.d/ac-only.conf /etc/systemd/system/systemd-binfmt.service.d/10-eager-mount.conf /etc/systemd/system/user@.service.d/10-faster-shutdown.conf /usr/lib/systemd/system-sleep/yoga-slim7x-lid-wake
+            rm -rf /etc/skel/.config/{alacritty,btop,chromium,fcitx5,foot,ghostty,git,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,imv,lazygit,obsidian,opencode,qtengine,tmux,wireplumber,wofi-x64,xdg-desktop-portal} /etc/skel/.config/autostart/{limine-snapper-notify.desktop,print-applet.desktop} /etc/skel/.local
+            git config --system --unset-all safe.directory /usr/share/omarchy 2>/dev/null || true
+        ' 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -f $udir/.config/systemd/user/default.target.wants/bt-agent.service $udir/.config/xdg-desktop-portal/hyprland-portals.conf 2>/dev/null
-                rmdir $udir/.config/xdg-desktop-portal 2>/dev/null
-                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper $udir/.local/share/hyprland $udir/.local/share/superwhisper $udir/.local/share/wayland-sessions $udir/.local/state/Omarchy $udir/.cache/cliphist $udir/.cache/quickshell $udir/.cache/xdg-terminal-exec $udir/.cache/folio $udir/.cache/aube 2>/dev/null
+                bash -c 'shopt -s nullglob
+                    u="$1"
+                    rm -f "$u"/.config/systemd/user/default.target.wants/bt-agent.service "$u"/.config/xdg-desktop-portal/hyprland-portals.conf "$u"/.XCompose "$u"/.local/bin/superwhisper "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service "$u"/.config/btop/themes/current.theme "$u"/.config/nvim/lua/plugins/theme.lua "$u"/.pi/agent/themes/omarchy-system.json "$u"/.pi/agent/settings.json
+                    rmdir "$u"/.config/xdg-desktop-portal 2>/dev/null || true
+                    rm -rf "$u"/.config/{AGENTS.md,alacritty,fcitx,fcitx5,folio,foot,ghostty,herdr,ibus,imv,obsidian,qtengine,superwhisper,BraveSoftware,google-chrome,google-chrome-beta,google-chrome-unstable,microsoft-edge,microsoft-edge-dev} "$u"/.config/opencode/{herdr-opencode,herdr-tui-session.js,tui.jsonc,plugins/herdr-agent-state.js} "$u"/.config/wireplumber/wireplumber.conf.d/{kef-lsx-no-suspend.conf,bluetooth-a2dp-autoconnect.conf} "$u"/.local/share/{fcitx5,hyprland,superwhisper,wayland-sessions} "$u"/.local/state/Omarchy "$u"/.cache/{cliphist,quickshell,xdg-terminal-exec,folio,aube}
+                    for sdir in "$u/.agents/skills" "$u/.claude/skills" "$u/.codex/skills" "$u/.pi/agent/skills" "$u/.hermes/skills" "$u/.gemini/config/skills" "$u/.local/share/icons/hicolor/scalable/apps" "$u/.config/systemd/user"; do
+                        [ -d "$sdir" ] && find "$sdir" -xtype l -delete 2>/dev/null || true
+                    done
+                ' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -778,6 +803,9 @@ except Exception:
             sudo pacman -Rcs --noconfirm $unused_nm_applet 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_nm_applet 2>/dev/null
         end
     end
+    systemctl --user daemon-reload 2>/dev/null
+    systemctl --user reset-failed 2>/dev/null
+    sudo systemctl daemon-reload 2>/dev/null
 
     if test "$target_id" = "9"
         if test $is_es -eq 1
