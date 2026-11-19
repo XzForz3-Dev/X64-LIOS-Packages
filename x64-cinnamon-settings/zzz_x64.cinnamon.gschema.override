@@ -20,10 +20,23 @@ theme='adw-gtk3-dark'
 [org.cinnamon.theme]
 name='cinnamon'
 
+[org.cinnamon.desktop.keybindings]
+custom-list=['custom-x64-area-screenshot', 'custom-x64-area-screenshot-clip']
+
+[org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot/]
+name='X64 Captura de Area'
+command='/usr/bin/x64-cinnamon-screenshot --area'
+binding=['<Shift><Super>s']
+
+[org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot-clip/]
+name='X64 Captura de Area (Portapapeles)'
+command='/usr/bin/x64-cinnamon-screenshot --area --clipboard'
+binding=['<Control><Shift>s']
+
 [org.cinnamon.desktop.keybindings.media-keys]
 terminal=['<Primary><Alt>t', '<Super>Return']
-area-screenshot=['<Shift>Print', '<Shift><Super>s']
-area-screenshot-clip=['<Control><Shift>Print', '<Control><Shift>s']
+area-screenshot=['<Shift>Print']
+area-screenshot-clip=['<Control><Shift>Print']
 
 [org.cinnamon.settings-daemon.plugins.power]
 sleep-inactive-ac-timeout=0

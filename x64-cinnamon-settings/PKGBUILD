@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -16,6 +16,9 @@ depends=(
     'glib2'
     'kitty'
     'ttf-jetbrains-mono-nerd'
+    'python-cairo'
+    'python-gobject'
+    'wl-clipboard'
 )
 source=(
     'cinnamon-login.jpg'
@@ -29,8 +32,10 @@ source=(
     'menu-0.json'
     'grouped-window-list-2.json'
     'sound-settings-override.json'
+    'x64-cinnamon-screenshot'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -97,4 +102,7 @@ package() {
     # 9. Override oficial de Cinnamon para applet de sonido (libera <Shift><Super>s para Captura de Area en cualquier instancia/usuario)
     install -d "${pkgdir}/usr/share/cinnamon/applets/sound@cinnamon.org"
     install -m644 "${srcdir}/sound-settings-override.json" "${pkgdir}/usr/share/cinnamon/applets/sound@cinnamon.org/settings-override.json"
+
+    # 10. Helper X64 Freeze-Frame Area Screenshot (captura menus abiertos y popups en Wayland/X11)
+    install -Dm755 "${srcdir}/x64-cinnamon-screenshot" "${pkgdir}/usr/bin/x64-cinnamon-screenshot"
 }

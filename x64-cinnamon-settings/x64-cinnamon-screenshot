@@ -1,0 +1,452 @@
+#!/usr/bin/python3
+"""
+X64 LIOS Freeze-Frame Area Screenshot Helper for Cinnamon (Wayland & X11).
+
+Captures a full-stage pixel snapshot via org.cinnamon.Screenshot BEFORE mapping
+any window or grabbing focus, so open menus, popups, tooltips, and context menus
+stay frozen on screen while the user selects a crop region.
+
+After cropping:
+  - Default (--area): opens Cinnamon's native cinnamon-screenshot editor window
+    (or autosaves if org.cinnamon.screenshot autosave-to-file is enabled).
+  - With --clipboard: copies the cropped PNG directly to the clipboard
+    (persistent via wl-copy on Wayland, Gtk.Clipboard on X11).
+"""
+
+import argparse
+import fcntl
+import gettext
+import math
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import gi
+gi.require_version('Gdk', '3.0')
+gi.require_version('GdkPixbuf', '2.0')
+gi.require_version('Gtk', '3.0')
+import cairo
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
+
+CINNAMON_SS_DIR = '/usr/share/cinnamon/cinnamon-screenshot'
+if CINNAMON_SS_DIR not in sys.path:
+    sys.path.insert(0, CINNAMON_SS_DIR)
+
+gettext.install('cinnamon', '/usr/share/locale')
+
+import application as cinnamon_app
+import prefs
+import util
+
+
+def _copy_pixbuf_persistent(pixbuf):
+    """Copy GdkPixbuf to clipboard persistently on both Wayland and X11."""
+    if os.environ.get('WAYLAND_DISPLAY') and shutil.which('wl-copy'):
+        ok, png_bytes = pixbuf.save_to_bufferv('png', [], [])
+        if ok:
+            try:
+                proc = subprocess.Popen(
+                    ['wl-copy', '--type', 'image/png'],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                proc.stdin.write(png_bytes)
+                proc.stdin.close()
+                return
+            except OSError:
+                pass
+    util.copy_pixbuf_to_clipboard(pixbuf)
+
+
+def _capture_frozen_stage(include_pointer):
+    """Snap the full compositor stage immediately via Cinnamon DBus before
+    any window opens or focus changes (preserves open menus & popups)."""
+    proxy = Gio.DBusProxy.new_for_bus_sync(
+        Gio.BusType.SESSION,
+        Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES,
+        None,
+        'org.cinnamon.Screenshot',
+        '/org/cinnamon/Screenshot',
+        'org.cinnamon.Screenshot',
+        None,
+    )
+    fd, tmp_path = tempfile.mkstemp(prefix='x64-freeze-', suffix='.png')
+    os.close(fd)
+    try:
+        res = proxy.call_sync(
+            'Screenshot',
+            GLib.Variant('(bsb)', (bool(include_pointer), tmp_path, False)),
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
+        ).unpack()
+        if not res or not res[0]:
+            return None
+        actual_path = res[1] or tmp_path
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file(actual_path)
+        if actual_path != tmp_path and os.path.exists(actual_path):
+            try:
+                os.unlink(actual_path)
+            except OSError:
+                pass
+        return pixbuf
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+class MonitorOverlay(Gtk.Window):
+    def __init__(self, controller, monitor_index, mon_geom, mon_pixbuf, scale_x, scale_y):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.controller = controller
+        self.monitor_index = monitor_index
+        self.mon_geom = mon_geom
+        self.mon_pixbuf = mon_pixbuf
+        self.scale_x = scale_x
+        self.scale_y = scale_y
+
+        self.dragging = False
+        self.start_x = 0.0
+        self.start_y = 0.0
+        self.curr_x = 0.0
+        self.curr_y = 0.0
+
+        self.set_title('X64 Screenshot')
+        self.set_decorated(False)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_keep_above(True)
+        self.set_app_paintable(True)
+        self.set_accept_focus(True)
+
+        self.area = Gtk.DrawingArea()
+        self.area.set_size_request(mon_geom.width, mon_geom.height)
+        self.area.add_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.POINTER_MOTION_MASK
+        )
+        self.area.connect('draw', self._on_draw)
+        self.area.connect('button-press-event', self._on_button_press)
+        self.area.connect('motion-notify-event', self._on_motion)
+        self.area.connect('button-release-event', self._on_button_release)
+        self.add(self.area)
+
+        self.connect('realize', self._on_realize)
+        self.connect('key-press-event', self._on_key_press)
+        self.connect('delete-event', lambda *_: self.controller.cancel() or True)
+
+        screen = Gdk.Display.get_default().get_default_screen()
+        self.move(mon_geom.x, mon_geom.y)
+        self.resize(mon_geom.width, mon_geom.height)
+        self.fullscreen_on_monitor(screen, monitor_index)
+
+    def _on_realize(self, _widget):
+        gdk_win = self.get_window()
+        if gdk_win:
+            cursor = Gdk.Cursor.new_for_display(
+                Gdk.Display.get_default(), Gdk.CursorType.CROSSHAIR
+            )
+            gdk_win.set_cursor(cursor)
+
+    def _on_key_press(self, _widget, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.controller.cancel()
+            return True
+        return False
+
+    def _on_button_press(self, _widget, event):
+        if event.button == Gdk.BUTTON_SECONDARY:
+            self.controller.cancel()
+            return True
+        if event.button != Gdk.BUTTON_PRIMARY:
+            return False
+        self.dragging = True
+        self.start_x = event.x
+        self.start_y = event.y
+        self.curr_x = event.x
+        self.curr_y = event.y
+        self.area.queue_draw()
+        return True
+
+    def _on_motion(self, _widget, event):
+        if not self.dragging:
+            return False
+        self.curr_x = event.x
+        self.curr_y = event.y
+        self.area.queue_draw()
+        return True
+
+    def _selection_rect(self):
+        alloc = self.area.get_allocation()
+        x1 = max(0.0, min(self.start_x, self.curr_x))
+        y1 = max(0.0, min(self.start_y, self.curr_y))
+        x2 = min(float(alloc.width), max(self.start_x, self.curr_x))
+        y2 = min(float(alloc.height), max(self.start_y, self.curr_y))
+        return x1, y1, max(0.0, x2 - x1), max(0.0, y2 - y1)
+
+    def _on_button_release(self, _widget, event):
+        if not self.dragging or event.button != Gdk.BUTTON_PRIMARY:
+            return False
+        self.dragging = False
+        self.curr_x = event.x
+        self.curr_y = event.y
+        x, y, w, h = self._selection_rect()
+        if w < 4 or h < 4:
+            self.controller.cancel()
+            return True
+
+        px = max(0, int(round(x * self.scale_x)))
+        py = max(0, int(round(y * self.scale_y)))
+        pw = max(1, min(self.mon_pixbuf.get_width() - px, int(round(w * self.scale_x))))
+        ph = max(1, min(self.mon_pixbuf.get_height() - py, int(round(h * self.scale_y))))
+        cropped = self.mon_pixbuf.new_subpixbuf(px, py, pw, ph).copy()
+        self.controller.finish(cropped)
+        return True
+
+    def _on_draw(self, widget, cr):
+        alloc = widget.get_allocation()
+        w_win = float(alloc.width)
+        h_win = float(alloc.height)
+
+        # 1. Draw frozen monitor slice at crisp 1:1 native resolution
+        cr.save()
+        if self.scale_x != 1.0 or self.scale_y != 1.0:
+            cr.scale(1.0 / self.scale_x, 1.0 / self.scale_y)
+        Gdk.cairo_set_source_pixbuf(cr, self.mon_pixbuf, 0, 0)
+        cr.paint()
+        cr.restore()
+
+        # 2. Darken unselected area using even-odd fill rule
+        cr.save()
+        cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
+        cr.rectangle(0, 0, w_win, h_win)
+        if self.dragging:
+            sx, sy, sw, sh = self._selection_rect()
+            if sw > 1 and sh > 1:
+                cr.rectangle(sx, sy, sw, sh)
+        cr.set_source_rgba(0.03, 0.03, 0.04, 0.40)
+        cr.fill()
+        cr.restore()
+
+        # 3. Draw X64 Crimson selection border & dimension pill
+        if self.dragging:
+            sx, sy, sw, sh = self._selection_rect()
+            if sw > 1 and sh > 1:
+                cr.save()
+                cr.set_source_rgba(1.0, 0.17, 0.17, 0.95)  # X64 Crimson #ff2b2b
+                cr.set_line_width(2.0)
+                cr.rectangle(math.floor(sx) + 1.0, math.floor(sy) + 1.0,
+                             max(1.0, math.floor(sw) - 2.0), max(1.0, math.floor(sh) - 2.0))
+                cr.stroke()
+
+                # Dimension badge
+                pw = int(round(sw * self.scale_x))
+                ph = int(round(sh * self.scale_y))
+                label = f'{pw} × {ph}'
+                cr.select_font_face('JetBrainsMono Nerd Font', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+                cr.set_font_size(12.0)
+                ext = cr.text_extents(label)
+                pad_x, pad_y = 8.0, 4.0
+                bw = ext.width + pad_x * 2
+                bh = ext.height + pad_y * 2
+                bx = sx + 6.0
+                by = sy - bh - 6.0 if sy >= bh + 10.0 else sy + 6.0
+                if bx + bw > w_win - 6.0:
+                    bx = max(6.0, w_win - bw - 6.0)
+
+                cr.set_source_rgba(0.05, 0.05, 0.07, 0.88)
+                cr.rectangle(bx, by, bw, bh)
+                cr.fill()
+                cr.set_source_rgba(1.0, 0.17, 0.17, 0.85)
+                cr.set_line_width(1.0)
+                cr.rectangle(bx + 0.5, by + 0.5, bw - 1.0, bh - 1.0)
+                cr.stroke()
+                cr.set_source_rgba(0.95, 0.95, 0.97, 1.0)
+                cr.move_to(bx + pad_x - ext.x_bearing, by + pad_y - ext.y_bearing)
+                cr.show_text(label)
+                cr.restore()
+        return False
+
+
+class FreezeSelectorController:
+    def __init__(self, frozen_pixbuf, on_done):
+        self.frozen_pixbuf = frozen_pixbuf
+        self.on_done = on_done
+        self.windows = []
+        self._done = False
+
+    def start(self):
+        display = Gdk.Display.get_default()
+        n_monitors = display.get_n_monitors()
+        geoms = [display.get_monitor(i).get_geometry() for i in range(n_monitors)]
+
+        min_x = min(g.x for g in geoms)
+        min_y = min(g.y for g in geoms)
+        max_x = max(g.x + g.width for g in geoms)
+        max_y = max(g.y + g.height for g in geoms)
+
+        total_w = max(1, max_x - min_x)
+        total_h = max(1, max_y - min_y)
+        pb_w = self.frozen_pixbuf.get_width()
+        pb_h = self.frozen_pixbuf.get_height()
+
+        scale_x = pb_w / float(total_w)
+        scale_y = pb_h / float(total_h)
+
+        for i, g in enumerate(geoms):
+            sx = max(0, int(round((g.x - min_x) * scale_x)))
+            sy = max(0, int(round((g.y - min_y) * scale_y)))
+            sw = max(1, min(pb_w - sx, int(round(g.width * scale_x))))
+            sh = max(1, min(pb_h - sy, int(round(g.height * scale_y))))
+            mon_pb = self.frozen_pixbuf.new_subpixbuf(sx, sy, sw, sh).copy()
+            win = MonitorOverlay(self, i, g, mon_pb, scale_x, scale_y)
+            self.windows.append(win)
+
+        for win in self.windows:
+            win.show_all()
+            win.present()
+
+    def _close_all(self):
+        for win in self.windows:
+            win.hide()
+            win.destroy()
+        self.windows.clear()
+
+    def cancel(self):
+        if self._done:
+            return
+        self._done = True
+        self._close_all()
+        self.on_done(None)
+
+    def finish(self, cropped_pixbuf):
+        if self._done:
+            return
+        self._done = True
+        self._close_all()
+        self.on_done(cropped_pixbuf)
+
+
+class X64FrozenScreenshotApp(cinnamon_app.ScreenshotApplication):
+    def __init__(self, args, frozen_pixbuf, on_overlay_closed=None):
+        super().__init__(args)
+        self.frozen_pixbuf = frozen_pixbuf
+        self._on_overlay_closed = on_overlay_closed
+
+    def _activate(self):
+        selector = FreezeSelectorController(self.frozen_pixbuf, self._on_region_selected)
+        selector.start()
+
+    def _on_region_selected(self, pixbuf):
+        if self._on_overlay_closed:
+            self._on_overlay_closed()
+            self._on_overlay_closed = None
+        if pixbuf is None:
+            self._exit_code = 1
+            self.quit()
+            return
+
+        if self.args.clipboard:
+            _copy_pixbuf_persistent(pixbuf)
+            self.quit()
+            return
+
+        if self.args.file and not self.args.interactive:
+            try:
+                util.save_pixbuf(pixbuf, self.args.file)
+            except Exception as exc:
+                print(f'x64-cinnamon-screenshot: save failed: {exc}', file=sys.stderr)
+                self._exit_code = 1
+            self.quit()
+            return
+
+        if prefs.get_autosave_to_file():
+            filename = util.build_filename(
+                prefs.get_save_directory(),
+                file_type=prefs.get_default_file_type(),
+            )
+            try:
+                util.save_pixbuf(pixbuf, filename)
+                if prefs.get_autosave_to_clipboard():
+                    _copy_pixbuf_persistent(pixbuf)
+            except Exception as exc:
+                print(f'x64-cinnamon-screenshot: save failed: {exc}', file=sys.stderr)
+                self._exit_code = 1
+            self.quit()
+            return
+
+        # Default: open Cinnamon's native screenshot editor with persistent Wayland clipboard
+        util.copy_pixbuf_to_clipboard = _copy_pixbuf_persistent
+        from main_window import MainWindow
+        win = MainWindow(self)
+        win.show_with_pixbuf(pixbuf)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='x64-cinnamon-screenshot',
+        description='X64 LIOS freeze-frame area screenshot for Cinnamon',
+    )
+    parser.add_argument('-a', '--area', action='store_true', default=True)
+    parser.add_argument('-c', '--clipboard', action='store_true')
+    parser.add_argument('-p', '--include-pointer', action='store_true')
+    parser.add_argument('-f', '--file', metavar='PATH')
+    parser.add_argument('-i', '--interactive', action='store_true')
+    args = parser.parse_args()
+    # Compatibility fields expected by Cinnamon MainWindow
+    args.window = False
+    args.select_window = False
+    args.monitor = None
+    args.include_shadow = False
+    args.delay = None
+
+    # Prevent duplicate overlays on accidental rapid double-press
+    lock_dir = os.environ.get('XDG_RUNTIME_DIR') or tempfile.gettempdir()
+    lock_path = os.path.join(lock_dir, 'x64-cinnamon-screenshot.lock')
+    lock_fp = open(lock_path, 'w')
+    try:
+        fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0
+
+    lock_released = False
+
+    def release_lock():
+        nonlocal lock_released
+        if lock_released:
+            return
+        lock_released = True
+        try:
+            fcntl.flock(lock_fp.fileno(), fcntl.LOCK_UN)
+            lock_fp.close()
+        except OSError:
+            pass
+
+    try:
+        include_pointer = args.include_pointer or prefs.get_include_pointer()
+        frozen = _capture_frozen_stage(include_pointer)
+        if frozen is None:
+            release_lock()
+            # Fallback to stock cinnamon-screenshot if DBus is unavailable
+            cmd = ['/usr/bin/cinnamon-screenshot', '--area']
+            if args.clipboard:
+                cmd.append('--clipboard')
+            os.execv(cmd[0], cmd)
+            return 1
+
+        app = X64FrozenScreenshotApp(args, frozen, on_overlay_closed=release_lock)
+        return app.run()
+    finally:
+        release_lock()
+
+
+if __name__ == '__main__':
+    sys.exit(main())

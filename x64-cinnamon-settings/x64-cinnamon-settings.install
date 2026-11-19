@@ -152,14 +152,36 @@ $DCONF_CMD write /org/gnome/desktop/interface/icon-theme "'Papirus-Dark'" 2>/dev
 $DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec "'kitty'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/default-applications/terminal/exec-arg "'-e'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/terminal "['<Primary><Alt>t', '<Super>Return']" 2>/dev/null || true
-# Re-registrar area-screenshot tras liberar sound@cinnamon.org (fuerza a Muffin a re-vincular <Shift><Super>s en vivo)
+# Liberar <Shift><Super>s y <Control><Shift>s de media-keys (ActionMode.NORMAL) para usar Custom Keybindings (ActionMode.NORMAL | POPUP)
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot "['<Shift>Print']" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot-clip "['<Control><Shift>Print']" 2>/dev/null || true
+# Registrar atajos soberanos de captura freeze-frame (funcionan incluso con el Menu de Aplicaciones abierto)
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot/name "'X64 Captura de Area'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot/command "'/usr/bin/x64-cinnamon-screenshot --area'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot/binding "['<Shift><Super>s']" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot-clip/name "'X64 Captura de Area (Portapapeles)'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot-clip/command "'/usr/bin/x64-cinnamon-screenshot --area --clipboard'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-keybindings/custom-x64-area-screenshot-clip/binding "['<Control><Shift>s']" 2>/dev/null || true
 if [ "$DCONF_CMD" = "dconf" ]; then
     sleep 0.2
-    $DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot "['<Shift>Print']" 2>/dev/null || true
-    sleep 0.2
 fi
-$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot "['<Shift>Print', '<Shift><Super>s']" 2>/dev/null || true
-$DCONF_CMD write /org/cinnamon/desktop/keybindings/media-keys/area-screenshot-clip "['<Control><Shift>Print', '<Control><Shift>s']" 2>/dev/null || true
+MERGED_CUSTOM=$(python3 -c '
+import ast, subprocess
+try:
+    raw = subprocess.check_output(["dconf", "read", "/org/cinnamon/desktop/keybindings/custom-list"], text=True).strip()
+    items = [x for x in (ast.literal_eval(raw) if raw and raw.startswith("[") else []) if x != "__dummy__"]
+except Exception:
+    items = []
+for k in ("custom-x64-area-screenshot", "custom-x64-area-screenshot-clip"):
+    if k not in items:
+        items.append(k)
+print(repr(items))
+' 2>/dev/null || echo "['custom-x64-area-screenshot', 'custom-x64-area-screenshot-clip']")
+if [ "$DCONF_CMD" = "dconf" ]; then
+    $DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-list "['__dummy__']" 2>/dev/null || true
+    sleep 0.15
+fi
+$DCONF_CMD write /org/cinnamon/desktop/keybindings/custom-list "$MERGED_CUSTOM" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-ac-type "'nothing'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/settings-daemon/plugins/power/sleep-inactive-battery-timeout 0 2>/dev/null || true
