@@ -678,13 +678,13 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Xfce4 suite...\e[0m"
         end
-        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm lightdm-slick-greeter lightdm-gtk-greeter labwc pavucontrol 2>/dev/null | sort -u)
+        set -l xfce_pkgs (pacman -Qq x64-xfce4-settings xfce4 xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfce4-power-manager xfce4-screensaver xfce4-notifyd xfce4-taskmanager xfce4-terminal xfce4-appfinder xfwm4 xfconf exo garcon tumbler mousepad parole xfburn libxfce4ui libxfce4util thunar ristretto file-roller lightdm lightdm-slick-greeter lightdm-gtk-greeter labwc pavucontrol satty wayfreeze xcape 2>/dev/null | sort -u)
         if test (count $xfce_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $xfce_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $xfce_pkgs 2>/dev/null
         end
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/xfce4 $udir/.config/Thunar $udir/.config/labwc $udir/.config/pavucontrol.ini 2>/dev/null
+                rm -rf $udir/.config/xfce4 $udir/.config/Thunar $udir/.config/labwc $udir/.config/pavucontrol.ini $udir/.cache/xfce4 $udir/.cache/sessions 2>/dev/null
             end
         end
     end
@@ -695,20 +695,29 @@ except Exception:
         if test (count $unused_sddm) -gt 0
             sudo pacman -Rcs --noconfirm $unused_sddm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_sddm 2>/dev/null
         end
+        sudo rm -rf /var/lib/sddm /etc/pam.d/sddm*.pacsave* 2>/dev/null
     end
     if not contains "$target_id" "6" "7"
         set -l unused_lightdm (pacman -Qq lightdm lightdm-slick-greeter lightdm-gtk-greeter 2>/dev/null | sort -u)
         if test (count $unused_lightdm) -gt 0
             sudo pacman -Rcs --noconfirm $unused_lightdm 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_lightdm 2>/dev/null
         end
+        sudo rm -rf /var/lib/lightdm /var/lib/lightdm-data 2>/dev/null
+    end
+    if not contains "$target_id" "1" "5" "7" "8"
+        set -l unused_wl_tools (pacman -Qq satty wayfreeze xcape grim slurp wtype 2>/dev/null | sort -u)
+        if test (count $unused_wl_tools) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_wl_tools 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_wl_tools 2>/dev/null
+        end
     end
     if test "$target_id" != "7"
         systemctl --user stop xfce4-panel.service 2>/dev/null
         systemctl --user disable xfce4-panel.service 2>/dev/null
-        sudo rm -f /usr/lib/systemd/user/xfce4-panel.service 2>/dev/null
+        sudo rm -f /usr/lib/systemd/user/xfce4-panel.service /usr/local/bin/nm-applet 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -f $udir/.config/systemd/user/*.wants/xfce4-panel.service 2>/dev/null
+                rm -f $udir/.config/systemd/user/*.wants/xfce4-panel.service $udir/.config/gtk-3.0/gtk.css.bak $udir/.config/gtk-4.0/gtk.css.bak 2>/dev/null
+                rm -rf $udir/.cache/xfce4 $udir/.cache/sessions 2>/dev/null
             end
         end
     end
@@ -717,30 +726,32 @@ except Exception:
         if test (count $unused_cosmic) -gt 0
             sudo pacman -Rcs --noconfirm $unused_cosmic 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_cosmic 2>/dev/null
         end
+        sudo rm -f /etc/pam.d/greetd.pacsave* 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/state/pop-launcher 2>/dev/null
+                rm -rf $udir/.local/state/pop-launcher $udir/.cache/pop-launcher $udir/.config/gtk-4.0/cosmic 2>/dev/null
             end
         end
     end
     if test "$target_id" != "2"
+        sudo rm -rf /var/lib/gdm 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/share/gnome-settings-daemon $udir/.local/share/gnome-shell $udir/.local/share/nautilus $udir/.local/share/org.gnome.TextEditor $udir/.local/state/gnome-session* 2>/dev/null
+                rm -rf $udir/.local/share/gnome-settings-daemon $udir/.local/share/gnome-shell $udir/.local/share/nautilus $udir/.local/share/org.gnome.TextEditor $udir/.local/state/gnome-session* $udir/.cache/gnome-settings-daemon $udir/.cache/tracker3 2>/dev/null
             end
         end
     end
     if test "$target_id" != "5"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.local/state/noctalia 2>/dev/null
+                rm -rf $udir/.local/state/noctalia $udir/.cache/noctalia 2>/dev/null
             end
         end
     end
     if test "$target_id" != "3"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.local/share/dolphin $udir/.local/share/kactivitymanagerd $udir/.local/share/klipper $udir/.local/share/konsole $udir/.local/share/kwalletd $udir/.local/share/libkunitconversion $udir/.local/share/sddm $udir/.local/share/user-places.xbel* $udir/.local/state/dolphinstaterc $udir/.local/state/kactivitymanagerdstaterc $udir/.local/state/kglobalshortcutsstaterc $udir/.local/state/kickerstaterc $udir/.local/state/konsolestaterc $udir/.local/state/kscreenlockerrc $udir/.local/state/plasmashellstaterc $udir/.local/state/UserFeedback.org.kde.* $udir/.local/state/xdg-desktop-portal-kdestaterc 2>/dev/null
+                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.local/share/dolphin $udir/.local/share/kactivitymanagerd $udir/.local/share/klipper $udir/.local/share/konsole $udir/.local/share/kwalletd $udir/.local/share/libkunitconversion $udir/.local/share/sddm $udir/.local/share/user-places.xbel* $udir/.local/state/dolphinstaterc $udir/.local/state/kactivitymanagerdstaterc $udir/.local/state/kglobalshortcutsstaterc $udir/.local/state/kickerstaterc $udir/.local/state/konsolestaterc $udir/.local/state/kscreenlockerrc $udir/.local/state/plasmashellstaterc $udir/.local/state/UserFeedback.org.kde.* $udir/.local/state/xdg-desktop-portal-kdestaterc $udir/.config/gtk-3.0/assets $udir/.config/gtk-3.0/colors.css $udir/.config/gtk-3.0/window_decorations.css $udir/.config/gtk-4.0/assets $udir/.config/gtk-4.0/colors.css $udir/.config/gtk-4.0/window_decorations.css $udir/.gtkrc-2.0 $udir/.cache/bookmarksrunner $udir/.cache/kscreenlocker_greet $udir/.cache/kscreen_osd_service $udir/.cache/ksmserver-logout-greeter $udir/.cache/ksplash $udir/.cache/ksvg-elements $udir/.cache/kwin $udir/.cache/kwinsession.kcache $udir/.cache/org.kde.unitconversion $udir/.cache/plasma_theme_default.kcache $udir/.cache/polkit-kde-authentication-agent-1 $udir/.cache/spectacle $udir/.cache/systemsettings 2>/dev/null
             end
         end
     end
@@ -755,8 +766,9 @@ except Exception:
         sudo rm -rf /etc/skel/.config/alacritty /etc/skel/.config/fcitx5 /etc/skel/.config/foot /etc/skel/.config/ghostty /etc/skel/.config/herdr /etc/skel/.config/hyprland-mimeapps.list /etc/skel/.config/hyprland-preview-share-picker /etc/skel/.config/imv /etc/skel/.config/lazygit /etc/skel/.config/obsidian /etc/skel/.config/qtengine /etc/skel/.config/tmux /etc/skel/.config/wofi-x64 /etc/skel/.config/xdg-desktop-portal 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -f $udir/.config/systemd/user/default.target.wants/bt-agent.service 2>/dev/null
-                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper $udir/.local/share/hyprland $udir/.local/share/superwhisper $udir/.local/share/wayland-sessions $udir/.local/state/Omarchy 2>/dev/null
+                rm -f $udir/.config/systemd/user/default.target.wants/bt-agent.service $udir/.config/xdg-desktop-portal/hyprland-portals.conf 2>/dev/null
+                rmdir $udir/.config/xdg-desktop-portal 2>/dev/null
+                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper $udir/.local/share/hyprland $udir/.local/share/superwhisper $udir/.local/share/wayland-sessions $udir/.local/state/Omarchy $udir/.cache/cliphist $udir/.cache/quickshell $udir/.cache/xdg-terminal-exec $udir/.cache/folio $udir/.cache/aube 2>/dev/null
             end
         end
     end

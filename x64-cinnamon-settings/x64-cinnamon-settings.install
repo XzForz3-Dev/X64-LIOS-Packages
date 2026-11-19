@@ -63,6 +63,21 @@ post_install() {
                 cp -f /etc/skel/.config/cinnamon/spices/grouped-window-list@cinnamon.org/2.json "$target_panel/2.json"
             fi
 
+            # 2.1 Limpiar residuos GTK3/GTK4 de KDE/COSMIC/Xfce y portales heredados
+            rm -rf "$user_dir/.config/gtk-3.0/assets" "$user_dir/.config/gtk-3.0/colors.css" "$user_dir/.config/gtk-3.0/window_decorations.css" "$user_dir/.config/gtk-3.0/gtk.css" "$user_dir/.config/gtk-3.0/gtk.css.bak" 2>/dev/null || true
+            rm -rf "$user_dir/.config/gtk-4.0/assets" "$user_dir/.config/gtk-4.0/colors.css" "$user_dir/.config/gtk-4.0/window_decorations.css" "$user_dir/.config/gtk-4.0/cosmic" "$user_dir/.config/gtk-4.0/gtk.css" "$user_dir/.config/gtk-4.0/gtk.css.bak" 2>/dev/null || true
+            rm -f "$user_dir/.gtkrc-2.0" "$user_dir/.config/xdg-desktop-portal/hyprland-portals.conf" 2>/dev/null || true
+            rmdir "$user_dir/.config/xdg-desktop-portal" 2>/dev/null || true
+            for gset in "$user_dir/.config/gtk-3.0/settings.ini" "$user_dir/.config/gtk-4.0/settings.ini"; do
+                if [ -f "$gset" ]; then
+                    sed -i 's/gtk-cursor-theme-name=breeze_cursors/gtk-cursor-theme-name=Adwaita/g' "$gset" 2>/dev/null || true
+                fi
+            done
+            if [ -f "$user_dir/.config/mimeapps.list" ]; then
+                sed -i 's/google-chrome\.desktop/chromium.desktop/g' "$user_dir/.config/mimeapps.list" 2>/dev/null || true
+                sed -i '/HEY\.desktop/d; /superwhisper-url\.desktop/d' "$user_dir/.config/mimeapps.list" 2>/dev/null || true
+            fi
+
             # 3. Avatar neutral oficial si no existe uno personalizado
             if [ -f "$user_dir/.face" ] && cmp -s "$user_dir/.face" /usr/share/pixmaps/x64-logo.png; then
                 cp -f /etc/skel/.face "$user_dir/.face"
