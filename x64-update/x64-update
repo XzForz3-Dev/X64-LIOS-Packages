@@ -98,6 +98,138 @@ def get_telemetry():
         "hostname": hostname
     }
 
+def _format_bytes(num_bytes):
+    if num_bytes < 1024 ** 2:
+        return f"{max(0, num_bytes // 1024)} KB"
+    if num_bytes < 1024 ** 3:
+        return f"{num_bytes / (1024 ** 2):.0f} MB"
+    return f"{num_bytes / (1024 ** 3):.1f} GB"
+
+def get_system_health():
+    # 1. Last check timestamp
+    last_rel = "Sin registro"
+    last_clock = "Pulsa Comprobar"
+    try:
+        if os.path.isfile(LAST_CHECK_FILE):
+            with open(LAST_CHECK_FILE, "r", encoding="utf-8") as f:
+                ts = float(f.read().strip())
+            delta = max(0, int(time.time() - ts))
+            if delta < 60:
+                last_rel = "Justo ahora"
+            elif delta < 3600:
+                mins = delta // 60
+                last_rel = f"Hace {mins} min"
+            elif delta < 86400:
+                hrs = delta // 3600
+                mins = (delta % 3600) // 60
+                last_rel = f"Hace {hrs}h {mins}m" if mins > 0 else f"Hace {hrs}h"
+            else:
+                days = delta // 86400
+                last_rel = f"Hace {days} d"
+            lt = time.localtime(ts)
+            now_lt = time.localtime()
+            if (lt.tm_year, lt.tm_yday) == (now_lt.tm_year, now_lt.tm_yday):
+                last_clock = f"Hoy · {time.strftime('%H:%M', lt)}"
+            else:
+                last_clock = time.strftime("%d/%m · %H:%M", lt)
+    except Exception:
+        pass
+
+    # 2. Root disk space
+    disk_free_str = "—"
+    disk_sub = "Raíz /"
+    disk_status = "ok"
+    try:
+        du = shutil.disk_usage("/")
+        free_gb = du.free / (1024 ** 3)
+        used_pct = int(round((du.used / du.total) * 100)) if du.total else 0
+        disk_free_str = f"{free_gb:.1f} GB libres"
+        disk_sub = f"{used_pct}% usado en raíz (/)"
+        if free_gb < 3.0:
+            disk_status = "crit"
+        elif free_gb < 15.0:
+            disk_status = "warn"
+    except Exception:
+        pass
+
+    # 3. Installed packages, pacman cache size & orphans
+    pkg_count = 0
+    try:
+        pkg_count = sum(1 for e in os.scandir("/var/lib/pacman/local") if e.is_dir())
+    except Exception:
+        pass
+
+    cache_bytes = 0
+    try:
+        for e in os.scandir("/var/cache/pacman/pkg"):
+            try:
+                if e.is_file(follow_symlinks=False):
+                    cache_bytes += e.stat(follow_symlinks=False).st_size
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+    orphan_count = 0
+    try:
+        res = subprocess.run(
+            ["pacman", "-Qtdq"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5
+        )
+        if res.returncode == 0:
+            orphan_count = sum(1 for l in res.stdout.splitlines() if l.strip())
+    except Exception:
+        pass
+
+    return {
+        "last_rel": last_rel,
+        "last_clock": last_clock,
+        "disk_free": disk_free_str,
+        "disk_sub": disk_sub,
+        "disk_status": disk_status,
+        "pkg_count": pkg_count,
+        "cache_bytes": cache_bytes,
+        "cache_str": _format_bytes(cache_bytes),
+        "orphan_count": orphan_count,
+    }
+
+def parse_pacman_history(limit=250):
+    log_path = "/var/log/pacman.log"
+    entries = []
+    if not os.path.isfile(log_path):
+        return entries
+    pat = re.compile(
+        r"^\[(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}):\d{2}[^\]]*\]\s+\[ALPM\]\s+"
+        r"(upgraded|installed|removed)\s+(\S+)\s+\(([^)]+)\)"
+    )
+    try:
+        size = os.path.getsize(log_path)
+        read_size = min(size, 512 * 1024)
+        with open(log_path, "rb") as f:
+            if size > read_size:
+                f.seek(size - read_size)
+            chunk = f.read().decode("utf-8", errors="replace")
+        for line in reversed(chunk.splitlines()):
+            m = pat.match(line)
+            if not m:
+                continue
+            date_s, time_s, action, pkg, ver = m.groups()
+            ver_clean = ver.replace(" -> ", " ➔ ")
+            entries.append({
+                "date": f"{date_s} {time_s}",
+                "action": action,
+                "pkg": pkg,
+                "version": ver_clean,
+            })
+            if len(entries) >= limit:
+                break
+    except Exception:
+        pass
+    return entries
+
 def is_x64_package(name):
     lower = name.lower()
     return lower.startswith("x64-") or lower.startswith("falcond") or lower == "calamares"
@@ -624,24 +756,24 @@ def blend_colors(c1, c2, factor=0.5):
 
 DEFAULT_PALETTE = {
     "mode": "dark",
-    "accent": "#dc2626",
-    "accent_hover": "#ef4444",
-    "accent_subtle": "#991b1b",
-    "background": "#09090d",
-    "dark_background": "#0b0b10",
+    "accent": "#ff2b2b",
+    "accent_hover": "#ff4d4d",
+    "accent_subtle": "#b91c1c",
+    "background": "#0a0a0e",
+    "dark_background": "#0d0d13",
     "darker_background": "#07070b",
-    "lighter_background": "#13131d",
-    "card_bg": "#12121c",
+    "lighter_background": "#12121a",
+    "card_bg": "#14141e",
     "card_border": "#232334",
     "table_bg": "#0d0d14",
-    "table_alt_bg": "#11111a",
+    "table_alt_bg": "#111119",
     "table_border": "#222232",
-    "selection": "#1f1218",
-    "foreground": "#f4f4f6",
-    "muted": "#7c7c90",
-    "sub_text": "#a1a1b5",
-    "laser_stop0": "#dc2626",
-    "laser_stop1": "#ef4444",
+    "selection": "#231318",
+    "foreground": "#f4f4f8",
+    "muted": "#828298",
+    "sub_text": "#a6a6bc",
+    "laser_stop0": "#ff2b2b",
+    "laser_stop1": "#ff5c5c",
     "green": "#22c55e",
     "green_bg": "#0b291a",
     "green_border": "#165636",
@@ -963,8 +1095,79 @@ def run_gui():
         QHeaderView, QCheckBox, QFrame, QButtonGroup, QAbstractItemView,
         QProgressBar, QTextEdit, QStackedWidget, QDialog, QStyledItemDelegate, QStyle, QSizePolicy
     )
-    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF, QFileSystemWatcher
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QRectF, QFileSystemWatcher, QByteArray
     from PyQt6.QtGui import QColor, QFont, QIcon, QPixmap, QTextCursor, QPainter, QPen, QBrush, QPalette
+    from PyQt6.QtSvg import QSvgRenderer
+
+    _SVG_PATHS = {
+        "refresh": (
+            '<path d="M21 12a9 9 0 1 1-2.64-6.36"/>'
+            '<polyline points="21 3 21 9 15 9"/>'
+        ),
+        "history": (
+            '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>'
+            '<path d="M3 3v5h5"/>'
+            '<path d="M12 7v5l4 2"/>'
+        ),
+        "sliders": (
+            '<line x1="21" y1="6" x2="14" y2="6"/><line x1="10" y1="6" x2="3" y2="6"/>'
+            '<circle cx="12" cy="6" r="2"/>'
+            '<line x1="21" y1="12" x2="17" y2="12"/><line x1="13" y1="12" x2="3" y2="12"/>'
+            '<circle cx="15" cy="12" r="2"/>'
+            '<line x1="21" y1="18" x2="9" y2="18"/><line x1="5" y1="18" x2="3" y2="18"/>'
+            '<circle cx="7" cy="18" r="2"/>'
+        ),
+        "check": (
+            '<polyline points="20 6 9 17 4 12"/>'
+        ),
+        "clock": (
+            '<circle cx="12" cy="12" r="9"/>'
+            '<polyline points="12 7 12 12 15.5 14"/>'
+        ),
+        "hard-drive": (
+            '<rect x="2" y="13" width="20" height="8" rx="2"/>'
+            '<path d="M5.45 5.11 2 13v2"/>'
+            '<path d="M18.55 5.11 22 13v2"/>'
+            '<line x1="6" y1="17" x2="6.01" y2="17"/>'
+            '<line x1="10" y1="17" x2="10.01" y2="17"/>'
+            '<path d="M5.45 5.11A2 2 0 0 1 7.24 4h9.52a2 2 0 0 1 1.79 1.11"/>'
+        ),
+        "package": (
+            '<path d="M16.5 9.4 7.55 4.24"/>'
+            '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>'
+            '<polyline points="3.29 7 12 12 20.71 7"/>'
+            '<line x1="12" y1="22" x2="12" y2="12"/>'
+        ),
+        "search": (
+            '<circle cx="11" cy="11" r="7"/>'
+            '<line x1="21" y1="21" x2="16.65" y2="16.65"/>'
+        ),
+        "power": (
+            '<path d="M12 2v10"/>'
+            '<path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>'
+        ),
+    }
+
+    def render_svg_pixmap(name, color="#f4f4f8", size=16, stroke_width=1.8):
+        body = _SVG_PATHS.get(name, "")
+        svg = (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" '
+            f'fill="none" stroke="{color}" stroke-width="{stroke_width}" '
+            f'stroke-linecap="round" stroke-linejoin="round">{body}</svg>'
+        )
+        renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
+        dpr = 2
+        pm = QPixmap(size * dpr, size * dpr)
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pm)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        renderer.render(painter, QRectF(0, 0, size, size))
+        painter.end()
+        return pm
+
+    def render_svg_icon(name, color="#f4f4f8", size=15, stroke_width=1.8):
+        return QIcon(render_svg_pixmap(name, color=color, size=size, stroke_width=stroke_width))
 
     class CheckWorker(QThread):
         finished = pyqtSignal(dict)
@@ -1147,11 +1350,12 @@ def run_gui():
             self.transaction_done.emit(success, ret, self.kernel_updated)
 
     class ConfirmDialog(QDialog):
-        def __init__(self, items_count, crit_count, cached_sudo, parent=None, breakdown=None, palette=None):
+        def __init__(self, items_count, crit_count, cached_sudo, parent=None, breakdown=None, palette=None, mode="update"):
             super().__init__(parent)
             self.palette = palette or (parent.palette if hasattr(parent, "palette") else load_theme_palette())
             p = self.palette
-            self.setWindowTitle("Autorización del Sistema")
+            self.mode = mode
+            self.setWindowTitle("Autorización de Mantenimiento" if mode == "maintenance" else "Autorización del Sistema")
             self.setFixedWidth(520)
             self.setModal(True)
             self.cached_sudo = cached_sudo
@@ -1206,9 +1410,13 @@ def run_gui():
 
             title_col = QVBoxLayout()
             title_col.setSpacing(2)
-            lbl_title = QLabel("Autorización de Actualización")
+            lbl_title = QLabel("Autorización de Mantenimiento" if self.mode == "maintenance" else "Autorización de Actualización")
             lbl_title.setStyleSheet(f"color: {p['foreground']}; font-size: 15px; font-weight: 800;")
-            lbl_sub = QLabel("Confirma la operación para iniciar la transacción del sistema")
+            lbl_sub = QLabel(
+                "Limpieza segura de caché Pacman, huérfanos y runtimes sin uso"
+                if self.mode == "maintenance"
+                else "Confirma la operación para iniciar la transacción del sistema"
+            )
             lbl_sub.setStyleSheet(f"color: {p['muted']}; font-size: 12px;")
             title_col.addWidget(lbl_title)
             title_col.addWidget(lbl_sub)
@@ -1230,19 +1438,6 @@ def run_gui():
             sbox.setContentsMargins(14, 12, 14, 12)
             sbox.setSpacing(8)
 
-            pkg_word = "paquete listo" if items_count == 1 else "paquetes listos"
-            lbl_pkgs = QLabel(f"{items_count} {pkg_word} para actualizar")
-            lbl_pkgs.setStyleSheet(f"color: {p['foreground']}; font-size: 13px; font-weight: 700;")
-            sbox.addWidget(lbl_pkgs)
-
-            # Breakdown pills in their own dedicated row so neither title nor pills ever get clipped
-            pills_row = QHBoxLayout()
-            pills_row.setSpacing(6)
-            x64_n = self.breakdown.get("x64", 0)
-            repo_n = self.breakdown.get("repo", 0)
-            aur_n = self.breakdown.get("aur", 0)
-            fp_n = self.breakdown.get("fp", 0)
-
             def make_pill(text, fg, bg, border):
                 pill = QLabel(text)
                 pill.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -1252,28 +1447,61 @@ def run_gui():
                 )
                 return pill
 
-            if x64_n > 0:
-                pills_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
-            if repo_n > 0:
-                pills_row.addWidget(make_pill(f"Sistema: {repo_n}", "#38bdf8", "#092030", "#123b56"))
-            if aur_n > 0:
-                pills_row.addWidget(make_pill(f"AUR: {aur_n}", "#e879f9", "#26092e", "#481456"))
-            if fp_n > 0:
-                pills_row.addWidget(make_pill(f"Flatpak: {fp_n}", "#818cf8", "#101036", "#232368"))
-            if crit_count > 0:
-                pills_row.addWidget(make_pill(f"Críticos: {crit_count}", "#fbbf24", "#2b1d06", "#573b0c"))
-            pills_row.addStretch()
+            if self.mode == "maintenance":
+                lbl_pkgs = QLabel("Optimización rápida del sistema X64 LIOS")
+                lbl_pkgs.setStyleSheet(f"color: {p['foreground']}; font-size: 13px; font-weight: 700;")
+                sbox.addWidget(lbl_pkgs)
 
-            sbox.addLayout(pills_row)
+                pills_row = QHBoxLayout()
+                pills_row.setSpacing(6)
+                cache_lbl = self.breakdown.get("cache_str", "—")
+                orphans_n = self.breakdown.get("orphans", 0)
+                pills_row.addWidget(make_pill(f"Caché Pacman: {cache_lbl}", "#cbd5e1", "#151822", "#262c3d"))
+                pills_row.addWidget(make_pill(f"Huérfanos: {orphans_n}", "#f0b44c" if orphans_n > 0 else "#e4e4ec", "#241a0b" if orphans_n > 0 else "#181824", "#4a3514" if orphans_n > 0 else "#2c2c3e"))
+                if shutil.which("flatpak"):
+                    pills_row.addWidget(make_pill("Flatpak sin uso", "#a5b4fc", "#13162b", "#272d54"))
+                pills_row.addStretch()
+                sbox.addLayout(pills_row)
 
-            if crit_count > 0:
-                crit_word = "componente crítico" if crit_count == 1 else "componentes críticos"
-                lbl_note = QLabel(f"Incluye {crit_count} {crit_word} del sistema (Kernel / Controladores).")
-                lbl_note.setStyleSheet(f"color: {p['yellow_text']}; font-size: 11px; font-weight: 600;")
-            else:
-                lbl_note = QLabel("Los paquetes se descargarán e instalarán mediante verificación criptográfica.")
+                lbl_note = QLabel("Se conservarán las últimas 2 versiones en caché (paccache -rk2) para rollback seguro.")
                 lbl_note.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
-            sbox.addWidget(lbl_note)
+                sbox.addWidget(lbl_note)
+            else:
+                pkg_word = "paquete listo" if items_count == 1 else "paquetes listos"
+                lbl_pkgs = QLabel(f"{items_count} {pkg_word} para actualizar")
+                lbl_pkgs.setStyleSheet(f"color: {p['foreground']}; font-size: 13px; font-weight: 700;")
+                sbox.addWidget(lbl_pkgs)
+
+                # Breakdown pills in their own dedicated row so neither title nor pills ever get clipped
+                pills_row = QHBoxLayout()
+                pills_row.setSpacing(6)
+                x64_n = self.breakdown.get("x64", 0)
+                repo_n = self.breakdown.get("repo", 0)
+                aur_n = self.breakdown.get("aur", 0)
+                fp_n = self.breakdown.get("fp", 0)
+
+                if x64_n > 0:
+                    pills_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
+                if repo_n > 0:
+                    pills_row.addWidget(make_pill(f"Sistema: {repo_n}", "#38bdf8", "#092030", "#123b56"))
+                if aur_n > 0:
+                    pills_row.addWidget(make_pill(f"AUR: {aur_n}", "#e879f9", "#26092e", "#481456"))
+                if fp_n > 0:
+                    pills_row.addWidget(make_pill(f"Flatpak: {fp_n}", "#818cf8", "#101036", "#232368"))
+                if crit_count > 0:
+                    pills_row.addWidget(make_pill(f"Críticos: {crit_count}", "#fbbf24", "#2b1d06", "#573b0c"))
+                pills_row.addStretch()
+
+                sbox.addLayout(pills_row)
+
+                if crit_count > 0:
+                    crit_word = "componente crítico" if crit_count == 1 else "componentes críticos"
+                    lbl_note = QLabel(f"Incluye {crit_count} {crit_word} del sistema (Kernel / Controladores).")
+                    lbl_note.setStyleSheet(f"color: {p['yellow_text']}; font-size: 11px; font-weight: 600;")
+                else:
+                    lbl_note = QLabel("Los paquetes se descargarán e instalarán mediante verificación criptográfica.")
+                    lbl_note.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
+                sbox.addWidget(lbl_note)
 
             vbox.addWidget(summary_frame)
 
@@ -1319,15 +1547,15 @@ def run_gui():
                 auth_ok_frame.setObjectName("authOkFrame")
                 auth_ok_frame.setStyleSheet(f"""
                     QFrame#authOkFrame {{
-                        background-color: {p['green_bg']};
-                        border: 1px solid {p['green_border']};
+                        background-color: {p['lighter_background']};
+                        border: 1px solid {p['card_border']};
                         border-radius: 8px;
                     }}
                 """)
                 ok_box = QHBoxLayout(auth_ok_frame)
                 ok_box.setContentsMargins(12, 8, 12, 8)
                 lbl_auth_ok = QLabel("Sesión de administrador activa — no se requiere contraseña adicional.")
-                lbl_auth_ok.setStyleSheet(f"color: {p['green_text']}; font-size: 11px; font-weight: 600;")
+                lbl_auth_ok.setStyleSheet(f"color: {p['sub_text']}; font-size: 11px; font-weight: 600;")
                 ok_box.addWidget(lbl_auth_ok)
                 vbox.addWidget(auth_ok_frame)
 
@@ -1357,7 +1585,7 @@ def run_gui():
             """)
             btn_cancel.clicked.connect(self.reject)
 
-            btn_confirm = QPushButton("Autorizar y Actualizar")
+            btn_confirm = QPushButton("Autorizar y Limpiar" if self.mode == "maintenance" else "Autorizar y Actualizar")
             btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_confirm.setStyleSheet(f"""
                 QPushButton {{
@@ -1448,7 +1676,7 @@ def run_gui():
                 font.setBold(True)
                 painter.setFont(font)
 
-                pill_w = 86
+                pill_w = max(86, painter.fontMetrics().horizontalAdvance(label) + 22)
                 pill_h = 24
                 x = option.rect.x() + (option.rect.width() - pill_w) / 2.0
                 y = option.rect.y() + (option.rect.height() - pill_h) / 2.0
@@ -1462,6 +1690,282 @@ def run_gui():
                 painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, label)
 
             painter.restore()
+
+    class HistoryDialog(QDialog):
+        """Modal Dark Cyber Glass con el historial reciente de /var/log/pacman.log."""
+        def __init__(self, parent=None, palette=None):
+            super().__init__(parent)
+            self.palette = palette or (parent.palette if hasattr(parent, "palette") else load_theme_palette())
+            p = self.palette
+            self.entries = parse_pacman_history(limit=250)
+            self.active_action = "all"
+
+            self.setWindowTitle("Historial de Actualizaciones — X64 LIOS")
+            self.resize(860, 560)
+            self.setMinimumSize(700, 440)
+            self.setModal(True)
+            self.setStyleSheet(f"""
+                QDialog {{
+                    background-color: {p['background']};
+                }}
+                QLabel {{
+                    border: none;
+                    background: transparent;
+                }}
+            """)
+
+            vbox = QVBoxLayout(self)
+            vbox.setContentsMargins(22, 18, 22, 18)
+            vbox.setSpacing(14)
+
+            # Header
+            hdr = QHBoxLayout()
+            hdr.setSpacing(12)
+            tcol = QVBoxLayout()
+            tcol.setSpacing(2)
+            trow = QHBoxLayout()
+            trow.setSpacing(8)
+            lbl_tag = QLabel("HISTORIAL")
+            lbl_tag.setStyleSheet(f"background-color: {p['accent']}; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 7px; border-radius: 4px;")
+            lbl_ttl = QLabel("Operaciones Recientes del Sistema")
+            lbl_ttl.setStyleSheet(f"color: {p['foreground']}; font-size: 16px; font-weight: 800;")
+            trow.addWidget(lbl_tag)
+            trow.addWidget(lbl_ttl)
+            trow.addStretch()
+            lbl_sub = QLabel("Registro verificado desde /var/log/pacman.log (más reciente primero)")
+            lbl_sub.setStyleSheet(f"color: {p['muted']}; font-size: 12px;")
+            tcol.addLayout(trow)
+            tcol.addWidget(lbl_sub)
+            hdr.addLayout(tcol)
+            hdr.addStretch()
+
+            self.lbl_count_pill = QLabel(f"{len(self.entries)} registros")
+            self.lbl_count_pill.setFixedHeight(30)
+            self.lbl_count_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_count_pill.setStyleSheet(
+                f"background-color: {p['lighter_background']}; color: {p['sub_text']}; "
+                f"border: 1px solid {p['card_border']}; border-radius: 7px; padding: 0px 12px; font-size: 11px; font-weight: 700;"
+            )
+            hdr.addWidget(self.lbl_count_pill)
+            vbox.addLayout(hdr)
+
+            # Filter Row
+            frow = QHBoxLayout()
+            frow.setSpacing(8)
+            self.search = QLineEdit()
+            self.search.setFixedHeight(34)
+            self.search.setPlaceholderText("Filtrar por paquete, versión o fecha (ej. 2026-11-18)...")
+            self.search.addAction(render_svg_icon("search", color=p["muted"], size=14), QLineEdit.ActionPosition.LeadingPosition)
+            self.search.setStyleSheet(f"""
+                QLineEdit {{
+                    background-color: {p['lighter_background']};
+                    color: {p['foreground']};
+                    border: 1px solid {p['card_border']};
+                    border-radius: 8px;
+                    padding: 0px 12px;
+                    font-size: 12px;
+                }}
+                QLineEdit:focus {{
+                    border: 1px solid {p['accent']};
+                    background-color: {p['selection']};
+                }}
+            """)
+            self.search.textChanged.connect(self._populate)
+            frow.addWidget(self.search, stretch=2)
+
+            self.f_group = QButtonGroup(self)
+            self.f_group.setExclusive(True)
+            up_n = sum(1 for e in self.entries if e["action"] == "upgraded")
+            in_n = sum(1 for e in self.entries if e["action"] == "installed")
+            rm_n = sum(1 for e in self.entries if e["action"] == "removed")
+            chips = [
+                ("all", f"Todos ({len(self.entries)})"),
+                ("upgraded", f"Actualizados ({up_n})"),
+                ("installed", f"Instalados ({in_n})"),
+                ("removed", f"Eliminados ({rm_n})"),
+            ]
+            for key, text in chips:
+                btn = QPushButton(text)
+                btn.setCheckable(True)
+                btn.setChecked(key == "all")
+                btn.setFixedHeight(34)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setProperty("action_filter", key)
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['lighter_background']};
+                        color: {p['sub_text']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 7px;
+                        padding: 0px 12px;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
+                    }}
+                    QPushButton:checked {{
+                        background-color: {p['accent']};
+                        color: #ffffff;
+                        border: 1px solid {p['accent_hover']};
+                    }}
+                """)
+                btn.clicked.connect(self._on_chip_clicked)
+                self.f_group.addButton(btn)
+                frow.addWidget(btn)
+            vbox.addLayout(frow)
+
+            # History Table
+            self.tbl = QTableWidget()
+            self.tbl.setColumnCount(4)
+            self.tbl.setHorizontalHeaderLabels(["ACCIÓN", "PAQUETE", "VERSIÓN", "FECHA"])
+            self.tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            self.tbl.setColumnWidth(0, 128)
+            self.tbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            self.tbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+            self.tbl.setColumnWidth(2, 235)
+            self.tbl.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            self.tbl.setColumnWidth(3, 138)
+            self.tbl.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tbl.horizontalHeaderItem(1).setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self.tbl.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self.tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self.tbl.setShowGrid(False)
+            self.tbl.verticalHeader().setVisible(False)
+            self.tbl.verticalHeader().setDefaultSectionSize(38)
+            self.tbl.setAlternatingRowColors(True)
+            self.tbl.setItemDelegateForColumn(0, BadgeDelegate(self.tbl, p))
+            self.tbl.setStyleSheet(f"""
+                QTableWidget {{
+                    background-color: {p['table_bg']};
+                    alternate-background-color: {p['table_alt_bg']};
+                    color: {p['foreground']};
+                    border: 1px solid {p['table_border']};
+                    border-radius: 10px;
+                    selection-background-color: {p['selection']};
+                    selection-color: {p['foreground']};
+                    font-size: 12px;
+                }}
+                QTableWidget::item {{
+                    padding: 0px 10px;
+                    border-bottom: 1px solid {p['card_border']};
+                }}
+                QHeaderView::section {{
+                    background-color: {p['lighter_background']};
+                    color: {p['muted']};
+                    padding: 9px 10px;
+                    border: none;
+                    border-bottom: 2px solid {p['accent']};
+                    font-weight: 800;
+                    font-size: 11px;
+                    letter-spacing: 0.6px;
+                }}
+                QScrollBar:vertical {{
+                    background: {p['table_bg']};
+                    width: 10px;
+                    border-radius: 5px;
+                }}
+                QScrollBar::handle:vertical {{
+                    background: {p['card_border']};
+                    min-height: 30px;
+                    border-radius: 5px;
+                }}
+                QScrollBar::handle:vertical:hover {{
+                    background: {p['accent']};
+                }}
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                    height: 0px;
+                }}
+            """)
+            vbox.addWidget(self.tbl, stretch=1)
+
+            # Footer
+            foot = QHBoxLayout()
+            self.lbl_foot = QLabel("")
+            self.lbl_foot.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
+            foot.addWidget(self.lbl_foot)
+            foot.addStretch()
+
+            btn_ok = QPushButton("Cerrar")
+            btn_ok.setFixedHeight(34)
+            btn_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_ok.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {p['lighter_background']};
+                    color: {p['foreground']};
+                    border: 1px solid {p['card_border']};
+                    border-radius: 8px;
+                    padding: 0px 22px;
+                    font-weight: 700;
+                    font-size: 12px;
+                }}
+                QPushButton:hover {{
+                    background-color: {p['selection']};
+                    border: 1px solid {p['accent']};
+                }}
+            """)
+            btn_ok.clicked.connect(self.accept)
+            foot.addWidget(btn_ok)
+            vbox.addLayout(foot)
+
+            self._populate()
+
+        def _on_chip_clicked(self):
+            s = self.sender()
+            if s:
+                self.active_action = s.property("action_filter")
+                self._populate()
+
+        def _populate(self):
+            q = self.search.text().strip().lower()
+            p = self.palette
+            mono_font = QFont("JetBrainsMono Nerd Font")
+            mono_font.setPointSize(9)
+
+            action_meta = {
+                "upgraded":  {"label": "Actualizado", "fg": "#e4e4ec", "bg": "#181824", "border": "#2d2d40"},
+                "installed": {"label": "Instalado",   "fg": "#b8c7dc", "bg": "#141923", "border": "#252f42"},
+                "removed":   {"label": "Eliminado",   "fg": "#ff5c5c", "bg": "#260d12", "border": "#4d1922"},
+            }
+
+            self.tbl.setRowCount(0)
+            shown = 0
+            for e in self.entries:
+                if self.active_action != "all" and e["action"] != self.active_action:
+                    continue
+                if q and q not in e["pkg"].lower() and q not in e["version"].lower() and q not in e["date"]:
+                    continue
+
+                row = self.tbl.rowCount()
+                self.tbl.insertRow(row)
+                shown += 1
+
+                a_item = QTableWidgetItem(e["action"])
+                a_item.setData(Qt.ItemDataRole.UserRole, action_meta.get(e["action"], action_meta["upgraded"]))
+                self.tbl.setItem(row, 0, a_item)
+
+                pkg_item = QTableWidgetItem(e["pkg"])
+                pf = QFont()
+                pf.setBold(True)
+                pkg_item.setFont(pf)
+                pkg_item.setForeground(QColor("#ff4d4d") if is_x64_package(e["pkg"]) else QColor(p["foreground"]))
+                self.tbl.setItem(row, 1, pkg_item)
+
+                v_item = QTableWidgetItem(e["version"])
+                v_item.setFont(mono_font)
+                v_item.setForeground(QColor(p["sub_text"]))
+                self.tbl.setItem(row, 2, v_item)
+
+                d_item = QTableWidgetItem(e["date"])
+                d_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                d_item.setFont(mono_font)
+                d_item.setForeground(QColor(p["muted"]))
+                self.tbl.setItem(row, 3, d_item)
+
+            self.lbl_foot.setText(f"Mostrando {shown} de {len(self.entries)} operaciones recientes")
 
     class X64UpdateWindow(QMainWindow):
         def __init__(self):
@@ -1581,19 +2085,40 @@ def run_gui():
                 self.lbl_title.setStyleSheet(f"color: {p['foreground']}; font-weight: 800; font-size: 19px; letter-spacing: 0.8px;")
             if hasattr(self, "lbl_sub"):
                 self.lbl_sub.setStyleSheet(f"color: {p['muted']}; font-size: 12px;")
-            if hasattr(self, "lbl_kernel"):
-                self.lbl_kernel.setStyleSheet(f"background-color: {p['lighter_background']}; color: {p['sub_text']}; border: 1px solid {p['card_border']}; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
-            if hasattr(self, "lbl_uptime"):
-                self.lbl_uptime.setStyleSheet(f"background-color: {p['lighter_background']}; color: {p['sub_text']}; border: 1px solid {p['card_border']}; border-radius: 7px; padding: 0px 13px; font-size: 11px; font-weight: 700;")
+            if hasattr(self, "lbl_telemetry"):
+                self.lbl_telemetry.setStyleSheet(
+                    f"background-color: {p['dark_background']}; color: {p['muted']}; "
+                    f"border: 1px solid {p['card_border']}; border-radius: 8px; "
+                    f"padding: 0px 13px; font-size: 11px; font-weight: 600;"
+                )
+            if hasattr(self, "btn_history"):
+                self.btn_history.setIcon(render_svg_icon("history", color=p["sub_text"], size=14))
+                self.btn_history.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['lighter_background']};
+                        color: {p['sub_text']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 8px;
+                        padding: 0px 14px;
+                        font-weight: 600;
+                        font-size: 12px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['accent']};
+                    }}
+                """)
             if hasattr(self, "btn_refresh"):
+                self.btn_refresh.setIcon(render_svg_icon("refresh", color=p["foreground"], size=14))
                 self.btn_refresh.setStyleSheet(f"""
                     QPushButton {{
                         background-color: {p['lighter_background']};
                         color: {p['foreground']};
                         border: 1px solid {p['card_border']};
-                        border-radius: 7px;
-                        padding: 0px 16px;
-                        font-weight: 700;
+                        border-radius: 8px;
+                        padding: 0px 15px;
+                        font-weight: 600;
                         font-size: 12px;
                     }}
                     QPushButton:hover {{
@@ -1607,19 +2132,30 @@ def run_gui():
                     }}
                 """)
 
+            if hasattr(self, "seg_bar"):
+                self.seg_bar.setStyleSheet(f"""
+                    QFrame#segBar {{
+                        background-color: {p['dark_background']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 9px;
+                    }}
+                """)
+
             if hasattr(self, "search_input"):
+                if hasattr(self, "_search_action") and self._search_action is not None:
+                    self._search_action.setIcon(render_svg_icon("search", color=p["muted"], size=14))
                 self.search_input.setStyleSheet(f"""
                     QLineEdit {{
-                        background-color: {p['lighter_background']};
+                        background-color: {p['dark_background']};
                         color: {p['foreground']};
                         border: 1px solid {p['card_border']};
-                        border-radius: 8px;
-                        padding: 0px 14px;
+                        border-radius: 9px;
+                        padding: 0px 12px;
                         font-size: 13px;
                     }}
                     QLineEdit:focus {{
                         border: 1px solid {p['accent']};
-                        background-color: {p['selection']};
+                        background-color: {p['lighter_background']};
                     }}
                 """)
 
@@ -1686,9 +2222,9 @@ def run_gui():
             if hasattr(self, "zero_card"):
                 self.zero_card.setStyleSheet(f"""
                     QFrame#zero_card {{
-                        background-color: {p['table_alt_bg']};
+                        background-color: {p['dark_background']};
                         border: 1px solid {p['card_border']};
-                        border-radius: 12px;
+                        border-radius: 14px;
                     }}
                     QFrame#zero_card QLabel {{
                         border: none;
@@ -1696,18 +2232,53 @@ def run_gui():
                     }}
                 """)
             if hasattr(self, "lbl_zero_icon"):
+                self.lbl_zero_icon.setPixmap(render_svg_pixmap("check", color=p["foreground"], size=26, stroke_width=2.1))
                 self.lbl_zero_icon.setStyleSheet(f"""
-                    background-color: {p['green_bg']};
-                    color: {p['green_text']};
-                    border: 1px solid {p['green_border']};
+                    background-color: {p['lighter_background']};
+                    border: 1px solid {p['card_border']};
                     border-radius: 30px;
-                    font-size: 28px;
-                    font-weight: 900;
                 """)
             if hasattr(self, "lbl_zero_title"):
-                self.lbl_zero_title.setStyleSheet(f"color: {p['green_text']}; font-size: 17px; font-weight: 800;")
+                self.lbl_zero_title.setStyleSheet(f"color: {p['foreground']}; font-size: 18px; font-weight: 700; letter-spacing: -0.2px;")
             if hasattr(self, "lbl_zero_desc"):
                 self.lbl_zero_desc.setStyleSheet(f"color: {p['muted']}; font-size: 13px;")
+            if hasattr(self, "health_cards"):
+                for card, ico_lbl, ico_name, lbl_k, lbl_v, lbl_s in self.health_cards:
+                    card.setStyleSheet(f"""
+                        QFrame#healthCard {{
+                            background-color: {p['lighter_background']};
+                            border: 1px solid {p['card_border']};
+                            border-radius: 10px;
+                        }}
+                        QFrame#healthCard QLabel {{
+                            border: none;
+                            background: transparent;
+                        }}
+                    """)
+                    ico_lbl.setPixmap(render_svg_pixmap(ico_name, color=p["muted"], size=13, stroke_width=1.8))
+                    lbl_k.setStyleSheet(f"color: {p['muted']}; font-size: 10px; font-weight: 700; letter-spacing: 0.9px;")
+                    lbl_v.setStyleSheet(f"color: {p['foreground']}; font-size: 15px; font-weight: 700;")
+                    lbl_s.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
+            if hasattr(self, "btn_maintenance"):
+                self.btn_maintenance.setIcon(render_svg_icon("sliders", color=p["sub_text"], size=14))
+                self.btn_maintenance.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['lighter_background']};
+                        color: {p['sub_text']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 8px;
+                        padding: 0px 18px;
+                        font-weight: 600;
+                        font-size: 12px;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['selection']};
+                        color: {p['foreground']};
+                        border: 1px solid {p['accent']};
+                    }}
+                """)
+            if hasattr(self, "refresh_health_cards"):
+                self.refresh_health_cards()
 
             if hasattr(self, "footer_frame"):
                 self.footer_frame.setStyleSheet(f"""
@@ -1894,15 +2465,19 @@ def run_gui():
             header_layout.addStretch()
 
             t = get_telemetry()
-            self.lbl_kernel = QLabel(f"Kernel: {t['kernel']}")
-            self.lbl_kernel.setFixedHeight(34)
-            self.lbl_kernel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_telemetry = QLabel(f"Kernel {t['kernel']}  ·  Activo {t['uptime']}")
+            self.lbl_telemetry.setFixedHeight(34)
+            self.lbl_telemetry.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            self.lbl_uptime = QLabel(f"Activo: {t['uptime']}")
-            self.lbl_uptime.setFixedHeight(34)
-            self.lbl_uptime.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.btn_history = QPushButton(" Historial")
+            self.btn_history.setIconSize(QSize(14, 14))
+            self.btn_history.setFixedHeight(34)
+            self.btn_history.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_history.setToolTip("Ver historial reciente de actualizaciones e instalaciones")
+            self.btn_history.clicked.connect(self.open_history_dialog)
 
-            self.btn_refresh = QPushButton("⟳ Comprobar")
+            self.btn_refresh = QPushButton(" Comprobar")
+            self.btn_refresh.setIconSize(QSize(14, 14))
             self.btn_refresh.setFixedHeight(34)
             self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_refresh.clicked.connect(self.trigger_refresh)
@@ -1921,20 +2496,20 @@ def run_gui():
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #ef4444;
+                    background-color: #ff2b2b;
                     color: #ffffff;
-                    border: 1px solid #ef4444;
+                    border: 1px solid #ff2b2b;
                 }
                 QPushButton:pressed {
-                    background-color: #dc2626;
+                    background-color: #d91e26;
                     color: #ffffff;
-                    border: 1px solid #dc2626;
+                    border: 1px solid #d91e26;
                 }
             """)
             self.btn_close.clicked.connect(self.close)
 
-            header_layout.addWidget(self.lbl_kernel)
-            header_layout.addWidget(self.lbl_uptime)
+            header_layout.addWidget(self.lbl_telemetry)
+            header_layout.addWidget(self.btn_history)
             header_layout.addWidget(self.btn_refresh)
             header_layout.addSpacing(6)
             header_layout.addWidget(self.btn_close)
@@ -1944,15 +2519,26 @@ def run_gui():
             self.btn_close.setVisible(is_tiling)
             layout.addLayout(header_layout)
 
-            # Search & Filter Chips Bar
+            # Search & Segmented Filter Control Bar
             filter_layout = QHBoxLayout()
             filter_layout.setSpacing(10)
 
             self.search_input = QLineEdit()
-            self.search_input.setFixedHeight(36)
+            self.search_input.setFixedHeight(38)
             self.search_input.setPlaceholderText("Filtrar paquetes por nombre o versión...")
+            self._search_action = self.search_input.addAction(
+                render_svg_icon("search", color=self.palette["muted"], size=14),
+                QLineEdit.ActionPosition.LeadingPosition
+            )
             self.search_input.textChanged.connect(self.apply_filter)
             filter_layout.addWidget(self.search_input, stretch=2)
+
+            self.seg_bar = QFrame()
+            self.seg_bar.setObjectName("segBar")
+            self.seg_bar.setFixedHeight(38)
+            seg_layout = QHBoxLayout(self.seg_bar)
+            seg_layout.setContentsMargins(3, 3, 3, 3)
+            seg_layout.setSpacing(3)
 
             self.btn_group = QButtonGroup(self)
             self.btn_group.setExclusive(True)
@@ -1979,12 +2565,13 @@ def run_gui():
             self.f_fp.setProperty("filter", "fp")
 
             for btn in [self.f_all, self.f_crit, self.f_repo, self.f_aur, self.f_fp]:
-                btn.setFixedHeight(36)
+                btn.setFixedHeight(30)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 self.btn_group.addButton(btn)
                 btn.clicked.connect(self.on_filter_clicked)
-                filter_layout.addWidget(btn)
+                seg_layout.addWidget(btn)
 
+            filter_layout.addWidget(self.seg_bar)
             layout.addLayout(filter_layout)
 
             # Progress Bar (Thin Laser Line)
@@ -2021,27 +2608,87 @@ def run_gui():
             self.table.setItemDelegateForColumn(0, self.badge_delegate)
             layout.addWidget(self.table, stretch=1)
 
-            # Zero Updates Card (Placeholder when system is up to date)
+            # Zero Updates Card (Modern Monochrome Obsidian + Crisp Vector Icons)
             self.zero_card = QFrame()
             self.zero_card.setObjectName("zero_card")
             zero_vbox = QVBoxLayout(self.zero_card)
-            zero_vbox.setContentsMargins(40, 50, 40, 50)
+            zero_vbox.setContentsMargins(36, 34, 36, 30)
             zero_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            zero_vbox.setSpacing(12)
+            zero_vbox.setSpacing(10)
 
-            self.lbl_zero_icon = QLabel("✓")
+            self.lbl_zero_icon = QLabel()
             self.lbl_zero_icon.setFixedSize(60, 60)
             self.lbl_zero_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            self.lbl_zero_title = QLabel("Tu sistema X64 LIOS está completamente al día")
+            self.lbl_zero_title = QLabel("Sistema X64 LIOS al día")
             self.lbl_zero_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            self.lbl_zero_desc = QLabel("Todos los paquetes del sistema, módulos X64 LIOS, catálogo AUR y aplicaciones Flatpak están en su última versión.")
+            self.lbl_zero_desc = QLabel("Paquetes oficiales, módulos X64 LIOS, catálogo AUR y aplicaciones Flatpak verificados.")
             self.lbl_zero_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lbl_zero_desc.setWordWrap(True)
 
+            zero_vbox.addStretch(1)
             zero_vbox.addWidget(self.lbl_zero_icon, alignment=Qt.AlignmentFlag.AlignCenter)
+            zero_vbox.addSpacing(2)
             zero_vbox.addWidget(self.lbl_zero_title)
             zero_vbox.addWidget(self.lbl_zero_desc)
+            zero_vbox.addSpacing(18)
+
+            # 3 Live System Health Mini-Cards with Monochrome Vector Icons
+            cards_container = QWidget()
+            cards_container.setStyleSheet("background: transparent; border: none;")
+            cards_container.setMaximumWidth(780)
+            cards_row = QHBoxLayout(cards_container)
+            cards_row.setContentsMargins(0, 0, 0, 0)
+            cards_row.setSpacing(12)
+
+            def _make_health_card(icon_name, title_text):
+                c = QFrame()
+                c.setObjectName("healthCard")
+                c.setMinimumWidth(226)
+                cv = QVBoxLayout(c)
+                cv.setContentsMargins(16, 14, 16, 14)
+                cv.setSpacing(5)
+                top_r = QHBoxLayout()
+                top_r.setContentsMargins(0, 0, 0, 0)
+                top_r.setSpacing(6)
+                ico = QLabel()
+                ico.setFixedSize(14, 14)
+                ico.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                lk = QLabel(title_text)
+                top_r.addWidget(ico)
+                top_r.addWidget(lk)
+                top_r.addStretch()
+                lv = QLabel("—")
+                ls = QLabel(" ")
+                cv.addLayout(top_r)
+                cv.addWidget(lv)
+                cv.addWidget(ls)
+                return c, ico, icon_name, lk, lv, ls
+
+            c1 = _make_health_card("clock", "ÚLTIMA COMPROBACIÓN")
+            c2 = _make_health_card("hard-drive", "ALMACENAMIENTO /")
+            c3 = _make_health_card("package", "PAQUETES Y CACHÉ")
+            self.health_cards = [c1, c2, c3]
+            self.lbl_hc_check_val, self.lbl_hc_check_sub = c1[4], c1[5]
+            self.lbl_hc_disk_val, self.lbl_hc_disk_sub = c2[4], c2[5]
+            self.lbl_hc_pkg_val, self.lbl_hc_pkg_sub = c3[4], c3[5]
+
+            for c_tuple in self.health_cards:
+                cards_row.addWidget(c_tuple[0], stretch=1)
+
+            zero_vbox.addWidget(cards_container, alignment=Qt.AlignmentFlag.AlignCenter)
+            zero_vbox.addSpacing(12)
+
+            # Single Clean Maintenance Action
+            self.btn_maintenance = QPushButton(" Optimizar caché y sistema")
+            self.btn_maintenance.setIconSize(QSize(14, 14))
+            self.btn_maintenance.setFixedHeight(35)
+            self.btn_maintenance.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_maintenance.setToolTip("Optimiza la caché de Pacman (paccache -rk2) y elimina huérfanos / runtimes sin uso")
+            self.btn_maintenance.clicked.connect(self.start_maintenance_transaction)
+            zero_vbox.addWidget(self.btn_maintenance, alignment=Qt.AlignmentFlag.AlignCenter)
+            zero_vbox.addStretch(1)
 
             self.zero_card.setVisible(False)
             layout.addWidget(self.zero_card, stretch=1)
@@ -2095,20 +2742,18 @@ def run_gui():
             }
             for btn, cnt in counts.items():
                 fg = p['foreground'] if cnt > 0 else p['muted']
-                bg = p['lighter_background'] if cnt > 0 else p['dark_background']
-                bdr = p['accent_hover'] if cnt > 0 else p['card_border']
                 btn.setStyleSheet(f"""
                     QPushButton {{
-                        background-color: {bg};
+                        background-color: transparent;
                         color: {fg};
-                        border: 1px solid {bdr};
-                        border-radius: 8px;
-                        padding: 0px 14px;
+                        border: 1px solid transparent;
+                        border-radius: 6px;
+                        padding: 0px 12px;
                         font-weight: 600;
                         font-size: 12px;
                     }}
                     QPushButton:hover {{
-                        background-color: {p['selection']};
+                        background-color: {p['lighter_background']};
                         color: {p['foreground']};
                     }}
                     QPushButton:checked {{
@@ -2145,14 +2790,14 @@ def run_gui():
 
             hdr_layout.addStretch()
 
-            self.lbl_elapsed = QLabel("⏱ Tiempo: 00:00")
+            self.lbl_elapsed = QLabel("Tiempo: 00:00")
             hdr_layout.addWidget(self.lbl_elapsed)
 
             layout.addLayout(hdr_layout)
 
             # Main Progress Bar
             self.tx_progress = QProgressBar()
-            self.tx_progress.setFixedHeight(8)
+            self.tx_progress.setFixedHeight(6)
             self.tx_progress.setTextVisible(False)
             self.tx_progress.setRange(0, 100)
             self.tx_progress.setValue(10)
@@ -2171,28 +2816,28 @@ def run_gui():
             footer_box.setContentsMargins(14, 10, 14, 10)
             footer_box.setSpacing(16)
 
-            self.lbl_tx_status = QLabel("⏳ Ejecutando comandos de actualización...")
+            self.lbl_tx_status = QLabel("Ejecutando comandos del sistema...")
             footer_box.addWidget(self.lbl_tx_status, stretch=2)
 
-            self.btn_tx_reboot = QPushButton("⚡ Reiniciar Ahora")
+            self.btn_tx_reboot = QPushButton(" Reiniciar Ahora")
+            self.btn_tx_reboot.setIcon(render_svg_icon("power", color="#ffffff", size=14))
+            self.btn_tx_reboot.setIconSize(QSize(14, 14))
             self.btn_tx_reboot.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_tx_reboot.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #b91c1c);
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff2b2b, stop:1 #b91c1c);
                     color: #ffffff;
-                    border: 1px solid #f87171;
+                    border: 1px solid #ff4d4d;
                     border-radius: 8px;
-                    padding: 10px 24px;
-                    font-weight: 800;
+                    padding: 10px 22px;
+                    font-weight: 700;
                     font-size: 13px;
                 }
                 QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #f87171, stop:1 #dc2626);
-                    border: 1px solid #fca5a5;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff4d4d, stop:1 #dc2626);
                 }
                 QPushButton:pressed {
                     background: #991b1b;
-                    border: 1px solid #b91c1c;
                 }
             """)
             self.btn_tx_reboot.setVisible(False)
@@ -2211,7 +2856,7 @@ def run_gui():
             elapsed = int(time.time() - self.tx_start_time)
             mins = elapsed // 60
             secs = elapsed % 60
-            self.lbl_elapsed.setText(f"⏱ Tiempo: {mins:02d}:{secs:02d}")
+            self.lbl_elapsed.setText(f"Tiempo: {mins:02d}:{secs:02d}")
 
         def load_cached_state(self):
             if not os.path.exists(PACKAGES_FILE):
@@ -2240,12 +2885,156 @@ def run_gui():
             self.check_worker.finished.connect(self.on_check_finished)
             self.check_worker.start()
 
+        def refresh_health_cards(self):
+            if not hasattr(self, "lbl_hc_check_val"):
+                return
+            h = get_system_health()
+            p = self.palette
+            self._last_health = h
+
+            self.lbl_hc_check_val.setText(h["last_rel"])
+            self.lbl_hc_check_sub.setText(h["last_clock"])
+
+            self.lbl_hc_disk_val.setText(h["disk_free"])
+            self.lbl_hc_disk_sub.setText(h["disk_sub"])
+            if h["disk_status"] == "crit":
+                disk_col = p["accent"]
+            elif h["disk_status"] == "warn":
+                disk_col = "#e5a93c"
+            else:
+                disk_col = p["foreground"]
+            self.lbl_hc_disk_val.setStyleSheet(f"color: {disk_col}; font-size: 15px; font-weight: 700;")
+
+            pkg_str = f"{h['pkg_count']:,}".replace(",", ".") if h["pkg_count"] else "—"
+            self.lbl_hc_pkg_val.setText(f"{pkg_str} paquetes")
+            orph_txt = "0 huérfanos" if h["orphan_count"] == 0 else (
+                "1 huérfano" if h["orphan_count"] == 1 else f"{h['orphan_count']} huérfanos"
+            )
+            self.lbl_hc_pkg_sub.setText(f"Caché: {h['cache_str']} · {orph_txt}")
+
+        def open_history_dialog(self):
+            dlg = HistoryDialog(self, palette=self.palette)
+            dlg.exec()
+
+        def start_maintenance_transaction(self):
+            nopasswd_sudo = (
+                subprocess.run(
+                    ["setsid", "sudo", "-n", "-v"],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                ).returncode == 0
+            )
+            cached_sudo = nopasswd_sudo or bool(getattr(self, "_session_sudo_pwd", None))
+            h = getattr(self, "_last_health", None) or get_system_health()
+            breakdown = {
+                "cache_str": h["cache_str"],
+                "orphans": h["orphan_count"],
+            }
+            dlg = ConfirmDialog(0, 0, cached_sudo, self, breakdown=breakdown, palette=self.palette, mode="maintenance")
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            if dlg.get_password():
+                self._session_sudo_pwd = dlg.get_password()
+            password = getattr(self, "_session_sudo_pwd", None)
+            sudo_cmd = "sudo -A" if password else "sudo"
+
+            commands = []
+            display_cmds = []
+            if shutil.which("paccache"):
+                commands.append(
+                    "printf '\\033[1;34m::\\033[0;1m Optimizando caché de Pacman (conservando últimas 2 versiones)...\\033[0m\\n' && "
+                    f"{sudo_cmd} paccache -rk2 -v && {sudo_cmd} paccache -ruk0 -v || true"
+                )
+                display_cmds.append("paccache -rk2 && paccache -ruk0")
+            else:
+                commands.append(f"{sudo_cmd} pacman -Sc --noconfirm || true")
+                display_cmds.append("pacman -Sc")
+
+            commands.append(
+                "{ orphans=$(pacman -Qtdq 2>/dev/null || true); "
+                "if [ -n \"$orphans\" ]; then "
+                "printf '\\033[1;34m::\\033[0;1m Eliminando paquetes huérfanos...\\033[0m\\n'; "
+                f"{sudo_cmd} pacman -Rns --noconfirm $orphans || true; "
+                "else printf '\\033[1;32m✓\\033[0;1m Sin paquetes huérfanos que limpiar.\\033[0m\\n'; fi; }"
+            )
+            display_cmds.append("limpiar-huérfanos")
+
+            if shutil.which("flatpak"):
+                commands.append(
+                    "printf '\\033[1;34m::\\033[0;1m Comprobando runtimes Flatpak sin uso...\\033[0m\\n' && "
+                    "flatpak uninstall --unused -y || true"
+                )
+                display_cmds.append("flatpak uninstall --unused -y")
+
+            self._is_maintenance_tx = True
+            self.stacked_widget.setCurrentIndex(1)
+            cmd_display = " && ".join(display_cmds).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            header_html = (
+                f"<div style=\"color: {self.palette['accent']}; font-weight: bold; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
+                f"[X64 LIOS MAINTENANCE] INICIANDO MANTENIMIENTO RÁPIDO DEL SISTEMA...</div>"
+                f"<div style=\"color: #71717a; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
+                f"Comandos: {cmd_display}</div>"
+                f"<div style=\"color: #222230; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px; margin-bottom: 6px;\">"
+                f"{'─' * 104}</div>"
+            )
+            self.vt_screen = Vt100Screen(header_html=header_html)
+            self.vt_last_render = 0.0
+            if not hasattr(self, "vt_render_timer"):
+                self.vt_render_timer = QTimer(self)
+                self.vt_render_timer.setSingleShot(True)
+                self.vt_render_timer.timeout.connect(self.flush_vt_render)
+            self.log_view.setHtml(self.vt_screen.to_html())
+
+            self.lbl_live.setText("EN VIVO")
+            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_tx_title.setText("MANTENIMIENTO RÁPIDO EN PROGRESO")
+            self.lbl_tx_stage.setText("Limpiando caché de paquetes y dependencias residuales...")
+            self.lbl_tx_stage.setStyleSheet(f"color: {self.palette['sub_text']}; font-size: 13px; font-weight: 600;")
+            self.lbl_tx_status.setText("Optimizando almacenamiento y paquetes...")
+            self.lbl_tx_status.setStyleSheet(f"color: {self.palette['foreground']}; font-weight: 600; font-size: 13px;")
+            self.btn_tx_done.setEnabled(False)
+            self.btn_tx_done.setText("Procesando...")
+            self.btn_tx_done.setStyleSheet("""
+                QPushButton {
+                    background: #14141d;
+                    color: #555568;
+                    border: 1px solid #222230;
+                    border-radius: 8px;
+                    padding: 10px 24px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+            """)
+            self.btn_tx_reboot.setVisible(False)
+            self.tx_progress.setValue(20)
+            self.tx_progress.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {self.palette['dark_background']};
+                    border: 1px solid {self.palette['card_border']};
+                    border-radius: 3px;
+                }}
+                QProgressBar::chunk {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {self.palette['accent']}, stop:1 {self.palette['accent_hover']});
+                    border-radius: 3px;
+                }}
+            """)
+            self.tx_start_time = time.time()
+            self.timer_elapsed.start(1000)
+
+            self.tx_worker = TransactionWorker(commands, password)
+            self.tx_worker.output_received.connect(self.on_tx_output)
+            self.tx_worker.stage_changed.connect(self.on_tx_stage)
+            self.tx_worker.transaction_done.connect(self.on_tx_finished)
+            self.tx_worker.start()
+
         def on_check_finished(self, data):
             self.prog_bar.setVisible(False)
             self.btn_refresh.setEnabled(True)
-            self.btn_refresh.setText("⟳ Comprobar")
+            self.btn_refresh.setText(" Comprobar")
 
             self.populate_items(data["repo"], data["aur"], data["flatpak"])
+            self.refresh_health_cards()
 
         def populate_items(self, repo_pkgs, aur_pkgs, flatpak_pkgs):
             self.all_items = []
@@ -2308,6 +3097,7 @@ def run_gui():
                 self.btn_update.setText("Sistema al Día")
                 self.table.setVisible(False)
                 self.zero_card.setVisible(True)
+                self.refresh_health_cards()
             else:
                 pkg_txt = "1 paquete pendiente de actualización" if tot == 1 else f"<b>{tot}</b> paquetes pendientes de actualización"
                 if crit_cnt > 0:
@@ -2358,22 +3148,22 @@ def run_gui():
                 row = self.table.rowCount()
                 self.table.insertRow(row)
 
-                # Col 0: Rounded Pill Badge via BadgeDelegate
+                # Col 0: Rounded Pill Badge via BadgeDelegate (Sober Linear X64 Palette)
                 if item["crit"]:
                     sort_key = "1_Crítico"
-                    meta = {"label": "Crítico", "fg": "#fbbf24", "bg": "#2b1d06", "border": "#573b0c"}
+                    meta = {"label": "Crítico", "fg": "#f0b44c", "bg": "#241a0b", "border": "#4a3514"}
                 elif item.get("x64"):
                     sort_key = "2_X64 LIOS"
-                    meta = {"label": "X64 LIOS", "fg": "#ff4d4d", "bg": "#2a0a0e", "border": "#5c161e"}
+                    meta = {"label": "X64 LIOS", "fg": "#ff5c5c", "bg": "#260d12", "border": "#4d1922"}
                 elif item["type"] == "Sistema":
                     sort_key = "3_Sistema"
-                    meta = {"label": "Sistema", "fg": "#38bdf8", "bg": "#092030", "border": "#123b56"}
+                    meta = {"label": "Sistema", "fg": "#b8c7dc", "bg": "#141923", "border": "#252f42"}
                 elif item["type"] == "AUR":
                     sort_key = "4_AUR"
-                    meta = {"label": "AUR", "fg": "#e879f9", "bg": "#26092e", "border": "#481456"}
+                    meta = {"label": "AUR", "fg": "#c9a7eb", "bg": "#1c1428", "border": "#36274d"}
                 else:
                     sort_key = "5_Flatpak"
-                    meta = {"label": "Flatpak", "fg": "#818cf8", "bg": "#101036", "border": "#232368"}
+                    meta = {"label": "Flatpak", "fg": "#a5b4fc", "bg": "#13162b", "border": "#272d54"}
 
                 tag_item = QTableWidgetItem(sort_key)
                 tag_item.setData(Qt.ItemDataRole.UserRole, meta)
@@ -2399,7 +3189,7 @@ def run_gui():
                 new_item = QTableWidgetItem(new_str)
                 new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 new_item.setFont(mono_bold)
-                new_item.setForeground(QColor(self.palette["green_text"]) if not item["crit"] else QColor(self.palette["yellow_text"]))
+                new_item.setForeground(QColor(self.palette["foreground"]) if not item["crit"] else QColor("#f0b44c"))
                 self.table.setItem(row, 3, new_item)
 
             self.table.setSortingEnabled(True)
@@ -2451,6 +3241,7 @@ def run_gui():
             )
 
             # Switch to In-App Transaction View
+            self._is_maintenance_tx = False
             self.stacked_widget.setCurrentIndex(1)
             cmd_display = " && ".join(display_cmds).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             header_html = (
@@ -2471,38 +3262,38 @@ def run_gui():
 
             # Reset header and transaction state
             self.lbl_live.setText("EN VIVO")
-            self.lbl_live.setStyleSheet("background-color: #ef4444; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 8px; border-radius: 4px;")
             self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
             self.lbl_tx_stage.setText("Inicializando transacción de paquetes...")
-            self.lbl_tx_stage.setStyleSheet("color: #38bdf8; font-size: 13px; font-weight: bold;")
-            self.lbl_tx_status.setText("⏳ Ejecutando comandos de actualización...")
-            self.lbl_tx_status.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 13px;")
+            self.lbl_tx_stage.setStyleSheet(f"color: {self.palette['sub_text']}; font-size: 13px; font-weight: 600;")
+            self.lbl_tx_status.setText("Ejecutando comandos de actualización...")
+            self.lbl_tx_status.setStyleSheet(f"color: {self.palette['foreground']}; font-weight: 600; font-size: 13px;")
 
             self.btn_tx_done.setEnabled(False)
             self.btn_tx_done.setText("Procesando...")
             self.btn_tx_done.setStyleSheet("""
                 QPushButton {
-                    background: #181822;
-                    color: #555566;
+                    background: #14141d;
+                    color: #555568;
                     border: 1px solid #222230;
                     border-radius: 8px;
                     padding: 10px 24px;
-                    font-weight: bold;
+                    font-weight: 600;
                     font-size: 13px;
                 }
             """)
             self.btn_tx_reboot.setVisible(False)
             self.tx_progress.setValue(10)
-            self.tx_progress.setStyleSheet("""
-                QProgressBar {
-                    background-color: #14141e;
-                    border: 1px solid #252536;
-                    border-radius: 4px;
-                }
-                QProgressBar::chunk {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff1a1a, stop:0.7 #f59e0b, stop:1 #22c55e);
-                    border-radius: 4px;
-                }
+            self.tx_progress.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: {self.palette['dark_background']};
+                    border: 1px solid {self.palette['card_border']};
+                    border-radius: 3px;
+                }}
+                QProgressBar::chunk {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {self.palette['accent']}, stop:1 {self.palette['accent_hover']});
+                    border-radius: 3px;
+                }}
             """)
             self.tx_start_time = time.time()
             self.timer_elapsed.start(1000)
@@ -2560,67 +3351,73 @@ def run_gui():
             self.btn_tx_done.setEnabled(True)
 
             if success:
+                p = self.palette
+                is_maint = getattr(self, "_is_maintenance_tx", False)
                 self.lbl_live.setText("COMPLETADO")
-                self.lbl_live.setStyleSheet("background-color: #22c55e; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
-                self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA FINALIZADA")
-                self.lbl_tx_stage.setText("✓ ¡Todos los paquetes se han instalado y verificado con éxito!")
-                self.lbl_tx_stage.setStyleSheet("color: #22c55e; font-size: 13px; font-weight: bold;")
-                self.lbl_tx_status.setText("🛡️ Sistema X64 LIOS actualizado, sincronizado y seguro.")
-                self.lbl_tx_status.setStyleSheet("color: #4ade80; font-weight: bold; font-size: 13px;")
+                self.lbl_live.setStyleSheet(f"background-color: {p['lighter_background']}; color: {p['foreground']}; border: 1px solid {p['card_border']}; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 4px;")
+                if is_maint:
+                    self.lbl_tx_title.setText("MANTENIMIENTO DEL SISTEMA FINALIZADO")
+                    self.lbl_tx_stage.setText("Caché de paquetes y dependencias residuales optimizadas.")
+                    self.lbl_tx_status.setText("Almacenamiento y sistema X64 LIOS optimizados.")
+                else:
+                    self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA FINALIZADA")
+                    self.lbl_tx_stage.setText("Todos los paquetes se han instalado y verificado con éxito.")
+                    self.lbl_tx_status.setText("Sistema X64 LIOS actualizado, sincronizado y listo.")
+                self.lbl_tx_stage.setStyleSheet(f"color: {p['sub_text']}; font-size: 13px; font-weight: 600;")
+                self.lbl_tx_status.setStyleSheet(f"color: {p['foreground']}; font-weight: 700; font-size: 13px;")
                 self.tx_progress.setValue(100)
-                self.tx_progress.setStyleSheet("""
-                    QProgressBar {
-                        background-color: #14141e;
-                        border: 1px solid #14532d;
-                        border-radius: 4px;
-                    }
-                    QProgressBar::chunk {
-                        background: #22c55e;
-                        border-radius: 4px;
-                    }
+                self.tx_progress.setStyleSheet(f"""
+                    QProgressBar {{
+                        background-color: {p['dark_background']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 3px;
+                    }}
+                    QProgressBar::chunk {{
+                        background: {p['foreground']};
+                        border-radius: 3px;
+                    }}
                 """)
 
-                self.btn_tx_done.setText("✓ Cerrar y Salir")
-                self.btn_tx_done.setStyleSheet("""
-                    QPushButton {
-                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #22c55e, stop:1 #15803d);
-                        color: #ffffff;
-                        border: 1px solid #4ade80;
+                self.btn_tx_done.setText("Volver al Centro" if is_maint else "Cerrar y Salir")
+                self.btn_tx_done.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['foreground']};
+                        color: {p['background']};
+                        border: 1px solid {p['foreground']};
                         border-radius: 8px;
                         padding: 10px 24px;
-                        font-weight: 800;
+                        font-weight: 700;
                         font-size: 13px;
-                    }
-                    QPushButton:hover {
-                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4ade80, stop:1 #16a34a);
-                        border: 1px solid #86efac;
-                    }
+                    }}
+                    QPushButton:hover {{
+                        background-color: #ffffff;
+                    }}
                 """)
 
                 if kernel_updated:
-                    self.lbl_tx_status.setText("⚡ Se actualizó el Kernel o Driver gráfico. Se recomienda reiniciar.")
-                    self.lbl_tx_status.setStyleSheet("color: #facc15; font-weight: bold; font-size: 13px;")
+                    self.lbl_tx_status.setText("Se actualizó el Kernel o controlador gráfico. Se recomienda reiniciar.")
+                    self.lbl_tx_status.setStyleSheet("color: #f0b44c; font-weight: 700; font-size: 13px;")
                     self.btn_tx_reboot.setVisible(True)
             else:
                 self.lbl_live.setText("ERROR")
-                self.lbl_live.setStyleSheet("background-color: #dc2626; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
-                self.lbl_tx_title.setText("ERROR EN LA ACTUALIZACIÓN")
-                self.lbl_tx_stage.setText(f"✕ La transacción se interrumpió (código de salida: {exit_code})")
-                self.lbl_tx_stage.setStyleSheet("color: #ef4444; font-size: 13px; font-weight: bold;")
-                self.lbl_tx_status.setText("✕ La actualización no se pudo completar completamente.")
-                self.lbl_tx_status.setStyleSheet("color: #f87171; font-weight: bold; font-size: 13px;")
+                self.lbl_live.setStyleSheet("background-color: #ff2b2b; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 8px; border-radius: 4px;")
+                self.lbl_tx_title.setText("ERROR EN LA OPERACIÓN")
+                self.lbl_tx_stage.setText(f"La transacción se interrumpió (código de salida: {exit_code})")
+                self.lbl_tx_stage.setStyleSheet("color: #ff5c5c; font-size: 13px; font-weight: 600;")
+                self.lbl_tx_status.setText("La operación no se pudo completar.")
+                self.lbl_tx_status.setStyleSheet("color: #ff5c5c; font-weight: 600; font-size: 13px;")
                 self.tx_progress.setStyleSheet("""
                     QProgressBar {
-                        background-color: #14141e;
-                        border: 1px solid #7f1d1d;
-                        border-radius: 4px;
+                        background-color: #101018;
+                        border: 1px solid #4d1922;
+                        border-radius: 3px;
                     }
                     QProgressBar::chunk {
-                        background: #ef4444;
-                        border-radius: 4px;
+                        background: #ff2b2b;
+                        border-radius: 3px;
                     }
                 """)
-                self.btn_tx_done.setText("← Volver")
+                self.btn_tx_done.setText("Volver")
                 self.btn_tx_done.setStyleSheet("""
                     QPushButton {
                         background: #27273a;
@@ -2640,6 +3437,7 @@ def run_gui():
         def on_tx_close_clicked(self):
             if self.btn_tx_done.text().startswith("←") or "Volver" in self.btn_tx_done.text():
                 self.stacked_widget.setCurrentIndex(0)
+                self.refresh_health_cards()
                 self.trigger_refresh()
             else:
                 self.close()

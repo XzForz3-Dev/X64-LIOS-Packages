@@ -1,0 +1,8 @@
+/* X64 LIOS — Official Crimson Accent Override for adw-gtk3-dark & Libadwaita (GTK3/GTK4) */
+@define-color accent_bg_color #ff2b2b;
+@define-color accent_fg_color #ffffff;
+@define-color accent_color #ff5c5c;
+@define-color theme_selected_bg_color #ff2b2b;
+@define-color theme_selected_fg_color #ffffff;
+@define-color theme_unfocused_selected_bg_color #c82222;
+@define-color theme_unfocused_selected_fg_color #ffffff;

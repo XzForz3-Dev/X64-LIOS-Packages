@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-update
 pkgver=1.0.0
-pkgrel=40
+pkgrel=41
 pkgdesc="Notificador y gestor de actualizaciones del sistema para X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -9,6 +9,7 @@ license=('GPL-3.0-or-later')
 depends=(
     'python'
     'python-pyqt6'
+    'qt6-svg'
     'pacman-contrib'
     'archlinux-contrib'
     'libnotify'
@@ -33,13 +34,13 @@ source=(
     'x64-update-tray.service'
     '90-x64-update-tray.preset'
 )
-sha256sums=('613aa5e6e549b714506373d4fd610dd26f76af65c1d824c71306444d8f1cebbc'
+sha256sums=('742d42c8c6f9a7ec5e68d122aede64687ca0744e984c17ce92b405ded0f7dc8b'
             'f19319d02bfb40bc0db7d337ab73026afe0ecb01535736857ae81bc5654f4f11'
             'd79151c6b310521a0c4ae374862b2b7d3130662f06a8819d74724a6b899934d9'
             'e8dc06813b80282aa71644d23c36a550dbe6416546902fb2876d12517c60047c'
             '03115e1d57d880038c40576becaf51ee3e3c9e4d43ead98d1a838746958e9a58'
             'e69a6d44aa34f682a9ad6e3aa72a838cec08bfae33a96b1476489591e45dfad5'
-            'b4e7c70b6b209022ee6f5f319ff4964265130a92153620e9d9235f6f3b30575f'
+            '2e579b04519c196348348227117047e3e44bd07f0935869a713ad06bbc07bfd7'
             'c2a74593722aee3400d35d11c15bd89149a7ef74514a73f489ddeb685d0f6375')
 
 package() {

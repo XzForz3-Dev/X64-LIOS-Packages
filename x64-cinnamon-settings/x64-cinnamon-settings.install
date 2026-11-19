@@ -43,6 +43,11 @@ post_install() {
         fi
     done
 
+    # Limpiar variables residuales de KDE en /etc/environment si existen
+    if [ -f /etc/environment ]; then
+        sed -i '/^QT_QPA_PLATFORMTHEME=kde$/d; /^KDE_SESSION_VERSION=6$/d' /etc/environment 2>/dev/null || true
+    fi
+
     # Propagar configuracion del boton de inicio y panel a los usuarios existentes
     for user_dir in /home/*; do
         if [ -d "$user_dir" ]; then
@@ -85,9 +90,18 @@ for path in glob.glob(sys.argv[1] + "/*.json"):
 ' "$target_sound" 2>/dev/null || true
             fi
 
-            # 2.1 Limpiar residuos GTK3/GTK4 de KDE/COSMIC/Xfce y portales heredados
+            # 2.1 Limpiar residuos GTK3/GTK4 de KDE/COSMIC/Xfce y portales heredados, y aplicar acento Carmesi X64
             rm -rf "$user_dir/.config/gtk-3.0/assets" "$user_dir/.config/gtk-3.0/colors.css" "$user_dir/.config/gtk-3.0/window_decorations.css" "$user_dir/.config/gtk-3.0/gtk.css" "$user_dir/.config/gtk-3.0/gtk.css.bak" 2>/dev/null || true
             rm -rf "$user_dir/.config/gtk-4.0/assets" "$user_dir/.config/gtk-4.0/colors.css" "$user_dir/.config/gtk-4.0/window_decorations.css" "$user_dir/.config/gtk-4.0/cosmic" "$user_dir/.config/gtk-4.0/gtk.css" "$user_dir/.config/gtk-4.0/gtk.css.bak" 2>/dev/null || true
+            mkdir -p "$user_dir/.config/gtk-3.0" "$user_dir/.config/gtk-4.0"
+            if [ -f /etc/skel/.config/gtk-3.0/gtk.css ]; then
+                cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css"
+                chown "$u:$g" "$user_dir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
+            fi
+            if [ -f /etc/skel/.config/gtk-4.0/gtk.css ]; then
+                cp -f /etc/skel/.config/gtk-4.0/gtk.css "$user_dir/.config/gtk-4.0/gtk.css"
+                chown "$u:$g" "$user_dir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
+            fi
             rm -f "$user_dir/.gtkrc-2.0" "$user_dir/.config/xdg-desktop-portal/hyprland-portals.conf" 2>/dev/null || true
             rmdir "$user_dir/.config/xdg-desktop-portal" 2>/dev/null || true
             for gset in "$user_dir/.config/gtk-3.0/settings.ini" "$user_dir/.config/gtk-4.0/settings.ini"; do
@@ -145,6 +159,7 @@ $DCONF_CMD write /org/cinnamon/desktop/background/picture-options "'zoom'" 2>/de
 $DCONF_CMD write /org/cinnamon/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/interface/icon-theme "'Papirus-Dark'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/desktop/wm/preferences/theme "'adw-gtk3-dark'" 2>/dev/null || true
+$DCONF_CMD write /org/cinnamon/desktop/wm/preferences/button-layout "':minimize,maximize,close'" 2>/dev/null || true
 $DCONF_CMD write /org/cinnamon/theme/name "'X64-Stealth'" 2>/dev/null || true
 $DCONF_CMD write /org/x/apps/portal/color-scheme "'prefer-dark'" 2>/dev/null || true
 $DCONF_CMD write /org/gnome/desktop/interface/gtk-theme "'adw-gtk3-dark'" 2>/dev/null || true

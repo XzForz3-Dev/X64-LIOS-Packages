@@ -1,6 +1,6 @@
 pkgname=x64-cinnamon-settings
 pkgver=1.0.0
-pkgrel=14
+pkgrel=15
 pkgdesc="Configuracion oficial de X64 LIOS para escritorio Cinnamon y LightDM Slick Greeter"
 arch=('any')
 license=('GPL')
@@ -34,8 +34,10 @@ source=(
     'grouped-window-list-2.json'
     'sound-settings-override.json'
     'x64-cinnamon-screenshot'
+    'gtk-accent.css'
 )
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -114,4 +116,8 @@ package() {
     install -d "${pkgdir}/usr/share/themes/X64-Stealth/cinnamon"
     install -m644 "${startdir}/x64-stealth-theme/index.theme" "${pkgdir}/usr/share/themes/X64-Stealth/index.theme"
     install -m644 "${startdir}/x64-stealth-theme/cinnamon/"* "${pkgdir}/usr/share/themes/X64-Stealth/cinnamon/"
+
+    # 12. Override de acento Rojo Carmesi X64 (#ff2b2b) para aplicaciones GTK3 y GTK4 (Nemo, Configuracion, etc.)
+    install -Dm644 "${srcdir}/gtk-accent.css" "${pkgdir}/etc/skel/.config/gtk-3.0/gtk.css"
+    install -Dm644 "${srcdir}/gtk-accent.css" "${pkgdir}/etc/skel/.config/gtk-4.0/gtk.css"
 }

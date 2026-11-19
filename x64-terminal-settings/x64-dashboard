@@ -627,6 +627,9 @@ except Exception:
             end
         end
     end
+    if test "$target_id" != "3"
+        sudo sed -i '/^QT_QPA_PLATFORMTHEME=kde$/d; /^KDE_SESSION_VERSION=6$/d' /etc/environment 2>/dev/null
+    end
 
     if test "$target_id" != "4"; and type -q cosmic-session
         if test $is_es -eq 1

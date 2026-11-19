@@ -16,6 +16,7 @@ icon-theme='Papirus-Dark'
 
 [org.cinnamon.desktop.wm.preferences]
 theme='adw-gtk3-dark'
+button-layout=':minimize,maximize,close'
 
 [org.cinnamon.theme]
 name='X64-Stealth'
