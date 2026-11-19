@@ -1,14 +1,14 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.1.0
-pkgrel=32
+pkgrel=33
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
 license=('GPL3')
 install='x64-terminal-settings.install'
 backup=('etc/scx_loader/config.toml')
-depends=('fish' 'starship' 'fastfetch' 'ttf-jetbrains-mono-nerd' 'opencode')
+depends=('fish' 'starship' 'fastfetch' 'ttf-jetbrains-mono-nerd' 'opencode' 'dmemcg-booster' 'thermald')
 optdepends=('kitty: GPU-accelerated terminal emulator'
             'btop: Resource monitor for x64-dashboard')
 source=(
@@ -69,7 +69,7 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
             '6bf718270636a86861b098ef20db507f90948a96cd7d93322224d30f51323700'
             'c848efb713a710ca29f0d3c6b15ef01cbfc1d5d7c96c256077c9606996eb8a7a'
-            '3bf3fa260a866a53a95d5e8929e54bcf3243430e4b6f2e15e546000a9cce5b1e'
+            'd5cd3beba36ffe095c887a4c8acf049cb056d2aae7c9a2ee7de252ca2a012744'
             '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
             'cbef6edab7ed9826c87bfae01b595ce6d2eff0ed5923250ead5584304530d0af'
             '0e9bfa271366a5d92265165f5c802a1f50a7ea266b455ad1392711299b6e67e8'

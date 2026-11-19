@@ -142,6 +142,32 @@ EOF
         ln -sf /etc/systemd/system/falcond.service /etc/systemd/system/multi-user.target.wants/falcond.service
     fi
 
+    # Habilitar dmemcg-booster (SteamOS/Valve VRAM cgroup protection integrado con FalconD)
+    if [ -f /usr/lib/systemd/system/dmemcg-booster-system.service ]; then
+        mkdir -p /etc/systemd/system/multi-user.target.wants
+        ln -sf /usr/lib/systemd/system/dmemcg-booster-system.service /etc/systemd/system/multi-user.target.wants/dmemcg-booster-system.service
+    fi
+    if [ -f /usr/lib/systemd/user/dmemcg-booster-user.service ]; then
+        mkdir -p /etc/systemd/user/graphical-session-pre.target.wants
+        ln -sf /usr/lib/systemd/user/dmemcg-booster-user.service /etc/systemd/user/graphical-session-pre.target.wants/dmemcg-booster-user.service
+    fi
+
+    # Habilitar thermald SOLO en CPUs Intel bare-metal (evita spawn innecesario en AMD Ryzen o VMs)
+    is_intel_baremetal=0
+    if grep -q "GenuineIntel" /proc/cpuinfo 2>/dev/null; then
+        if ! command -v systemd-detect-virt >/dev/null 2>&1 || ! systemd-detect-virt --quiet 2>/dev/null; then
+            is_intel_baremetal=1
+        fi
+    fi
+    if [ "$is_intel_baremetal" -eq 1 ] && [ -f /usr/lib/systemd/system/thermald.service ]; then
+        mkdir -p /etc/systemd/system/multi-user.target.wants
+        ln -sf /usr/lib/systemd/system/thermald.service /etc/systemd/system/multi-user.target.wants/thermald.service
+        ln -sf /usr/lib/systemd/system/thermald.service /etc/systemd/system/dbus-org.freedesktop.thermald.service
+    else
+        rm -f /etc/systemd/system/multi-user.target.wants/thermald.service \
+              /etc/systemd/system/dbus-org.freedesktop.thermald.service 2>/dev/null || true
+    fi
+
     # Aplicar reglas udev de baja latencia (NVMe ADIOS, USB HID anti-autosuspend, cpu_dma_latency)
     if command -v udevadm >/dev/null 2>&1; then
         udevadm control --reload-rules 2>/dev/null || true
@@ -177,9 +203,15 @@ EOF
         scx_cfg_migrated=1
     fi
 
-    # Recargar systemd y activar FalconD + scx_loader en vivo si no hay chroot
+    # Recargar systemd y activar FalconD + dmemcg-booster + thermald (Intel) + scx_loader en vivo si no hay chroot
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload 2>/dev/null || true
+        if [ -f /usr/lib/systemd/system/dmemcg-booster-system.service ]; then
+            systemctl start dmemcg-booster-system.service 2>/dev/null || true
+        fi
+        if [ "$is_intel_baremetal" -eq 1 ] && [ -f /usr/lib/systemd/system/thermald.service ]; then
+            systemctl start thermald.service 2>/dev/null || true
+        fi
         if [ -x /usr/bin/falcond ]; then
             systemctl restart falcond.service 2>/dev/null || true
         fi
