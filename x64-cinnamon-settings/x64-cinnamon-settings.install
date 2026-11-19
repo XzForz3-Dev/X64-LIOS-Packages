@@ -28,6 +28,13 @@ post_install() {
             echo "NotShowIn=GNOME;COSMIC;KDE;X-Cinnamon;" >> /usr/share/applications/nm-connection-editor.desktop
         fi
     fi
+    if [ -f /usr/share/applications/org.gnome.Screenshot.desktop ]; then
+        if grep -q "^NotShowIn=" /usr/share/applications/org.gnome.Screenshot.desktop; then
+            sed -i 's/^NotShowIn=.*/NotShowIn=X-Cinnamon;Cinnamon;/' /usr/share/applications/org.gnome.Screenshot.desktop 2>/dev/null || true
+        else
+            echo "NotShowIn=X-Cinnamon;Cinnamon;" >> /usr/share/applications/org.gnome.Screenshot.desktop
+        fi
+    fi
     for qt_app in assistant designer linguist qdbusviewer qv4l2 qvidcap; do
         if [ -f "/usr/share/applications/${qt_app}.desktop" ]; then
             if ! grep -q "NoDisplay" "/usr/share/applications/${qt_app}.desktop"; then

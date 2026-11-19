@@ -625,7 +625,7 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full COSMIC Desktop suite...\e[0m"
         end
-        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
+        set -l cosmic_pkgs (pacman -Qq x64-cosmic-settings cosmic-session cosmic-greeter cosmic-comp cosmic-panel cosmic-app-library cosmic-applets cosmic-bg cosmic-workspaces cosmic-launcher cosmic-notifications cosmic-osd cosmic-settings cosmic-settings-daemon cosmic-randr cosmic-files cosmic-terminal cosmic-text-editor cosmic-viewer cosmic-player cosmic-monitor cosmic-screenshot cosmic-icon-theme cosmic-wallpapers cosmic-idle xdg-desktop-portal-cosmic 2>/dev/null | sort -u)
         if test (count $cosmic_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cosmic_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cosmic_pkgs 2>/dev/null
         end
@@ -633,7 +633,7 @@ except Exception:
         test -L /usr/share/themes/Adwaita-dark; and sudo rm -f /usr/share/themes/Adwaita-dark 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                sudo rm -rf $udir/.config/cosmic $udir/.local/state/cosmic $udir/.local/state/cosmic-comp 2>/dev/null
+                sudo rm -rf $udir/.config/cosmic $udir/.local/state/cosmic $udir/.local/state/cosmic-comp $udir/.local/state/pop-launcher 2>/dev/null
             end
         end
     end
@@ -712,10 +712,35 @@ except Exception:
             end
         end
     end
+    if test "$target_id" != "4"
+        set -l unused_cosmic (pacman -Qq cosmic-idle 2>/dev/null | sort -u)
+        if test (count $unused_cosmic) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_cosmic 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_cosmic 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.local/state/pop-launcher 2>/dev/null
+            end
+        end
+    end
+    if test "$target_id" != "2"
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.local/share/gnome-settings-daemon $udir/.local/share/gnome-shell $udir/.local/share/nautilus $udir/.local/share/org.gnome.TextEditor $udir/.local/state/gnome-session* 2>/dev/null
+            end
+        end
+    end
+    if test "$target_id" != "5"
+        for udir in /home/*
+            if test -d $udir
+                rm -rf $udir/.local/state/noctalia 2>/dev/null
+            end
+        end
+    end
     if test "$target_id" != "3"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib 2>/dev/null
+                rm -rf $udir/.config/baloofilerc $udir/.config/bluedevilglobalrc $udir/.config/dolphinrc $udir/.config/libaccounts-glib $udir/.local/share/dolphin $udir/.local/share/kactivitymanagerd $udir/.local/share/klipper $udir/.local/share/konsole $udir/.local/share/kwalletd $udir/.local/share/libkunitconversion $udir/.local/share/sddm $udir/.local/share/user-places.xbel* $udir/.local/state/dolphinstaterc $udir/.local/state/kactivitymanagerdstaterc $udir/.local/state/kglobalshortcutsstaterc $udir/.local/state/kickerstaterc $udir/.local/state/konsolestaterc $udir/.local/state/kscreenlockerrc $udir/.local/state/plasmashellstaterc $udir/.local/state/UserFeedback.org.kde.* $udir/.local/state/xdg-desktop-portal-kdestaterc 2>/dev/null
             end
         end
     end
@@ -731,7 +756,7 @@ except Exception:
         for udir in /home/*
             if test -d $udir
                 rm -f $udir/.config/systemd/user/default.target.wants/bt-agent.service 2>/dev/null
-                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper 2>/dev/null
+                rm -rf $udir/.config/AGENTS.md $udir/.config/alacritty $udir/.config/fcitx $udir/.config/fcitx5 $udir/.local/share/fcitx5 $udir/.config/folio $udir/.config/foot $udir/.config/ghostty $udir/.config/herdr $udir/.config/ibus $udir/.config/imv $udir/.config/obsidian $udir/.config/qtengine $udir/.config/superwhisper $udir/.local/share/hyprland $udir/.local/share/superwhisper $udir/.local/share/wayland-sessions $udir/.local/state/Omarchy 2>/dev/null
             end
         end
     end
