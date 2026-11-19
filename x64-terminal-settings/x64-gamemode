@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# X64 LIOS Linux — Universal Gaming Performance Wrapper (gamemoderun compatible)
+# Activates Proton NTSYNC + CachyOS game-performance (performance profile +
+# systemd-inhibit) without conflicting with falcond.
+# ==============================================================================
+set -e
+
+export PROTON_USE_NTSYNC="${PROTON_USE_NTSYNC:-1}"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $(basename "$0") <command> [args...]" >&2
+    exit 1
+fi
+
+if command -v game-performance >/dev/null 2>&1; then
+    exec /usr/bin/game-performance "$@"
+fi
+
+exec "$@"

@@ -1,0 +1,13 @@
+# ==============================================================================
+# X64 LIOS Linux — Gaming Low-Latency I/O, USB HID & CPU DMA Latency udev Rules
+# ==============================================================================
+
+# 1. NVMe & Non-Rotational SATA SSD I/O Scheduler -> ADIOS (ultra-low latency)
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ATTR{queue/scheduler}="adios"
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="adios"
+
+# 2. Disable USB autosuspend on HID gaming peripherals (mice, keyboards, controllers)
+ACTION=="add|bind", SUBSYSTEM=="usb", ATTR{bInterfaceClass}=="03", TEST=="../power/control", ATTR{../power/control}="on"
+
+# 3. Allow wheel group to request low CPU DMA latency (prevents deep C-state micro-stutters)
+KERNEL=="cpu_dma_latency", GROUP="wheel", MODE="0660"

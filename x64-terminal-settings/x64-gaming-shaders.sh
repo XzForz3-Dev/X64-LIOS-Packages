@@ -5,4 +5,5 @@ export MESA_SHADER_CACHE_MAX_SIZE=12G
 export __GL_ShaderDiskCache=1
 export __GL_ShaderDiskCacheMaxSize=12884901888
 export AMD_VULKAN_ICD=RADV
+export PROTON_USE_NTSYNC=1
 

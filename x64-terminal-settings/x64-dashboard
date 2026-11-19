@@ -1852,6 +1852,7 @@ while true
                     echo -e "    \e[1;33m[2]\e[0m \e[1;37mDetectar y purgar paquetes huérfanos (pacman -Qtdq)\e[0m"
                     echo -e "    \e[1;33m[3]\e[0m \e[1;37mOptimizar y vaciar caché de Pacman (pacman -Sc)\e[0m"
                     echo -e "    \e[1;33m[4]\e[0m \e[1;37mCompactar registros del sistema Journalctl (últimos 7 días)\e[0m"
+                    echo -e "    \e[1;33m[5]\e[0m \e[1;37mPerfil Gaming y Kernel Extremo (SCX / FalconD / Mitigaciones CPU)\e[0m"
                     echo -e "    \e[1;31m[0]\e[0m \e[1;37mVolver al Centro de Mando\e[0m\n"
                 else
                     echo -e "   \e[1;37mSYSTEM MAINTENANCE & CLEANUP\e[0m"
@@ -1868,11 +1869,12 @@ while true
                     echo -e "    \e[1;33m[2]\e[0m \e[1;37mDetect and purge orphaned packages (pacman -Qtdq)\e[0m"
                     echo -e "    \e[1;33m[3]\e[0m \e[1;37mOptimize and clean Pacman package cache (pacman -Sc)\e[0m"
                     echo -e "    \e[1;33m[4]\e[0m \e[1;37mVacuum Journalctl system logs (retain last 7 days)\e[0m"
+                    echo -e "    \e[1;33m[5]\e[0m \e[1;37mGaming & Extreme Kernel Profile (SCX / FalconD / CPU Mitigations)\e[0m"
                     echo -e "    \e[1;31m[0]\e[0m \e[1;37mReturn to Control Center\e[0m\n"
                 end
                 echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
                 echo ""
-                set -l prompt_clean (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-4, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-4, 0]: \e[0m")
+                set -l prompt_clean (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-5, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-5, 0]: \e[0m")
                 read -l -P (echo -e "$prompt_clean") l_choice
                 test $status -ne 0; and break
 
@@ -2031,6 +2033,135 @@ while true
                         echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
                         set -l prompt_back (test $is_es -eq 1; and echo "  Presiona Enter para continuar..."; or echo "  Press Enter to continue...")
                         read -l -P "$prompt_back" dummy
+                    case 5
+                        while true
+                            clear
+                            echo ""
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m"
+                            set -l scx_ops (cat /sys/kernel/sched_ext/root/ops 2>/dev/null)
+                            test -z "$scx_ops"; and set scx_ops "BORE (nativo)"
+                            set -l falcon_state (systemctl is-active falcond.service 2>/dev/null)
+                            set -l nvme_sched (cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null | grep -o '\[[^]]*\]' | tr -d '[]')
+                            test -z "$nvme_sched"; and set nvme_sched "N/A"
+                            set -l has_mit_off 0
+                            if grep -q "mitigations=off" /etc/default/limine /etc/default/grub 2>/dev/null
+                                set has_mit_off 1
+                            end
+                            set -l has_preempt 0
+                            if grep -q "preempt=full" /etc/default/limine /etc/default/grub /proc/cmdline 2>/dev/null
+                                set has_preempt 1
+                            end
+
+                            if test $is_es -eq 1
+                                echo -e "   \e[1;37mPERFIL GAMING Y KERNEL EXTREMO (X64 LIOS)\e[0m"
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                                echo -e "    \e[1;33mEstado en Tiempo Real:\e[0m"
+                                echo -e "      • Planificador CPU activo:     \e[1;36m$scx_ops\e[0m"
+                                if test "$falcon_state" = "active"
+                                    echo -e "      • Demonio FalconD Gaming:      \e[1;32mACTIVO\e[0m"
+                                else
+                                    echo -e "      • Demonio FalconD Gaming:      \e[1;31m$falcon_state\e[0m"
+                                end
+                                echo -e "      • Planificador I/O NVMe:       \e[1;37m$nvme_sched\e[0m"
+                                if test $has_preempt -eq 1
+                                    echo -e "      • Preempción de Kernel:        \e[1;32mpreempt=full (Baja Latencia)\e[0m"
+                                else
+                                    echo -e "      • Preempción de Kernel:        \e[1;33mPor defecto\e[0m"
+                                end
+                                if test $has_mit_off -eq 1
+                                    echo -e "      • Mitigaciones CPU (Spectre):  \e[1;31mDESACTIVADAS (Perfil Extremo: mitigations=off)\e[0m\n"
+                                    echo -e "    \e[1;32m[1]\e[0m \e[1;37mRestaurar mitigaciones de seguridad de CPU (Recomendado / Seguro)\e[0m"
+                                else
+                                    echo -e "      • Mitigaciones CPU (Spectre):  \e[1;32mACTIVAS (Seguro por defecto)\e[0m\n"
+                                    echo -e "    \e[1;31m[1]\e[0m \e[1;37mActivar Perfil CPU Extremo (mitigations=off — +10-25% CPU en Intel 6a-10a gen)\e[0m"
+                                end
+                                echo -e "    \e[1;33m[2]\e[0m \e[1;37mActivar/Recargar planificador scx_lavd (Modo Gaming)\e[0m"
+                                echo -e "    \e[1;33m[3]\e[0m \e[1;37mReiniciar demonio FalconD Gaming\e[0m"
+                                echo -e "    \e[1;31m[0]\e[0m \e[1;37mVolver\e[0m\n"
+                            else
+                                echo -e "   \e[1;37mGAMING & EXTREME KERNEL PROFILE (X64 LIOS)\e[0m"
+                                echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                                echo -e "    \e[1;33mLive Telemetry:\e[0m"
+                                echo -e "      • Active CPU Scheduler:        \e[1;36m$scx_ops\e[0m"
+                                if test "$falcon_state" = "active"
+                                    echo -e "      • FalconD Gaming Daemon:       \e[1;32mACTIVE\e[0m"
+                                else
+                                    echo -e "      • FalconD Gaming Daemon:       \e[1;31m$falcon_state\e[0m"
+                                end
+                                echo -e "      • NVMe I/O Scheduler:          \e[1;37m$nvme_sched\e[0m"
+                                if test $has_preempt -eq 1
+                                    echo -e "      • Kernel Preemption:           \e[1;32mpreempt=full (Low Latency)\e[0m"
+                                else
+                                    echo -e "      • Kernel Preemption:           \e[1;33mDefault\e[0m"
+                                end
+                                if test $has_mit_off -eq 1
+                                    echo -e "      • CPU Mitigations (Spectre):   \e[1;31mDISABLED (Extreme Profile: mitigations=off)\e[0m\n"
+                                    echo -e "    \e[1;32m[1]\e[0m \e[1;37mRestore CPU security mitigations (Recommended / Safe)\e[0m"
+                                else
+                                    echo -e "      • CPU Mitigations (Spectre):   \e[1;32mENABLED (Safe default)\e[0m\n"
+                                    echo -e "    \e[1;31m[1]\e[0m \e[1;37mEnable Extreme CPU Profile (mitigations=off — +10-25% CPU on older CPUs)\e[0m"
+                                end
+                                echo -e "    \e[1;33m[2]\e[0m \e[1;37mActivate/Reload scx_lavd scheduler (Gaming Mode)\e[0m"
+                                echo -e "    \e[1;33m[3]\e[0m \e[1;37mRestart FalconD Gaming Daemon\e[0m"
+                                echo -e "    \e[1;31m[0]\e[0m \e[1;37mBack\e[0m\n"
+                            end
+                            echo -e "  \e[1;31m─────────────────────────────────────────────────────────────────────────────\e[0m\n"
+                            set -l prompt_perf (test $is_es -eq 1; and echo "  \e[1;31m> Selecciona una opción [1-3, 0]: \e[0m"; or echo "  \e[1;31m> Select an option [1-3, 0]: \e[0m")
+                            read -l -P (echo -e "$prompt_perf") p_choice
+                            test $status -ne 0; and break
+
+                            switch "$p_choice"
+                                case 1
+                                    if test $has_mit_off -eq 1
+                                        echo -e "\n  \e[1;36m[*] Restaurando mitigaciones de seguridad de CPU...\e[0m"
+                                        test -f /etc/default/limine; and sudo sed -i 's/ mitigations=off//g; s/mitigations=off //g' /etc/default/limine
+                                        test -f /etc/default/grub; and sudo sed -i 's/ mitigations=off//g; s/mitigations=off //g' /etc/default/grub
+                                        type -q limine-update; and sudo limine-update
+                                        test -f /boot/grub/grub.cfg; and type -q grub-mkconfig; and sudo grub-mkconfig -o /boot/grub/grub.cfg
+                                        echo -e "  \e[1;32m[OK] Mitigaciones restauradas. Reinicia para aplicar el cambio.\e[0m"
+                                        sleep 2
+                                    else
+                                        echo ""
+                                        if test $is_es -eq 1
+                                            echo -e "  \e[1;31m[ADVERTENCIA DE SEGURIDAD]\e[0m"
+                                            echo -e "  \e[0;37mDesactivar mitigaciones (mitigations=off) aumenta el rendimiento de CPU,\e[0m"
+                                            echo -e "  \e[0;37mpero deshabilita protecciones de hardware contra Spectre/Meltdown/MDS.\e[0m"
+                                            echo -e "  \e[0;37mÚsalo SOLO en un PC doméstico / gaming personal, NUNCA en servidores.\e[0m\n"
+                                            read -l -P "  ¿Confirmas activar mitigations=off? [s/N]: " confirm_mit
+                                        else
+                                            echo -e "  \e[1;31m[SECURITY WARNING]\e[0m"
+                                            echo -e "  \e[0;37mDisabling CPU mitigations (mitigations=off) boosts CPU performance,\e[0m"
+                                            echo -e "  \e[0;37mbut disables hardware mitigations for Spectre/Meltdown/MDS.\e[0m"
+                                            echo -e "  \e[0;37mUse ONLY on personal gaming/home PCs, NEVER on production servers.\e[0m\n"
+                                            read -l -P "  Confirm enabling mitigations=off? [y/N]: " confirm_mit
+                                        end
+                                        if test "$confirm_mit" = "s" -o "$confirm_mit" = "S" -o "$confirm_mit" = "y" -o "$confirm_mit" = "Y"
+                                            if test -f /etc/default/limine
+                                                sudo sed -i 's/^\(KERNEL_CMDLINE\[default\]+="[^"]*\)"/\1 mitigations=off"/' /etc/default/limine
+                                                type -q limine-update; and sudo limine-update
+                                            end
+                                            if test -f /etc/default/grub
+                                                sudo sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^"]*\)"/\1 mitigations=off"/' /etc/default/grub
+                                                test -f /boot/grub/grub.cfg; and type -q grub-mkconfig; and sudo grub-mkconfig -o /boot/grub/grub.cfg
+                                            end
+                                            echo -e "  \e[1;32m[OK] Perfil CPU Extremo configurado. Reinicia para activar mitigations=off.\e[0m"
+                                            sleep 2
+                                        end
+                                    end
+                                case 2
+                                    if type -q scxctl
+                                        scxctl switch -s lavd -m gaming 2>/dev/null; or scxctl start -s lavd -m gaming 2>/dev/null
+                                        echo -e "\n  \e[1;32m[OK] Planificador scx_lavd (Gaming) activado.\e[0m"
+                                        sleep 1.5
+                                    end
+                                case 3
+                                    sudo systemctl restart falcond.service 2>/dev/null
+                                    echo -e "\n  \e[1;32m[OK] FalconD reiniciado.\e[0m"
+                                    sleep 1.5
+                                case 0 'q' 'Q' ''
+                                    break
+                            end
+                        end
                     case 0 'q' 'Q' ''
                         break
                     case '*'

@@ -75,14 +75,29 @@ exec /usr/bin/kitty "$@"
 EOF
     chmod 755 /usr/local/bin/kitty
 
-    # Configurar parámetros de kernel para Nvidia en Limine si no están presentes
+    # Wrapper compatible con gamemoderun sin entrar en conflicto con el paquete falcond
+    if [ ! -e /usr/bin/gamemoderun ]; then
+        ln -sf /usr/bin/x64-gamemode /usr/local/bin/gamemoderun
+    fi
+
+    # Configurar parámetros de kernel (Nvidia + preempt=full) en Limine si no están presentes
     if [ -f /etc/default/limine ]; then
+        limine_changed=0
         if ! grep -q "nvidia-drm.modeset=1" /etc/default/limine 2>/dev/null; then
             sed -i 's/splash rw/splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1 rw/' /etc/default/limine 2>/dev/null || true
             sed -i 's/splash"$/ nvidia-drm.modeset=1 nvidia-drm.fbdev=1"/' /etc/default/limine 2>/dev/null || true
-            if command -v limine-update >/dev/null 2>&1; then
-                limine-update 2>/dev/null || true
+            limine_changed=1
+        fi
+        if ! grep -q "preempt=full" /etc/default/limine 2>/dev/null; then
+            if grep -q "zswap.enabled=0" /etc/default/limine 2>/dev/null; then
+                sed -i 's/zswap\.enabled=0/zswap.enabled=0 preempt=full/' /etc/default/limine 2>/dev/null || true
+            else
+                sed -i 's/^\(KERNEL_CMDLINE\[default\]+="[^"]*\)"/\1 preempt=full"/' /etc/default/limine 2>/dev/null || true
             fi
+            limine_changed=1
+        fi
+        if [ "$limine_changed" -eq 1 ] && command -v limine-update >/dev/null 2>&1; then
+            limine-update 2>/dev/null || true
         fi
     fi
 
@@ -94,6 +109,35 @@ EOF
 
     # Desactivar servicios nvidia-suspend/resume (evita Kernel Oops en nvidia-sleep.sh / uvm_suspend y delega al kernel + hook system-sleep)
     systemctl disable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service 2>/dev/null || true
+
+    # Habilitar FalconD bajo multi-user.target (funciona tanto en Modo Consola TTY1 como en Modo Escritorio)
+    if [ -x /usr/bin/falcond ]; then
+        rm -f /etc/systemd/system/graphical.target.wants/falcond.service 2>/dev/null || true
+        mkdir -p /etc/systemd/system/multi-user.target.wants
+        ln -sf /etc/systemd/system/falcond.service /etc/systemd/system/multi-user.target.wants/falcond.service
+    fi
+
+    # Aplicar reglas udev de baja latencia (NVMe ADIOS, USB HID anti-autosuspend, cpu_dma_latency)
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules 2>/dev/null || true
+        udevadm trigger --subsystem-match=block --subsystem-match=usb --subsystem-match=misc 2>/dev/null || true
+    fi
+
+    # Recargar systemd y activar FalconD + scx_loader en vivo si no hay chroot
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload 2>/dev/null || true
+        if [ -x /usr/bin/falcond ]; then
+            systemctl restart falcond.service 2>/dev/null || true
+        fi
+        if systemctl is-active --quiet scx_loader.service 2>/dev/null; then
+            if grep -qE '^[[:space:]]*default_sched[[:space:]]*=' /etc/scx_loader/config.toml 2>/dev/null; then
+                cur_ops=$(cat /sys/kernel/sched_ext/root/ops 2>/dev/null || true)
+                if [ -z "$cur_ops" ] || [ "$cur_ops" = "none" ]; then
+                    systemctl restart scx_loader.service 2>/dev/null || true
+                fi
+            fi
+        fi
+    fi
 
     # Regenerar initramfs para aplicar Early KMS de Nvidia
     if command -v mkinitcpio >/dev/null 2>&1; then
@@ -107,6 +151,9 @@ post_upgrade() {
 
 post_remove() {
     rm -f /usr/local/bin/kitty 2>/dev/null || true
+    if [ -L /usr/local/bin/gamemoderun ] && [ "$(readlink /usr/local/bin/gamemoderun)" = "/usr/bin/x64-gamemode" ]; then
+        rm -f /usr/local/bin/gamemoderun 2>/dev/null || true
+    fi
 }
 
 

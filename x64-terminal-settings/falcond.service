@@ -1,0 +1,17 @@
+# X64 LIOS Override: ensures FalconD starts reliably in both Console Mode
+# (multi-user.target) and Desktop Mode (graphical.target) without pulling in
+# graphical.target when booting into TTY1 Server/Console Mode.
+[Unit]
+Description=Falcon Daemon Service (X64 LIOS Gaming Daemon)
+After=network.target dbus.service
+ConditionPathExists=/usr/bin/falcond
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/falcond
+User=root
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
