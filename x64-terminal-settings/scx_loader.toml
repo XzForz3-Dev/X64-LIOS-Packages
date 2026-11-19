@@ -1,27 +1,9 @@
 # ==============================================================================
 # X64 LIOS Linux - sched_ext (scx_loader) Low-Latency Gaming Profile
 # Protected via Pacman backup=() so user selections from X64 Hello persist.
+# Scheduler mode flags are managed natively by scx_loader so scx-scheds updates
+# never break flag compatibility across scx_lavd, scx_bpfland, scx_cosmos,
+# scx_flash, or scx_rusty.
 # ==============================================================================
 default_sched = "scx_lavd"
 default_mode = "Gaming"
-
-[scheds.scx_lavd]
-gaming_mode = ["--performance"]
-lowlatency_mode = ["--performance"]
-auto_mode = ["--autopilot"]
-powersave_mode = ["--powersave"]
-
-[scheds.scx_bpfland]
-gaming_mode = ["-m", "performance"]
-lowlatency_mode = ["-m", "performance", "-s", "5000", "-k"]
-auto_mode = []
-powersave_mode = ["-m", "powersave"]
-
-[scheds.scx_flash]
-gaming_mode = ["-m", "all", "-w", "-C", "0"]
-lowlatency_mode = ["-m", "all", "-s", "5000", "-S", "500", "-L"]
-auto_mode = []
-powersave_mode = ["-m", "powersave"]
-
-[scheds.scx_rusty]
-auto_mode = []

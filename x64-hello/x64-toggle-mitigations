@@ -18,40 +18,62 @@ def is_running_disabled():
 
 
 def check_configured_disabled():
-    # GRUB
-    if os.path.exists("/etc/default/grub"):
+    # GRUB (only when GRUB is actually installed/configured)
+    if os.path.exists("/etc/default/grub") and os.path.exists("/boot/grub/grub.cfg"):
         try:
             with open("/etc/default/grub", "r") as f:
                 for line in f:
                     if line.strip().startswith("GRUB_CMDLINE_LINUX_DEFAULT"):
-                        if "mitigations=off" in line:
+                        if re.search(r'(?<!\S)mitigations=off(?!\S)', line):
                             return True
         except Exception:
             pass
-    # Limine
-    for lp in ["/etc/default/limine", "/boot/limine.conf", "/boot/efi/limine.conf"]:
-        if os.path.exists(lp):
-            try:
-                with open(lp, "r") as f:
-                    if "mitigations=off" in f.read():
-                        return True
-            except Exception:
-                pass
-    # systemd-boot
-    if os.path.isdir("/boot/loader/entries"):
-        for fname in os.listdir("/boot/loader/entries"):
-            if fname.endswith(".conf"):
+    # Limine (prefer /etc/default/limine managed by limine-entry-tool over snapshots in limine.conf)
+    if os.path.exists("/etc/default/limine"):
+        try:
+            with open("/etc/default/limine", "r") as f:
+                for line in f:
+                    if "KERNEL_CMDLINE[default]" in line and not line.strip().startswith("#"):
+                        if re.search(r'(?<!\S)mitigations=off(?!\S)', line):
+                            return True
+        except Exception:
+            pass
+    else:
+        for lp in ["/boot/limine.conf", "/boot/efi/limine.conf"]:
+            if os.path.exists(lp):
                 try:
-                    with open(os.path.join("/boot/loader/entries", fname), "r") as f:
-                        if "mitigations=off" in f.read():
+                    with open(lp, "r") as f:
+                        if re.search(r'(?<!\S)mitigations=off(?!\S)', f.read()):
                             return True
                 except Exception:
                     pass
+    # systemd-boot (/etc/kernel/cmdline + /boot/efi/loader/entries + /boot/loader/entries)
+    if os.path.exists("/etc/kernel/cmdline"):
+        try:
+            with open("/etc/kernel/cmdline", "r") as f:
+                if "mitigations=off" in f.read().split():
+                    return True
+        except Exception:
+            pass
+    for entries_dir in ["/boot/efi/loader/entries", "/boot/loader/entries"]:
+        if os.path.isdir(entries_dir):
+            try:
+                for fname in os.listdir(entries_dir):
+                    if fname.endswith(".conf"):
+                        try:
+                            with open(os.path.join(entries_dir, fname), "r") as f:
+                                for line in f:
+                                    if line.strip().startswith("options") and "mitigations=off" in line.split():
+                                        return True
+                        except Exception:
+                            pass
+            except Exception:
+                pass
     # rEFInd
     if os.path.exists("/boot/refind_linux.conf"):
         try:
             with open("/boot/refind_linux.conf", "r") as f:
-                if "mitigations=off" in f.read():
+                if re.search(r'(?<!\S)mitigations=off(?!\S)', f.read()):
                     return True
         except Exception:
             pass
@@ -73,7 +95,7 @@ def get_status():
 
 def update_grub(enable_off=True):
     path = "/etc/default/grub"
-    if not os.path.exists(path):
+    if not (os.path.exists(path) and os.path.exists("/boot/grub/grub.cfg")):
         return False
     with open(path, "r") as f:
         content = f.read()
@@ -102,77 +124,114 @@ def update_grub(enable_off=True):
     if modified:
         with open(path, "w") as f:
             f.write("\n".join(new_lines) + "\n")
-        subprocess.run(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"], check=False)
+        if subprocess.run(["which", "grub-mkconfig"], capture_output=True).returncode == 0:
+            subprocess.run(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"], check=False)
         return True
     return False
 
 
 def update_limine(enable_off=True):
     modified = False
-    # Check /etc/default/limine
     lp = "/etc/default/limine"
     if os.path.exists(lp):
         with open(lp, "r") as f:
             lines = f.readlines()
         new_lines = []
         for line in lines:
-            if "KERNEL_CMDLINE[default]" in line:
-                if enable_off and "mitigations=off" not in line:
-                    line = re.sub(r'(["\'])$', r' mitigations=off\1', line.strip()) + "\n"
-                    modified = True
-                elif not enable_off and "mitigations=off" in line:
-                    line = line.replace("mitigations=off", "").replace("  ", " ")
-                    modified = True
+            stripped = line.strip()
+            if "KERNEL_CMDLINE[default]" in stripped and not stripped.startswith("#"):
+                m = re.match(r'^(\s*KERNEL_CMDLINE\[default\]\+?=\s*)(["\'])(.*)(["\'])\s*$', line)
+                if m:
+                    prefix, q_open, val, q_close = m.groups()
+                    tokens = val.split()
+                    if enable_off and "mitigations=off" not in tokens:
+                        tokens.append("mitigations=off")
+                        modified = True
+                    elif not enable_off and "mitigations=off" in tokens:
+                        tokens = [t for t in tokens if t != "mitigations=off"]
+                        modified = True
+                    line = f"{prefix}{q_open}{' '.join(tokens)}{q_close}\n"
             new_lines.append(line)
         if modified:
             with open(lp, "w") as f:
                 f.writelines(new_lines)
             if subprocess.run(["which", "limine-update"], capture_output=True).returncode == 0:
                 subprocess.run(["limine-update"], check=False)
+        return modified
 
-    # Check /boot/limine.conf
+    # Fallback for manual Limine setups without /etc/default/limine
     for cf in ["/boot/limine.conf", "/boot/efi/limine.conf"]:
         if os.path.exists(cf):
             with open(cf, "r") as f:
-                content = f.read()
-            if enable_off and "mitigations=off" not in content:
-                content = re.sub(r'(cmdline:.*)', r'\1 mitigations=off', content)
+                lines = f.readlines()
+            new_lines = []
+            file_modified = False
+            for line in lines:
+                m = re.match(r'^(\s*cmdline:\s*)(.*)$', line)
+                if m:
+                    prefix, val = m.groups()
+                    tokens = val.split()
+                    if enable_off and "mitigations=off" not in tokens:
+                        tokens.append("mitigations=off")
+                        file_modified = True
+                    elif not enable_off and "mitigations=off" in tokens:
+                        tokens = [t for t in tokens if t != "mitigations=off"]
+                        file_modified = True
+                    line = f"{prefix}{' '.join(tokens)}\n"
+                new_lines.append(line)
+            if file_modified:
                 with open(cf, "w") as f:
-                    f.write(content)
-                modified = True
-            elif not enable_off and "mitigations=off" in content:
-                content = content.replace("mitigations=off", "").replace("  ", " ")
-                with open(cf, "w") as f:
-                    f.write(content)
+                    f.writelines(new_lines)
                 modified = True
     return modified
 
 
 def update_systemd_boot(enable_off=True):
     modified = False
-    entries_dir = "/boot/loader/entries"
-    if os.path.isdir(entries_dir):
-        for fname in os.listdir(entries_dir):
-            if fname.endswith(".conf"):
-                p = os.path.join(entries_dir, fname)
-                with open(p, "r") as f:
-                    lines = f.readlines()
-                new_lines = []
-                for line in lines:
-                    if line.startswith("options"):
-                        tokens = line.strip().split()
-                        if enable_off and "mitigations=off" not in tokens:
-                            tokens.append("mitigations=off")
-                            line = " ".join(tokens) + "\n"
-                            modified = True
-                        elif not enable_off and "mitigations=off" in tokens:
-                            tokens = [t for t in tokens if t != "mitigations=off"]
-                            line = " ".join(tokens) + "\n"
-                            modified = True
-                    new_lines.append(line)
-                if modified:
-                    with open(p, "w") as f:
-                        f.writelines(new_lines)
+    # 1. Update /etc/kernel/cmdline (source of truth for kernel-install / Calamares systemd-boot)
+    cmdline_path = "/etc/kernel/cmdline"
+    if os.path.exists(cmdline_path):
+        with open(cmdline_path, "r") as f:
+            raw = f.read().strip()
+        tokens = raw.split()
+        file_modified = False
+        if enable_off and "mitigations=off" not in tokens:
+            tokens.append("mitigations=off")
+            file_modified = True
+        elif not enable_off and "mitigations=off" in tokens:
+            tokens = [t for t in tokens if t != "mitigations=off"]
+            file_modified = True
+        if file_modified:
+            with open(cmdline_path, "w") as f:
+                f.write(" ".join(tokens) + "\n")
+            modified = True
+
+    # 2. Update live loader entries in both /boot/efi/loader/entries and /boot/loader/entries
+    for entries_dir in ["/boot/efi/loader/entries", "/boot/loader/entries"]:
+        if os.path.isdir(entries_dir):
+            for fname in os.listdir(entries_dir):
+                if fname.endswith(".conf"):
+                    p = os.path.join(entries_dir, fname)
+                    with open(p, "r") as f:
+                        lines = f.readlines()
+                    new_lines = []
+                    file_modified = False
+                    for line in lines:
+                        if line.startswith("options"):
+                            tokens = line.strip().split()
+                            if enable_off and "mitigations=off" not in tokens:
+                                tokens.append("mitigations=off")
+                                line = " ".join(tokens) + "\n"
+                                file_modified = True
+                            elif not enable_off and "mitigations=off" in tokens:
+                                tokens = [t for t in tokens if t != "mitigations=off"]
+                                line = " ".join(tokens) + "\n"
+                                file_modified = True
+                        new_lines.append(line)
+                    if file_modified:
+                        with open(p, "w") as f:
+                            f.writelines(new_lines)
+                        modified = True
     return modified
 
 
@@ -184,13 +243,17 @@ def update_refind(enable_off=True):
             lines = f.readlines()
         new_lines = []
         for line in lines:
-            if '"' in line:
-                if enable_off and "mitigations=off" not in line:
-                    line = re.sub(r'"$', ' mitigations=off"', line.strip()) + "\n"
+            m = re.match(r'^(\s*"[^"]*"\s*")([^"]*)("\s*)$', line)
+            if m:
+                prefix, val, suffix = m.groups()
+                tokens = val.split()
+                if enable_off and "mitigations=off" not in tokens:
+                    tokens.append("mitigations=off")
                     modified = True
-                elif not enable_off and "mitigations=off" in line:
-                    line = line.replace("mitigations=off", "").replace("  ", " ")
+                elif not enable_off and "mitigations=off" in tokens:
+                    tokens = [t for t in tokens if t != "mitigations=off"]
                     modified = True
+                line = f"{prefix}{' '.join(tokens)}{suffix.rstrip()}\n"
             new_lines.append(line)
         if modified:
             with open(path, "w") as f:

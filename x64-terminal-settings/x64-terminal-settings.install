@@ -148,6 +148,35 @@ EOF
         udevadm trigger --subsystem-match=block --subsystem-match=usb --subsystem-match=misc 2>/dev/null || true
     fi
 
+    # Migrar flags obsoletos de scx_flash/scx_bpfland en /etc/scx_loader/config.toml preservando la selección del usuario
+    scx_cfg_migrated=0
+    if [ -f /etc/scx_loader/config.toml ] && grep -qE '"-w", "-C", "0"|"-S", "500"|"-S", "1000"' /etc/scx_loader/config.toml 2>/dev/null; then
+        cur_sched=$(grep -E '^[[:space:]]*default_sched[[:space:]]*=' /etc/scx_loader/config.toml 2>/dev/null | head -n1 || true)
+        cur_mode=$(grep -E '^[[:space:]]*default_mode[[:space:]]*=' /etc/scx_loader/config.toml 2>/dev/null | head -n1 || true)
+        {
+            echo "# =============================================================================="
+            echo "# X64 LIOS Linux - sched_ext (scx_loader) Low-Latency Gaming Profile"
+            echo "# Protected via Pacman backup=() so user selections from X64 Hello persist."
+            echo "# Scheduler mode flags are managed natively by scx_loader so scx-scheds updates"
+            echo "# never break flag compatibility across scx_lavd, scx_bpfland, scx_cosmos,"
+            echo "# scx_flash, or scx_rusty."
+            echo "# =============================================================================="
+            if [ -n "$cur_sched" ]; then
+                echo "$cur_sched"
+                if [ -n "$cur_mode" ]; then
+                    echo "$cur_mode"
+                else
+                    echo 'default_mode = "Auto"'
+                fi
+            else
+                echo "# Default scheduler at boot (BORE kernel default active; managed dynamically by FalconD)"
+                echo '# default_sched = "scx_lavd"'
+                echo '# default_mode = "Gaming"'
+            fi
+        } > /etc/scx_loader/config.toml
+        scx_cfg_migrated=1
+    fi
+
     # Recargar systemd y activar FalconD + scx_loader en vivo si no hay chroot
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload 2>/dev/null || true
@@ -155,7 +184,9 @@ EOF
             systemctl restart falcond.service 2>/dev/null || true
         fi
         if systemctl is-active --quiet scx_loader.service 2>/dev/null; then
-            if grep -qE '^[[:space:]]*default_sched[[:space:]]*=' /etc/scx_loader/config.toml 2>/dev/null; then
+            if [ "$scx_cfg_migrated" -eq 1 ]; then
+                systemctl restart scx_loader.service 2>/dev/null || true
+            elif grep -qE '^[[:space:]]*default_sched[[:space:]]*=' /etc/scx_loader/config.toml 2>/dev/null; then
                 cur_ops=$(cat /sys/kernel/sched_ext/root/ops 2>/dev/null || true)
                 if [ -z "$cur_ops" ] || [ "$cur_ops" = "none" ]; then
                     systemctl restart scx_loader.service 2>/dev/null || true
