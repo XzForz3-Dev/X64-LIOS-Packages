@@ -367,6 +367,14 @@ function sanitize_user_dirs_and_configs
 end
 
 function configure_desktop_boot_mode -a dm_service desktop_name
+    # Purga post-instalación de xdg-desktop-portal-xapp/xapp tras instalar un entorno no-Cinnamon
+    # (antes de instalar el entorno destino podía quedar retenido por apps como lutris que requieren xdg-desktop-portal-impl)
+    if not type -q cinnamon-session; and test (count (pacman -Qq xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-desktop-portal-gnome xdg-desktop-portal-cosmic 2>/dev/null)) -gt 0
+        set -l unused_xapp (pacman -Qq xdg-desktop-portal-xapp xapp xapp-symbolic-icons 2>/dev/null | sort -u)
+        if test (count $unused_xapp) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_xapp 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_xapp 2>/dev/null
+        end
+    end
     sanitize_user_dirs_and_configs
     clear
     echo ""
@@ -673,13 +681,33 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Cinnamon suite...\e[0m"
         end
-        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo nemo-fileroller file-roller blueman xed xviewer xreader gnome-calculator gnome-disk-utility gnome-system-monitor gnome-screenshot lightdm lightdm-slick-greeter gnome-terminal 2>/dev/null | sort -u)
+        set -l cin_pkgs (pacman -Qq x64-cinnamon-settings cinnamon cinnamon-translations nemo nemo-fileroller file-roller blueman xed xviewer xreader gnome-calculator gnome-disk-utility gnome-system-monitor gnome-screenshot lightdm lightdm-slick-greeter gnome-terminal xdg-desktop-portal-xapp xapp xapp-symbolic-icons 2>/dev/null | sort -u)
         if test (count $cin_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $cin_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $cin_pkgs 2>/dev/null
         end
+    end
+    if test "$target_id" != "6"
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/cinnamon $udir/.config/nemo $udir/.config/xed $udir/.config/xviewer $udir/.config/xreader 2>/dev/null
+                bash -c 'shopt -s nullglob
+                    u="$1"
+                    rm -rf "$u"/.config/{cinnamon,cinnamon-session,nemo,xed,xviewer,xreader} "$u"/.config/menus/cinnamon-applications-merged "$u"/.local/share/{cinnamon,nemo} "$u"/.local/state/cinnamon
+                    rmdir "$u"/.config/menus/applications-merged "$u"/.config/menus 2>/dev/null || true
+                    for f in "$u/.config/gtk-3.0/gtk.css" "$u/.config/gtk-4.0/gtk.css"; do
+                        [ -f "$f" ] && grep -q "X64 LIOS — Official Crimson Accent Override" "$f" && rm -f "$f"
+                    done
+                    for f in "$u/.config/gtk-3.0/settings.ini" "$u/.config/gtk-4.0/settings.ini"; do
+                        [ -f "$f" ] && grep -q "^gtk-xft-dpi=" "$f" && rm -f "$f"
+                    done
+                ' _ "$udir" 2>/dev/null
+            end
+        end
+        if type -q dconf
+            for p in /org/cinnamon/ /org/nemo/ /org/x/apps/portal/ /org/gnome/terminal/
+                dconf reset -f $p 2>/dev/null
+            end
+            if test "$target_id" != "7"
+                dconf reset -f /org/blueman/ 2>/dev/null
             end
         end
     end
