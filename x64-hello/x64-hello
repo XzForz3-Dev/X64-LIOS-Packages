@@ -4174,11 +4174,7 @@ class DnsOptimizerPanel(QFrame):
         """)
         self.btn_ping.clicked.connect(self.run_ping_benchmark)
         conn_row.addWidget(self.btn_ping)
-
-        self.status_lbl = FitLabel("", min_ratio=0.85)
-        self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
-        conn_row.addSpacing(6)
-        conn_row.addWidget(self.status_lbl, 1)
+        conn_row.addStretch(1)
         layout.addLayout(conn_row)
 
         # 3x2 Grid of 6 DNS Providers
@@ -4295,6 +4291,11 @@ class DnsOptimizerPanel(QFrame):
         btm_row.addWidget(btn_apply)
         layout.addLayout(btm_row)
 
+        self.status_lbl = FitLabel("", min_ratio=0.85)
+        self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
+        self.status_lbl.setFixedHeight(16)
+        layout.addWidget(self.status_lbl)
+
     def populate_connections(self):
         self.conn_combo.clear()
         try:
@@ -4402,11 +4403,13 @@ class DnsOptimizerPanel(QFrame):
             self.status_lbl.setText("")
 
     def _run_dns_pkexec(self, sh_cmd, pending_msg, success_msg):
+        self.status_lbl.setTextFormat(Qt.TextFormat.PlainText)
         self.status_lbl.setStyleSheet("color: #f39c12; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(f"⟳ {pending_msg}")
         proc = QProcess(self)
 
         def _on_done(exit_code, _exit_status):
+            self.status_lbl.setTextFormat(Qt.TextFormat.PlainText)
             if exit_code == 0:
                 self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
