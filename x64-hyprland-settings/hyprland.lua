@@ -46,8 +46,8 @@ hl.on("hyprland.start", function ()
     -- Monolith 4K Wallpaper Daemon
     hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
 
-    -- Quickshell Cyberpunk Desktop Shell (Top Bar, App Launcher, Control Center, OSD)
-    hl.exec_cmd("killall quickshell 2>/dev/null; QT_QPA_PLATFORMTHEME=kde KDE_SESSION_VERSION=6 QT_QUICK_BACKEND=software quickshell -n &")
+    -- Quickshell Cyberpunk Desktop Shell (Auto GPU-accelerated on bare-metal, software fallback on VMs)
+    hl.exec_cmd("x64-hyprland-ctl launch-shell &")
 
     -- X64 System Update Tray Monitor (SNI)
     hl.exec_cmd("x64-update-tray &")
@@ -139,6 +139,14 @@ hl.config({
         vrr                     = 1,
     },
 
+    render = {
+        direct_scanout = 2,
+    },
+
+    xwayland = {
+        force_zero_scaling = true,
+    },
+
     input = {
         kb_layout  = "es,us",
         kb_options = "grp:alt_shift_toggle",
@@ -211,11 +219,11 @@ hl.window_rule({
     center = true,
 })
 
--- Quickshell Surface Blur
+-- Quickshell Bar uses 95%-opaque obsidian glass (#f20a0b10); skip redundant 2-pass Kawase blur on every bar hover/click
 hl.layer_rule({
-    name  = "quickshell-blur",
+    name  = "quickshell-bar-noblur",
     match = { namespace = "^quickshell$" },
-    blur  = true,
+    blur  = false,
 })
 
 -- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games

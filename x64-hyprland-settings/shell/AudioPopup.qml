@@ -216,7 +216,7 @@ PanelWindow {
             id: audioCmdCollector
             onStreamFinished: {
                 if (!audioWindow.isInteractingWithStreams) {
-                    audioWindow.refreshAudio();
+                    audioWindow.refreshAudio(true);
                 }
             }
         }
@@ -228,11 +228,15 @@ PanelWindow {
         running: false
     }
 
-    function refreshAudio() {
-        if (!audioDataProc.running) {
-            audioDataProc.command = ["/usr/bin/x64-hyprland-ctl", "audio", "data"];
-            audioDataProc.running = true;
-        }
+    property double lastAudioRefreshMs: 0
+
+    function refreshAudio(force) {
+        if (audioDataProc.running) return;
+        var now = Date.now();
+        if (!force && (now - audioWindow.lastAudioRefreshMs) < 1000) return;
+        audioWindow.lastAudioRefreshMs = now;
+        audioDataProc.command = ["/usr/bin/x64-hyprland-ctl", "audio", "data"];
+        audioDataProc.running = true;
     }
 
     function runAudioCmd(args) {
@@ -250,6 +254,8 @@ PanelWindow {
     Rectangle {
         id: card
         anchors.fill: parent
+        layer.enabled: openAnim.running || closeAnim.running
+        layer.smooth: true
         color: Theme.bgCard
         radius: Theme.radiusLg
         border.color: Theme.borderGlass

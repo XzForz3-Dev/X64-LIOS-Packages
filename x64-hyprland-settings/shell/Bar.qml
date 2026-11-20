@@ -68,36 +68,29 @@ PanelWindow {
     }
 
     // =========================================================================
-    // SYSTEM TELEMETRY & BACKGROUND MONITORS (x64-hyprland-ctl)
+    // SYSTEM TELEMETRY & BACKGROUND MONITORS (Backed by SysState Singleton)
     // =========================================================================
 
-    property int cpuUsage: 0
-    property string ramUsage: "0.0"
-    property int cpuTemp: 40
-    property bool caffeineActive: false
-    property bool nightlightActive: false
-    property bool dndActive: false
-    property bool isRecording: false
-    property string recTime: "00:00"
-    property bool hasBattery: false
-    property int batPct: 100
-    property string batStatus: "AC"
-    property int brightnessVal: 100
-    property int gpuCount: 0
-    property int gpuTemp: 0
-    property int gpuUtil: 0
-    property var gpus: []
+    readonly property int cpuUsage: SysState.cpuUsage
+    readonly property string ramUsage: SysState.ramUsed
+    readonly property int cpuTemp: SysState.cpuTemp
+    readonly property bool caffeineActive: SysState.caffeineActive
+    readonly property bool nightlightActive: SysState.nightlightActive
+    readonly property bool dndActive: SysState.dndActive
+    readonly property bool isRecording: SysState.isRecording
+    readonly property string recTime: SysState.recTime
+    readonly property bool gamingModeActive: SysState.gamingModeActive
+    readonly property bool hasBattery: SysState.hasBattery
+    readonly property int batPct: SysState.batPct
+    readonly property string batStatus: SysState.batStatus
+    readonly property int brightnessVal: SysState.brightnessVal
+    readonly property int gpuCount: SysState.gpuCount
+    readonly property int gpuTemp: SysState.gpuTemp
+    readonly property int gpuUtil: SysState.gpuUtil
+    readonly property var gpus: SysState.gpus
 
     function runCtl(args) {
-        toggleGuardTimer.restart();
-        ctlActionProc.command = ["x64-hyprland-ctl"].concat(args);
-        ctlActionProc.running = true;
-    }
-
-    Timer {
-        id: toggleGuardTimer
-        interval: 900
-        repeat: false
+        SysState.runCtl(args);
     }
 
     Process {
@@ -112,70 +105,12 @@ PanelWindow {
         appSpawnProc.running = true;
     }
 
-    Process {
-        id: ctlActionProc
-        onExited: {
-            if (!teleProcess.running) teleProcess.running = true;
-        }
-    }
-
-    Process {
-        id: teleProcess
-        command: ["x64-hyprland-ctl", "status"]
-        stdout: StdioCollector {
-            id: teleCollector
-            onStreamFinished: {
-                if (!teleCollector.text) return;
-                try {
-                    var d = JSON.parse(teleCollector.text.trim());
-                    barWindow.cpuUsage = d.cpu || 0;
-                    barWindow.ramUsage = d.ramUsed || "0.0";
-                    barWindow.cpuTemp = d.temp || 40;
-                    barWindow.gpuCount = d.gpuCount || 0;
-                    barWindow.gpuTemp = d.gpuTemp || 0;
-                    barWindow.gpuUtil = d.gpuUtil || 0;
-                    barWindow.gpus = d.gpus || [];
-                    if (!toggleGuardTimer.running) {
-                        barWindow.caffeineActive = Boolean(d.caffeine);
-                        barWindow.nightlightActive = Boolean(d.nightlight);
-                        barWindow.dndActive = Boolean(d.dnd);
-                    }
-                    barWindow.isRecording = Boolean(d.recording);
-                    barWindow.recTime = d.recTime || "00:00";
-                    barWindow.hasBattery = Boolean(d.hasBattery);
-                    barWindow.batPct = d.batPct !== undefined ? d.batPct : 100;
-                    barWindow.batStatus = d.batStatus || "AC";
-                    if (!brGuardTimer.running && d.brightness !== undefined) {
-                        barWindow.brightnessVal = d.brightness;
-                    }
-                } catch (e) {}
-            }
-        }
-    }
-
-    Timer {
-        id: brGuardTimer
-        interval: 900
-        repeat: false
-    }
-
     Timer {
         id: kbGuardTimer
         interval: 800
         repeat: false
         onTriggered: {
             if (!kbProcess.running) kbProcess.running = true;
-        }
-    }
-
-    Timer {
-        interval: 1200
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (teleProcess.running) return;
-            teleProcess.running = true;
         }
     }
 
@@ -234,7 +169,7 @@ PanelWindow {
 
     Timer {
         interval: 4000
-        running: true
+        running: !SysState.fullscreenActive
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -708,8 +643,57 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            barWindow.isRecording = false;
+                            SysState.isRecording = false;
                             barWindow.runCtl(["record", "stop"]);
+                        }
+                    }
+                }
+
+                // Compact Gaming Mode Indicator Capsule (visible only when active; 1-click disable)
+                Rectangle {
+                    id: gameCapsule
+                    visible: barWindow.gamingModeActive
+                    implicitHeight: 30
+                    implicitWidth: gameRow.implicitWidth + 16
+                    radius: 15
+                    color: gameArea.containsMouse ? Theme.accent : "#f52a0b0f"
+                    border.color: Theme.accent
+                    border.width: 1
+                    scale: gameArea.pressed ? 0.94 : (gameArea.containsMouse ? 1.02 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack; easing.overshoot: 1.3 } }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    RowLayout {
+                        id: gameRow
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        Text {
+                            text: "󰊴"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 13
+                            color: gameArea.containsMouse ? "#ffffff" : Theme.accent
+                        }
+
+                        Text {
+                            text: "GAME"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 10
+                            font.bold: true
+                            font.letterSpacing: 0.7
+                            color: "#ffffff"
+                        }
+                    }
+
+                    MouseArea {
+                        id: gameArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            SysState.guardToggle();
+                            SysState.gamingModeActive = false;
+                            barWindow.runCtl(["gamemode", "off"]);
                         }
                     }
                 }
@@ -893,7 +877,8 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    barWindow.caffeineActive = false;
+                                    SysState.guardToggle();
+                                    SysState.caffeineActive = false;
                                     barWindow.runCtl(["caffeine", "off"]);
                                 }
                             }
@@ -918,7 +903,8 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    barWindow.nightlightActive = false;
+                                    SysState.guardToggle();
+                                    SysState.nightlightActive = false;
                                     barWindow.runCtl(["nightlight", "off"]);
                                 }
                             }
@@ -943,7 +929,8 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    barWindow.dndActive = false;
+                                    SysState.guardToggle();
+                                    SysState.dndActive = false;
                                     barWindow.runCtl(["dnd", "off"]);
                                 }
                             }
@@ -1196,10 +1183,10 @@ PanelWindow {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: barWindow.toggleControl()
                                 onWheel: (wheel) => {
-                                    brGuardTimer.restart();
+                                    SysState.guardBrightness();
                                     var step = wheel.angleDelta.y > 0 ? 5 : -5;
-                                    var nextBr = Math.max(15, Math.min(100, barWindow.brightnessVal + step));
-                                    barWindow.brightnessVal = nextBr;
+                                    var nextBr = Math.max(15, Math.min(100, SysState.brightnessVal + step));
+                                    SysState.brightnessVal = nextBr;
                                     barWindow.brightnessChangedOsd(nextBr);
                                     barWindow.runCtl(["brightness", "set", String(nextBr)]);
                                 }

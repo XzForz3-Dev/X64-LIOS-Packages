@@ -185,6 +185,8 @@ PanelWindow {
         transformOrigin: Item.Top
         scale: 1.0
         opacity: 1.0
+        layer.enabled: openAnim.running || closeAnim.running
+        layer.smooth: true
         radius: Theme.radiusLg
         color: Theme.bgGlass
         border.color: Theme.borderGlass

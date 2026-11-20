@@ -16,23 +16,24 @@ PanelWindow {
     signal nightlightToggled(bool active)
     signal brightnessChangedOsd(int val)
 
-    property bool caffeineActive: false
-    property bool nightlightActive: false
-    property bool dndActive: false
-    property bool isRecording: false
-    property string recTime: "00:00"
+    readonly property bool caffeineActive: SysState.caffeineActive
+    readonly property bool nightlightActive: SysState.nightlightActive
+    readonly property bool dndActive: SysState.dndActive
+    readonly property bool isRecording: SysState.isRecording
+    readonly property string recTime: SysState.recTime
     property bool recMenuOpen: false
     property string recScope: "fullscreen"
     property string recAudio: "desktop"
-    property bool hasBattery: false
-    property int batPct: 100
-    property string batStatus: "AC"
-    property string powerProfile: "balanced"
-    property int brightnessVal: 100
-    property string aiEngine: "opencode"
-    property bool zoomEnabled: false
-    property string zoomFactor: "1.0"
-    property bool gamingModeActive: false
+    readonly property bool hasBattery: SysState.hasBattery
+    readonly property int batPct: SysState.batPct
+    readonly property string batStatus: SysState.batStatus
+    readonly property string powerProfile: SysState.powerProfile
+    readonly property int brightnessVal: SysState.brightnessVal
+    readonly property string aiEngine: SysState.aiEngine
+    readonly property bool zoomEnabled: SysState.zoomEnabled
+    readonly property string zoomFactor: SysState.zoomFactor
+    readonly property bool gamingModeActive: SysState.gamingModeActive
+    readonly property bool autoGamingEnabled: SysState.autoGamingEnabled
 
     anchors {
         top: true
@@ -142,18 +143,7 @@ PanelWindow {
     }
 
     function runCtl(args) {
-        ctlGuardTimer.restart();
-        if (ctlExecProc.running) {
-            ctlExecProc.running = false;
-        }
-        ctlExecProc.command = ["/usr/bin/x64-hyprland-ctl"].concat(args);
-        ctlExecProc.running = true;
-    }
-
-    Timer {
-        id: ctlGuardTimer
-        interval: 900
-        repeat: false
+        SysState.runCtl(args);
     }
 
     Process {
@@ -171,60 +161,13 @@ PanelWindow {
 
     function refreshAll() {
         displayCard.refreshScale();
-        if (!ctlStatusProc.running) ctlStatusProc.running = true;
-    }
-
-    Process {
-        id: ctlExecProc
-        onExited: {
-            if (!ctlStatusProc.running) ctlStatusProc.running = true;
-        }
-    }
-
-    Process {
-        id: ctlStatusProc
-        command: ["x64-hyprland-ctl", "status"]
-        stdout: StdioCollector {
-            id: ctlCollector
-            onStreamFinished: {
-                if (!ctlCollector.text) return;
-                try {
-                    var d = JSON.parse(ctlCollector.text.trim());
-                    if (!ctlGuardTimer.running) {
-                        controlWindow.caffeineActive = Boolean(d.caffeine);
-                        controlWindow.nightlightActive = Boolean(d.nightlight);
-                        controlWindow.dndActive = Boolean(d.dnd);
-                        controlWindow.powerProfile = d.powerProfile || "balanced";
-                        if (d.aiEngine) controlWindow.aiEngine = d.aiEngine;
-                        if (d.zoomEnabled !== undefined) controlWindow.zoomEnabled = Boolean(d.zoomEnabled);
-                        if (d.zoomFactor) controlWindow.zoomFactor = String(d.zoomFactor);
-                        if (d.gamingMode !== undefined) controlWindow.gamingModeActive = Boolean(d.gamingMode);
-                    }
-                    controlWindow.isRecording = Boolean(d.recording);
-                    controlWindow.recTime = d.recTime || "00:00";
-                    controlWindow.hasBattery = Boolean(d.hasBattery);
-                    controlWindow.batPct = d.batPct !== undefined ? d.batPct : 100;
-                    controlWindow.batStatus = d.batStatus || "AC";
-                    if (!brSlider.pressed && d.brightness !== undefined) {
-                        controlWindow.brightnessVal = d.brightness;
-                    }
-                } catch (e) {}
-            }
-        }
-    }
-
-    Timer {
-        interval: 1200
-        running: controlWindow.visible
-        repeat: true
-        onTriggered: {
-            if (!ctlStatusProc.running) ctlStatusProc.running = true;
-        }
+        SysState.refreshNow(true);
     }
 
     onVisibleChanged: {
+        SysState.controlOpen = visible;
         if (visible) {
-            controlWindow.refreshAll();
+            displayCard.refreshScale();
             card.scale = 0.82;
             card.y = -24;
             card.opacity = 0.0;
@@ -237,7 +180,7 @@ PanelWindow {
     }
 
     Component.onCompleted: {
-        controlWindow.refreshAll();
+        displayCard.refreshScale();
     }
 
     // Control Center Card pinned to top right with Jelly / Elastic Physics
@@ -248,6 +191,8 @@ PanelWindow {
         anchors.right: parent.right
         height: mainCol.implicitHeight + 30
         transformOrigin: Item.TopRight
+        layer.enabled: openAnim.running || closeAnim.running
+        layer.smooth: true
         scale: 1.0
         opacity: 1.0
         radius: Theme.radiusLg
@@ -506,8 +451,10 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            controlWindow.caffeineActive = !controlWindow.caffeineActive;
-                            controlWindow.runCtl(["caffeine", controlWindow.caffeineActive ? "on" : "off"]);
+                            SysState.guardToggle();
+                            var next = !SysState.caffeineActive;
+                            SysState.caffeineActive = next;
+                            controlWindow.runCtl(["caffeine", next ? "on" : "off"]);
                         }
                     }
                 }
@@ -567,9 +514,11 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            controlWindow.nightlightActive = !controlWindow.nightlightActive;
-                            controlWindow.nightlightToggled(controlWindow.nightlightActive);
-                            controlWindow.runCtl(["nightlight", controlWindow.nightlightActive ? "on" : "off"]);
+                            SysState.guardToggle();
+                            var next = !SysState.nightlightActive;
+                            SysState.nightlightActive = next;
+                            controlWindow.nightlightToggled(next);
+                            controlWindow.runCtl(["nightlight", next ? "on" : "off"]);
                         }
                     }
                 }
@@ -629,9 +578,11 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            controlWindow.dndActive = !controlWindow.dndActive;
-                            controlWindow.dndToggled(controlWindow.dndActive);
-                            controlWindow.runCtl(["dnd", controlWindow.dndActive ? "on" : "off"]);
+                            SysState.guardToggle();
+                            var next = !SysState.dndActive;
+                            SysState.dndActive = next;
+                            controlWindow.dndToggled(next);
+                            controlWindow.runCtl(["dnd", next ? "on" : "off"]);
                         }
                     }
                 }
@@ -694,13 +645,15 @@ PanelWindow {
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         cursorShape: Qt.PointingHandCursor
                         onClicked: (mouse) => {
+                            SysState.guardToggle();
                             if (mouse.button === Qt.RightButton) {
-                                controlWindow.zoomFactor = "1.0";
+                                SysState.zoomFactor = "1.0";
                                 controlWindow.runCtl(["zoom", "reset"]);
                             } else {
-                                controlWindow.zoomEnabled = !controlWindow.zoomEnabled;
-                                if (!controlWindow.zoomEnabled) controlWindow.zoomFactor = "1.0";
-                                controlWindow.runCtl(["zoom", controlWindow.zoomEnabled ? "on" : "off"]);
+                                var next = !SysState.zoomEnabled;
+                                SysState.zoomEnabled = next;
+                                if (!next) SysState.zoomFactor = "1.0";
+                                controlWindow.runCtl(["zoom", next ? "on" : "off"]);
                             }
                         }
                     }
@@ -830,12 +783,12 @@ PanelWindow {
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 onClicked: (mouse) => {
                                     if (controlWindow.isRecording) {
-                                        controlWindow.isRecording = false;
+                                        SysState.isRecording = false;
                                         controlWindow.recMenuOpen = false;
                                         controlWindow.runCtl(["record", "stop"]);
                                     } else if (mouse.button === Qt.RightButton) {
                                         controlWindow.recMenuOpen = false;
-                                        controlWindow.isRecording = true;
+                                        SysState.isRecording = true;
                                         controlWindow.closeRequested();
                                         controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
                                     } else {
@@ -997,7 +950,7 @@ PanelWindow {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         controlWindow.recMenuOpen = false;
-                                        controlWindow.isRecording = true;
+                                        SysState.isRecording = true;
                                         controlWindow.closeRequested();
                                         controlWindow.runCtl(["record", "start", controlWindow.recScope, controlWindow.recAudio]);
                                     }
@@ -1209,10 +1162,12 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
+                            onPressedChanged: SysState.brightnessDragging = pressed
                             function setBrFromX(mx) {
+                                SysState.guardBrightness();
                                 var ratio = Math.max(0.15, Math.min(1.0, mx / brSlider.width));
                                 var v = Math.round(ratio * 100);
-                                controlWindow.brightnessVal = v;
+                                SysState.brightnessVal = v;
                                 controlWindow.brightnessChangedOsd(v);
                                 brApplyDebounce.restart();
                             }
@@ -1221,9 +1176,10 @@ PanelWindow {
                                 if (pressed) setBrFromX(mouse.x);
                             }
                             onWheel: (wheel) => {
+                                SysState.guardBrightness();
                                 var step = wheel.angleDelta.y > 0 ? 5 : -5;
-                                var v = Math.max(15, Math.min(100, controlWindow.brightnessVal + step));
-                                controlWindow.brightnessVal = v;
+                                var v = Math.max(15, Math.min(100, SysState.brightnessVal + step));
+                                SysState.brightnessVal = v;
                                 controlWindow.brightnessChangedOsd(v);
                                 brApplyDebounce.restart();
                             }
@@ -1242,7 +1198,7 @@ PanelWindow {
             }
 
             // =================================================================
-            // 3B. MODO GAMING / LATENCIA CERO (SUPER + G)
+            // 3B. MODO GAMING / LATENCIA CERO (SUPER + G + AUTO FULLSCREEN)
             // =================================================================
             Rectangle {
                 id: gamingCard
@@ -1255,11 +1211,24 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 150 } }
                 Behavior on border.color { ColorAnimation { duration: 150 } }
 
+                MouseArea {
+                    id: gamingCardArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        SysState.guardToggle();
+                        var next = !SysState.gamingModeActive;
+                        SysState.gamingModeActive = next;
+                        controlWindow.runCtl(["gamemode", next ? "on" : "off"]);
+                    }
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12
                     anchors.rightMargin: 12
-                    spacing: 10
+                    spacing: 8
 
                     Rectangle {
                         implicitWidth: 26
@@ -1290,11 +1259,54 @@ PanelWindow {
 
                         Text {
                             text: controlWindow.gamingModeActive
-                                ? (I18n.isEs ? "Activo (Sin blur/gaps • CPU Max • Tearing ON)" : "Active (No blur/gaps • Max CPU • Tearing ON)")
-                                : (I18n.isEs ? "Apagado (SUPER + G para activar)" : "Off (SUPER + G to toggle)")
+                                ? (I18n.isEs ? "Activo (Sin blur/sombras • DND • CPU Max)" : "Active (No blur/shadows • DND • Max CPU)")
+                                : (controlWindow.autoGamingEnabled
+                                    ? (I18n.isEs ? "Apagado (SUPER + G • Auto juegos ON)" : "Off (SUPER + G • Auto games ON)")
+                                    : (I18n.isEs ? "Apagado (SUPER + G • Solo manual)" : "Off (SUPER + G • Manual only)"))
                             font.family: Theme.fontSans
                             font.pixelSize: 9
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
                             color: controlWindow.gamingModeActive ? "#ff9494" : Theme.textMuted
+                        }
+                    }
+
+                    // Compact Auto-Gaming Toggle Pill
+                    Rectangle {
+                        id: autoGameChip
+                        implicitHeight: 20
+                        implicitWidth: autoGameLabel.implicitWidth + 12
+                        radius: 10
+                        color: controlWindow.autoGamingEnabled
+                            ? (autoGameArea.containsMouse ? "#40ff2b2b" : "#26ff2b2b")
+                            : (autoGameArea.containsMouse ? "#22ffffff" : "#12ffffff")
+                        border.color: controlWindow.autoGamingEnabled ? Theme.accentBorder : Theme.borderSubtle
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                        Text {
+                            id: autoGameLabel
+                            anchors.centerIn: parent
+                            text: "AUTO"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 8
+                            font.bold: true
+                            font.letterSpacing: 0.5
+                            color: controlWindow.autoGamingEnabled ? Theme.accent : Theme.textMuted
+                        }
+
+                        MouseArea {
+                            id: autoGameArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                SysState.guardToggle();
+                                var next = !SysState.autoGamingEnabled;
+                                SysState.autoGamingEnabled = next;
+                                controlWindow.runCtl(["auto-gaming", next ? "on" : "off"]);
+                            }
                         }
                     }
 
@@ -1314,16 +1326,6 @@ PanelWindow {
                             x: controlWindow.gamingModeActive ? parent.width - width - 2 : 2
                             Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
                         }
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        controlWindow.gamingModeActive = !controlWindow.gamingModeActive;
-                        controlWindow.runCtl(["gamemode", controlWindow.gamingModeActive ? "on" : "off"]);
                     }
                 }
             }
@@ -1411,7 +1413,8 @@ PanelWindow {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            controlWindow.powerProfile = modelData.id;
+                                            SysState.guardToggle();
+                                            SysState.powerProfile = modelData.id;
                                             controlWindow.runCtl(["power", "set", modelData.id]);
                                         }
                                     }
@@ -1437,6 +1440,7 @@ PanelWindow {
                 property real currentScale: 1.0
                 property string currentMonitor: "Virtual-1"
                 property bool isAutoScale: true
+                property double lastScaleRefreshMs: 0
 
                 Process {
                     id: scaleStatusProc
@@ -1467,11 +1471,15 @@ PanelWindow {
                     id: scaleRefreshTimer
                     interval: 350
                     repeat: false
-                    onTriggered: displayCard.refreshScale()
+                    onTriggered: displayCard.refreshScale(true)
                 }
 
-                function refreshScale() {
-                    if (!scaleStatusProc.running) scaleStatusProc.running = true;
+                function refreshScale(force) {
+                    if (scaleStatusProc.running) return;
+                    var now = Date.now();
+                    if (!force && (now - displayCard.lastScaleRefreshMs) < 1000) return;
+                    displayCard.lastScaleRefreshMs = now;
+                    scaleStatusProc.running = true;
                 }
 
                 function applyScale(sVal, autoMode) {
@@ -1674,7 +1682,8 @@ PanelWindow {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            controlWindow.aiEngine = modelData.id;
+                                            SysState.guardToggle();
+                                            SysState.aiEngine = modelData.id;
                                             controlWindow.runCtl(["ai-engine", "set", modelData.id]);
                                         }
                                     }

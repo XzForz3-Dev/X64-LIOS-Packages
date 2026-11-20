@@ -20,8 +20,10 @@ PanelWindow {
         var cleanSum = sum || "Notificación";
         var cleanBod = bod || "";
 
-        // Block all notifications while DND is active EXCEPT the DND toggle confirmation itself
-        if (notifWindow.dndEnabled && cleanApp !== "No Molestar" && cleanApp !== "Do Not Disturb") {
+        // Block all notifications while DND is active EXCEPT DND & Gaming Mode state confirmations
+        if (notifWindow.dndEnabled
+            && cleanApp !== "No Molestar" && cleanApp !== "Do Not Disturb"
+            && cleanApp !== "Gaming X64" && cleanApp !== "X64 Gaming") {
             return;
         }
 

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
@@ -11,47 +12,41 @@ PanelWindow {
 
     signal closeRequested()
 
-    property int cpuUsage: 0
-    property int cpuTemp: 40
-    property string cpuModel: "X64 Processor"
-    property int cpuCores: 4
-    property string cpuFreq: "3.60 GHz"
-    property string loadAvg: "0.10"
-    property var cpuHistory: [4, 6, 5, 8, 7, 10, 6, 5, 9, 7, 6, 8, 5, 7, 6, 8, 10, 7, 6, 5]
+    readonly property int cpuUsage: SysState.cpuUsage
+    readonly property int cpuTemp: SysState.cpuTemp
+    readonly property string cpuModel: SysState.cpuModel
+    readonly property int cpuCores: SysState.cpuCores
+    readonly property string cpuFreq: SysState.cpuFreq
+    readonly property string loadAvg: SysState.loadAvg
+    readonly property var cpuHistory: SysState.cpuHistory
 
-    property string ramUsed: "0.0"
-    property string ramTotal: "8.0"
-    property int ramPct: 0
-    property string ramCached: "0.0"
-    property string swapUsed: "0.0"
-    property string swapTotal: "0.0"
+    readonly property string ramUsed: SysState.ramUsed
+    readonly property string ramTotal: SysState.ramTotal
+    readonly property int ramPct: SysState.ramPct
+    readonly property string ramCached: SysState.ramCached
+    readonly property string swapUsed: SysState.swapUsed
+    readonly property string swapTotal: SysState.swapTotal
 
-    property string diskUsed: "0G"
-    property string diskTotal: "0G"
-    property string diskFree: "0G"
-    property string diskFs: "BTRFS"
-    property int diskPct: 0
+    readonly property string diskUsed: SysState.diskUsed
+    readonly property string diskTotal: SysState.diskTotal
+    readonly property string diskFree: SysState.diskFree
+    readonly property string diskFs: SysState.diskFs
+    readonly property int diskPct: SysState.diskPct
 
-    property string netDown: "0 KB/s"
-    property string netUp: "0 KB/s"
-    property string netIp: "127.0.0.1"
-    property string netIface: "eth0"
+    readonly property string netDown: SysState.netDown
+    readonly property string netUp: SysState.netUp
+    readonly property string netIp: SysState.netIp
+    readonly property string netIface: SysState.netIface
 
-    property var cpuCoresLoad: [0, 0, 0, 0, 0, 0, 0, 0]
+    readonly property var cpuCoresLoad: SysState.cpuCoresLoad
 
-    property string kernelVer: "Linux"
-    property string uptimeStr: "0m"
-    property int gpuCount: 0
-    property int gpuTemp: 0
-    property int gpuUtil: 0
-    property var gpus: []
-    property var topList: [
-        { "name": "antigravity-ide", "cpu": "8.8%", "mem": "389 MB" },
-        { "name": "Hyprland",        "cpu": "2.4%", "mem": "271 MB" },
-        { "name": "quickshell",      "cpu": "1.2%", "mem": "115 MB" },
-        { "name": "kitty",           "cpu": "0.4%", "mem": "64 MB" },
-        { "name": "systemd",         "cpu": "0.1%", "mem": "24 MB" }
-    ]
+    readonly property string kernelVer: SysState.kernelVer
+    readonly property string uptimeStr: SysState.uptimeStr
+    readonly property int gpuCount: SysState.gpuCount
+    readonly property int gpuTemp: SysState.gpuTemp
+    readonly property int gpuUtil: SysState.gpuUtil
+    readonly property var gpus: SysState.gpus
+    property var topList: []
 
     anchors {
         top: true
@@ -162,78 +157,24 @@ PanelWindow {
         teleAppProc.running = true;
     }
 
-    Process {
-        id: statusProc
-        command: ["x64-hyprland-ctl", "status"]
-        stdout: StdioCollector {
-            id: statusCollector
-            onStreamFinished: {
-                if (!statusCollector.text) return;
-                try {
-                    var data = JSON.parse(statusCollector.text.trim());
-                    var c = data.cpu || 0;
-                    teleWindow.cpuUsage = c;
-                    teleWindow.cpuTemp = data.temp || 40;
-                    if (data.cpuModel) teleWindow.cpuModel = data.cpuModel;
-                    if (data.cpuCores) teleWindow.cpuCores = data.cpuCores;
-                    if (data.cpuFreq) teleWindow.cpuFreq = data.cpuFreq;
-                    if (data.loadAvg) teleWindow.loadAvg = data.loadAvg;
-                    if (data.cpuCoresLoad && data.cpuCoresLoad.length > 0) teleWindow.cpuCoresLoad = data.cpuCoresLoad;
-
-                    // Update rolling 20-sample sparkline history
-                    var hist = teleWindow.cpuHistory.slice(1);
-                    hist.push(Math.max(4, Math.min(100, c)));
-                    teleWindow.cpuHistory = hist;
-
-                    teleWindow.ramUsed = data.ramUsed || "0.0";
-                    teleWindow.ramTotal = data.ramTotal || "0.0";
-                    teleWindow.ramPct = data.ramPct || 0;
-                    teleWindow.ramCached = data.ramCached || "0.0";
-                    teleWindow.swapUsed = data.swapUsed || "0.0";
-                    teleWindow.swapTotal = data.swapTotal || "0.0";
-
-                    teleWindow.diskUsed = data.diskUsed || "0G";
-                    teleWindow.diskTotal = data.diskTotal || "0G";
-                    teleWindow.diskFree = data.diskFree || "0G";
-                    teleWindow.diskFs = data.diskFs || "BTRFS";
-                    teleWindow.diskPct = data.diskPct || 0;
-
-                    teleWindow.netDown = data.netDown || "0 KB/s";
-                    teleWindow.netUp = data.netUp || "0 KB/s";
-                    teleWindow.netIp = data.netIp || "Local";
-                    teleWindow.netIface = data.netIface || "LAN";
-
-                    if (data.kernel) teleWindow.kernelVer = data.kernel;
-                    teleWindow.uptimeStr = data.uptime || "0m";
-                    teleWindow.gpuCount = data.gpuCount || 0;
-                    teleWindow.gpuTemp = data.gpuTemp || 0;
-                    teleWindow.gpuUtil = data.gpuUtil || 0;
-                    teleWindow.gpus = data.gpus || [];
-                    if (data.topList && data.topList.length > 0) {
-                        if (typeof procListView !== "undefined" && procListView && procListView.applyNewList) {
-                            procListView.applyNewList(data.topList);
-                        } else {
-                            teleWindow.topList = data.topList;
-                        }
-                    }
-                } catch (e) {}
+    Connections {
+        target: SysState
+        function onTopListUpdated(list) {
+            if (!teleWindow.visible) return;
+            if (typeof procListView !== "undefined" && procListView && procListView.applyNewList) {
+                procListView.applyNewList(list);
+            } else {
+                teleWindow.topList = list;
             }
         }
     }
 
-    Timer {
-        interval: 1200
-        running: teleWindow.visible
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!statusProc.running) statusProc.running = true;
-        }
-    }
-
     onVisibleChanged: {
+        SysState.telemetryOpen = visible;
         if (visible) {
-            if (!statusProc.running) statusProc.running = true;
+            if (SysState.topList && SysState.topList.length > 0) {
+                teleWindow.topList = SysState.topList;
+            }
             card.scale = 0.82;
             card.y = -24;
             card.opacity = 0.0;
@@ -254,6 +195,8 @@ PanelWindow {
         id: card
         anchors.fill: parent
         transformOrigin: Item.TopRight
+        layer.enabled: openAnim.running || closeAnim.running
+        layer.smooth: true
         scale: 1.0
         opacity: 1.0
         radius: Theme.radiusLg
@@ -347,34 +290,35 @@ PanelWindow {
                             width: 54
                             height: 54
 
-                            Canvas {
+                            Shape {
                                 id: cpuGaugeCanvas
                                 anchors.fill: parent
+                                preferredRendererType: Shape.CurveRenderer
                                 property int val: teleWindow.cpuUsage
-                                onValChanged: requestPaint()
-                                onPaint: {
-                                    var ctx = getContext("2d");
-                                    ctx.reset();
-                                    var cx = width / 2;
-                                    var cy = height / 2;
-                                    var r = 22;
-                                    ctx.lineWidth = 4.5;
-                                    ctx.lineCap = "round";
 
-                                    // Background ring
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: "#14ffffff"
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: 0; sweepAngle: 360
+                                    }
+                                }
 
-                                    // Value arc
-                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
-                                    var startAngle = -Math.PI / 2;
-                                    var endAngle = startAngle + (Math.PI * 2 * pct);
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, startAngle, endAngle);
-                                    ctx.strokeStyle = val >= 85 ? "#ff2b2b" : (val >= 65 ? "#f5a524" : "#d8d6d0");
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: cpuGaugeCanvas.val >= 85 ? "#ff2b2b" : (cpuGaugeCanvas.val >= 65 ? "#f5a524" : "#d8d6d0")
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: -90
+                                        sweepAngle: Math.max(7.2, Math.min(360, cpuGaugeCanvas.val * 3.6))
+                                    }
                                 }
                             }
 
@@ -425,32 +369,35 @@ PanelWindow {
                             width: 54
                             height: 54
 
-                            Canvas {
+                            Shape {
                                 id: ramGaugeCanvas
                                 anchors.fill: parent
+                                preferredRendererType: Shape.CurveRenderer
                                 property int val: teleWindow.ramPct
-                                onValChanged: requestPaint()
-                                onPaint: {
-                                    var ctx = getContext("2d");
-                                    ctx.reset();
-                                    var cx = width / 2;
-                                    var cy = height / 2;
-                                    var r = 22;
-                                    ctx.lineWidth = 4.5;
-                                    ctx.lineCap = "round";
 
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: "#14ffffff"
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: 0; sweepAngle: 360
+                                    }
+                                }
 
-                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
-                                    var startAngle = -Math.PI / 2;
-                                    var endAngle = startAngle + (Math.PI * 2 * pct);
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, startAngle, endAngle);
-                                    ctx.strokeStyle = val >= 85 ? "#ff2b2b" : (val >= 70 ? "#f5a524" : "#d8d6d0");
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: ramGaugeCanvas.val >= 85 ? "#ff2b2b" : (ramGaugeCanvas.val >= 70 ? "#f5a524" : "#d8d6d0")
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: -90
+                                        sweepAngle: Math.max(7.2, Math.min(360, ramGaugeCanvas.val * 3.6))
+                                    }
                                 }
                             }
 
@@ -501,32 +448,35 @@ PanelWindow {
                             width: 54
                             height: 54
 
-                            Canvas {
+                            Shape {
                                 id: diskGaugeCanvas
                                 anchors.fill: parent
+                                preferredRendererType: Shape.CurveRenderer
                                 property int val: teleWindow.diskPct
-                                onValChanged: requestPaint()
-                                onPaint: {
-                                    var ctx = getContext("2d");
-                                    ctx.reset();
-                                    var cx = width / 2;
-                                    var cy = height / 2;
-                                    var r = 22;
-                                    ctx.lineWidth = 4.5;
-                                    ctx.lineCap = "round";
 
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                                    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: "#14ffffff"
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: 0; sweepAngle: 360
+                                    }
+                                }
 
-                                    var pct = Math.max(0.02, Math.min(1.0, val / 100.0));
-                                    var startAngle = -Math.PI / 2;
-                                    var endAngle = startAngle + (Math.PI * 2 * pct);
-                                    ctx.beginPath();
-                                    ctx.arc(cx, cy, r, startAngle, endAngle);
-                                    ctx.strokeStyle = val >= 90 ? "#ff2b2b" : (val >= 75 ? "#f5a524" : "#d8d6d0");
-                                    ctx.stroke();
+                                ShapePath {
+                                    strokeWidth: 4.5
+                                    strokeColor: diskGaugeCanvas.val >= 90 ? "#ff2b2b" : (diskGaugeCanvas.val >= 75 ? "#f5a524" : "#d8d6d0")
+                                    fillColor: "transparent"
+                                    capStyle: ShapePath.RoundCap
+                                    PathAngleArc {
+                                        centerX: 27; centerY: 27
+                                        radiusX: 22; radiusY: 22
+                                        startAngle: -90
+                                        sweepAngle: Math.max(7.2, Math.min(360, diskGaugeCanvas.val * 3.6))
+                                    }
                                 }
                             }
 

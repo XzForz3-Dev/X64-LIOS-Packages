@@ -42,6 +42,13 @@ fi
 [ -f "${STATE_DIR}/dnd" ]           || echo "0" > "${STATE_DIR}/dnd"
 [ -f "${STATE_DIR}/brightness" ]    || echo "100" > "${STATE_DIR}/brightness"
 [ -f "${STATE_DIR}/gaming_mode" ]   || echo "0" > "${STATE_DIR}/gaming_mode"
+[ -f "${STATE_DIR}/auto_gaming" ]   || {
+    if [ -f "${HOME}/.config/hypr/auto_gaming" ]; then
+        tr -d '[:space:]' < "${HOME}/.config/hypr/auto_gaming" > "${STATE_DIR}/auto_gaming" 2>/dev/null || echo "1" > "${STATE_DIR}/auto_gaming"
+    else
+        echo "1" > "${STATE_DIR}/auto_gaming"
+    fi
+}
 [ -f "${STATE_DIR}/power_profile" ] || {
     prof=$(powerprofilesctl get 2>/dev/null || echo "balanced")
     echo "${prof:-balanced}" > "${STATE_DIR}/power_profile"
@@ -230,6 +237,11 @@ cmd_brightness() {
         brightnessctl -q set "${val}%" >/dev/null 2>&1 || true
     else
         apply_ctm_state
+    fi
+
+    # Show instant Quickshell OSD when triggered via physical brightness keys (up/down)
+    if [ "$sub" = "up" ] || [ "$sub" = "down" ]; then
+        quickshell ipc call osd brightness "$val" >/dev/null 2>&1 || true
     fi
 }
 
@@ -599,11 +611,323 @@ cmd_screenshot() {
 }
 
 # -----------------------------------------------------------------------------
-# 7. UNIFIED FAST TELEMETRY & STATUS JSON
+# 7. UNIFIED FAST TELEMETRY & STATUS JSON (FULL + LITE + NVIDIA/AMD/INTEL GPU)
 # -----------------------------------------------------------------------------
-cmd_status() {
-    # 1. CPU Delta % & Per-Core Load
+get_cpu_temp() {
+    local fallback_cpu_pct="${1:-0}"
+    local tz_path=""
+    if [ -s "${STATE_DIR}/cpu_temp_path" ]; then
+        tz_path=$(cat "${STATE_DIR}/cpu_temp_path" 2>/dev/null || echo "")
+        [ -r "$tz_path" ] || tz_path=""
+    fi
+
+    if [ -z "$tz_path" ]; then
+        # Prioritize accurate CPU package sensors (Intel coretemp/x86_pkg_temp, AMD k10temp/zenpower)
+        for hm in /sys/class/hwmon/hwmon*; do
+            [ -r "${hm}/name" ] || continue
+            local hname
+            hname=$(cat "${hm}/name" 2>/dev/null || echo "")
+            case "$hname" in
+                coretemp|k10temp|zenpower|cpu_thermal|thinkpad)
+                    if [ -r "${hm}/temp1_input" ]; then
+                        tz_path="${hm}/temp1_input"
+                        break
+                    fi
+                    ;;
+            esac
+        done
+        if [ -z "$tz_path" ]; then
+            for tz in /sys/class/thermal/thermal_zone*; do
+                [ -r "${tz}/type" ] && [ -r "${tz}/temp" ] || continue
+                local ttype
+                ttype=$(cat "${tz}/type" 2>/dev/null || echo "")
+                case "$ttype" in
+                    x86_pkg_temp|TCPU|cpu-thermal)
+                        tz_path="${tz}/temp"
+                        break
+                        ;;
+                esac
+            done
+        fi
+        if [ -z "$tz_path" ]; then
+            for tz in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp1_input; do
+                if [ -r "$tz" ]; then
+                    local raw_check
+                    raw_check=$(cat "$tz" 2>/dev/null || echo "")
+                    if [ -n "$raw_check" ] && [ "$raw_check" -gt 1000 ] 2>/dev/null; then
+                        tz_path="$tz"
+                        break
+                    fi
+                fi
+            done
+        fi
+        [ -n "$tz_path" ] && echo "$tz_path" > "${STATE_DIR}/cpu_temp_path"
+    fi
+
+    if [ -n "$tz_path" ] && [ -r "$tz_path" ]; then
+        local raw_t
+        raw_t=$(cat "$tz_path" 2>/dev/null || echo "")
+        if [ -n "$raw_t" ] && [ "$raw_t" -gt 1000 ] 2>/dev/null; then
+            echo $(( raw_t / 1000 ))
+            return 0
+        fi
+    fi
+    # Smart thermal model for virtualized environments without hwmon passthrough
+    echo $(( 38 + (fallback_cpu_pct * 35) / 100 ))
+}
+
+collect_gpu_telemetry() {
+    local ttl="${1:-0}"
+    local cache_file="${STATE_DIR}/gpu_cache"
+    local now_s
+    now_s=$(date +%s)
+
+    gpu_count=0
+    gpu_primary_temp=0
+    gpu_primary_util=0
+    gpus_json="[]"
+
+    if [ "$ttl" -gt 0 ] && [ -s "$cache_file" ]; then
+        local cache_ts=0
+        # shellcheck disable=SC1090
+        source "$cache_file" 2>/dev/null || true
+        if [ $(( now_s - cache_ts )) -lt "$ttl" ] && [ -n "${gpus_json:-}" ]; then
+            return 0
+        fi
+        gpu_count=0
+        gpu_primary_temp=0
+        gpu_primary_util=0
+        gpus_json="[]"
+    fi
+
+    # 1. NVIDIA (nvidia-smi — Single & Multi-GPU / SLI aware)
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        local smi_out
+        smi_out=$(nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null)
+        if [ -n "$smi_out" ]; then
+            gpus_json=$(echo "$smi_out" | awk -F', ' 'BEGIN{printf "["} {
+                if (NR>1) printf ",";
+                idx=$1; name=$2; temp=$3; util=$4; vram_u=$5; vram_t=$6;
+                vram_pct = (vram_t > 0) ? int((vram_u * 100) / vram_t) : 0;
+                if (vram_u >= 1024) vram_u_str = sprintf("%.1f GB", vram_u / 1024);
+                else vram_u_str = sprintf("%d MB", vram_u);
+                vram_t_str = sprintf("%.1f GB", vram_t / 1024);
+                gsub(/"/,"",name);
+                printf "{\"index\":%d,\"name\":\"%s\",\"temp\":%d,\"util\":%d,\"vramUsed\":\"%s\",\"vramTotal\":\"%s\",\"vramPct\":%d}", idx, name, temp, util, vram_u_str, vram_t_str, vram_pct;
+            } END{printf "]"}')
+            gpu_count=$(echo "$smi_out" | wc -l)
+            gpu_primary_temp=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $3}')
+            gpu_primary_util=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $4}')
+        fi
+    fi
+
+    # 2. AMD / Intel DRM Native Sysfs Fallback (0 external tools required)
+    if [ "${gpu_count:-0}" -eq 0 ]; then
+        local idx=0
+        local json_acc="["
+        for card in /sys/class/drm/card[0-9]*; do
+            local cname
+            cname=$(basename "$card")
+            [[ "$cname" =~ ^card[0-9]+$ ]] || continue
+            local dev="${card}/device"
+            [ -r "${dev}/vendor" ] || continue
+            local vendor
+            vendor=$(cat "${dev}/vendor" 2>/dev/null || echo "")
+            local label=""
+            case "$vendor" in
+                0x1002) label="AMD Radeon GPU" ;;
+                0x8086) label="Intel Graphics" ;;
+                *) continue ;;
+            esac
+
+            # Skip virtual / non-telemetry cards unless temp or busy sensor exists
+            local g_util=0 g_temp=0 has_metric=0
+            if [ -r "${dev}/gpu_busy_percent" ]; then
+                g_util=$(cat "${dev}/gpu_busy_percent" 2>/dev/null || echo 0)
+                has_metric=1
+            fi
+            for hwm in "${dev}"/hwmon/hwmon*/temp1_input; do
+                if [ -r "$hwm" ]; then
+                    local raw_gt
+                    raw_gt=$(cat "$hwm" 2>/dev/null || echo 0)
+                    if [ "$raw_gt" -gt 1000 ] 2>/dev/null; then
+                        g_temp=$(( raw_gt / 1000 ))
+                        has_metric=1
+                        break
+                    fi
+                fi
+            done
+            [ "$has_metric" -eq 0 ] && continue
+
+            local vram_u_str="0 MB" vram_t_str="0.0 GB" vram_pct=0
+            if [ -r "${dev}/mem_info_vram_used" ] && [ -r "${dev}/mem_info_vram_total" ]; then
+                local vu_b vt_b
+                vu_b=$(cat "${dev}/mem_info_vram_used" 2>/dev/null || echo 0)
+                vt_b=$(cat "${dev}/mem_info_vram_total" 2>/dev/null || echo 0)
+                if [ "$vt_b" -gt 0 ] 2>/dev/null; then
+                    vram_pct=$(( (vu_b * 100) / vt_b ))
+                    local vu_m=$(( vu_b / 1048576 ))
+                    if [ "$vu_m" -ge 1024 ]; then
+                        vram_u_str=$(awk -v m="$vu_m" 'BEGIN{printf "%.1f GB", m/1024}')
+                    else
+                        vram_u_str="${vu_m} MB"
+                    fi
+                    vram_t_str=$(awk -v b="$vt_b" 'BEGIN{printf "%.1f GB", b/1073741824}')
+                fi
+            fi
+
+            # Cache human-readable PCI GPU name once per card
+            local name_cache="${STATE_DIR}/gpu_name_${cname}"
+            if [ -s "$name_cache" ]; then
+                label=$(cat "$name_cache" 2>/dev/null || echo "$label")
+            elif command -v lspci >/dev/null 2>&1 && [ -r "${dev}/uevent" ]; then
+                local pci_slot
+                pci_slot=$(awk -F'=' '/^PCI_SLOT_NAME=/{print $2; exit}' "${dev}/uevent" 2>/dev/null)
+                if [ -n "$pci_slot" ]; then
+                    local pci_desc
+                    pci_desc=$(lspci -s "$pci_slot" 2>/dev/null | sed 's/^[^:]*: //; s/Advanced Micro Devices, Inc. \[AMD\/ATI\] /AMD /; s/Intel Corporation /Intel /; s/ (rev .*//; s/"//g')
+                    [ -n "$pci_desc" ] && label="$pci_desc"
+                fi
+                echo "$label" > "$name_cache"
+            fi
+
+            [ "$idx" -gt 0 ] && json_acc="${json_acc},"
+            json_acc="${json_acc}{\"index\":${idx},\"name\":\"${label}\",\"temp\":${g_temp},\"util\":${g_util},\"vramUsed\":\"${vram_u_str}\",\"vramTotal\":\"${vram_t_str}\",\"vramPct\":${vram_pct}}"
+            if [ "$idx" -eq 0 ]; then
+                gpu_primary_temp="$g_temp"
+                gpu_primary_util="$g_util"
+            fi
+            idx=$(( idx + 1 ))
+        done
+        if [ "$idx" -gt 0 ]; then
+            gpu_count="$idx"
+            gpus_json="${json_acc}]"
+        fi
+    fi
+
+    printf 'cache_ts=%s\ngpu_count=%d\ngpu_primary_temp=%d\ngpu_primary_util=%d\ngpus_json=%q\n' \
+        "$now_s" "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}" "$gpus_json" > "${cache_file}.tmp.$$" && \
+        mv -f "${cache_file}.tmp.$$" "$cache_file"
+}
+
+cmd_status_lite() {
+    local skip_gpu=0
+    [ "${1:-}" = "--no-gpu" ] && skip_gpu=1
+
+    # 1. CPU Delta % (Pure bash builtins, zero awk; atomic state writes + anti-spike guard)
     local cpu_pct=0
+    [ -f "${STATE_DIR}/cpu_pct_last" ] && cpu_pct=$(cat "${STATE_DIR}/cpu_pct_last" 2>/dev/null || echo 0)
+    local _lbl user nice sys idle iowait irq softirq steal _rest
+    if read -r _lbl user nice sys idle iowait irq softirq steal _rest < /proc/stat 2>/dev/null; then
+        local total=$(( ${user:-0} + ${nice:-0} + ${sys:-0} + ${idle:-0} + ${iowait:-0} + ${irq:-0} + ${softirq:-0} + ${steal:-0} ))
+        local idle_all=$(( ${idle:-0} + ${iowait:-0} ))
+        if [ -f "${STATE_DIR}/cpu_stat" ]; then
+            local prev_total="" prev_idle=""
+            read -r prev_total prev_idle < "${STATE_DIR}/cpu_stat" 2>/dev/null || true
+            if [ -n "$prev_total" ] && [ -n "$prev_idle" ]; then
+                local diff_total=$(( total - prev_total ))
+                local diff_idle=$(( idle_all - prev_idle ))
+                if [ "$diff_total" -ge 80 ]; then
+                    cpu_pct=$(( (100 * (diff_total - diff_idle)) / diff_total ))
+                    [ "$cpu_pct" -lt 0 ] && cpu_pct=0
+                    [ "$cpu_pct" -gt 100 ] && cpu_pct=100
+                    printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
+                    printf '%s\n' "${cpu_pct}" > "${STATE_DIR}/cpu_pct_last.tmp.$$" && mv -f "${STATE_DIR}/cpu_pct_last.tmp.$$" "${STATE_DIR}/cpu_pct_last"
+                fi
+            else
+                printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
+            fi
+        else
+            printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
+        fi
+    fi
+
+    # 2. RAM Used (GB)
+    local ram_used="0.0"
+    ram_used=$(awk '/^MemTotal:/{mt=$2} /^MemAvailable:/{ma=$2} END{if(mt>0) printf "%.1f", (mt-ma)/1048576; else print "0.0"}' /proc/meminfo 2>/dev/null)
+
+    # 3. CPU Temp (cached sensor path)
+    local temp_c
+    temp_c=$(get_cpu_temp "$cpu_pct")
+
+    # 4. Local toggle & state files (zero external commands)
+    local caf_val nl_val dnd_val br_val pwr_prof ai_eng zoom_en zoom_fac game_en auto_game_en
+    caf_val=$(cat "${STATE_DIR}/caffeine" 2>/dev/null || echo "0")
+    nl_val=$(cat "${STATE_DIR}/nightlight" 2>/dev/null || echo "0")
+    dnd_val=$(cat "${STATE_DIR}/dnd" 2>/dev/null || echo "0")
+    br_val=$(cat "${STATE_DIR}/brightness" 2>/dev/null || echo "100")
+    pwr_prof=$(cat "${STATE_DIR}/power_profile" 2>/dev/null || echo "balanced")
+    ai_eng=$(cat "${STATE_DIR}/ai_engine" 2>/dev/null || echo "opencode")
+    zoom_en=$(cat "${STATE_DIR}/zoom_enabled" 2>/dev/null || echo "0")
+    zoom_fac=$(cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
+    game_en=$(cat "${STATE_DIR}/gaming_mode" 2>/dev/null || echo "0")
+    auto_game_en=$(cat "${STATE_DIR}/auto_gaming" 2>/dev/null || echo "1")
+
+    # 5. Recording timer
+    local rec_active="false" rec_time="00:00"
+    if [ -f "${STATE_DIR}/record.start" ] && is_recorder_running; then
+        rec_active="true"
+        local start_s now_s elapsed
+        start_s=$(cat "${STATE_DIR}/record.start" 2>/dev/null || date +%s)
+        now_s=$(date +%s)
+        elapsed=$(( now_s - start_s ))
+        [ "$elapsed" -lt 0 ] && elapsed=0
+        rec_time=$(printf "%02d:%02d" $(( elapsed / 60 )) $(( elapsed % 60 )))
+    fi
+
+    # 6. Smart Battery
+    local has_bat="false" bat_pct=100 bat_status="AC"
+    for bat_dir in /sys/class/power_supply/BAT*; do
+        if [ -d "$bat_dir" ]; then
+            bat_pct=$(cat "${bat_dir}/capacity" 2>/dev/null || echo 0)
+            bat_status=$(cat "${bat_dir}/status" 2>/dev/null || echo "Discharging")
+            if [ "$bat_pct" -eq 0 ] 2>/dev/null && [ "$bat_status" = "Not charging" ]; then
+                has_bat="false"
+                bat_pct=100
+                bat_status="AC"
+            else
+                has_bat="true"
+                break
+            fi
+        fi
+    done
+
+    # 7. GPU summary (6s TTL cache in normal desktop; skipped completely with --no-gpu)
+    local gpu_count=-1 gpu_primary_temp=-1 gpu_primary_util=-1 gpus_json=""
+    if [ "$skip_gpu" -eq 0 ]; then
+        collect_gpu_telemetry 6
+    fi
+
+    if [ "$skip_gpu" -eq 1 ]; then
+        printf '{"cpu":%d,"ramUsed":"%s","temp":%d,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"autoGaming":%s}\n' \
+            "$cpu_pct" "$ram_used" "$temp_c" \
+            "$([ "$caf_val" = "1" ] && echo true || echo false)" \
+            "$([ "$nl_val" = "1" ] && echo true || echo false)" \
+            "$([ "$dnd_val" = "1" ] && echo true || echo false)" \
+            "$rec_active" "$rec_time" \
+            "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "$ai_eng" \
+            "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
+            "$([ "$game_en" = "1" ] && echo true || echo false)" \
+            "$([ "$auto_game_en" = "1" ] && echo true || echo false)"
+    else
+        printf '{"cpu":%d,"ramUsed":"%s","temp":%d,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"autoGaming":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d}\n' \
+            "$cpu_pct" "$ram_used" "$temp_c" \
+            "$([ "$caf_val" = "1" ] && echo true || echo false)" \
+            "$([ "$nl_val" = "1" ] && echo true || echo false)" \
+            "$([ "$dnd_val" = "1" ] && echo true || echo false)" \
+            "$rec_active" "$rec_time" \
+            "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "$ai_eng" \
+            "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
+            "$([ "$game_en" = "1" ] && echo true || echo false)" \
+            "$([ "$auto_game_en" = "1" ] && echo true || echo false)" \
+            "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}"
+    fi
+}
+
+cmd_status() {
+    # 1. CPU Delta % & Per-Core Load (guarded against short-window self-measurement spikes)
+    local cpu_pct=0
+    [ -f "${STATE_DIR}/cpu_pct_last" ] && cpu_pct=$(cat "${STATE_DIR}/cpu_pct_last" 2>/dev/null || echo 0)
     local stat_line
     stat_line=$(head -n1 /proc/stat 2>/dev/null)
     if [ -n "$stat_line" ]; then
@@ -613,15 +937,24 @@ cmd_status() {
         local idle_all=$(( idle + iowait ))
 
         if [ -f "${STATE_DIR}/cpu_stat" ]; then
-            local prev_total prev_idle
-            read -r prev_total prev_idle < "${STATE_DIR}/cpu_stat"
-            local diff_total=$(( total - prev_total ))
-            local diff_idle=$(( idle_all - prev_idle ))
-            if [ "$diff_total" -gt 0 ]; then
-                cpu_pct=$(( (100 * (diff_total - diff_idle)) / diff_total ))
+            local prev_total="" prev_idle=""
+            read -r prev_total prev_idle < "${STATE_DIR}/cpu_stat" 2>/dev/null || true
+            if [ -n "$prev_total" ] && [ -n "$prev_idle" ]; then
+                local diff_total=$(( total - prev_total ))
+                local diff_idle=$(( idle_all - prev_idle ))
+                if [ "$diff_total" -ge 80 ]; then
+                    cpu_pct=$(( (100 * (diff_total - diff_idle)) / diff_total ))
+                    [ "$cpu_pct" -lt 0 ] && cpu_pct=0
+                    [ "$cpu_pct" -gt 100 ] && cpu_pct=100
+                    printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
+                    printf '%s\n' "${cpu_pct}" > "${STATE_DIR}/cpu_pct_last.tmp.$$" && mv -f "${STATE_DIR}/cpu_pct_last.tmp.$$" "${STATE_DIR}/cpu_pct_last"
+                fi
+            else
+                printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
             fi
+        else
+            printf '%s %s\n' "${total}" "${idle_all}" > "${STATE_DIR}/cpu_stat.tmp.$$" && mv -f "${STATE_DIR}/cpu_stat.tmp.$$" "${STATE_DIR}/cpu_stat"
         fi
-        echo "${total} ${idle_all}" > "${STATE_DIR}/cpu_stat"
     fi
 
     local cpu_cores_json="[]"
@@ -708,22 +1041,9 @@ cmd_status() {
             }
         }' /proc/meminfo 2>/dev/null)"
 
-    # 3. CPU Temperature (°C)
-    local temp_c=""
-    for tz in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp1_input; do
-        if [ -r "$tz" ]; then
-            local raw_t
-            raw_t=$(cat "$tz" 2>/dev/null || echo "")
-            if [ -n "$raw_t" ] && [ "$raw_t" -gt 1000 ] 2>/dev/null; then
-                temp_c=$(( raw_t / 1000 ))
-                break
-            fi
-        fi
-    done
-    if [ -z "$temp_c" ]; then
-        # Smart thermal model for virtualized environments without hwmon passthrough
-        temp_c=$(( 38 + (cpu_pct * 35) / 100 ))
-    fi
+    # 3. CPU Temperature (°C — cached accurate package sensor)
+    local temp_c
+    temp_c=$(get_cpu_temp "$cpu_pct")
 
     # 4. Root Disk Usage (/), Free Space & Filesystem Type
     local disk_used="0G" disk_total="0G" disk_free="0G" disk_fs="ext4" disk_pct=0
@@ -819,7 +1139,7 @@ cmd_status() {
     pwr_prof=$(get_effective_power_profile)
 
     # 10. Brightness, OSD Event, AI Scratchpad Engine & Live Zoom State
-    local br_val osd_br_ts=0 ai_eng="opencode" zoom_en="0" zoom_fac="1.0" game_en="0"
+    local br_val osd_br_ts=0 ai_eng="opencode" zoom_en="0" zoom_fac="1.0" game_en="0" auto_game_en="1"
     br_val=$(cat "${STATE_DIR}/brightness" 2>/dev/null || echo "100")
     if [ -f "${STATE_DIR}/osd_brightness" ]; then
         IFS='|' read -r osd_br_ts _ < "${STATE_DIR}/osd_brightness"
@@ -828,30 +1148,13 @@ cmd_status() {
     zoom_en=$(get_effective_zoom_enabled)
     zoom_fac=$(cat "${STATE_DIR}/zoom_factor" 2>/dev/null || echo "1.0")
     game_en=$(get_effective_gaming_mode)
+    auto_game_en=$(get_effective_auto_gaming)
 
-    # 11. Multi-GPU Telemetry (NVIDIA SMI + Dual/SLI Aware)
+    # 11. Multi-GPU Telemetry (NVIDIA SLI + AMD / Intel DRM Native, 2s anti-spam cache)
     local gpu_count=0 gpu_primary_temp=0 gpu_primary_util=0 gpus_json="[]"
-    if command -v nvidia-smi >/dev/null 2>&1; then
-        local smi_out
-        smi_out=$(nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null)
-        if [ -n "$smi_out" ]; then
-            gpus_json=$(echo "$smi_out" | awk -F', ' 'BEGIN{printf "["} {
-                if (NR>1) printf ",";
-                idx=$1; name=$2; temp=$3; util=$4; vram_u=$5; vram_t=$6;
-                vram_pct = (vram_t > 0) ? int((vram_u * 100) / vram_t) : 0;
-                if (vram_u >= 1024) vram_u_str = sprintf("%.1f GB", vram_u / 1024);
-                else vram_u_str = sprintf("%d MB", vram_u);
-                vram_t_str = sprintf("%.1f GB", vram_t / 1024);
-                gsub(/"/,"",name);
-                printf "{\"index\":%d,\"name\":\"%s\",\"temp\":%d,\"util\":%d,\"vramUsed\":\"%s\",\"vramTotal\":\"%s\",\"vramPct\":%d}", idx, name, temp, util, vram_u_str, vram_t_str, vram_pct;
-            } END{printf "]"}')
-            gpu_count=$(echo "$smi_out" | wc -l)
-            gpu_primary_temp=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $3}')
-            gpu_primary_util=$(echo "$smi_out" | head -n1 | awk -F', ' '{print $4}')
-        fi
-    fi
+    collect_gpu_telemetry 2
 
-    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","cpuCoresLoad":%s,"ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d,"gpus":%s}\n' \
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","cpuCoresLoad":%s,"ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"autoGaming":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d,"gpus":%s}\n' \
         "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" "$cpu_cores_json" \
         "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
         "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
@@ -864,6 +1167,7 @@ cmd_status() {
         "$has_bat" "$bat_pct" "$bat_status" "$pwr_prof" "$br_val" "${osd_br_ts:-0}" "$ai_eng" \
         "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
         "$([ "$game_en" = "1" ] && echo true || echo false)" \
+        "$([ "$auto_game_en" = "1" ] && echo true || echo false)" \
         "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}" "$gpus_json"
 }
 
@@ -1278,61 +1582,164 @@ get_effective_gaming_mode() {
     cat "${STATE_DIR}/gaming_mode" 2>/dev/null || echo "0"
 }
 
-cmd_gamemode() {
+get_effective_auto_gaming() {
+    if [ -s "${STATE_DIR}/auto_gaming" ]; then
+        tr -d '[:space:]' < "${STATE_DIR}/auto_gaming" 2>/dev/null
+        return 0
+    fi
+    if [ -s "${HOME}/.config/hypr/auto_gaming" ]; then
+        local saved
+        saved=$(tr -d '[:space:]' < "${HOME}/.config/hypr/auto_gaming" 2>/dev/null)
+        [ "$saved" = "0" ] || saved="1"
+        echo "$saved" > "${STATE_DIR}/auto_gaming"
+        echo "$saved"
+        return 0
+    fi
+    echo "1" > "${STATE_DIR}/auto_gaming"
+    echo "1"
+}
+
+cmd_auto_gaming() {
     local action="${1:-toggle}"
     local cur
+    cur=$(get_effective_auto_gaming)
+    if [ "$action" = "toggle" ]; then
+        [ "$cur" = "1" ] && action="off" || action="on"
+    fi
+    mkdir -p "${HOME}/.config/hypr"
+    case "$action" in
+        on|1|true)
+            echo "1" > "${STATE_DIR}/auto_gaming"
+            echo "1" > "${HOME}/.config/hypr/auto_gaming"
+            ;;
+        off|0|false)
+            echo "0" > "${STATE_DIR}/auto_gaming"
+            echo "0" > "${HOME}/.config/hypr/auto_gaming"
+            ;;
+        get)
+            echo "$cur"
+            return 0
+            ;;
+    esac
+    quickshell ipc call sys refresh >/dev/null 2>&1 || true
+}
+
+cmd_gamemode() {
+    local action="${1:-toggle}"
+    local cur src
     cur=$(get_effective_gaming_mode)
+    src=$(cat "${STATE_DIR}/gaming_mode_source" 2>/dev/null || echo "none")
 
     if [ "$action" = "toggle" ]; then
         [ "$cur" = "1" ] && action="off" || action="on"
     fi
 
     case "$action" in
-        on)
+        on|auto-on)
+            local is_auto=0
+            [ "$action" = "auto-on" ] && is_auto=1
+
+            # Idempotent: never overwrite saved power/DND state if already in Gaming Mode
+            if [ "$cur" = "1" ]; then
+                [ "$is_auto" -eq 0 ] && echo "manual" > "${STATE_DIR}/gaming_mode_source"
+                quickshell ipc call sys refresh >/dev/null 2>&1 || true
+                return 0
+            fi
+
             echo "1" > "${STATE_DIR}/gaming_mode"
-            # Backup current power profile to restore later, then switch to performance
-            local cur_pwr
+            [ "$is_auto" -eq 1 ] && echo "auto" > "${STATE_DIR}/gaming_mode_source" || echo "manual" > "${STATE_DIR}/gaming_mode_source"
+
+            # Backup current power profile & DND state to restore cleanly later
+            local cur_pwr cur_dnd
             cur_pwr=$(get_effective_power_profile)
+            cur_dnd=$(cat "${STATE_DIR}/dnd" 2>/dev/null || echo "0")
             echo "${cur_pwr:-balanced}" > "${STATE_DIR}/pre_game_power_profile"
+            echo "${cur_dnd:-0}" > "${STATE_DIR}/pre_game_dnd"
             cmd_power set "performance"
-            
-            # Disable compositor overhead via native Lua engine (with legacy keyword fallback)
-            hyprctl eval "hl.config({ decoration = { blur = { enabled = false }, rounding = 0 }, general = { gaps_in = 0, gaps_out = 0 }, animations = { enabled = false } })" >/dev/null 2>&1 || \
+
+            # Disable ALL compositor overhead via native Lua engine (blur, shadows, rounding, inactive opacity, gaps, animations)
+            hyprctl eval "hl.config({ decoration = { blur = { enabled = false }, shadow = { enabled = false }, rounding = 0, inactive_opacity = 1.0 }, general = { gaps_in = 0, gaps_out = 0 }, animations = { enabled = false } })" >/dev/null 2>&1 || \
             hyprctl --batch "\
                 keyword decoration:blur:enabled 0;\
                 keyword decoration:shadow:enabled 0;\
+                keyword decoration:inactive_opacity 1.0;\
                 keyword animations:enabled 0;\
                 keyword general:gaps_in 0;\
                 keyword general:gaps_out 0;\
                 keyword decoration:rounding 0" >/dev/null 2>&1 || true
 
+            # Notify BEFORE enabling DND so confirmation displays if user was not already in DND
             if [ "$IS_ES" -eq 1 ]; then
-                notify_user "Modo Gaming: Activado" "Rendimiento máximo • Blur y animaciones desactivados" "Gaming X64"
+                if [ "$is_auto" -eq 1 ]; then
+                    notify_user "Auto-Gaming: Activado" "Juego detectado • Sin blur/sombras • CPU Max • DND ON" "Gaming X64"
+                else
+                    notify_user "Modo Gaming: Activado" "Rendimiento máximo • Sin blur/sombras • DND ON" "Gaming X64"
+                fi
             else
-                notify_user "Gaming Mode: Enabled" "Maximum performance • Blur & animations disabled" "X64 Gaming"
+                if [ "$is_auto" -eq 1 ]; then
+                    notify_user "Auto-Gaming: Enabled" "Game detected • No blur/shadows • Max CPU • DND ON" "X64 Gaming"
+                else
+                    notify_user "Gaming Mode: Enabled" "Maximum performance • No blur/shadows • DND ON" "X64 Gaming"
+                fi
             fi
+
+            # Silence subsequent popups during gameplay
+            echo "1" > "${STATE_DIR}/dnd"
+            quickshell ipc call sys refresh >/dev/null 2>&1 || true
             ;;
-        off)
+        off|auto-off)
+            # Never disable a manually enabled Gaming Mode when an auto-detected game closes
+            if [ "$action" = "auto-off" ] && [ "$src" != "auto" ]; then
+                return 0
+            fi
+            if [ "$cur" != "1" ]; then
+                echo "0" > "${STATE_DIR}/gaming_mode"
+                echo "none" > "${STATE_DIR}/gaming_mode_source"
+                return 0
+            fi
+
+            local was_auto=0
+            [ "$action" = "auto-off" ] && was_auto=1
+
             echo "0" > "${STATE_DIR}/gaming_mode"
-            local prev_pwr
+            echo "none" > "${STATE_DIR}/gaming_mode_source"
+
+            local prev_pwr prev_dnd
             prev_pwr=$(cat "${STATE_DIR}/pre_game_power_profile" 2>/dev/null || echo "balanced")
             [ -z "$prev_pwr" ] && prev_pwr="balanced"
+            rm -f "${STATE_DIR}/pre_game_power_profile"
             cmd_power set "$prev_pwr"
 
+            prev_dnd=$(cat "${STATE_DIR}/pre_game_dnd" 2>/dev/null || echo "0")
+            [ "$prev_dnd" = "1" ] || prev_dnd="0"
+            rm -f "${STATE_DIR}/pre_game_dnd"
+            echo "$prev_dnd" > "${STATE_DIR}/dnd"
+
             # Restore Obsidian & Crimson visual effects via native Lua engine (with legacy keyword fallback)
-            hyprctl eval "hl.config({ decoration = { blur = { enabled = true }, rounding = 10 }, general = { gaps_in = 5, gaps_out = 10 }, animations = { enabled = true } })" >/dev/null 2>&1 || \
+            hyprctl eval "hl.config({ decoration = { blur = { enabled = true }, shadow = { enabled = true }, rounding = 10, inactive_opacity = 0.96 }, general = { gaps_in = 5, gaps_out = 10 }, animations = { enabled = true } })" >/dev/null 2>&1 || \
             hyprctl --batch "\
                 keyword decoration:blur:enabled 1;\
                 keyword decoration:shadow:enabled 1;\
+                keyword decoration:inactive_opacity 0.96;\
                 keyword animations:enabled 1;\
                 keyword general:gaps_in 5;\
                 keyword general:gaps_out 10;\
                 keyword decoration:rounding 10" >/dev/null 2>&1 || true
 
+            quickshell ipc call sys refresh >/dev/null 2>&1 || true
+
             if [ "$IS_ES" -eq 1 ]; then
-                notify_user "Modo Gaming: Desactivado" "Efectos visuales y perfil de energía restaurados" "Gaming X64"
+                if [ "$was_auto" -eq 1 ]; then
+                    notify_user "Auto-Gaming: Desactivado" "Escritorio, efectos visuales y DND restaurados" "Gaming X64"
+                else
+                    notify_user "Modo Gaming: Desactivado" "Efectos visuales, perfil de energía y DND restaurados" "Gaming X64"
+                fi
             else
-                notify_user "Gaming Mode: Disabled" "Visual effects and power profile restored" "X64 Gaming"
+                if [ "$was_auto" -eq 1 ]; then
+                    notify_user "Auto-Gaming: Disabled" "Desktop visuals, power profile and DND restored" "X64 Gaming"
+                else
+                    notify_user "Gaming Mode: Disabled" "Visual effects, power profile and DND restored" "X64 Gaming"
+                fi
             fi
             ;;
         get)
@@ -1700,13 +2107,83 @@ print(json.dumps(data))
     esac
 }
 
+cmd_launch_shell() {
+    # Cleanly stop any prior Quickshell instance
+    if pgrep -x quickshell >/dev/null 2>&1; then
+        pkill -x quickshell 2>/dev/null || true
+        for _ in 1 2 3 4 5 6 7 8; do
+            pgrep -x quickshell >/dev/null 2>&1 || break
+            sleep 0.05
+        done
+        pkill -9 -x quickshell 2>/dev/null || true
+    fi
+
+    local use_sw=0
+    if [ -f "${HOME}/.config/hypr/quickshell_software" ]; then
+        use_sw=1
+    elif command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt -q 2>/dev/null; then
+        use_sw=1
+    elif grep -qiE "QEMU|VirtualBox|KVM|VMware|Bochs" /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null; then
+        use_sw=1
+    elif ! ls /dev/dri/renderD* >/dev/null 2>&1; then
+        use_sw=1
+    fi
+
+    local qs_log="${STATE_DIR}/quickshell.log"
+    if [ "$use_sw" -eq 1 ]; then
+        echo "software" > "${STATE_DIR}/shell_backend"
+        setsid -f env QT_QPA_PLATFORMTHEME=kde KDE_SESSION_VERSION=6 GTK_THEME=adw-gtk3-dark QT_QUICK_BACKEND=software quickshell -n >"$qs_log" 2>&1 </dev/null
+        return 0
+    fi
+
+    # Bare-metal GPU-accelerated launch with automatic fallback to software if EGL/RHI crashes
+    echo "gpu" > "${STATE_DIR}/shell_backend"
+    setsid -f env -u QT_QUICK_BACKEND QT_QPA_PLATFORMTHEME=kde KDE_SESSION_VERSION=6 GTK_THEME=adw-gtk3-dark quickshell -n >"$qs_log" 2>&1 </dev/null
+    sleep 1.5
+    if ! pgrep -u "$UID_NUM" -x quickshell >/dev/null 2>&1; then
+        echo "software-fallback" > "${STATE_DIR}/shell_backend"
+        setsid -f env QT_QPA_PLATFORMTHEME=kde KDE_SESSION_VERSION=6 GTK_THEME=adw-gtk3-dark QT_QUICK_BACKEND=software quickshell -n >>"$qs_log" 2>&1 </dev/null
+    fi
+}
+
 cmd_init() {
     # Synchronize keyboard layout with system settings
     cmd_keyboard sync >/dev/null 2>&1 || true
 }
 
+cmd_fullscreen_state() {
+    local fs="0" gm="0"
+    if hyprctl activeworkspace -j 2>/dev/null | grep -q '"hasfullscreen": true'; then
+        fs="1"
+    fi
+
+    local auto_en src
+    auto_en=$(cat "${STATE_DIR}/auto_gaming" 2>/dev/null || echo "1")
+    src=$(cat "${STATE_DIR}/gaming_mode_source" 2>/dev/null || echo "none")
+
+    if [ "$auto_en" = "1" ] || [ "$src" = "auto" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            gm=$(hyprctl clients -j 2>/dev/null | jq -r '
+                any(.[];
+                    ((.fullscreen // 0) >= 2) and (
+                        ((.class // "") | test("^(steam_app_|gamescope|cs2|dota2|osu!|retroarch|wine|proton|minecraft|factorio|hl2_linux|portal2_linux|tf_linux64|dolphin-emu|pcsx2|rpcs3|ryujinx|cemu|duckstation|flycast|xemu|ppsspp|mgba|melonds)"; "i"))
+                        or
+                        ((.initialClass // "") | test("^(steam_app_|gamescope|wine|proton)"; "i"))
+                    )
+                ) | if . then "1" else "0" end
+            ' 2>/dev/null || echo "0")
+            [ "$gm" = "1" ] || gm="0"
+        fi
+    fi
+
+    printf '%s|%s\n' "$fs" "$gm"
+}
+
 case "${1:-status}" in
-    status)     cmd_status ;;
+    status)           cmd_status ;;
+    status-lite)      cmd_status_lite "${2:-}" ;;
+    fullscreen-state) cmd_fullscreen_state ;;
+    launch-shell)     cmd_launch_shell ;;
     caffeine)   cmd_caffeine "${2:-toggle}" ;;
     nightlight) cmd_nightlight "${2:-toggle}" ;;
     dnd)        cmd_dnd "${2:-toggle}" ;;
@@ -1719,7 +2196,8 @@ case "${1:-status}" in
     scratchpad)        cmd_scratchpad ;;
     ai-engine)         cmd_ai_engine "${2:-get}" "${3:-opencode}" ;;
     zoom)              cmd_zoom "${2:-toggle}" ;;
-    gamemode|gaming)   cmd_gamemode "${2:-toggle}" ;;
+    gamemode|gaming)        cmd_gamemode "${2:-toggle}" ;;
+    auto-gaming|autogaming) cmd_auto_gaming "${2:-toggle}" ;;
     shortcuts|guide)   quickshell ipc call shortcuts "${2:-toggle}" 2>/dev/null || true ;;
     clipboard|clip)    shift; cmd_clipboard "$@" ;;
     overview)          quickshell ipc call overview "${2:-toggle}" 2>/dev/null || true ;;

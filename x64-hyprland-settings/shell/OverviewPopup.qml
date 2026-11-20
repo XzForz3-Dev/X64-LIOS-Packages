@@ -34,10 +34,14 @@ PanelWindow {
     property int activeWorkspaceId: 1
     property var allClients: []
 
-    function reload() {
-        if (!dataProc.running) {
-            dataProc.running = true;
-        }
+    property double lastOverviewRefreshMs: 0
+
+    function reload(force) {
+        if (dataProc.running) return;
+        var now = Date.now();
+        if (!force && (now - overviewWindow.lastOverviewRefreshMs) < 900) return;
+        overviewWindow.lastOverviewRefreshMs = now;
+        dataProc.running = true;
     }
 
     function focusWorkspace(wsId) {

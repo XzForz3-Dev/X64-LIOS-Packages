@@ -134,9 +134,21 @@ PanelWindow {
         }
     }
 
-    function refreshNet(doScan) {
+    property double lastNetRefreshMs: 0
+    property double lastWifiScanMs: 0
+
+    function refreshNet(doScan, force) {
         if (netStatusProc.running) return;
-        if (doScan) {
+        var now = Date.now();
+        if (!force && !doScan && (now - netWindow.lastNetRefreshMs) < 1000) return;
+        var wantScan = Boolean(doScan);
+        if (wantScan && !force && (now - netWindow.lastWifiScanMs) < 5000) {
+            wantScan = false;
+            if ((now - netWindow.lastNetRefreshMs) < 1000) return;
+        }
+        netWindow.lastNetRefreshMs = now;
+        if (wantScan) {
+            netWindow.lastWifiScanMs = now;
             netWindow.statusMsg = "Escaneando redes...";
             netStatusProc.command = ["x64-hyprland-ctl", "net", "scan"];
         } else {
@@ -229,7 +241,7 @@ PanelWindow {
                 } else if (out.indexOf("ERR:") !== -1) {
                     netWindow.statusMsg = "Contraseña incorrecta o fallo al conectar";
                 }
-                netWindow.refreshNet(false);
+                netWindow.refreshNet(false, true);
             }
         }
     }
@@ -258,6 +270,8 @@ PanelWindow {
         id: card
         anchors.fill: parent
         transformOrigin: Item.TopRight
+        layer.enabled: openAnim.running || closeAnim.running
+        layer.smooth: true
         scale: 1.0
         opacity: 1.0
         radius: Theme.radiusLg
@@ -341,7 +355,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: netWindow.refreshNet(true)
+                        onClicked: netWindow.refreshNet(true, true)
                     }
                 }
             }

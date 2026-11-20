@@ -48,7 +48,7 @@ sync_user_configs() {
                 else
                     cp -f /etc/skel/.config/hypr/hyprland.lua "$target_hypr/hyprland.lua" 2>/dev/null || true
                     cp -f /etc/skel/.config/hypr/hyprlock.conf "$target_hypr/hyprlock.conf" 2>/dev/null || true
-                    if [ ! -f "$target_hypr/hyprland.conf" ] || grep -q "X64 LIOS - Official Hyprland Desktop Configuration" "$target_hypr/hyprland.conf" 2>/dev/null; then
+                    if [ ! -f "$target_hypr/hyprland.conf" ] || grep -qE "X64 LIOS - (Official Hyprland Desktop Configuration|Hyprland Classic Configuration Fallback)" "$target_hypr/hyprland.conf" 2>/dev/null; then
                         cp -f /etc/skel/.config/hypr/hyprland.conf "$target_hypr/hyprland.conf" 2>/dev/null || true
                     fi
                 fi

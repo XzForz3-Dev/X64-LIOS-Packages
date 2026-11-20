@@ -304,6 +304,29 @@ ShellRoot {
         }
     }
 
+    // Fast IPC state sync for keybindings / external ctl commands (e.g. SUPER + G)
+    IpcHandler {
+        target: "sys"
+
+        function refresh() {
+            SysState.syncFromExternal();
+        }
+    }
+
+    // Direct OSD trigger for hardware brightness keys (XF86MonBrightnessUp/Down)
+    IpcHandler {
+        target: "osd"
+
+        function brightness(val: string) {
+            var n = parseInt(val, 10);
+            if (!isNaN(n)) {
+                SysState.guardBrightness();
+                SysState.brightnessVal = n;
+                volumeOsd.showBrightness(n);
+            }
+        }
+    }
+
     // Top Bar Floating Island
     Bar {
         id: mainBar
@@ -425,18 +448,11 @@ ShellRoot {
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: controlCenter.visible = false
-        onDndToggled: (active) => {
-            mainBar.dndActive = active;
-        }
-        onNightlightToggled: (active) => {
-            mainBar.nightlightActive = active;
-        }
         onLockRequested: {
             root.closeAllExcept("none");
             lockScreen.lockSession();
         }
         onBrightnessChangedOsd: (val) => {
-            mainBar.brightnessVal = val;
             volumeOsd.showBrightness(val);
         }
     }
@@ -444,8 +460,8 @@ ShellRoot {
     // Universal Click-Through Screen Filter (Warm 4200K Nightlight + Software Dimming)
     ScreenFilter {
         id: screenFilter
-        nightlightActive: mainBar.nightlightActive
-        brightnessVal: mainBar.brightnessVal
+        nightlightActive: SysState.nightlightActive
+        brightnessVal: SysState.brightnessVal
     }
 
     // Unified On-Screen Display for Volume / Mute / Brightness Changes
@@ -458,7 +474,7 @@ ShellRoot {
     NotificationPopup {
         id: notifPopup
         screen: root.primaryScreen
-        dndEnabled: mainBar.dndActive
+        dndEnabled: SysState.dndActive
         sidePanelOpen: controlCenter.visible || networkPopup.visible
     }
 
