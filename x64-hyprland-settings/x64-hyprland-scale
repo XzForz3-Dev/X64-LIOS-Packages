@@ -1,128 +1,375 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ==============================================================================
-# X64 LIOS - Sovereign Hyprland Monitor Scaling Engine
-# Supports Automatic EDID PPI Scaling ("auto") and Fractional Presets (1.0..2.0)
+# X64 LIOS - Sovereign Multi-Monitor Display Engine (x64-hyprland-scale)
+# Per-monitor Scale, Refresh Rate (Hz) & VRR control with clean Lua persistence
+# in ~/.config/hypr/monitors.lua (preserved across all package upgrades).
 # ==============================================================================
 
+set -u
 export LC_ALL=C.UTF-8
 export LC_NUMERIC=C
+
+RAW_LANG="${LANG:-${LC_MESSAGES:-es_ES.UTF-8}}"
+IS_ES=0
+[[ "$RAW_LANG" =~ ^es ]] && IS_ES=1
+
 UID_NUM=$(id -u)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID_NUM}}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 
-notify_scale() {
-  local title="$1"
-  local body="$2"
-  local dnd_val
-  dnd_val=$(cat "${XDG_RUNTIME_DIR}/x64-shell/dnd" 2>/dev/null || echo "0")
-  if [ "$dnd_val" != "1" ] && command -v notify-send >/dev/null 2>&1; then
-    notify-send -a "Pantalla X64" "$title" "$body" 2>/dev/null || true
-  fi
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && [ -d "${XDG_RUNTIME_DIR}/hypr" ]; then
+    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "${XDG_RUNTIME_DIR}/hypr/" 2>/dev/null | head -n1)
+fi
+
+CONF_DIR="${HOME}/.config/hypr"
+MON_JSON="${CONF_DIR}/monitors.json"
+MON_LUA="${CONF_DIR}/monitors.lua"
+
+notify_display() {
+    local title="$1"
+    local body="$2"
+    local dnd_val
+    dnd_val=$(cat "${XDG_RUNTIME_DIR}/x64-shell/dnd" 2>/dev/null || echo "0")
+    if [ "$dnd_val" != "1" ] && command -v notify-send >/dev/null 2>&1; then
+        local app="X64 Display"
+        [ "$IS_ES" -eq 1 ] && app="Pantalla X64"
+        notify-send -a "$app" "$title" "$body" 2>/dev/null || true
+    fi
+}
+
+valid_monitor_name() {
+    [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+valid_mode_str() {
+    [ "${1:-}" = "preferred" ] || [[ "${1:-}" =~ ^[0-9]+x[0-9]+@[0-9]+(\.[0-9]+)?$ ]]
+}
+
+get_monitors_raw() {
+    hyprctl monitors -j 2>/dev/null || echo "[]"
 }
 
 get_focused_info() {
-  export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
-  local mon_info=$(hyprctl monitors -j 2>/dev/null | jq -e -c '.[] | select(.focused == true)' 2>/dev/null)
-  if [ -z "$mon_info" ]; then
-    mon_info=$(hyprctl monitors -j 2>/dev/null | jq -e -c '.[0]' 2>/dev/null)
-  fi
-  echo "$mon_info"
+    local raw info
+    raw=$(get_monitors_raw)
+    info=$(printf '%s' "$raw" | jq -e -c '.[] | select(.focused == true)' 2>/dev/null | head -n1)
+    if [ -z "$info" ]; then
+        info=$(printf '%s' "$raw" | jq -e -c '.[0]' 2>/dev/null)
+    fi
+    printf '%s' "${info:-}"
 }
 
-is_config_auto() {
-  local lua_cfg="$HOME/.config/hypr/hyprland.lua"
-  if [ -f "$lua_cfg" ] && grep -qE 'scale\s*=\s*"auto"' "$lua_cfg" 2>/dev/null; then
-    echo "true"
-  else
-    echo "false"
-  fi
+get_monitor_info_by_name() {
+    local target="${1:-}"
+    local raw info=""
+    raw=$(get_monitors_raw)
+    if [ -n "$target" ]; then
+        info=$(printf '%s' "$raw" | jq -e -c --arg n "$target" '.[] | select(.name == $n)' 2>/dev/null | head -n1)
+    fi
+    if [ -z "$info" ]; then
+        info=$(printf '%s' "$raw" | jq -e -c '.[] | select(.focused == true)' 2>/dev/null | head -n1)
+    fi
+    if [ -z "$info" ]; then
+        info=$(printf '%s' "$raw" | jq -e -c '.[0]' 2>/dev/null)
+    fi
+    printf '%s' "${info:-}"
 }
 
-case "$1" in
-  "status")
-    info=$(get_focused_info)
-    name=$(echo "$info" | jq -r '.name // "Virtual-1"')
-    scale=$(echo "$info" | jq -r '.scale // 1')
-    auto_state=$(is_config_auto)
-    echo "${name}|${scale}|${auto_state}"
-    ;;
-  "current"|"")
-    info=$(get_focused_info)
-    echo "$info" | jq -r '.scale // 1'
-    ;;
-  "monitor")
-    info=$(get_focused_info)
-    echo "$info" | jq -r '.name // "Virtual-1"'
-    ;;
-  "auto"|"AUTO")
-    info=$(get_focused_info)
-    name=$(echo "$info" | jq -r '.name // "Virtual-1"')
-    height=$(echo "$info" | jq -r '.height // 1080')
+get_current_vrr() {
+    local v
+    v=$(hyprctl getoption misc:vrr 2>/dev/null | awk '/int:/{print $2; exit}')
+    case "${v:-1}" in
+        0|1|2) echo "$v" ;;
+        *)     echo "1" ;;
+    esac
+}
 
-    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
-    mode="preferred"
-    if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
-      mode="1920x1080@60"
-      if [ "$height" -eq 1022 ] || [ "$height" -ne 1080 ]; then
-        hyprctl eval "hl.monitor({ output = \"$name\", mode = \"1920x1080@60\", position = \"auto\", scale = 1.0 })" >/dev/null 2>&1
-        sleep 0.05
-      fi
+ensure_state_json() {
+    mkdir -p "$CONF_DIR"
+    if [ ! -s "$MON_JSON" ] || ! jq -e '.monitors | type == "object"' "$MON_JSON" >/dev/null 2>&1; then
+        local cur_vrr
+        cur_vrr=$(get_current_vrr)
+        printf '{"vrr":%d,"monitors":{}}\n' "$cur_vrr" > "${MON_JSON}.tmp.$$" && mv -f "${MON_JSON}.tmp.$$" "$MON_JSON"
+    fi
+}
+
+write_monitors_lua() {
+    ensure_state_json
+    local tmp_lua="${MON_LUA}.tmp.$$"
+    {
+        echo "-- Auto-generated by X64 LIOS Display Engine (x64-hyprland-scale)"
+        echo "-- Safe across package upgrades; manual overrides in custom.lua take precedence."
+        jq -r '
+            (.monitors // {} | to_entries[] |
+                "hl.monitor({ output = \"" + .key + "\", mode = \"" + (.value.mode // "preferred") + "\", position = \"auto\", scale = " +
+                (if (.value.scale // "1") == "auto" then "\"auto\"" else (.value.scale | tostring) end) +
+                " })"
+            ),
+            (if (.vrr != null) then
+                "hl.config({ misc = { vrr = " + (.vrr | tostring) + " } })"
+             else empty end)
+        ' "$MON_JSON" 2>/dev/null
+    } > "$tmp_lua" && mv -f "$tmp_lua" "$MON_LUA"
+}
+
+save_monitor_entry() {
+    local mon="$1"
+    local mode="$2"
+    local scale="$3"
+    ensure_state_json
+    jq --arg m "$mon" --arg md "$mode" --arg sc "$scale" \
+        '.monitors[$m] = {mode: $md, scale: $sc}' "$MON_JSON" > "${MON_JSON}.tmp.$$" && \
+        mv -f "${MON_JSON}.tmp.$$" "$MON_JSON"
+    write_monitors_lua
+}
+
+save_vrr_entry() {
+    local vrr_val="$1"
+    ensure_state_json
+    jq --argjson v "$vrr_val" '.vrr = $v' "$MON_JSON" > "${MON_JSON}.tmp.$$" && \
+        mv -f "${MON_JSON}.tmp.$$" "$MON_JSON"
+    write_monitors_lua
+}
+
+apply_monitor_live() {
+    local name="$1"
+    local mode="$2"
+    local scale="$3"
+    local height="${4:-1080}"
+
+    if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ] 2>/dev/null; then
+        mode="1920x1080@60"
+        if [ "$height" -eq 1022 ] 2>/dev/null; then
+            hyprctl eval "hl.monitor({ output = \"${name}\", mode = \"1920x1080@60\", position = \"auto\", scale = 1.0 })" >/dev/null 2>&1 || true
+            sleep 0.05
+        fi
     fi
 
-    hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = \"auto\" })" >/dev/null 2>&1
+    local scale_lua="$scale"
+    [ "$scale" = "auto" ] && scale_lua='"auto"'
 
-    lua_cfg="$HOME/.config/hypr/hyprland.lua"
-    if [ -f "$lua_cfg" ]; then
-      sed -i -E 's/scale\s*=\s*("auto"|[0-9.]+)/scale    = "auto"/' "$lua_cfg"
+    hyprctl eval "hl.monitor({ output = \"${name}\", mode = \"${mode}\", position = \"auto\", scale = ${scale_lua} })" >/dev/null 2>&1 || \
+        hyprctl keyword monitor "${name},${mode},auto,${scale}" >/dev/null 2>&1 || true
+}
+
+cmd_list() {
+    ensure_state_json
+    local raw vrr_opt
+    raw=$(get_monitors_raw)
+    vrr_opt=$(get_current_vrr)
+
+    printf '%s' "$raw" | jq -c --argjson vrr "$vrr_opt" --slurpfile saved "$MON_JSON" '
+        ($saved[0].monitors // {}) as $smap |
+        {
+            vrr: $vrr,
+            monitors: [
+                .[] | select(.disabled != true) |
+                (.width | tostring) as $w |
+                (.height | tostring) as $h |
+                (.refreshRate | round) as $curHz |
+                ($smap[.name] // {}) as $sv |
+                ([
+                    (.availableModes // [])[]
+                    | capture("^(?<mw>[0-9]+)x(?<mh>[0-9]+)@(?<mr>[0-9]+(?:\\.[0-9]+)?)Hz$")?
+                    | select(.mw == $w and .mh == $h)
+                    | {
+                        hz: ((.mr | tonumber) | round),
+                        num: (.mr | tonumber),
+                        mode: (.mw + "x" + .mh + "@" + .mr),
+                        label: ((((.mr | tonumber) | round) | tostring) + " Hz")
+                    }
+                    | select(.hz >= 48 or .hz == $curHz)
+                ]
+                | sort_by(-.num)
+                | reduce .[] as $it ([]; if any(.[]; .hz == $it.hz) then . else . + [$it] end)
+                | .[0:5]
+                | map({label, hz, mode})
+                ) as $rates |
+                {
+                    name: .name,
+                    description: (.description // .name),
+                    width: .width,
+                    height: .height,
+                    refresh: $curHz,
+                    refreshExact: ((((.refreshRate * 100) | round) / 100) | tostring),
+                    scale: (.scale // 1),
+                    isAuto: (($sv.scale // "") == "auto"),
+                    savedMode: ($sv.mode // "preferred"),
+                    focused: (.focused // false),
+                    vrrCapable: (.hardwareDetails.vrrCapable // false),
+                    vrrActive: (.vrr // false),
+                    rates: (if ($rates | length) > 0 then $rates else [{label: (($curHz | tostring) + " Hz"), hz: $curHz, mode: ($w + "x" + $h + "@" + ($curHz | tostring))}] end)
+                }
+            ]
+        }
+    ' 2>/dev/null || printf '{"vrr":%d,"monitors":[]}\n' "$vrr_opt"
+}
+
+resolve_mode_for_monitor() {
+    local mon="$1"
+    local info="$2"
+    ensure_state_json
+    local saved_mode
+    saved_mode=$(jq -r --arg m "$mon" '.monitors[$m].mode // ""' "$MON_JSON" 2>/dev/null || echo "")
+    if [ -n "$saved_mode" ] && valid_mode_str "$saved_mode"; then
+        echo "$saved_mode"
+        return 0
+    fi
+    echo "preferred"
+}
+
+resolve_scale_for_monitor() {
+    local mon="$1"
+    local info="$2"
+    ensure_state_json
+    local saved_scale
+    saved_scale=$(jq -r --arg m "$mon" '.monitors[$m].scale // ""' "$MON_JSON" 2>/dev/null || echo "")
+    if [ -n "$saved_scale" ]; then
+        echo "$saved_scale"
+        return 0
+    fi
+    local cur_sc
+    cur_sc=$(printf '%s' "$info" | jq -r '.scale // 1' 2>/dev/null || echo "1")
+    awk -v s="${cur_sc:-1}" 'BEGIN { printf "%g", s }'
+}
+
+do_set_scale() {
+    local mon="$1"
+    local req="$2"
+    local info
+    info=$(get_monitor_info_by_name "$mon")
+    local name height
+    name=$(printf '%s' "$info" | jq -r '.name // ""' 2>/dev/null)
+    height=$(printf '%s' "$info" | jq -r '.height // 1080' 2>/dev/null)
+    [ -z "$name" ] && name="${mon:-Virtual-1}"
+    valid_monitor_name "$name" || return 1
+
+    local mode
+    mode=$(resolve_mode_for_monitor "$name" "$info")
+
+    if [ "$req" = "auto" ] || [ "$req" = "AUTO" ]; then
+        apply_monitor_live "$name" "$mode" "auto" "$height"
+        save_monitor_entry "$name" "$mode" "auto"
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_display "Escalado Automático (AUTO)" "Monitor ${name} sincronizado por densidad EDID"
+        else
+            notify_display "Automatic Scaling (AUTO)" "Display ${name} synced by EDID density"
+        fi
+        echo "auto"
+        return 0
     fi
 
-    if [ -f "/etc/skel/.config/hypr/hyprland.lua" ] && [ "$(id -u)" -eq 0 ]; then
-      sed -i -E 's/scale\s*=\s*("auto"|[0-9.]+)/scale    = "auto"/' "/etc/skel/.config/hypr/hyprland.lua"
-    fi
+    local final_scale
+    final_scale=$(awk -v s="$req" 'BEGIN { v = s + 0; if (v < 0.5 || v > 3.0) v = 1; printf "%g", v }')
+    apply_monitor_live "$name" "$mode" "$final_scale" "$height"
+    save_monitor_entry "$name" "$mode" "$final_scale"
 
-    notify_scale "Escalado Automático (AUTO)" "Monitor ${name} sincronizado por densidad EDID"
-    echo "auto"
-    ;;
-  *)
-    target_scale="$1"
-    final_scale=$(awk -v s="$target_scale" 'BEGIN { printf "%g", s }')
-    if [ -z "$final_scale" ] || [ "$final_scale" = "0" ]; then
-      final_scale="1"
-    fi
-
-    info=$(get_focused_info)
-    name=$(echo "$info" | jq -r '.name // "Virtual-1"')
-    height=$(echo "$info" | jq -r '.height // 1080')
-
-    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t /run/user/$(id -u)/hypr/ 2>/dev/null | head -n1)
-    mode="preferred"
-    if [[ "$name" =~ ^(Virtual|XWAYLAND|qemu|vbox) ]] || [ "$height" -eq 1022 ]; then
-      mode="1920x1080@60"
-      if [ "$height" -eq 1022 ] || [ "$height" -ne 1080 ]; then
-        hyprctl eval "hl.monitor({ output = \"$name\", mode = \"1920x1080@60\", position = \"auto\", scale = 1.0 })" >/dev/null 2>&1
-        sleep 0.05
-      fi
-    fi
-
-    hyprctl eval "hl.monitor({ output = \"$name\", mode = \"$mode\", position = \"auto\", scale = $final_scale })" >/dev/null 2>&1
-
-    lua_cfg="$HOME/.config/hypr/hyprland.lua"
-    if [ -f "$lua_cfg" ]; then
-      sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "$lua_cfg"
-      if [ "$mode" != "preferred" ]; then
-        sed -i -E "s/mode\s*=\s*\"[^\"]+\"/mode     = \"$mode\"/" "$lua_cfg"
-      fi
-    fi
-
-    if [ -f "/etc/skel/.config/hypr/hyprland.lua" ] && [ "$(id -u)" -eq 0 ]; then
-      sed -i -E "s/scale\s*=\s*(\"auto\"|[0-9.]+)/scale    = $final_scale/" "/etc/skel/.config/hypr/hyprland.lua"
-      if [ "$mode" != "preferred" ]; then
-        sed -i -E "s/mode\s*=\s*\"[^\"]+\"/mode     = \"$mode\"/" "/etc/skel/.config/hypr/hyprland.lua"
-      fi
-    fi
-
+    local pct_label
     pct_label=$(awk -v s="$final_scale" 'BEGIN { printf "%.0f%%", s * 100 }')
-    notify_scale "Escala de Monitor: ${pct_label}" "Aplicada en vivo sobre ${name}"
+    if [ "$IS_ES" -eq 1 ]; then
+        notify_display "Escala de Monitor: ${pct_label}" "Aplicada y guardada en ${name}"
+    else
+        notify_display "Display Scale: ${pct_label}" "Applied and saved for ${name}"
+    fi
     echo "$final_scale"
-    ;;
+}
+
+do_set_rate() {
+    local mon="$1"
+    local mode="$2"
+    valid_mode_str "$mode" || return 1
+
+    local info
+    info=$(get_monitor_info_by_name "$mon")
+    local name height
+    name=$(printf '%s' "$info" | jq -r '.name // ""' 2>/dev/null)
+    height=$(printf '%s' "$info" | jq -r '.height // 1080' 2>/dev/null)
+    [ -z "$name" ] && name="$mon"
+    valid_monitor_name "$name" || return 1
+
+    local scale
+    scale=$(resolve_scale_for_monitor "$name" "$info")
+
+    apply_monitor_live "$name" "$mode" "$scale" "$height"
+    save_monitor_entry "$name" "$mode" "$scale"
+
+    local rate_lbl="$mode"
+    if [[ "$mode" =~ @([0-9]+(\.[0-9]+)?)$ ]]; then
+        rate_lbl=$(awk -v r="${BASH_REMATCH[1]}" 'BEGIN { printf "%.0f Hz", r }')
+    fi
+    if [ "$IS_ES" -eq 1 ]; then
+        notify_display "Frecuencia: ${rate_lbl}" "Aplicada y guardada en ${name}"
+    else
+        notify_display "Refresh Rate: ${rate_lbl}" "Applied and saved for ${name}"
+    fi
+    echo "$mode"
+}
+
+do_set_vrr() {
+    local vrr_val="${1:-1}"
+    case "$vrr_val" in
+        0|1|2) ;;
+        *) return 1 ;;
+    esac
+
+    hyprctl eval "hl.config({ misc = { vrr = ${vrr_val} } })" >/dev/null 2>&1 || \
+        hyprctl keyword misc:vrr "$vrr_val" >/dev/null 2>&1 || true
+    save_vrr_entry "$vrr_val"
+
+    local lbl=""
+    if [ "$IS_ES" -eq 1 ]; then
+        case "$vrr_val" in
+            0) lbl="Apagado (OFF)" ;;
+            1) lbl="Siempre Activo (ON)" ;;
+            2) lbl="Solo Pantalla Completa" ;;
+        esac
+        notify_display "VRR / Adaptive Sync" "Modo: ${lbl}"
+    else
+        case "$vrr_val" in
+            0) lbl="Off" ;;
+            1) lbl="Always On" ;;
+            2) lbl="Fullscreen Only" ;;
+        esac
+        notify_display "VRR / Adaptive Sync" "Mode: ${lbl}"
+    fi
+    echo "$vrr_val"
+}
+
+case "${1:-}" in
+    list)
+        cmd_list
+        ;;
+    set-scale)
+        do_set_scale "${2:-}" "${3:-1}"
+        ;;
+    set-rate)
+        do_set_rate "${2:-}" "${3:-preferred}"
+        ;;
+    set-vrr|vrr)
+        do_set_vrr "${2:-1}"
+        ;;
+    status)
+        info=$(get_focused_info)
+        name=$(printf '%s' "$info" | jq -r '.name // "Virtual-1"')
+        scale=$(printf '%s' "$info" | jq -r '.scale // 1')
+        ensure_state_json
+        saved_sc=$(jq -r --arg m "$name" '.monitors[$m].scale // ""' "$MON_JSON" 2>/dev/null || echo "")
+        auto_state="false"
+        [ "$saved_sc" = "auto" ] && auto_state="true"
+        echo "${name}|${scale}|${auto_state}"
+        ;;
+    current|"")
+        info=$(get_focused_info)
+        printf '%s' "$info" | jq -r '.scale // 1'
+        ;;
+    monitor)
+        info=$(get_focused_info)
+        printf '%s' "$info" | jq -r '.name // "Virtual-1"'
+        ;;
+    auto|AUTO)
+        do_set_scale "" "auto"
+        ;;
+    *)
+        do_set_scale "" "$1"
+        ;;
 esac

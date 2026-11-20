@@ -46,7 +46,7 @@ PanelWindow {
     }
 
     implicitWidth: 400
-    implicitHeight: Math.min(745, (screen ? screen.height : 1080) - 52)
+    implicitHeight: Math.min(Math.max(600, mainCol.implicitHeight + 30), (screen ? screen.height : 1080) - 52)
 
     color: "transparent"
 
@@ -167,7 +167,11 @@ PanelWindow {
     onVisibleChanged: {
         SysState.controlOpen = visible;
         if (visible) {
-            displayCard.refreshScale();
+            if (controlWindow.screen && controlWindow.screen.name) {
+                displayCard.selectedMonitorName = controlWindow.screen.name;
+            }
+            cardScroll.contentY = 0;
+            displayCard.refreshScale(false);
             card.scale = 0.82;
             card.y = -24;
             card.opacity = 0.0;
@@ -189,7 +193,8 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: mainCol.implicitHeight + 30
+        height: Math.min(mainCol.implicitHeight + 30, parent.height)
+        clip: true
         transformOrigin: Item.TopRight
         layer.enabled: openAnim.running || closeAnim.running
         layer.smooth: true
@@ -200,13 +205,20 @@ PanelWindow {
         border.color: Theme.borderGlass
         border.width: 1
 
-        ColumnLayout {
-            id: mainCol
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: 15
-            spacing: 10
+        Flickable {
+            id: cardScroll
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: mainCol.implicitHeight + 30
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentHeight > height
+
+            ColumnLayout {
+                id: mainCol
+                x: 15
+                y: 15
+                width: cardScroll.width - 30
+                spacing: 10
 
             // =================================================================
             // HEADER: TITLE, SUBTITLE & TOP-RIGHT CIRCULAR SESSION ACTIONS
@@ -1428,34 +1440,83 @@ PanelWindow {
             // =================================================================
             // 5. DISPLAY & MONITOR SCALING SEGMENTED CARD
             // =================================================================
+            // 5. MULTI-MONITOR DISPLAY CONTROL (MONITOR, SCALE, HZ & VRR)
+            // =================================================================
             Rectangle {
                 id: displayCard
                 Layout.fillWidth: true
-                implicitHeight: 68
+                implicitHeight: displayCol.implicitHeight + 20
                 radius: Theme.radiusMd
                 color: Theme.bgCard
                 border.color: Theme.borderSubtle
                 border.width: 1
 
-                property real currentScale: 1.0
-                property string currentMonitor: "Virtual-1"
-                property bool isAutoScale: true
+                property var monitorsList: []
+                property string selectedMonitorName: ""
+                property int vrrMode: 1 // 0=Off, 1=On, 2=Fullscreen
                 property double lastScaleRefreshMs: 0
+
+                readonly property var activeMon: {
+                    if (!monitorsList || monitorsList.length === 0) return null;
+                    if (selectedMonitorName !== "") {
+                        for (var i = 0; i < monitorsList.length; i++) {
+                            if (monitorsList[i].name === selectedMonitorName) return monitorsList[i];
+                        }
+                    }
+                    var scrName = (controlWindow.screen && controlWindow.screen.name) ? controlWindow.screen.name : "";
+                    if (scrName !== "") {
+                        for (var j = 0; j < monitorsList.length; j++) {
+                            if (monitorsList[j].name === scrName) return monitorsList[j];
+                        }
+                    }
+                    for (var k = 0; k < monitorsList.length; k++) {
+                        if (monitorsList[k].focused) return monitorsList[k];
+                    }
+                    return monitorsList[0];
+                }
+
+                readonly property string currentMonitor: activeMon ? activeMon.name : ((controlWindow.screen && controlWindow.screen.name) ? controlWindow.screen.name : "Display")
+                readonly property real currentScale: activeMon ? Number(activeMon.scale || 1.0) : 1.0
+                readonly property bool isAutoScale: activeMon ? Boolean(activeMon.isAuto) : false
+                readonly property int currentRefresh: activeMon ? Number(activeMon.refresh || 60) : 60
+                readonly property string currentResStr: activeMon ? (activeMon.width + "×" + activeMon.height) : ""
+                readonly property var currentRates: (activeMon && activeMon.rates && activeMon.rates.length > 0) ? activeMon.rates : [{ label: currentRefresh + " Hz", hz: currentRefresh, mode: "preferred" }]
 
                 Process {
                     id: scaleStatusProc
-                    command: ["x64-hyprland-scale", "status"]
+                    command: ["/usr/bin/x64-hyprland-scale", "list"]
                     stdout: StdioCollector {
                         id: scaleStatusCollector
                         onStreamFinished: {
                             if (!scaleStatusCollector.text) return;
-                            var parts = scaleStatusCollector.text.trim().split("|");
-                            if (parts.length >= 3) {
-                                if (parts[0] !== "") displayCard.currentMonitor = parts[0];
-                                var s = parseFloat(parts[1]);
-                                if (!isNaN(s) && s > 0) displayCard.currentScale = s;
-                                displayCard.isAutoScale = (parts[2] === "true");
-                            }
+                            try {
+                                var d = JSON.parse(scaleStatusCollector.text.trim());
+                                if (d.vrr !== undefined) displayCard.vrrMode = Number(d.vrr);
+                                if (d.monitors && d.monitors.length > 0) {
+                                    displayCard.monitorsList = d.monitors;
+                                    // Validate current selection still exists (hotplug-safe)
+                                    var found = false;
+                                    for (var i = 0; i < d.monitors.length; i++) {
+                                        if (d.monitors[i].name === displayCard.selectedMonitorName) {
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        var pref = (controlWindow.screen && controlWindow.screen.name) ? controlWindow.screen.name : "";
+                                        var picked = "";
+                                        for (var j = 0; j < d.monitors.length; j++) {
+                                            if (d.monitors[j].name === pref) { picked = pref; break; }
+                                        }
+                                        if (picked === "") {
+                                            for (var k = 0; k < d.monitors.length; k++) {
+                                                if (d.monitors[k].focused) { picked = d.monitors[k].name; break; }
+                                            }
+                                        }
+                                        displayCard.selectedMonitorName = picked !== "" ? picked : d.monitors[0].name;
+                                    }
+                                }
+                            } catch (e) {}
                         }
                     }
                 }
@@ -1483,25 +1544,42 @@ PanelWindow {
                 }
 
                 function applyScale(sVal, autoMode) {
-                    displayCard.isAutoScale = Boolean(autoMode);
-                    if (autoMode) {
-                        scaleApplyProc.command = ["x64-hyprland-scale", "auto"];
-                    } else {
-                        displayCard.currentScale = sVal;
-                        scaleApplyProc.command = ["x64-hyprland-scale", String(sVal)];
-                    }
+                    var mon = displayCard.currentMonitor;
+                    if (!mon) return;
+                    if (scaleApplyProc.running) scaleApplyProc.running = false;
+                    scaleApplyProc.command = ["/usr/bin/x64-hyprland-scale", "set-scale", mon, autoMode ? "auto" : String(sVal)];
+                    scaleApplyProc.running = true;
+                }
+
+                function applyRate(modeStr) {
+                    var mon = displayCard.currentMonitor;
+                    if (!mon || !modeStr) return;
+                    if (scaleApplyProc.running) scaleApplyProc.running = false;
+                    scaleApplyProc.command = ["/usr/bin/x64-hyprland-scale", "set-rate", mon, String(modeStr)];
+                    scaleApplyProc.running = true;
+                }
+
+                function cycleVrr() {
+                    var nextVrr = (displayCard.vrrMode + 1) % 3;
+                    displayCard.vrrMode = nextVrr;
+                    if (scaleApplyProc.running) scaleApplyProc.running = false;
+                    scaleApplyProc.command = ["/usr/bin/x64-hyprland-scale", "set-vrr", String(nextVrr)];
                     scaleApplyProc.running = true;
                 }
 
                 ColumnLayout {
-                    anchors.fill: parent
+                    id: displayCol
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     anchors.margins: 10
                     spacing: 6
 
+                    // Header: Title + Active Monitor Summary
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: I18n.isEs ? "󰍹 PANTALLA & ESCALADO" : "󰍹 DISPLAY & SCALING"
+                            text: I18n.isEs ? "󰍹 PANTALLA & MONITOR" : "󰍹 DISPLAY & MONITOR"
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             font.bold: true
@@ -1510,7 +1588,9 @@ PanelWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: displayCard.currentMonitor + " • " + Math.round(displayCard.currentScale * 100) + "%"
+                            text: displayCard.currentMonitor
+                                + (displayCard.currentResStr !== "" ? (" • " + displayCard.currentResStr) : "")
+                                + " • " + displayCard.currentRefresh + "Hz • " + Math.round(displayCard.currentScale * 100) + "%"
                             font.family: Theme.fontMono
                             font.pixelSize: 9
                             font.bold: true
@@ -1518,6 +1598,69 @@ PanelWindow {
                         }
                     }
 
+                    // Row 1: Monitor Selector Pills (visible only when >1 display connected)
+                    Rectangle {
+                        visible: displayCard.monitorsList.length > 1
+                        Layout.fillWidth: true
+                        implicitHeight: 26
+                        radius: 8
+                        color: Theme.bgElevated
+                        border.color: Theme.borderSubtle
+                        border.width: 1
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            spacing: 2
+
+                            Repeater {
+                                model: displayCard.monitorsList
+
+                                Rectangle {
+                                    id: monBtn
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 6
+                                    readonly property bool isSel: modelData.name === displayCard.currentMonitor
+                                    color: isSel ? Theme.accentDim : (monBtnArea.containsMouse ? Theme.bgHover : "transparent")
+                                    border.color: isSel ? Theme.accentBorder : "transparent"
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 140 } }
+
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 5
+
+                                        Rectangle {
+                                            visible: Boolean(modelData.focused)
+                                            implicitWidth: 5
+                                            implicitHeight: 5
+                                            radius: 3
+                                            color: Theme.accent
+                                        }
+
+                                        Text {
+                                            text: modelData.name + " (" + modelData.refresh + "Hz)"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: monBtn.isSel ? Theme.textPrimary : Theme.textSecondary
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: monBtnArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: displayCard.selectedMonitorName = modelData.name
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Row 2: Per-Monitor Scale Presets
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 28
@@ -1537,6 +1680,7 @@ PanelWindow {
                                     { label: "100%", val: 1.0,  isAuto: false },
                                     { label: "125%", val: 1.25, isAuto: false },
                                     { label: "150%", val: 1.5,  isAuto: false },
+                                    { label: "175%", val: 1.75, isAuto: false },
                                     { label: "200%", val: 2.0,  isAuto: false }
                                 ]
 
@@ -1568,6 +1712,92 @@ PanelWindow {
                                         onClicked: displayCard.applyScale(modelData.val, modelData.isAuto)
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // Row 3: Per-Monitor Refresh Rate (Hz) + VRR Mode
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 26
+                            radius: 8
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 2
+                                spacing: 2
+
+                                Repeater {
+                                    model: displayCard.currentRates
+
+                                    Rectangle {
+                                        id: rateBtn
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: 6
+                                        readonly property bool isActive: Math.abs(displayCard.currentRefresh - Number(modelData.hz)) <= 1
+                                        color: isActive ? Theme.accentDim : (rateBtnArea.containsMouse ? Theme.bgHover : "transparent")
+                                        border.color: isActive ? Theme.accentBorder : "transparent"
+                                        border.width: 1
+                                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                            color: rateBtn.isActive ? Theme.textPrimary : Theme.textSecondary
+                                        }
+
+                                        MouseArea {
+                                            id: rateBtnArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: displayCard.applyRate(modelData.mode)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Compact VRR 3-state selector (OFF / ON / FULL)
+                        Rectangle {
+                            id: vrrBtn
+                            implicitHeight: 26
+                            implicitWidth: vrrLbl.implicitWidth + 16
+                            radius: 8
+                            readonly property bool vrrOn: displayCard.vrrMode > 0
+                            color: vrrOn ? Theme.accentDim : (vrrArea.containsMouse ? Theme.bgHover : Theme.bgElevated)
+                            border.color: vrrOn ? Theme.accentBorder : Theme.borderSubtle
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                            Text {
+                                id: vrrLbl
+                                anchors.centerIn: parent
+                                text: displayCard.vrrMode === 0 ? "VRR OFF" : (displayCard.vrrMode === 1 ? "VRR ON" : "VRR FULL")
+                                font.family: Theme.fontMono
+                                font.pixelSize: 9
+                                font.bold: true
+                                color: vrrBtn.vrrOn ? Theme.accent : Theme.textSecondary
+                            }
+
+                            MouseArea {
+                                id: vrrArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: displayCard.cycleVrr()
                             }
                         }
                     }
@@ -1749,6 +1979,7 @@ PanelWindow {
                         }
                     }
                 }
+            }
             }
         }
     }

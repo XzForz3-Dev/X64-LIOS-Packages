@@ -90,6 +90,13 @@ QtObject {
     property bool autoGamingEnabled: true
     property bool autoGameDetected: false
 
+    // Shared Multi-Monitor Bar State (single instance across all connected displays)
+    property string kbLayout: "ES"
+    property string netType: "LAN"
+    property string netName: "Cable"
+    property string timeStr: "00:00"
+    property string dateStr: "LUN 01 ENE"
+
     signal topListUpdated(var list)
 
     function _buildStatusCmd(forceFull) {
@@ -139,6 +146,25 @@ QtObject {
     function syncFromExternal() {
         toggleGuardTimer.stop();
         refreshNow(sys.detailedMode, true);
+    }
+
+    function switchKeyboardLayout() {
+        kbGuardTimer.restart();
+        if (!kbSwitchProc.running) kbSwitchProc.running = true;
+    }
+
+    function _updateClock() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        sys.timeStr = h + ":" + m;
+
+        var days = I18n.dayShortNames;
+        var months = I18n.monthShortNames;
+        var dName = days[now.getDay()];
+        var dNum = String(now.getDate()).padStart(2, '0');
+        var mName = months[now.getMonth()];
+        sys.dateStr = dName + " " + dNum + " " + mName;
     }
 
     onDetailedModeChanged: {
@@ -299,13 +325,94 @@ QtObject {
         }
     }
 
-    Component.onCompleted: fsCheckDebounce.restart()
+    Component.onCompleted: {
+        sys._updateClock();
+        fsCheckDebounce.restart();
+    }
+
+    // Shared Keyboard Layout, Network Capsule & Clock (0 duplication on multi-monitor bars)
+    readonly property Timer _clockTimer: Timer {
+        id: clockTimer
+        interval: 1000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: sys._updateClock()
+    }
+
+    readonly property Timer _kbGuardTimer: Timer {
+        id: kbGuardTimer
+        interval: 800
+        repeat: false
+        onTriggered: {
+            if (!kbProcess.running) kbProcess.running = true;
+        }
+    }
+
+    readonly property Process _kbProcess: Process {
+        id: kbProcess
+        command: ["/usr/bin/x64-hyprland-ctl", "keyboard", "get"]
+        stdout: StdioCollector {
+            id: kbCollector
+            onStreamFinished: {
+                if (!kbCollector.text || kbGuardTimer.running) return;
+                var val = kbCollector.text.trim();
+                if (val.length > 0) sys.kbLayout = val;
+            }
+        }
+    }
+
+    readonly property Process _kbSwitchProc: Process {
+        id: kbSwitchProc
+        command: ["/usr/bin/x64-hyprland-ctl", "keyboard", "next"]
+        stdout: StdioCollector {
+            id: kbSwitchCollector
+            onStreamFinished: {
+                if (!kbSwitchCollector.text) return;
+                var val = kbSwitchCollector.text.trim();
+                if (val.length > 0) sys.kbLayout = val;
+            }
+        }
+        onExited: {
+            kbGuardTimer.stop();
+            if (!kbProcess.running) kbProcess.running = true;
+        }
+    }
+
+    readonly property Process _netProcess: Process {
+        id: netProcess
+        command: ["sh", "-c", "route=$(ip route get 1.1.1.1 2>/dev/null | head -n1); if [ -n \"$route\" ]; then dev=$(echo \"$route\" | awk '{print $5}'); if [ -d \"/sys/class/net/$dev/wireless\" ]; then ssid=$(iw dev \"$dev\" link 2>/dev/null | awk -F': ' '/SSID/{print $2}'); echo \"WIFI|${ssid:-Wi-Fi}\"; else echo \"LAN|Cable\"; fi; else echo \"NONE|Desconectado\"; fi"]
+        stdout: StdioCollector {
+            id: netCollector
+            onStreamFinished: {
+                if (!netCollector.text) return;
+                var parts = netCollector.text.trim().split("|");
+                sys.netType = parts[0] || "LAN";
+                sys.netName = parts[1] || "Cable";
+            }
+        }
+    }
+
+    readonly property Timer _kbNetTimer: Timer {
+        id: kbNetTimer
+        interval: 4000
+        running: !sys.fullscreenActive
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            if (!kbProcess.running) kbProcess.running = true;
+            if (!netProcess.running) netProcess.running = true;
+        }
+    }
 
     readonly property Connections _hyprConn: Connections {
         target: Hyprland
         function onRawEvent(event) {
             if (!event || !event.name) return;
             var name = String(event.name);
+            if (name.indexOf("activelayout") !== -1 || name === "configreloaded") {
+                if (!kbProcess.running) kbProcess.running = true;
+            }
             if (name === "fullscreen") {
                 var data = String(event.data || "").trim();
                 if (data === "1" || data === "0") {

@@ -358,6 +358,13 @@ hl.bind("Print",                 hl.dsp.exec_cmd("x64-hyprland-ctl screenshot fu
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("x64-hyprland-ctl screenshot region"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("x64-hyprland-ctl record toggle"))
 
+---------------------------------------------------
+---- PER-MONITOR DISPLAY CONFIG (monitors.lua) ----
+---------------------------------------------------
+-- Managed automatically by x64-hyprland-scale / Control Center and preserved across package updates.
+local monitors_cfg = (os.getenv("HOME") or "") .. "/.config/hypr/monitors.lua"
+pcall(dofile, monitors_cfg)
+
 -----------------------------------------
 ---- USER CUSTOMIZATION (custom.lua) ----
 -----------------------------------------

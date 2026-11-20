@@ -11,15 +11,10 @@ import Quickshell.Services.Mpris
 PanelWindow {
     id: barWindow
 
-    screen: {
-        for (var i = 0; i < Quickshell.screens.length; i++) {
-            var s = Quickshell.screens[i];
-            if (s && s.name && (s.name.indexOf("eDP") !== -1 || s.name.indexOf("LVDS") !== -1)) {
-                return s;
-            }
-        }
-        return (Quickshell.screens.length > 0) ? Quickshell.screens[0] : null;
-    }
+    property bool isPrimaryBar: true
+    readonly property var hyprMon: barWindow.screen ? Hyprland.monitorFor(barWindow.screen) : null
+    readonly property int monitorActiveWsId: (hyprMon && hyprMon.activeWorkspace) ? hyprMon.activeWorkspace.id : (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1)
+    readonly property bool monitorFocused: hyprMon ? Boolean(hyprMon.focused) : true
 
     signal toggleLauncher()
     signal toggleCalendar()
@@ -51,9 +46,9 @@ PanelWindow {
     WlrLayershell.exclusiveZone: 40
     WlrLayershell.namespace: "quickshell"
 
-    // Native Wayland Idle Inhibitor (zwp_idle_inhibit_manager_v1) for Modo Café
+    // Native Wayland Idle Inhibitor (zwp_idle_inhibit_manager_v1) for Modo Café (single instance on primary bar)
     IdleInhibitor {
-        enabled: barWindow.caffeineActive
+        enabled: barWindow.isPrimaryBar && barWindow.caffeineActive
         window: barWindow
     }
 
@@ -88,6 +83,11 @@ PanelWindow {
     readonly property int gpuTemp: SysState.gpuTemp
     readonly property int gpuUtil: SysState.gpuUtil
     readonly property var gpus: SysState.gpus
+    readonly property string kbLayout: SysState.kbLayout
+    readonly property string netType: SysState.netType
+    readonly property string netName: SysState.netName
+    readonly property string timeStr: SysState.timeStr
+    readonly property string dateStr: SysState.dateStr
 
     function runCtl(args) {
         SysState.runCtl(args);
@@ -103,114 +103,6 @@ PanelWindow {
         }
         appSpawnProc.command = ["bash", "-c", "nohup " + cmdStr + " >/dev/null 2>&1 &"];
         appSpawnProc.running = true;
-    }
-
-    Timer {
-        id: kbGuardTimer
-        interval: 800
-        repeat: false
-        onTriggered: {
-            if (!kbProcess.running) kbProcess.running = true;
-        }
-    }
-
-    // Active Keyboard Layout Detector
-    property string kbLayout: "ES"
-    Process {
-        id: kbProcess
-        command: ["x64-hyprland-ctl", "keyboard", "get"]
-        stdout: StdioCollector {
-            id: kbCollector
-            onStreamFinished: {
-                if (!kbCollector.text || kbGuardTimer.running) return;
-                var val = kbCollector.text.trim();
-                if (val.length > 0) {
-                    barWindow.kbLayout = val;
-                }
-            }
-        }
-    }
-
-    Process {
-        id: kbSwitchProc
-        command: ["x64-hyprland-ctl", "keyboard", "next"]
-        stdout: StdioCollector {
-            id: kbSwitchCollector
-            onStreamFinished: {
-                if (!kbSwitchCollector.text) return;
-                var val = kbSwitchCollector.text.trim();
-                if (val.length > 0) {
-                    barWindow.kbLayout = val;
-                }
-            }
-        }
-        onExited: {
-            kbGuardTimer.stop();
-            if (!kbProcess.running) kbProcess.running = true;
-        }
-    }
-
-    // Network Connectivity Detector
-    property string netType: "LAN"
-    property string netName: "Cable"
-    Process {
-        id: netProcess
-        command: ["sh", "-c", "route=$(ip route get 1.1.1.1 2>/dev/null | head -n1); if [ -n \"$route\" ]; then dev=$(echo \"$route\" | awk '{print $5}'); if [ -d \"/sys/class/net/$dev/wireless\" ]; then ssid=$(iw dev \"$dev\" link 2>/dev/null | awk -F': ' '/SSID/{print $2}'); echo \"WIFI|${ssid:-Wi-Fi}\"; else echo \"LAN|Cable\"; fi; else echo \"NONE|Desconectado\"; fi"]
-        stdout: StdioCollector {
-            id: netCollector
-            onStreamFinished: {
-                if (!netCollector.text) return;
-                var parts = netCollector.text.trim().split("|");
-                barWindow.netType = parts[0] || "LAN";
-                barWindow.netName = parts[1] || "Cable";
-            }
-        }
-    }
-
-    Timer {
-        interval: 4000
-        running: !SysState.fullscreenActive
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!kbProcess.running) kbProcess.running = true;
-            if (!netProcess.running) netProcess.running = true;
-        }
-    }
-
-    Connections {
-        target: Hyprland
-        function onRawEvent(event) {
-            if (!event || !event.name) return;
-            var name = String(event.name);
-            if (name.indexOf("activelayout") !== -1 || name === "configreloaded") {
-                if (!kbProcess.running) kbProcess.running = true;
-            }
-        }
-    }
-
-    // Real-time Clock Strings
-    property string timeStr: "00:00"
-    property string dateStr: "LUN 01 ENE"
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            var now = new Date();
-            var h = String(now.getHours()).padStart(2, '0');
-            var m = String(now.getMinutes()).padStart(2, '0');
-            barWindow.timeStr = h + ":" + m;
-
-            var days = I18n.dayShortNames;
-            var months = I18n.monthShortNames;
-            var dName = days[now.getDay()];
-            var dNum = String(now.getDate()).padStart(2, '0');
-            var mName = months[now.getMonth()];
-            barWindow.dateStr = dName + " " + dNum + " " + mName;
-        }
     }
 
     // =========================================================================
@@ -343,7 +235,9 @@ PanelWindow {
                                     id: wsItem
                                     required property int modelData
 
-                                    readonly property bool isFocused: Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id === modelData
+                                    readonly property bool isMonitorActive: barWindow.monitorActiveWsId === modelData
+                                    readonly property bool isGlobalFocused: Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id === modelData
+                                    readonly property bool isFocused: isMonitorActive
                                     readonly property bool isOccupied: {
                                         if (!Hyprland.workspaces) return false;
                                         var list = Hyprland.workspaces.values;
@@ -360,7 +254,7 @@ PanelWindow {
                                         id: wsIndicator
                                         anchors.centerIn: parent
 
-                                        // Dynamic morphic pill: elongated glowing bar for active, dot for occupied/empty
+                                        // Dynamic morphic pill: elongated glowing bar for this monitor's active ws
                                         width: {
                                             if (wsItem.isFocused) return wsArea.containsMouse ? 24 : 20;
                                             if (wsArea.containsMouse) return 10;
@@ -370,7 +264,7 @@ PanelWindow {
                                         radius: height / 2
 
                                         color: {
-                                            if (wsItem.isFocused) return Theme.accent;
+                                            if (wsItem.isFocused) return (barWindow.monitorFocused || wsItem.isGlobalFocused) ? Theme.accent : "#88ff2b2b";
                                             if (wsArea.containsMouse) return "#ffffff";
                                             if (wsItem.isOccupied) return "#c0c0d0";
                                             return "#404050";
@@ -966,10 +860,7 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    kbGuardTimer.restart();
-                                    if (!kbSwitchProc.running) kbSwitchProc.running = true;
-                                }
+                                onClicked: SysState.switchKeyboardLayout()
                             }
                         }
 

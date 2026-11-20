@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 
 ShellRoot {
@@ -16,6 +17,36 @@ ShellRoot {
         return (Quickshell.screens.length > 0) ? Quickshell.screens[0] : null;
     }
 
+    // Dynamically track the currently focused Hyprland monitor (LVDS-1, HDMI-A-1, DP-*, etc.)
+    readonly property var focusedScreen: {
+        var fm = Hyprland.focusedMonitor;
+        if (fm && fm.name) {
+            for (var i = 0; i < Quickshell.screens.length; i++) {
+                var s = Quickshell.screens[i];
+                if (s && s.name === fm.name) return s;
+            }
+        }
+        return primaryScreen;
+    }
+
+    // Hotplug-safe target screen for bar-triggered popups (empty = follow focusedScreen)
+    property string targetScreenName: ""
+
+    readonly property var activePopupScreen: {
+        if (targetScreenName !== "") {
+            for (var i = 0; i < Quickshell.screens.length; i++) {
+                var s = Quickshell.screens[i];
+                if (s && s.name === targetScreenName) return s;
+            }
+        }
+        return focusedScreen;
+    }
+
+    function _screenName(scr) {
+        if (scr && scr.name) return scr.name;
+        return (focusedScreen && focusedScreen.name) ? focusedScreen.name : "";
+    }
+
     function closeAllExcept(targetName) {
         if (targetName !== "launcher") launcher.visible = false;
         if (targetName !== "calendar") calendarPopup.visible = false;
@@ -28,18 +59,82 @@ ShellRoot {
         if (targetName !== "overview") overviewPopup.visible = false;
     }
 
-    // IPC Handlers for Hyprland Keybindings & Scripts
+    function toggleAnimatedPopup(popup, keyName, targetScreen) {
+        var wantName = _screenName(targetScreen);
+        if (popup.visible) {
+            if (popup.screen && popup.screen.name === wantName) {
+                popup.closeAnimated();
+                return;
+            }
+            // Open on the other monitor -> rebind cleanly to the newly clicked/focused monitor
+            popup.visible = false;
+        }
+        root.targetScreenName = wantName;
+        root.closeAllExcept(keyName);
+        popup.visible = true;
+    }
+
+    function openAnimatedPopup(popup, keyName, targetScreen) {
+        var wantName = _screenName(targetScreen);
+        if (popup.visible && popup.screen && popup.screen.name !== wantName) {
+            popup.visible = false;
+        }
+        root.targetScreenName = wantName;
+        root.closeAllExcept(keyName);
+        popup.visible = true;
+    }
+
+    function toggleInstantPopup(popup, keyName, targetScreen, onOpenFn) {
+        var wantName = _screenName(targetScreen);
+        if (popup.visible) {
+            if (popup.screen && popup.screen.name === wantName) {
+                popup.visible = false;
+                return;
+            }
+            popup.visible = false;
+        }
+        root.targetScreenName = wantName;
+        root.closeAllExcept(keyName);
+        popup.visible = true;
+        if (onOpenFn) onOpenFn();
+    }
+
+    function openInstantPopup(popup, keyName, targetScreen, onOpenFn) {
+        var wantName = _screenName(targetScreen);
+        if (popup.visible && popup.screen && popup.screen.name !== wantName) {
+            popup.visible = false;
+        }
+        root.targetScreenName = wantName;
+        root.closeAllExcept(keyName);
+        popup.visible = true;
+        if (onOpenFn) onOpenFn();
+    }
+
+    function toggleAudioOnScreen(targetScreen, tab) {
+        var wantName = _screenName(targetScreen);
+        if (audioPopup.visible && (!tab || audioPopup.activeTab === tab) && audioPopup.screen && audioPopup.screen.name === wantName) {
+            audioPopup.closeAnimated();
+            return;
+        }
+        if (audioPopup.visible && (!audioPopup.screen || audioPopup.screen.name !== wantName)) {
+            audioPopup.visible = false;
+        }
+        root.targetScreenName = wantName;
+        if (tab) audioPopup.activeTab = tab;
+        root.closeAllExcept("audio");
+        audioPopup.visible = true;
+    }
+
+    // IPC Handlers for Hyprland Keybindings & Scripts (always follow focused monitor)
     IpcHandler {
         target: "menu"
 
         function toggle() {
-            launcher.visible = !launcher.visible;
-            if (launcher.visible) root.closeAllExcept("launcher");
+            root.toggleInstantPopup(launcher, "launcher", root.focusedScreen, null);
         }
 
         function open() {
-            launcher.visible = true;
-            root.closeAllExcept("launcher");
+            root.openInstantPopup(launcher, "launcher", root.focusedScreen, null);
         }
 
         function close() {
@@ -51,17 +146,11 @@ ShellRoot {
         target: "calendar"
 
         function toggle() {
-            if (calendarPopup.visible) {
-                calendarPopup.closeAnimated();
-            } else {
-                calendarPopup.visible = true;
-                root.closeAllExcept("calendar");
-            }
+            root.toggleAnimatedPopup(calendarPopup, "calendar", root.focusedScreen);
         }
 
         function open() {
-            calendarPopup.visible = true;
-            root.closeAllExcept("calendar");
+            root.openAnimatedPopup(calendarPopup, "calendar", root.focusedScreen);
         }
 
         function close() {
@@ -73,17 +162,11 @@ ShellRoot {
         target: "control"
 
         function toggle() {
-            if (controlCenter.visible) {
-                controlCenter.closeAnimated();
-            } else {
-                controlCenter.visible = true;
-                root.closeAllExcept("control");
-            }
+            root.toggleAnimatedPopup(controlCenter, "control", root.focusedScreen);
         }
 
         function open() {
-            controlCenter.visible = true;
-            root.closeAllExcept("control");
+            root.openAnimatedPopup(controlCenter, "control", root.focusedScreen);
         }
 
         function close() {
@@ -91,9 +174,8 @@ ShellRoot {
         }
 
         function recordMenu() {
-            controlCenter.visible = true;
             controlCenter.recMenuOpen = true;
-            root.closeAllExcept("control");
+            root.openAnimatedPopup(controlCenter, "control", root.focusedScreen);
         }
     }
 
@@ -125,17 +207,11 @@ ShellRoot {
         target: "telemetry"
 
         function toggle() {
-            if (telemetryPopup.visible) {
-                telemetryPopup.closeAnimated();
-            } else {
-                telemetryPopup.visible = true;
-                root.closeAllExcept("telemetry");
-            }
+            root.toggleAnimatedPopup(telemetryPopup, "telemetry", root.focusedScreen);
         }
 
         function open() {
-            telemetryPopup.visible = true;
-            root.closeAllExcept("telemetry");
+            root.openAnimatedPopup(telemetryPopup, "telemetry", root.focusedScreen);
         }
 
         function close() {
@@ -147,17 +223,11 @@ ShellRoot {
         target: "network"
 
         function toggle() {
-            if (networkPopup.visible) {
-                networkPopup.closeAnimated();
-            } else {
-                networkPopup.visible = true;
-                root.closeAllExcept("network");
-            }
+            root.toggleAnimatedPopup(networkPopup, "network", root.focusedScreen);
         }
 
         function open() {
-            networkPopup.visible = true;
-            root.closeAllExcept("network");
+            root.openAnimatedPopup(networkPopup, "network", root.focusedScreen);
         }
 
         function close() {
@@ -169,35 +239,26 @@ ShellRoot {
         target: "audio"
 
         function toggle() {
-            if (audioPopup.visible) {
-                audioPopup.closeAnimated();
-            } else {
-                audioPopup.visible = true;
-                root.closeAllExcept("audio");
-            }
+            root.toggleAudioOnScreen(root.focusedScreen, "");
         }
 
         function open() {
-            audioPopup.visible = true;
-            root.closeAllExcept("audio");
+            root.openAnimatedPopup(audioPopup, "audio", root.focusedScreen);
         }
 
         function openSinks() {
             audioPopup.activeTab = "sinks";
-            audioPopup.visible = true;
-            root.closeAllExcept("audio");
+            root.openAnimatedPopup(audioPopup, "audio", root.focusedScreen);
         }
 
         function openSources() {
             audioPopup.activeTab = "sources";
-            audioPopup.visible = true;
-            root.closeAllExcept("audio");
+            root.openAnimatedPopup(audioPopup, "audio", root.focusedScreen);
         }
 
         function openStreams() {
             audioPopup.activeTab = "streams";
-            audioPopup.visible = true;
-            root.closeAllExcept("audio");
+            root.openAnimatedPopup(audioPopup, "audio", root.focusedScreen);
         }
 
         function close() {
@@ -218,15 +279,27 @@ ShellRoot {
         }
     }
 
+    // Universal ScreenFilter temporary hide for clean screenshots across all monitors
+    property bool filterTempHidden: false
+
+    Timer {
+        id: filterUnhideSafetyTimer
+        interval: 2500
+        repeat: false
+        onTriggered: root.filterTempHidden = false
+    }
+
     IpcHandler {
         target: "filter"
 
         function hide() {
-            screenFilter.tempHidden = true;
+            root.filterTempHidden = true;
+            filterUnhideSafetyTimer.restart();
         }
 
         function show() {
-            screenFilter.tempHidden = false;
+            filterUnhideSafetyTimer.stop();
+            root.filterTempHidden = false;
         }
     }
 
@@ -234,13 +307,11 @@ ShellRoot {
         target: "shortcuts"
 
         function toggle() {
-            shortcutsPopup.visible = !shortcutsPopup.visible;
-            if (shortcutsPopup.visible) root.closeAllExcept("shortcuts");
+            root.toggleInstantPopup(shortcutsPopup, "shortcuts", root.focusedScreen, null);
         }
 
         function open() {
-            shortcutsPopup.visible = true;
-            root.closeAllExcept("shortcuts");
+            root.openInstantPopup(shortcutsPopup, "shortcuts", root.focusedScreen, null);
         }
 
         function close() {
@@ -252,17 +323,15 @@ ShellRoot {
         target: "clipboard"
 
         function toggle() {
-            clipboardPopup.visible = !clipboardPopup.visible;
-            if (clipboardPopup.visible) {
-                root.closeAllExcept("clipboard");
+            root.toggleInstantPopup(clipboardPopup, "clipboard", root.focusedScreen, function() {
                 clipboardPopup.reload();
-            }
+            });
         }
 
         function open() {
-            clipboardPopup.visible = true;
-            root.closeAllExcept("clipboard");
-            clipboardPopup.reload();
+            root.openInstantPopup(clipboardPopup, "clipboard", root.focusedScreen, function() {
+                clipboardPopup.reload();
+            });
         }
 
         function close() {
@@ -280,17 +349,15 @@ ShellRoot {
         target: "overview"
 
         function toggle() {
-            overviewPopup.visible = !overviewPopup.visible;
-            if (overviewPopup.visible) {
-                root.closeAllExcept("overview");
+            root.toggleInstantPopup(overviewPopup, "overview", root.focusedScreen, function() {
                 overviewPopup.reload();
-            }
+            });
         }
 
         function open() {
-            overviewPopup.visible = true;
-            root.closeAllExcept("overview");
-            overviewPopup.reload();
+            root.openInstantPopup(overviewPopup, "overview", root.focusedScreen, function() {
+                overviewPopup.reload();
+            });
         }
 
         function close() {
@@ -327,80 +394,30 @@ ShellRoot {
         }
     }
 
-    // Top Bar Floating Island
-    Bar {
-        id: mainBar
-        screen: root.primaryScreen
+    // Top Bar Floating Island replicated across ALL connected displays (0 duplicated polling via SysState)
+    Variants {
+        model: Quickshell.screens
 
-        onToggleLauncher: {
-            launcher.visible = !launcher.visible;
-            if (launcher.visible) root.closeAllExcept("launcher");
-        }
+        Bar {
+            required property var modelData
+            screen: modelData
+            isPrimaryBar: root.primaryScreen !== null && modelData.name === root.primaryScreen.name
 
-        onToggleCalendar: {
-            if (calendarPopup.visible) {
-                calendarPopup.closeAnimated();
-            } else {
-                calendarPopup.visible = true;
-                root.closeAllExcept("calendar");
-            }
-        }
-
-        onToggleControl: {
-            if (controlCenter.visible) {
-                controlCenter.closeAnimated();
-            } else {
-                controlCenter.visible = true;
-                root.closeAllExcept("control");
-            }
-        }
-
-        onTogglePower: {
-            if (controlCenter.visible) {
-                controlCenter.closeAnimated();
-            } else {
-                controlCenter.visible = true;
-                root.closeAllExcept("control");
-            }
-        }
-
-        onToggleTelemetry: {
-            if (telemetryPopup.visible) {
-                telemetryPopup.closeAnimated();
-            } else {
-                telemetryPopup.visible = true;
-                root.closeAllExcept("telemetry");
-            }
-        }
-
-        onToggleNetwork: {
-            if (networkPopup.visible) {
-                networkPopup.closeAnimated();
-            } else {
-                networkPopup.visible = true;
-                root.closeAllExcept("network");
-            }
-        }
-
-        onToggleAudio: (tab) => {
-            if (audioPopup.visible && (!tab || audioPopup.activeTab === tab)) {
-                audioPopup.closeAnimated();
-            } else {
-                if (tab) audioPopup.activeTab = tab;
-                audioPopup.visible = true;
-                root.closeAllExcept("audio");
-            }
-        }
-
-        onBrightnessChangedOsd: (val) => {
-            volumeOsd.showBrightness(val);
+            onToggleLauncher: root.toggleInstantPopup(launcher, "launcher", modelData, null)
+            onToggleCalendar: root.toggleAnimatedPopup(calendarPopup, "calendar", modelData)
+            onToggleControl: root.toggleAnimatedPopup(controlCenter, "control", modelData)
+            onTogglePower: root.toggleAnimatedPopup(controlCenter, "control", modelData)
+            onToggleTelemetry: root.toggleAnimatedPopup(telemetryPopup, "telemetry", modelData)
+            onToggleNetwork: root.toggleAnimatedPopup(networkPopup, "network", modelData)
+            onToggleAudio: (tab) => root.toggleAudioOnScreen(modelData, tab)
+            onBrightnessChangedOsd: (val) => volumeOsd.showBrightness(val)
         }
     }
 
     // Cyberpunk Dashboard App Launcher
     AppLauncher {
         id: launcher
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         onCloseRequested: launcher.visible = false
     }
@@ -408,7 +425,7 @@ ShellRoot {
     // Cyberpunk Calendar & Date Dropdown Popup
     CalendarPopup {
         id: calendarPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: calendarPopup.visible = false
@@ -417,7 +434,7 @@ ShellRoot {
     // Expanded Hardware Telemetry Popup
     TelemetryPopup {
         id: telemetryPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: telemetryPopup.visible = false
@@ -426,7 +443,7 @@ ShellRoot {
     // Native Network & Wi-Fi Popup (Omarchy 4 Quattro style)
     NetworkPopup {
         id: networkPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: networkPopup.visible = false
@@ -435,7 +452,7 @@ ShellRoot {
     // Native Audio & Devices Popup (Outputs, Mic VU Meter, Boost 150%, Streams Mixer)
     AudioPopup {
         id: audioPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: audioPopup.visible = false
@@ -444,7 +461,7 @@ ShellRoot {
     // Control Center Sliding Panel
     ControlCenter {
         id: controlCenter
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         lockClose: root.lockPopups
         onCloseRequested: controlCenter.visible = false
@@ -457,31 +474,37 @@ ShellRoot {
         }
     }
 
-    // Universal Click-Through Screen Filter (Warm 4200K Nightlight + Software Dimming)
-    ScreenFilter {
-        id: screenFilter
-        nightlightActive: SysState.nightlightActive
-        brightnessVal: SysState.brightnessVal
+    // Universal Click-Through Screen Filter replicated across ALL connected monitors
+    Variants {
+        model: Quickshell.screens
+
+        ScreenFilter {
+            required property var modelData
+            screen: modelData
+            tempHidden: root.filterTempHidden
+            nightlightActive: SysState.nightlightActive
+            brightnessVal: SysState.brightnessVal
+        }
     }
 
-    // Unified On-Screen Display for Volume / Mute / Brightness Changes
+    // Unified On-Screen Display for Volume / Mute / Brightness Changes (follows active monitor)
     VolumeOsd {
         id: volumeOsd
-        screen: root.primaryScreen
+        screen: root.focusedScreen
     }
 
-    // Native Notification Server & Toast Overlay (Respects DND No Molestar)
+    // Native Notification Server & Toast Overlay (follows active monitor, respects DND)
     NotificationPopup {
         id: notifPopup
-        screen: root.primaryScreen
+        screen: root.focusedScreen
         dndEnabled: SysState.dndActive
-        sidePanelOpen: controlCenter.visible || networkPopup.visible
+        sidePanelOpen: (controlCenter.visible || networkPopup.visible) && (root.activePopupScreen === root.focusedScreen)
     }
 
     // Native Interactive Shortcuts Guide & HUD (SUPER + F1)
     ShortcutsPopup {
         id: shortcutsPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         onCloseRequested: shortcutsPopup.visible = false
     }
@@ -489,7 +512,7 @@ ShellRoot {
     // Native Wayland Clipboard History Manager (SUPER + V)
     ClipboardPopup {
         id: clipboardPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         onCloseRequested: clipboardPopup.visible = false
     }
@@ -497,7 +520,7 @@ ShellRoot {
     // Native Wayland Workspaces Overview / Mission Control (SUPER + TAB)
     OverviewPopup {
         id: overviewPopup
-        screen: root.primaryScreen
+        screen: root.activePopupScreen
         visible: false
         onCloseRequested: overviewPopup.visible = false
     }
