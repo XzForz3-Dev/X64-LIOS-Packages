@@ -71,6 +71,22 @@ def get_system_update_cmd():
     return "x64-update"
 
 
+def _launch_detached(cmd):
+    """Lanza un comando de forma asíncrona y desacoplada sin bloquear Qt ni dejar procesos acoplados."""
+    if not cmd:
+        return
+    try:
+        subprocess.Popen(
+            cmd,
+            shell=True,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 def get_static_hw_info():
     cpu_model = "Generic x86_64 Processor"
     cpu_cores = os.cpu_count() or 1
@@ -131,20 +147,39 @@ def get_static_hw_info():
         pass
 
     root_fs = "Linux FS"
+    root_disk_type = "SSD"
     try:
+        root_src = ""
         with open("/proc/mounts", "r") as f:
             for line in f:
                 parts = line.split()
                 if len(parts) >= 3 and parts[1] == "/":
+                    root_src = parts[0]
                     root_fs = parts[2].upper()
                     break
+        if root_src.startswith("/dev/"):
+            dev_real = os.path.basename(os.path.realpath(root_src))
+            if dev_real.startswith("nvme"):
+                root_disk_type = "NVMe"
+            elif dev_real.startswith("vd"):
+                root_disk_type = "VirtIO / VM"
+            else:
+                base_dev = re.sub(r"p?\d+$", "", dev_real)
+                rot_path = f"/sys/block/{base_dev}/queue/rotational"
+                if os.path.exists(rot_path):
+                    with open(rot_path, "r") as rf:
+                        root_disk_type = "HDD" if rf.read().strip() == "1" else "SSD"
     except Exception:
         pass
 
     zram_active = False
+    zram_size_gb = 0.0
     try:
         with open("/proc/swaps", "r") as f:
             zram_active = ("zram" in f.read())
+        if zram_active and os.path.exists("/sys/block/zram0/disksize"):
+            with open("/sys/block/zram0/disksize", "r") as zf:
+                zram_size_gb = int(zf.read().strip()) / (1024 ** 3)
     except Exception:
         pass
 
@@ -153,10 +188,72 @@ def get_static_hw_info():
         "cpu_cores": cpu_cores,
         "gpu_model": gpu_model,
         "root_fs": root_fs,
-        "zram_active": zram_active
+        "root_disk_type": root_disk_type,
+        "zram_active": zram_active,
+        "zram_size_gb": zram_size_gb,
     }
 
 STATIC_HW = get_static_hw_info()
+
+
+class GpuTelemetryWorker(QThread):
+    """Lectura asíncrona no bloqueante de uso, VRAM y temperatura de GPU (AMD/Intel sysfs y NVIDIA)."""
+    telemetry_ready = pyqtSignal(dict)
+
+    def run(self):
+        data = {}
+        # 1. AMD / Intel DRM sysfs (<1 ms, sin procesos externos)
+        try:
+            drm_dir = "/sys/class/drm"
+            if os.path.isdir(drm_dir):
+                for entry in sorted(os.listdir(drm_dir)):
+                    if not re.match(r"^card\d+$", entry):
+                        continue
+                    dev_dir = os.path.join(drm_dir, entry, "device")
+                    busy_p = os.path.join(dev_dir, "gpu_busy_percent")
+                    if os.path.exists(busy_p):
+                        with open(busy_p, "r") as f:
+                            data["util"] = int(f.read().strip())
+                        v_used = os.path.join(dev_dir, "mem_info_vram_used")
+                        v_tot = os.path.join(dev_dir, "mem_info_vram_total")
+                        if os.path.exists(v_used) and os.path.exists(v_tot):
+                            with open(v_used, "r") as f1, open(v_tot, "r") as f2:
+                                data["vram_used_gb"] = int(f1.read().strip()) / (1024 ** 3)
+                                data["vram_total_gb"] = int(f2.read().strip()) / (1024 ** 3)
+                        hwmon_dir = os.path.join(dev_dir, "hwmon")
+                        if os.path.isdir(hwmon_dir):
+                            for hm in sorted(os.listdir(hwmon_dir)):
+                                t_p = os.path.join(hwmon_dir, hm, "temp1_input")
+                                if os.path.exists(t_p):
+                                    with open(t_p, "r") as tf:
+                                        data["temp_c"] = int(tf.read().strip()) // 1000
+                                    break
+                        break
+        except Exception:
+            pass
+
+        # 2. NVIDIA (nvidia-smi, ejecutado fuera del hilo UI)
+        if "util" not in data and shutil.which("nvidia-smi"):
+            try:
+                res = subprocess.run(
+                    [
+                        "nvidia-smi",
+                        "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu",
+                        "--format=csv,noheader,nounits",
+                    ],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.2
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    parts = [p.strip() for p in res.stdout.splitlines()[0].split(",")]
+                    if len(parts) >= 4:
+                        data["util"] = int(float(parts[0]))
+                        data["vram_used_gb"] = float(parts[1]) / 1024.0
+                        data["vram_total_gb"] = float(parts[2]) / 1024.0
+                        data["temp_c"] = int(float(parts[3]))
+            except Exception:
+                pass
+
+        self.telemetry_ready.emit(data)
 
 
 class ServiceStatusWorker(QThread):
@@ -264,9 +361,9 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinstall All Native Packages': 'Reinstalar Todos los Paquetes Nativos',
         'Force reinstall of all native system packages to repair damaged files.': 'Reinstala todos los paquetes nativos para reparar el '
                                                                                   'sistema.',
-        'KWin (Wayland) Debug Console': 'Consola de Depuración KWin (Wayland)',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': 'Abre el inspector de KWin para diagnosticar Wayland y '
-                                                                                  'VRR.',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Consola de Rescate)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Abre la consola soberana X64 para '
+                                                                                                   'rescate, escritorios y telemetría.',
         'X64 Gaming Center': 'Centro Gaming X64',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Instalación modular en 1 clic de '
                                                                                                      'lanzadores de juegos, motores '
@@ -783,9 +880,9 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinstall All Native Packages': 'Réinstaller Tous les Paquets Natifs',
         'Force reinstall of all native system packages to repair damaged files.': 'Réinstalle tous les paquets natifs pour réparer le '
                                                                                   'système.',
-        'KWin (Wayland) Debug Console': 'Console de Débogage KWin (Wayland)',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': "Ouvre l'inspecteur KWin pour diagnostiquer Wayland et "
-                                                                                  'VRR.',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Console de Secours)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Ouvre la console souveraine X64 pour '
+                                                                                                   'secours, bureaux et télémétrie.',
         'X64 Gaming Center': 'Centre Gaming X64',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Installation modulaire en 1 clic des '
                                                                                                      'lanceurs de jeux, couches '
@@ -1198,8 +1295,8 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinitialize and populate GPG cryptographic keys if package signatures fail.': 'Erneuert GPG-Schlüssel bei Signaturfehlern.',
         'Reinstall All Native Packages': 'Alle nativen Pakete neu installieren',
         'Force reinstall of all native system packages to repair damaged files.': 'Installiert alle Systempakete zur Reparatur neu.',
-        'KWin (Wayland) Debug Console': 'KWin (Wayland) Debug-Konsole',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': 'Öffnet die KWin-Diagnose für Wayland und VRR.',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Rettungskonsole)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Öffnet die X64-Konsole für Rettung, Desktops und Telemetrie.',
         'X64 Gaming Center': 'X64 Gaming-Center',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Modulare 1-Klick-Installation von '
                                                                                                      'Spiele-Launchern, Proton/UMU-Layern, '
@@ -1550,8 +1647,8 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinstall All Native Packages': 'Reinstalla Tutti i Pacchetti Nativi',
         'Force reinstall of all native system packages to repair damaged files.': 'Reinstalla tutti i pacchetti nativi per riparare il '
                                                                                   'sistema.',
-        'KWin (Wayland) Debug Console': 'Console di Debug KWin (Wayland)',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': "Apre l'ispettore KWin per diagnosticare Wayland e VRR.",
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Console di Ripristino)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Apre la console X64 per ripristino, desktop e telemetria.',
         'X64 Gaming Center': 'Centro Gaming X64',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Installazione modulare in 1 clic di '
                                                                                                      'launcher di gioco, layer Proton/UMU, '
@@ -1944,9 +2041,9 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinstall All Native Packages': 'Reinstalar Todos os Pacotes Nativos',
         'Force reinstall of all native system packages to repair damaged files.': 'Reinstala todos os pacotes nativos para reparar o '
                                                                                   'sistema.',
-        'KWin (Wayland) Debug Console': 'Console de Depuração KWin (Wayland)',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': 'Abre o inspetor do KWin para diagnosticar Wayland e '
-                                                                                  'VRR.',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Console de Resgate)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Abre o console soberano X64 para '
+                                                                                                   'resgate, desktops e telemetria.',
         'X64 Gaming Center': 'Central Gaming X64',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Instalação modular em 1 clique de '
                                                                                                      'inicializadores de jogos, camadas '
@@ -2363,8 +2460,8 @@ TRANSLATIONS = {'es': {'Home': 'Inicio',
         'Reinstall All Native Packages': 'Переустановить все пакеты',
         'Force reinstall of all native system packages to repair damaged files.': 'Полная переустановка системных пакетов для '
                                                                                   'восстановления.',
-        'KWin (Wayland) Debug Console': 'Консоль отладки KWin (Wayland)',
-        'Open the native KWin Wayland diagnostic inspector for windows and VRR.': 'Открывает инспектор KWin для диагностики Wayland и VRR.',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Консоль спасения)',
+        'Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue.': 'Открывает консоль X64 для восстановления, окружений и телеметрии.',
         'X64 Gaming Center': 'Игровой Центр X64',
         'Modular 1-click installation of gaming launchers, compatibility layers, and FPS overlays.': 'Модульная установка игровых '
                                                                                                      'лаунчеров, Proton/UMU, 32-битных '
@@ -3033,26 +3130,26 @@ FIT_TRANSLATIONS = {
         'Reset Pacman Keyrings': 'Reset GPG Keyrings',
         'Unlock Pacman Database': 'Unlock Pacman (db.lck)',
         'Reinstall All Native Packages': 'Reinstall Native Packages',
-        'KWin (Wayland) Debug Console': 'KWin Debug Console',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Rescue)',
     },
     'es': {
         'Reset Pacman Keyrings': 'Restablecer Keyrings GPG',
         'Unlock Pacman Database': 'Desbloquear Pacman (db.lck)',
         'Reinstall All Native Packages': 'Reinstalar Paquetes Nativos',
-        'KWin (Wayland) Debug Console': 'Consola de Depuración KWin',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Rescate)',
     },
     'fr': {
         'Reset Pacman Keyrings': 'Réinitialiser Clés GPG',
         'Unlock Pacman Database': 'Déverrouiller Pacman (db.lck)',
         'Reinstall All Native Packages': 'Réinstaller Paquets Natifs',
-        'KWin (Wayland) Debug Console': 'Console de Débogage KWin',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Secours)',
         'Ananicy-cpp Priority': 'Ananicy-cpp',
     },
     'de': {
         'Reset Pacman Keyrings': 'GPG-Schlüssel zurücksetzen',
         'Unlock Pacman Database': 'Pacman entsperren (db.lck)',
         'Reinstall All Native Packages': 'Native Pakete neu installieren',
-        'KWin (Wayland) Debug Console': 'KWin-Debug-Konsole',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Rettung)',
         'Ananicy-cpp Priority': 'Ananicy-cpp',
         'Systemd-OOMD Anti-Freeze': 'Systemd-OOMD',
         'LIOS Update Notifier': 'LIOS Update-Info',
@@ -3061,7 +3158,7 @@ FIT_TRANSLATIONS = {
         'Reset Pacman Keyrings': 'Ripristina Chiavi GPG',
         'Unlock Pacman Database': 'Sblocca Pacman (db.lck)',
         'Reinstall All Native Packages': 'Reinstalla Pacchetti Nativi',
-        'KWin (Wayland) Debug Console': 'Console Debug KWin',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Ripristino)',
         'Ananicy-cpp Priority': 'Ananicy-cpp',
         'Profile-sync-daemon (RAM Browser)': 'Browser in RAM',
         'LIOS Update Notifier': 'Avvisi LIOS Update',
@@ -3070,14 +3167,14 @@ FIT_TRANSLATIONS = {
         'Reset Pacman Keyrings': 'Redefinir Chaves GPG',
         'Unlock Pacman Database': 'Desbloquear Pacman (db.lck)',
         'Reinstall All Native Packages': 'Reinstalar Pacotes Nativos',
-        'KWin (Wayland) Debug Console': 'Console de Depuração KWin',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Resgate)',
         'Bpftune Kernel Auto-Tuning': 'Bpftune Auto-Tuning',
     },
     'ru': {
         'Reset Pacman Keyrings': 'Сброс ключей GPG',
         'Unlock Pacman Database': 'Разблокировать Pacman',
         'Reinstall All Native Packages': 'Переустановить пакеты',
-        'KWin (Wayland) Debug Console': 'Консоль отладки KWin',
+        'X64 Dashboard (Rescue Console)': 'X64 Dashboard (Спасение)',
         'Profile-sync-daemon (RAM Browser)': 'Браузер в ОЗУ',
         'BORE (Native Kernel)': 'BORE (Нативный)',
         'CPU & Performance': 'CPU и Скорость',
@@ -3124,13 +3221,13 @@ for _lc, _d in SUNSHINE_TRANSLATIONS.items():
         TRANSLATIONS[_lc].update(_d)
 
 STATUS_BADGE_TRANSLATIONS = {
-    'en': {'ACTIVE': 'ACTIVE', 'DISABLED': 'DISABLED', 'Automatic (DHCP)': 'Automatic (DHCP)', 'Fastest DNS:': 'Fastest DNS:', 'Custom DNS': 'Custom DNS'},
-    'es': {'ACTIVE': 'ACTIVADO', 'DISABLED': 'DESACTIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Más rápido:', 'Custom DNS': 'DNS Personalizado'},
-    'fr': {'ACTIVE': 'ACTIVÉ', 'DISABLED': 'DÉSACTIVÉ', 'Automatic (DHCP)': 'Automatique (DHCP)', 'Fastest DNS:': 'Plus rapide :', 'Custom DNS': 'DNS Personnalisé'},
-    'de': {'ACTIVE': 'AKTIV', 'DISABLED': 'DEAKTIVIERT', 'Automatic (DHCP)': 'Automatisch (DHCP)', 'Fastest DNS:': 'Schnellster DNS:', 'Custom DNS': 'Benutzerdef. DNS'},
-    'it': {'ACTIVE': 'ATTIVO', 'DISABLED': 'DISATTIVATO', 'Automatic (DHCP)': 'Automatico (DHCP)', 'Fastest DNS:': 'Più veloce:', 'Custom DNS': 'DNS Personalizzato'},
-    'pt': {'ACTIVE': 'ATIVADO', 'DISABLED': 'DESATIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Mais rápido:', 'Custom DNS': 'DNS Personalizado'},
-    'ru': {'ACTIVE': 'АКТИВЕН', 'DISABLED': 'ОТКЛЮЧЕН', 'Automatic (DHCP)': 'Авто (DHCP)', 'Fastest DNS:': 'Самый быстрый:', 'Custom DNS': 'Свой DNS'}
+    'en': {'ACTIVE': 'ACTIVE', 'DISABLED': 'DISABLED', 'Automatic (DHCP)': 'Automatic (DHCP)', 'Fastest DNS:': 'Fastest DNS:', 'Custom DNS': 'Custom DNS', 'System Memory': 'System Memory'},
+    'es': {'ACTIVE': 'ACTIVADO', 'DISABLED': 'DESACTIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Más rápido:', 'Custom DNS': 'DNS Personalizado', 'System Memory': 'Memoria del Sistema'},
+    'fr': {'ACTIVE': 'ACTIVÉ', 'DISABLED': 'DÉSACTIVÉ', 'Automatic (DHCP)': 'Automatique (DHCP)', 'Fastest DNS:': 'Plus rapide :', 'Custom DNS': 'DNS Personnalisé', 'System Memory': 'Mémoire Système'},
+    'de': {'ACTIVE': 'AKTIV', 'DISABLED': 'DEAKTIVIERT', 'Automatic (DHCP)': 'Automatisch (DHCP)', 'Fastest DNS:': 'Schnellster DNS:', 'Custom DNS': 'Benutzerdef. DNS', 'System Memory': 'Systemspeicher'},
+    'it': {'ACTIVE': 'ATTIVO', 'DISABLED': 'DISATTIVATO', 'Automatic (DHCP)': 'Automatico (DHCP)', 'Fastest DNS:': 'Più veloce:', 'Custom DNS': 'DNS Personalizzato', 'System Memory': 'Memoria di Sistema'},
+    'pt': {'ACTIVE': 'ATIVADO', 'DISABLED': 'DESATIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Mais rápido:', 'Custom DNS': 'DNS Personalizado', 'System Memory': 'Memória do Sistema'},
+    'ru': {'ACTIVE': 'АКТИВЕН', 'DISABLED': 'ОТКЛЮЧЕН', 'Automatic (DHCP)': 'Авто (DHCP)', 'Fastest DNS:': 'Самый быстрый:', 'Custom DNS': 'Свой DNS', 'System Memory': 'Системная Память'}
 }
 for _lc, _d in STATUS_BADGE_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
@@ -3160,6 +3257,11 @@ TOOLTIP_GUIDES = {
             'Demonio inteligente de detección automática de videojuegos (Steam, Proton, Wine y binarios nativos) compatible con TODOS los planificadores de CPU (scx_lavd, scx_bpfland, BORE, etc.).',
             'Activa automáticamente el modo máximo rendimiento, bloquea la suspensión, prioriza 3D V-Cache en AMD X3D, protege la VRAM vía dmemcg-booster y desactiva split-lock durante tus partidas.',
             'Mantenlo ACTIVADO siempre: potencia cualquier planificador de CPU que elijas arriba sin interferir con él.'
+        ),
+        'dmemcg': (
+            'Servicio oficial de protección de memoria VRAM desarrollado por Valve / SteamOS (dmemcg-booster sobre CONFIG_CGROUP_DMEM).',
+            'Reserva y protege la VRAM de tu GPU para el juego en primer plano junto a FalconD, evitando que navegadores o apps en segundo plano provoquen tirones.',
+            'Activo de serie en X64 LIOS (beneficio directo en GPUs AMD e Intel, y cero sobrecarga en NVIDIA).'
         ),
         'ananicy-cpp.service': (
             'Gestor automático de prioridades de procesos (nice / ionice) escrito en C++ con reglas optimizadas para gaming y escritorio.',
@@ -3292,7 +3394,7 @@ TOOLTIP_GUIDES = {
             'Úsalo solo cuando Pacman o X64 Update te indiquen "no se pudo bloquear la base de datos (unable to lock database)".'
         ),
         'rescue_reinstall': (
-            'Rutina de reconstrucción integral de todos los paquetes nativos instalados (pacman -Sy $(pacman -Qnq)).',
+            'Rutina de reconstrucción integral de todos los paquetes nativos instalados (pacman -Syu && pacman -S $(pacman -Qnq)).',
             'Descarga y sobreescribe todos los binarios y librerías del sistema sin borrar tus archivos personales ni configuraciones de usuario.',
             'Úsalo como herramienta de rescate mayor si borraste por accidente archivos del sistema en /usr o tras un corte eléctrico grave.'
         ),
@@ -3301,10 +3403,10 @@ TOOLTIP_GUIDES = {
             'Filtra y muestra exclusivamente los errores de severidad alta del kernel, drivers y servicios de systemd ocurridos al encender el PC.',
             'Úsalo para diagnosticar fallos de hardware, errores de montaje de discos o servicios que no levantan.'
         ),
-        'rescue_kwin': (
-            'Consola oficial de diagnóstico interno del compositor KWin Wayland de KDE Plasma.',
-            'Muestra en tiempo real qué ventanas corren en Wayland nativo o XWayland, estado de FreeSync/VRR (Adaptive Sync), monitores y buffers DRM.',
-            'Úsala para verificar si el refresco variable (VRR) está activo en tu monitor gamer o depurar problemas gráficos.'
+        'rescue_dashboard': (
+            'Centro de mando y rescate oficial de X64 LIOS (x64-dashboard) en terminal interactiva Kitty.',
+            'Permite consultar telemetría, gestionar snapshots, cambiar entre los 8 escritorios oficiales, activar Modo Servidor, diagnosticar red y ajustar el perfil gaming.',
+            'Ábrelo en cualquiera de los 8 escritorios de X64 LIOS cuando necesites control total o tareas avanzadas de rescate.'
         ),
         'rescue_btop': (
             'Monitor interactivo de recursos del sistema en alta definición (btop++).',
@@ -3412,6 +3514,11 @@ TOOLTIP_GUIDES = {
             'Intelligent game-detection daemon (Steam, Proton, Wine, and native games) that works on top of ALL CPU schedulers (scx_lavd, scx_bpfland, BORE, etc.).',
             'Automatically enables maximum performance power mode, prevents idle/sleep, prioritizes AMD 3D V-Cache, protects GPU VRAM via dmemcg-booster, and disables split-lock penalty while gaming.',
             'Keep it ACTIVE at all times: it enhances whichever CPU scheduler you choose above without conflicting with it.'
+        ),
+        'dmemcg': (
+            'Official Valve / SteamOS GPU VRAM protection service (dmemcg-booster on CONFIG_CGROUP_DMEM).',
+            'Reserves and protects GPU VRAM for foreground games alongside FalconD, preventing background browsers or Electron apps from causing frame-time stutters.',
+            'Active out of the box in X64 LIOS (full hardware benefit on AMD/Intel GPUs, zero overhead on NVIDIA).'
         ),
         'ananicy-cpp.service': (
             'Automatic process priority manager (nice / ionice) written in C++ with curated rules for gaming and desktop responsiveness.',
@@ -3544,7 +3651,7 @@ TOOLTIP_GUIDES = {
             'Use it only when Pacman or X64 Update reports "unable to lock database".'
         ),
         'rescue_reinstall': (
-            'Full reinstallation routine for all native system packages (pacman -Sy $(pacman -Qnq)).',
+            'Full reinstallation routine for all native system packages (pacman -Syu && pacman -S $(pacman -Qnq)).',
             'Re-downloads and overwrites all system binaries and libraries in /usr without touching your personal files or user configs.',
             'Use as a major rescue tool if system files were accidentally deleted or corrupted after a sudden power outage.'
         ),
@@ -3553,10 +3660,10 @@ TOOLTIP_GUIDES = {
             'Filters and displays only high-severity kernel, driver, and systemd service errors from the current boot session.',
             'Use it to diagnose hardware initialization issues, disk mount errors, or failing services.'
         ),
-        'rescue_kwin': (
-            'Official built-in diagnostic inspector for the KDE Plasma KWin Wayland compositor.',
-            'Shows live details on native Wayland vs XWayland windows, FreeSync/VRR (Adaptive Sync) state, displays, and DRM buffers.',
-            'Use it to verify if Variable Refresh Rate (VRR) is active on your gaming monitor or debug window rendering.'
+        'rescue_dashboard': (
+            'Official X64 LIOS sovereign command & rescue console (x64-dashboard) inside a Kitty terminal.',
+            'Provides live telemetry, snapshot management, switching across all 8 official desktops, Server Mode, network diagnostics, and extreme gaming tuning.',
+            'Open it from any of the 8 X64 LIOS desktops whenever you need full system control or advanced rescue tools.'
         ),
         'rescue_btop': (
             'High-definition interactive terminal resource monitor (btop++).',
@@ -4407,8 +4514,10 @@ class DnsOptimizerPanel(QFrame):
                 self.chk_dot.setChecked(True if dot_enabled is None else dot_enabled)
 
     def populate_connections(self):
-        self.conn_combo.clear()
+        prev_conn = self.conn_combo.currentText().strip()
+        self.conn_combo.blockSignals(True)
         try:
+            self.conn_combo.clear()
             res = subprocess.run(
                 ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show", "--active"],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2
@@ -4431,8 +4540,14 @@ class DnsOptimizerPanel(QFrame):
                             conns.append(name)
             for c in conns:
                 self.conn_combo.addItem(c)
+            if prev_conn:
+                prev_idx = self.conn_combo.findText(prev_conn)
+                if prev_idx >= 0:
+                    self.conn_combo.setCurrentIndex(prev_idx)
         except Exception:
             pass
+        finally:
+            self.conn_combo.blockSignals(False)
 
     def select_provider(self, idx):
         self.selected_idx = idx
@@ -5265,7 +5380,7 @@ class PremiumButton(QPushButton):
         elif self.url:
             webbrowser.open(self.url)
         elif self.cmd:
-            os.system(f"{self.cmd} &")
+            _launch_detached(self.cmd)
 
 
 
@@ -5760,15 +5875,15 @@ class ServiceSwitchCard(QFrame):
                 act_part = f"sudo systemctl enable --now {self.unit_name}"
 
             body = (
-                f"printf '\033[1;31m==> [X64 SERVICE MANAGER]\033[0m El servicio \033[1;37m{self.title}\033[0m requiere instalar el paquete \033[1;33m{self.req_pkg}\033[0m.\n\n'; "
-                f"sudo pacman -Sy --needed --overwrite '*' {self.req_pkg} && {act_part}"
+                f"printf '\\033[1;31m==> [X64 SERVICE MANAGER]\\033[0m El servicio \\033[1;37m{self.title}\\033[0m requiere instalar el paquete \\033[1;33m{self.req_pkg}\\033[0m.\\n\\n'; "
+                f"sudo pacman -Syu --needed --overwrite '*' {self.req_pkg} && {act_part}"
             )
             cmd = build_x64_term_cmd(
                 f"X64 Service Installer - {self.req_pkg}",
                 f"INSTALACIÓN Y ACTIVACIÓN DE SERVICIO ({self.req_pkg})",
                 body
             )
-            os.system(f"{cmd} &")
+            _launch_detached(cmd)
             return
 
         action = "disable --now" if self._active else "enable --now"
@@ -6037,7 +6152,7 @@ class GamingInstallCard(QFrame):
             f"sudo pacman -Syu --needed --overwrite '*' {extra_gpu_pkgs}{self.install_pkgs}" + (f" && {{ {self.post_cmd}; }}" if self.post_cmd else "")
         )
         cmd = build_x64_term_cmd("X64 LIOS Gaming Installer", "INSTALADOR MODULAR DE GAMING", body)
-        os.system(f"{cmd} &")
+        _launch_detached(cmd)
 
 
 class MiniToggleSwitch(QWidget):
@@ -6201,18 +6316,20 @@ class TelemetryCard(QFrame):
 
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
-        self.lbl_cat = QLabel(category)
+        top_row.setSpacing(8)
+        self.lbl_cat = FitLabel(category, min_ratio=0.78)
         self.lbl_cat.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lbl_cat.setMinimumWidth(0)
+        self.lbl_cat.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_cat.setStyleSheet("color: #9ca3af; font-size: 11px; font-weight: bold; letter-spacing: 0.6px; background: transparent; border: none;")
         self.lbl_val = QLabel(initial_val)
         self.lbl_val.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_val.setStyleSheet("color: #ffffff; font-size: 12.5px; font-weight: bold; background: transparent; border: none;")
-        top_row.addWidget(self.lbl_cat)
-        top_row.addStretch(1)
-        top_row.addWidget(self.lbl_val)
+        top_row.addWidget(self.lbl_cat, 1)
+        top_row.addWidget(self.lbl_val, 0)
         vbox.addLayout(top_row)
 
-        self.lbl_model = QLabel(model_text)
+        self.lbl_model = FitLabel(model_text, min_ratio=0.80)
         self.lbl_model.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_model.setMinimumWidth(0)
         self.lbl_model.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -6222,7 +6339,7 @@ class TelemetryCard(QFrame):
         sub_row = QHBoxLayout()
         sub_row.setContentsMargins(0, 0, 0, 0)
         sub_row.setSpacing(8)
-        self.lbl_sub = QLabel(sub_text)
+        self.lbl_sub = FitLabel(sub_text, min_ratio=0.80)
         self.lbl_sub.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_sub.setMinimumWidth(0)
         self.lbl_sub.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -6414,6 +6531,8 @@ class X64Hello(QWidget):
         self.service_cards = []
         self.gaming_cards = []
         self._svc_worker = None
+        self._gpu_worker = None
+        self._thermald_active = False
         self._prev_cpu_Idle = 0
         self._prev_cpu_Total = 0
         self.initUI()
@@ -6427,6 +6546,36 @@ class X64Hello(QWidget):
         self.update_hardware_telemetry(force=True)
 
         self.refresh_services_async()
+
+    def refresh_gpu_telemetry_async(self):
+        if self._gpu_worker and self._gpu_worker.isRunning():
+            return
+        worker = GpuTelemetryWorker()
+        self._gpu_worker = worker
+        _BG_WORKERS.add(worker)
+        worker.telemetry_ready.connect(self.on_gpu_telemetry)
+        worker.finished.connect(lambda w=worker: _BG_WORKERS.discard(w))
+        worker.start()
+
+    def on_gpu_telemetry(self, data):
+        if not hasattr(self, "card_gpu") or not data:
+            return
+        try:
+            util = data.get("util")
+            temp_c = data.get("temp_c")
+            v_used = data.get("vram_used_gb")
+            v_tot = data.get("vram_total_gb")
+            desktop_env = os.environ.get("XDG_CURRENT_DESKTOP", "KDE Plasma")
+            sess_type = os.environ.get("XDG_SESSION_TYPE", "wayland").capitalize()
+            if util is not None:
+                val_str = f"{util}%  •  {temp_c}°C" if temp_c is not None else f"{util}%"
+                if v_used is not None and v_tot:
+                    sub_str = f"VRAM {v_used:.1f} / {v_tot:.1f} GB  •  {sess_type} ({desktop_env})"
+                else:
+                    sub_str = f"{sess_type}  •  {desktop_env}"
+                self.card_gpu.update_telemetry(val_str, util, sub_str)
+        except Exception:
+            pass
 
     def update_hardware_telemetry(self, force=False):
         if not force and self.stacked_widget.currentIndex() != 0:
@@ -6445,14 +6594,17 @@ class X64Hello(QWidget):
                 cpu_pct = max(0.0, min(100.0, 100.0 * (diff_total - diff_idle) / diff_total))
             active_sched = get_active_cpu_scheduler()
             kernel_rel = platform.release().replace('-cachyos', '')
+            cpu_sub = f"Kernel: {kernel_rel}  •  Thermald" if self._thermald_active else f"Kernel: {kernel_rel}"
             self.card_cpu.update_telemetry(
                 f"{cpu_pct:.1f}%  •  {STATIC_HW['cpu_cores']} {tr('Threads')}",
                 cpu_pct,
-                f"Kernel: {kernel_rel}"
+                cpu_sub
             )
             self.card_cpu.set_sched_badge(active_sched)
         except Exception:
             pass
+
+        self.refresh_gpu_telemetry_async()
 
         try:
             mem = {}
@@ -6501,7 +6653,11 @@ class X64Hello(QWidget):
     def refresh_services_async(self):
         if self._svc_worker and self._svc_worker.isRunning():
             return
-        sys_units = list(dict.fromkeys(c.unit_name for c in self.service_cards if not c.is_user))
+        sys_units = list(dict.fromkeys([
+            *(c.unit_name for c in self.service_cards if not c.is_user),
+            "dmemcg-booster-system.service",
+            "thermald.service",
+        ]))
         user_units = list(dict.fromkeys(c.unit_name for c in self.service_cards if c.is_user))
         worker = ServiceStatusWorker(sys_units, user_units)
         self._svc_worker = worker
@@ -6516,21 +6672,41 @@ class X64Hello(QWidget):
     def open_scx_dialog(self):
         self.change_page(1)
 
+    def _make_hero_pill(self, target_page, tooltip_key, title_for_tip):
+        btn = QPushButton()
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFixedHeight(24)
+        btn.setToolTip(format_rich_tooltip(title_for_tip, "", guide_key=tooltip_key))
+        btn.clicked.connect(lambda _checked=False, pg=target_page: self.change_page(pg))
+        return btn
+
     def set_hero_pill_state(self, pill, name, is_active):
-        pill.setTextFormat(Qt.TextFormat.RichText)
         if is_active:
-            pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{name}: <span style='color:#ffffff;'>{tr('ACTIVE')}</span>")
+            pill.setText(f"● {name} · ON")
             pill.setStyleSheet("""
-                color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
-                border: 1px solid rgba(239, 68, 68, 0.38); border-radius: 6px;
-                font-size: 10.5px; font-weight: bold; padding: 3px 10px;
+                QPushButton {
+                    color: #ffffff; background-color: rgba(220, 38, 38, 0.12);
+                    border: 1px solid rgba(239, 68, 68, 0.42); border-radius: 6px;
+                    font-size: 9.8px; font-weight: bold; padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(220, 38, 38, 0.24);
+                    border: 1px solid #ef4444;
+                }
             """)
         else:
-            pill.setText(f"<span style='color:#52525b;'>○</span>&nbsp;&nbsp;{name}: <span style='color:#71717a;'>{tr('INACTIVE')}</span>")
+            pill.setText(f"○ {name} · OFF")
             pill.setStyleSheet("""
-                color: #a1a1aa; background-color: rgba(255, 255, 255, 0.035);
-                border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 6px;
-                font-size: 10.5px; font-weight: bold; padding: 3px 10px;
+                QPushButton {
+                    color: #a1a1aa; background-color: rgba(255, 255, 255, 0.035);
+                    border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 6px;
+                    font-size: 9.8px; font-weight: bold; padding: 2px 8px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.08);
+                    border: 1px solid rgba(255, 255, 255, 0.24);
+                    color: #ffffff;
+                }
             """)
 
     def on_services_status(self, status_dict):
@@ -6541,8 +6717,15 @@ class X64Hello(QWidget):
             self.set_hero_pill_state(self.pill_falcond, "FALCOND", status_dict["falcond.service"])
         if hasattr(self, "pill_ananicy") and "ananicy-cpp.service" in status_dict:
             self.set_hero_pill_state(self.pill_ananicy, "ANANICY-CPP", status_dict["ananicy-cpp.service"])
+        if hasattr(self, "pill_dmemcg") and "dmemcg-booster-system.service" in status_dict:
+            self.set_hero_pill_state(self.pill_dmemcg, "DMEMCG", status_dict["dmemcg-booster-system.service"])
         if hasattr(self, "pill_ufw") and "ufw.service" in status_dict:
-            self.set_hero_pill_state(self.pill_ufw, tr("FIREWALL UFW"), status_dict["ufw.service"])
+            self.set_hero_pill_state(self.pill_ufw, "UFW", status_dict["ufw.service"])
+        if "thermald.service" in status_dict:
+            prev = self._thermald_active
+            self._thermald_active = bool(status_dict["thermald.service"])
+            if prev != self._thermald_active:
+                self.update_hardware_telemetry(force=True)
 
     def on_pacman_db_changed(self, _path=None):
         reload_installed_pkgs_cache()
@@ -6554,7 +6737,18 @@ class X64Hello(QWidget):
     def initUI(self):
         self.setObjectName("X64HelloRoot")
         self.setWindowTitle('X64 LIOS - Hello')
-        self.setFixedSize(1250, 720)
+        self.setMinimumSize(1060, 660)
+        init_w, init_h = 1250, 720
+        try:
+            scr = QApplication.primaryScreen()
+            if scr is not None:
+                avail = scr.availableGeometry()
+                if avail.width() > 0 and avail.height() > 0:
+                    init_w = min(1250, max(1060, avail.width() - 40))
+                    init_h = min(720, max(660, avail.height() - 40))
+        except Exception:
+            pass
+        self.resize(init_w, init_h)
         self.setStyleSheet("""
             QWidget#X64HelloRoot {
                 background-color: #080808;
@@ -6869,7 +7063,7 @@ class X64Hello(QWidget):
     def create_page_home(self):
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(46, 32, 46, 28)
+        layout.setContentsMargins(36, 30, 36, 26)
         layout.setSpacing(0)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         page.setLayout(layout)
@@ -6887,26 +7081,30 @@ class X64Hello(QWidget):
             }
         """)
         hero_hbox = QHBoxLayout()
-        hero_hbox.setContentsMargins(26, 15, 26, 15)
-        hero_hbox.setSpacing(20)
+        hero_hbox.setContentsMargins(22, 15, 22, 15)
+        hero_hbox.setSpacing(16)
 
         hero_left = QVBoxLayout()
         hero_left.setSpacing(6)
 
         badges_row = QHBoxLayout()
-        badges_row.setSpacing(10)
+        badges_row.setSpacing(6)
 
-        self.pill_falcond = QLabel()
+        self.pill_falcond = self._make_hero_pill(1, "falcond.service", "FalconD Gaming")
         self.set_hero_pill_state(self.pill_falcond, "FALCOND", False)
 
-        self.pill_ananicy = QLabel()
+        self.pill_ananicy = self._make_hero_pill(1, "ananicy-cpp.service", "Ananicy-cpp")
         self.set_hero_pill_state(self.pill_ananicy, "ANANICY-CPP", False)
 
-        self.pill_ufw = QLabel()
-        self.set_hero_pill_state(self.pill_ufw, tr("FIREWALL UFW"), False)
+        self.pill_dmemcg = self._make_hero_pill(1, "dmemcg", "dmemcg-booster (VRAM)")
+        self.set_hero_pill_state(self.pill_dmemcg, "DMEMCG", False)
+
+        self.pill_ufw = self._make_hero_pill(2, "ufw.service", tr("UFW Security Firewall"))
+        self.set_hero_pill_state(self.pill_ufw, "UFW", False)
 
         badges_row.addWidget(self.pill_falcond)
         badges_row.addWidget(self.pill_ananicy)
+        badges_row.addWidget(self.pill_dmemcg)
         badges_row.addWidget(self.pill_ufw)
         badges_row.addStretch(1)
         hero_left.addLayout(badges_row)
@@ -6948,7 +7146,7 @@ class X64Hello(QWidget):
             }
         """)
         upd_cmd = get_system_update_cmd()
-        btn_hero_upd.clicked.connect(lambda: os.system(f"{upd_cmd} &"))
+        btn_hero_upd.clicked.connect(lambda: _launch_detached(upd_cmd))
         hero_right.addWidget(btn_hero_upd)
 
         btn_hero_btop = QPushButton(f"◈   {tr('LIVE BTOP MONITOR')}")
@@ -6972,7 +7170,7 @@ class X64Hello(QWidget):
             }
         """)
         btop_cmd = "kitty -o remember_window_size=no -o background_opacity=1.0 -o initial_window_width=105c -o initial_window_height=30c --title 'X64 LIOS Resource Monitor' -e btop"
-        btn_hero_btop.clicked.connect(lambda: os.system(f"{btop_cmd} &"))
+        btn_hero_btop.clicked.connect(lambda: _launch_detached(btop_cmd))
         hero_right.addWidget(btn_hero_btop)
 
         hero_hbox.addLayout(hero_right)
@@ -7006,9 +7204,13 @@ class X64Hello(QWidget):
         self.card_cpu.setToolTip(f"<b>{tr('PROCESSOR (CPU)')}</b><br>{tr('Click to open X64 CPU Scheduler Selector (BORE / sched_ext).')}")
 
         ram_sub = tr("ZRAM Active in RAM • Zero Disk Swap") if STATIC_HW["zram_active"] else tr("High-Speed System Memory")
+        ram_model = (
+            f"{tr('System Memory')}  •  ZRAM {STATIC_HW['zram_size_gb']:.0f} GB"
+            if STATIC_HW.get("zram_size_gb", 0) >= 1.0 else tr("System Memory")
+        )
         self.card_ram = TelemetryCard(
             tr("PHYSICAL RAM & ZRAM"),
-            "DDR System Memory",
+            ram_model,
             ram_sub,
             "memory",
             "0.0 / 0.0 GB",
@@ -7022,11 +7224,11 @@ class X64Hello(QWidget):
             tr("Hardware Acceleration Active"),
             "video-display",
             f"{sess_type}  •  {desktop_env}",
-            16
+            3
         )
         self.card_disk = TelemetryCard(
             tr("ROOT STORAGE (/) & UPTIME"),
-            f"NVMe / SSD ({STATIC_HW['root_fs']})",
+            f"{STATIC_HW['root_disk_type']} ({STATIC_HW['root_fs']})",
             f"{tr('Filesystem')} {STATIC_HW['root_fs']}",
             "drive-harddisk",
             "0.0 / 0.0 GB",
@@ -7301,7 +7503,7 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Winboat Installer",
                 "INSTALADOR DE WINBOAT Y CONTENEDORES",
-                "printf '\033[1;31m==> [X64 WINBOAT]\033[0m \033[1;37mInstalando Winboat y motor de contenedores Docker...\033[0m\n\n'; sudo pacman -Sy --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
+                "printf '\\033[1;31m==> [X64 WINBOAT]\\033[0m \\033[1;37mInstalando Winboat y motor de contenedores Docker...\\033[0m\\n\\n'; sudo pacman -Syu --needed winboat docker docker-compose && sudo systemctl enable --now docker.socket && sudo gpasswd -a $USER docker"
             ),
             height=100,
             guide_key="maint_winboat"
@@ -7340,7 +7542,12 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS Keyring Reset",
                 "RESTABLECIMIENTO DE LLAVES CRIPTOGRÁFICAS (KEYRINGS)",
-                "printf '\033[1;31m==> [X64 KEYRINGS]\033[0m \033[1;37mRegenerando depósito de firmas GPG de Pacman...\033[0m\n\n'; sudo rm -rf /etc/pacman.d/gnupg/ && sudo pacman-key --init && sudo pacman-key --populate && sudo pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && sudo pacman-key --lsign-key F3B607488DB35A47"
+                "printf '\\033[1;33m[AVISO]\\033[0m Esta operación regenerará /etc/pacman.d/gnupg/ y volverá a firmar los llaveros de Arch, CachyOS y X64.\\n'; "
+                "read -r -p '¿Deseas continuar? [s/N]: ' ans; "
+                "case \"$ans\" in [sSyY]*) "
+                "printf '\\n\\033[1;31m==> [X64 KEYRINGS]\\033[0m \\033[1;37mRegenerando depósito de firmas GPG de Pacman...\\033[0m\\n\\n'; "
+                "sudo rm -rf /etc/pacman.d/gnupg/ && sudo pacman-key --init && sudo pacman-key --populate && sudo pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com && sudo pacman-key --lsign-key F3B607488DB35A47 ;; "
+                "*) printf '\\nOperación cancelada por el usuario.\\n' ;; esac"
             ),
             height=100,
             guide_key="rescue_keyrings"
@@ -7364,7 +7571,12 @@ class X64Hello(QWidget):
             cmd=build_x64_term_cmd(
                 "X64 LIOS System Reinstaller",
                 "REINSTALACIÓN COMPLETA DE PAQUETES NATIVOS",
-                "printf '\033[1;31m==> [X64 RESCUE]\033[0m \033[1;37mReinstalando todos los paquetes nativos del sistema...\033[0m\n\n'; sudo pacman -Sy $(pacman -Qnq)"
+                "printf '\\033[1;33m[AVISO]\\033[0m Esto actualizará el sistema y reinstalará todos los paquetes nativos (puede descargar varios GB).\\n'; "
+                "read -r -p '¿Confirmas continuar? [s/N]: ' ans; "
+                "case \"$ans\" in [sSyY]*) "
+                "printf '\\n\\033[1;31m==> [X64 RESCUE]\\033[0m \\033[1;37mActualizando y reinstalando paquetes nativos...\\033[0m\\n\\n'; "
+                "sudo pacman -Syu && sudo pacman -S $(pacman -Qnq) ;; "
+                "*) printf '\\nOperación cancelada por el usuario.\\n' ;; esac"
             ),
             height=100,
             guide_key="rescue_reinstall"
@@ -7381,13 +7593,13 @@ class X64Hello(QWidget):
             height=100,
             guide_key="rescue_journal"
         )
-        btn_kwin = PremiumButton(
-            tr("KWin (Wayland) Debug Console"),
-            tr("Open the native KWin Wayland diagnostic inspector for windows and VRR."),
-            "bug",
-            cmd="/usr/lib/qt6/bin/qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus6 org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || qdbus org.kde.KWin /KWin org.kde.KWin.showDebugConsole 2>/dev/null || dbus-send --session --dest=org.kde.KWin --type=method_call /KWin org.kde.KWin.showDebugConsole",
+        btn_dashboard = PremiumButton(
+            tr("X64 Dashboard (Rescue Console)"),
+            tr("Open the sovereign X64 CLI dashboard for snapshots, desktops, gaming profile, and rescue."),
+            "sliders",
+            cmd="kitty -o remember_window_size=no -o background_opacity=1.0 -o initial_window_width=105c -o initial_window_height=34c --title 'X64 LIOS Dashboard' -e x64-dashboard",
             height=100,
-            guide_key="rescue_kwin"
+            guide_key="rescue_dashboard"
         )
         btn_btop = PremiumButton(
             tr("Live Resource Monitor (btop)"),
@@ -7402,7 +7614,7 @@ class X64Hello(QWidget):
         rescue_grid.addWidget(btn_unlock, 0, 1)
         rescue_grid.addWidget(btn_reinstall, 0, 2)
         rescue_grid.addWidget(btn_journal, 1, 0)
-        rescue_grid.addWidget(btn_kwin, 1, 1)
+        rescue_grid.addWidget(btn_dashboard, 1, 1)
         rescue_grid.addWidget(btn_btop, 1, 2)
         layout.addLayout(rescue_grid)
 
@@ -7596,18 +7808,18 @@ class X64Hello(QWidget):
                     ),
                     (
                         "II. Optimización Quirúrgica",
-                        "Kernel Linux-CachyOS con schedulers dinámicos sched_ext (scx_lavd / BORE), afinidad gaming FalconD, ananicy-cpp y ZRAM puro en RAM sin falsos cierres de systemd-oomd.",
+                        "Kernel Linux-CachyOS (preempt=full) con sched_ext (scx_lavd / BORE), FalconD, protección VRAM dmemcg-booster, I/O ADIOS, NTSYNC, ananicy-cpp y ZRAM puro.",
                         (
-                            "Pila de rendimiento de ultra-baja latencia en espacio de kernel (eBPF / BORE) y espacio de usuario.",
-                            "Maximiza los FPS mínimos (1% Low), prioriza procesos interactivos y protege tus juegos durante compilaciones masivas de shaders Vulkan mediante ZRAM zstd.",
+                            "Pila de ultra-baja latencia en espacio de kernel (eBPF / BORE / ADIOS / NTSYNC) y espacio de usuario.",
+                            "Maximiza los FPS mínimos (1% Low), protege tu VRAM y prioriza tus juegos sin falsos cierres de systemd-oomd.",
                             "Activo de fábrica y personalizable en tiempo real desde la pestaña CPU y Rendimiento."
                         )
                     ),
                     (
                         "III. Ecosistema Multi-Entorno & Silent Boot",
-                        "Arranque limpio Silent Handover (Plymouth → SDDM sin parpadeos) y 8 entornos oficiales (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland y Servidor).",
+                        "Arranque limpio Silent Handover (Plymouth → Display Manager sin parpadeos) y 8 escritorios + Servidor (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce y Hyprland).",
                         (
-                            "Arquitectura gráfica Wayland/X11 con transición continua de framebuffer KMS y soporte oficial para 8 escritorios.",
+                            "Arquitectura gráfica Wayland/X11 con transición continua de framebuffer KMS y soporte oficial para 8 escritorios + Servidor.",
                             "Elimina textos de consola y parpadeos visuales al encender el PC, entregando tu entorno favorito preconfigurado con identidad X64.",
                             "Elegible durante la instalación en Calamares y activo en cada arranque."
                         )
@@ -7711,18 +7923,18 @@ class X64Hello(QWidget):
                     ),
                     (
                         "II. Surgical Optimization",
-                        "Linux-CachyOS kernel with live sched_ext (scx_lavd / BORE) schedulers, FalconD gaming CPU affinity, ananicy-cpp priority tuning, and pure ZRAM in RAM with zero false systemd-oomd kills.",
+                        "Linux-CachyOS kernel (preempt=full) with live sched_ext (scx_lavd / BORE), FalconD, dmemcg-booster VRAM protection, ADIOS I/O, NTSYNC, ananicy-cpp, and pure ZRAM.",
                         (
-                            "Ultra-low-latency performance stack across both kernel space (eBPF / BORE) and user space.",
-                            "Maximizes 1% Low FPS stability, prioritizes interactive tasks, and protects games during heavy Vulkan shader compilation via zstd ZRAM.",
+                            "Ultra-low-latency performance stack across kernel space (eBPF / BORE / ADIOS / NTSYNC) and user space.",
+                            "Maximizes 1% Low FPS stability, protects GPU VRAM, and prioritizes games with zero false systemd-oomd kills.",
                             "Active out of the box and customizable in real time from the CPU & Performance tab."
                         )
                     ),
                     (
                         "III. Multi-Environment & Silent Boot",
-                        "Flicker-free Silent Handover boot (Plymouth → SDDM) and 8 official desktop environments (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, and Server).",
+                        "Flicker-free Silent Handover boot (Plymouth → Display Manager) and 8 desktops + Server (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, and Hyprland).",
                         (
-                            "Wayland/X11 graphics architecture with seamless KMS framebuffer handover and native support for 8 desktops.",
+                            "Wayland/X11 graphics architecture with seamless KMS framebuffer handover and native support for 8 desktops + Server.",
                             "Eliminates boot console text and screen flicker at startup while delivering your favorite desktop pre-tuned with X64 identity.",
                             "Selectable during Calamares installation and active on every boot."
                         )
@@ -7820,13 +8032,13 @@ class X64Hello(QWidget):
                         "Garantit un accès immédiat aux dépôts Arch, à l'AUR et à Flatpak sans blocages artificiels.",
                         "Actif en permanence comme fondation de votre système."
                     )),
-                    ("II. Optimisation Chirurgicale", "Noyau Linux-CachyOS avec ordonnanceurs dynamiques sched_ext (scx_lavd / BORE), affinité CPU FalconD, ananicy-cpp et ZRAM pure sans fermetures forcées de systemd-oomd.", (
-                        "Pile de performance à ultra-basse latence dans l'espace noyau (eBPF / BORE) et utilisateur.",
-                        "Maximise les FPS minimums (1% Low) et protège vos jeux lors de la compilation des shaders Vulkan grâce à ZRAM zstd.",
+                    ("II. Optimisation Chirurgicale", "Noyau Linux-CachyOS (preempt=full) avec sched_ext (scx_lavd / BORE), FalconD, protection VRAM dmemcg-booster, I/O ADIOS, NTSYNC, ananicy-cpp et ZRAM pure.", (
+                        "Pile de performance à ultra-basse latence dans l'espace noyau (eBPF / BORE / ADIOS / NTSYNC) et utilisateur.",
+                        "Maximise les FPS minimums (1% Low), protège la VRAM et vos jeux sans fermetures forcées de systemd-oomd.",
                         "Actif par défaut et réglable en direct dans l'onglet CPU & Performance."
                     )),
-                    ("III. Écosystème Multi-Environnements & Silent Boot", "Démarrage fluide Silent Handover (Plymouth → SDDM sans scintillement) et 8 environnements officiels (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland, Serveur).", (
-                        "Architecture graphique Wayland/X11 avec transition KMS continue et 8 bureaux officiels.",
+                    ("III. Écosystème Multi-Environnements & Silent Boot", "Démarrage fluide Silent Handover (Plymouth → Display Manager sans scintillement) et 8 bureaux + Serveur (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland).", (
+                        "Architecture graphique Wayland/X11 avec transition KMS continue et 8 bureaux officiels + Serveur.",
                         "Supprime les textes de console au démarrage et livre votre bureau préconfiguré aux couleurs X64.",
                         "Sélectionnable lors de l'installation Calamares et actif à chaque démarrage."
                     )),
@@ -7887,13 +8099,13 @@ class X64Hello(QWidget):
                         "Garantiert sofortigen Zugriff auf alle offiziellen Arch-Pakete, das AUR und Flatpak ohne künstliche Sperren.",
                         "Dauerhaft aktiv als Fundament Ihres Betriebssystems."
                     )),
-                    ("II. Chirurgische Optimierung", "Linux-CachyOS-Kernel mit Live-sched_ext-Schedulern (scx_lavd / BORE), FalconD-Gaming-Affinität, ananicy-cpp und reinem ZRAM ohne falsche systemd-oomd-Abbrüche.", (
-                        "Ultra-niedriglatenter Performance-Stack im Kernel- (eBPF / BORE) und Userspace.",
-                        "Maximiert die 1%-Low-FPS und schützt Spiele während massiver Vulkan-Shader-Kompilierungen durch ZRAM.",
+                    ("II. Chirurgische Optimierung", "Linux-CachyOS-Kernel (preempt=full) mit sched_ext (scx_lavd / BORE), FalconD, dmemcg-booster VRAM-Schutz, ADIOS I/O, NTSYNC, ananicy-cpp und reinem ZRAM.", (
+                        "Ultra-niedriglatenter Performance-Stack im Kernel- (eBPF / BORE / ADIOS / NTSYNC) und Userspace.",
+                        "Maximiert 1%-Low-FPS, schützt den GPU-VRAM und verhindert falsche systemd-oomd-Abbrüche.",
                         "Standardmäßig aktiv und im Tab CPU & Leistung in Echtzeit anpassbar."
                     )),
-                    ("III. Multi-Desktop & Silent Boot", "Flackerfreier Silent Handover (Plymouth → SDDM) sowie 8 offizielle Desktop-Umgebungen (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland und Server).", (
-                        "Wayland/X11-Grafikarchitektur mit nahtlosem KMS-Framebuffer-Übergang und 8 offiziellen Desktops.",
+                    ("III. Multi-Desktop & Silent Boot", "Flackerfreier Silent Handover (Plymouth → Display Manager) sowie 8 Desktops + Server (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce und Hyprland).", (
+                        "Wayland/X11-Grafikarchitektur mit nahtlosem KMS-Übergang und 8 offiziellen Desktops + Server.",
                         "Beseitigt Konsolentext und Flackern beim Systemstart und liefert Ihren Wunsch-Desktop im X64-Design.",
                         "Bei der Calamares-Installation wählbar und bei jedem Start aktiv."
                     )),
@@ -7954,13 +8166,13 @@ class X64Hello(QWidget):
                         "Garantisce accesso immediato al catalogo ufficiale Arch, AUR e Flatpak senza blocchi artificiali.",
                         "Attivo permanentemente come fondamento del sistema operativo."
                     )),
-                    ("II. Ottimizzazione Chirurgica", "Kernel Linux-CachyOS con scheduler dinamici sched_ext (scx_lavd / BORE), affinità gaming FalconD, ananicy-cpp e ZRAM pura senza chiusure anomale di systemd-oomd.", (
-                        "Stack ad altissime prestazioni e bassa latenza nello spazio kernel (eBPF / BORE) e utente.",
-                        "Massimizza gli FPS minimi (1% Low) e protegge i giochi durante la compilazione shader Vulkan tramite ZRAM.",
+                    ("II. Ottimizzazione Chirurgica", "Kernel Linux-CachyOS (preempt=full) con sched_ext (scx_lavd / BORE), FalconD, protezione VRAM dmemcg-booster, I/O ADIOS, NTSYNC, ananicy-cpp e ZRAM pura.", (
+                        "Stack ad altissime prestazioni e bassa latenza nello spazio kernel (eBPF / BORE / ADIOS / NTSYNC) e utente.",
+                        "Massimizza gli FPS minimi (1% Low), protegge la VRAM e i giochi senza chiusure anomale di systemd-oomd.",
                         "Attivo di serie e personalizzabile in tempo reale nella scheda CPU e Prestazioni."
                     )),
-                    ("III. Ecosistema Multi-Ambiente & Silent Boot", "Avvio fluido Silent Handover (Plymouth → SDDM senza sfarfallio) e 8 ambienti desktop ufficiali (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland e Server).", (
-                        "Architettura grafica Wayland/X11 con transizione framebuffer KMS continua e 8 desktop ufficiali.",
+                    ("III. Ecosistema Multi-Ambiente & Silent Boot", "Avvio fluido Silent Handover (Plymouth → Display Manager senza sfarfallio) e 8 desktop + Server (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce e Hyprland).", (
+                        "Architettura grafica Wayland/X11 con transizione framebuffer KMS continua e 8 desktop ufficiali + Server.",
                         "Elimina scritte di console e sfarfallii all'avvio, offrendo il tuo desktop preferito già rifinito in stile X64.",
                         "Selezionabile durante l'installazione Calamares e attivo a ogni avvio."
                     )),
@@ -8021,13 +8233,13 @@ class X64Hello(QWidget):
                         "Garante acesso imediato a todo o catálogo oficial do Arch, AUR e Flatpak sem bloqueios artificiais.",
                         "Ativo permanentemente como alicerce do seu sistema operacional."
                     )),
-                    ("II. Otimização Cirúrgica", "Kernel Linux-CachyOS com schedulers dinâmicos sched_ext (scx_lavd / BORE), afinidade FalconD para jogos, ananicy-cpp e ZRAM pura sem fechamentos falsos do systemd-oomd.", (
-                        "Pilha de desempenho de ultrabaixa latência no espaço do kernel (eBPF / BORE) e do usuário.",
-                        "Maximiza os FPS mínimos (1% Low) e protege seus jogos durante compilações de shaders Vulkan via ZRAM.",
+                    ("II. Otimização Cirúrgica", "Kernel Linux-CachyOS (preempt=full) com sched_ext (scx_lavd / BORE), FalconD, proteção VRAM dmemcg-booster, I/O ADIOS, NTSYNC, ananicy-cpp e ZRAM pura.", (
+                        "Pilha de desempenho de ultrabaixa latência no espaço do kernel (eBPF / BORE / ADIOS / NTSYNC) e do usuário.",
+                        "Maximiza os FPS mínimos (1% Low), protege a VRAM e seus jogos sem fechamentos falsos do systemd-oomd.",
                         "Ativo de fábrica e ajustável em tempo real na aba CPU e Desempenho."
                     )),
-                    ("III. Ecossistema Multi-Ambiente & Silent Boot", "Inicialização contínua Silent Handover (Plymouth → SDDM sem piscar) e 8 ambientes oficiais (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland e Servidor).", (
-                        "Arquitetura gráfica Wayland/X11 com transição contínua de framebuffer KMS e 8 desktops oficiais.",
+                    ("III. Ecossistema Multi-Ambiente & Silent Boot", "Inicialização contínua Silent Handover (Plymouth → Display Manager sem piscar) e 8 desktops + Servidor (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce e Hyprland).", (
+                        "Arquitetura gráfica Wayland/X11 com transição contínua de framebuffer KMS e 8 desktops oficiais + Servidor.",
                         "Elimina textos de console e piscadas ao ligar o PC, entregando seu ambiente favorito com identidade X64.",
                         "Escolhido durante a instalação no Calamares e ativo em cada inicialização."
                     )),
@@ -8088,13 +8300,13 @@ class X64Hello(QWidget):
                         "Гарантирует мгновенный доступ ко всем пакетам Arch, AUR и Flatpak без искусственных ограничений.",
                         "Постоянно активно как фундамент вашей операционной системы."
                     )),
-                    ("II. Хирургическая Оптимизация", "Ядро Linux-CachyOS с динамическими планировщиками sched_ext (scx_lavd / BORE), игровым демоном FalconD, ananicy-cpp и чистым ZRAM без ложных срабатываний systemd-oomd.", (
-                        "Стек сверхнизкой задержки на уровне ядра (eBPF / BORE) и пространства пользователя.",
-                        "Максимизирует минимальный FPS (1% Low) и защищает игры при компиляции шейдеров Vulkan через ZRAM.",
+                    ("II. Хирургическая Оптимизация", "Ядро Linux-CachyOS (preempt=full) с sched_ext (scx_lavd / BORE), FalconD, защитой VRAM dmemcg-booster, I/O ADIOS, NTSYNC, ananicy-cpp и чистым ZRAM.", (
+                        "Стек сверхнизкой задержки на уровне ядра (eBPF / BORE / ADIOS / NTSYNC) и пространства пользователя.",
+                        "Максимизирует минимальный FPS (1% Low), защищает VRAM и игры без ложных срабатываний systemd-oomd.",
                         "Активно по умолчанию и настраивается в реальном времени во вкладке Процессор и Производительность."
                     )),
-                    ("III. Мульти-Среда и Бесшовная Загрузка", "Плавный переход Silent Handover (Plymouth → SDDM без мерцания) и 8 официальных окружений (KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland и Сервер).", (
-                        "Графическая архитектура Wayland/X11 с бесшовной передачей кадрового буфера KMS и 8 окружениями.",
+                    ("III. Мульти-Среда и Бесшовная Загрузка", "Плавный переход Silent Handover (Plymouth → Display Manager без мерцания) и 8 рабочих столов + Сервер (Omarchy, KDE Plasma 6, GNOME, COSMIC, Niri, Cinnamon, Xfce, Hyprland).", (
+                        "Графическая архитектура Wayland/X11 с бесшовной передачей буфера KMS и 8 окружениями + Сервер.",
                         "Убирает консольный текст и мерцание при включении ПК, предоставляя готовый рабочий стол в стиле X64.",
                         "Выбирается при установке в Calamares и работает при каждом запуске."
                     )),
@@ -8247,6 +8459,21 @@ class X64Hello(QWidget):
         self.update_hardware_telemetry(force=True)
         self.refresh_services_async()
 
+    def closeEvent(self, event):
+        try:
+            if hasattr(self, "hw_timer") and self.hw_timer:
+                self.hw_timer.stop()
+        except Exception:
+            pass
+        for w in list(_BG_WORKERS):
+            try:
+                if w.isRunning():
+                    w.quit()
+                    w.wait(1200)
+            except Exception:
+                pass
+        super().closeEvent(event)
+
     def change_page(self, index):
         for i, btn in enumerate(self.nav_buttons):
             if i == index:
@@ -8260,10 +8487,13 @@ class X64Hello(QWidget):
         elif index == 1:
             if hasattr(self, "scx_panel"):
                 self.scx_panel.refresh_runtime_state(select_active=True)
+            if hasattr(self, "mitigations_card"):
+                self.mitigations_card.refresh_state()
             self.refresh_services_async()
         elif index == 2:
             if hasattr(self, "dns_panel"):
                 self.dns_panel.populate_connections()
+                self.dns_panel.refresh_active_dns(select_active=False)
                 if not self.dns_panel._has_benchmarked:
                     QTimer.singleShot(120, self.dns_panel.run_ping_benchmark)
             self.refresh_services_async()
@@ -8279,10 +8509,17 @@ if __name__ == '__main__':
         _lock_fd = open(_lock_path, "w")
         fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (IOError, BlockingIOError, OSError):
-        try:
-            subprocess.run(["hyprctl", "dispatch", "focuswindow", "class:x64-hello"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        for focus_cmd in (
+            ["hyprctl", "dispatch", "focuswindow", "class:x64-hello"],
+            ["wmctrl", "-a", "X64 LIOS - Hello"],
+        ):
+            try:
+                if shutil.which(focus_cmd[0]):
+                    res = subprocess.run(focus_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.5)
+                    if res.returncode == 0:
+                        break
+            except Exception:
+                pass
         sys.exit(0)
 
     app = QApplication(sys.argv)

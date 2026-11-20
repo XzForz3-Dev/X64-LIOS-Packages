@@ -14,7 +14,7 @@ fi
 
 # 2. Asegurar servicio Avahi para autodescubrimiento mDNS local con Moonlight
 if ! systemctl is-active --quiet avahi-daemon.service 2>/dev/null; then
-    sudo systemctl enable --now avahi-daemon.service 2>/dev/null || true
+    pkexec systemctl enable --now avahi-daemon.service 2>/dev/null || sudo -n systemctl enable --now avahi-daemon.service 2>/dev/null || true
 fi
 
 # 3. Asegurar certificado TLS local con SAN (DNS:localhost, IP:127.0.0.1) y registrar confianza en navegador (NSS)
