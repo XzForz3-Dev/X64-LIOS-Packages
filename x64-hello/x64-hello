@@ -3124,13 +3124,13 @@ for _lc, _d in SUNSHINE_TRANSLATIONS.items():
         TRANSLATIONS[_lc].update(_d)
 
 STATUS_BADGE_TRANSLATIONS = {
-    'en': {'ACTIVE': 'ACTIVE', 'DISABLED': 'DISABLED'},
-    'es': {'ACTIVE': 'ACTIVADO', 'DISABLED': 'DESACTIVADO'},
-    'fr': {'ACTIVE': 'ACTIVÉ', 'DISABLED': 'DÉSACTIVÉ'},
-    'de': {'ACTIVE': 'AKTIV', 'DISABLED': 'DEAKTIVIERT'},
-    'it': {'ACTIVE': 'ATTIVO', 'DISABLED': 'DISATTIVATO'},
-    'pt': {'ACTIVE': 'ATIVADO', 'DISABLED': 'DESATIVADO'},
-    'ru': {'ACTIVE': 'АКТИВЕН', 'DISABLED': 'ОТКЛЮЧЕН'}
+    'en': {'ACTIVE': 'ACTIVE', 'DISABLED': 'DISABLED', 'Automatic (DHCP)': 'Automatic (DHCP)', 'Fastest DNS:': 'Fastest DNS:', 'Custom DNS': 'Custom DNS'},
+    'es': {'ACTIVE': 'ACTIVADO', 'DISABLED': 'DESACTIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Más rápido:', 'Custom DNS': 'DNS Personalizado'},
+    'fr': {'ACTIVE': 'ACTIVÉ', 'DISABLED': 'DÉSACTIVÉ', 'Automatic (DHCP)': 'Automatique (DHCP)', 'Fastest DNS:': 'Plus rapide :', 'Custom DNS': 'DNS Personnalisé'},
+    'de': {'ACTIVE': 'AKTIV', 'DISABLED': 'DEAKTIVIERT', 'Automatic (DHCP)': 'Automatisch (DHCP)', 'Fastest DNS:': 'Schnellster DNS:', 'Custom DNS': 'Benutzerdef. DNS'},
+    'it': {'ACTIVE': 'ATTIVO', 'DISABLED': 'DISATTIVATO', 'Automatic (DHCP)': 'Automatico (DHCP)', 'Fastest DNS:': 'Più veloce:', 'Custom DNS': 'DNS Personalizzato'},
+    'pt': {'ACTIVE': 'ATIVADO', 'DISABLED': 'DESATIVADO', 'Automatic (DHCP)': 'Automático (DHCP)', 'Fastest DNS:': 'Mais rápido:', 'Custom DNS': 'DNS Personalizado'},
+    'ru': {'ACTIVE': 'АКТИВЕН', 'DISABLED': 'ОТКЛЮЧЕН', 'Automatic (DHCP)': 'Авто (DHCP)', 'Fastest DNS:': 'Самый быстрый:', 'Custom DNS': 'Свой DNS'}
 }
 for _lc, _d in STATUS_BADGE_TRANSLATIONS.items():
     if _lc in TRANSLATIONS:
@@ -4135,6 +4135,7 @@ class DnsOptimizerPanel(QFrame):
         self._ping_worker = None
         self._has_benchmarked = False
         self.selected_idx = 0
+        self.active_provider_idx = None
         self.provider_buttons = []
 
         layout = QVBoxLayout(self)
@@ -4146,7 +4147,7 @@ class DnsOptimizerPanel(QFrame):
         lbl_conn = QLabel(tr("Active Network Connection:"))
         lbl_conn.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
         self.conn_combo = QComboBox()
-        self.conn_combo.setMinimumWidth(210)
+        self.conn_combo.setMinimumWidth(190)
         self.conn_combo.setFixedHeight(34)
         self.populate_connections()
         conn_row.addWidget(lbl_conn)
@@ -4175,6 +4176,16 @@ class DnsOptimizerPanel(QFrame):
         self.btn_ping.clicked.connect(self.run_ping_benchmark)
         conn_row.addWidget(self.btn_ping)
         conn_row.addStretch(1)
+
+        self.lbl_active_dns_pill = QLabel("")
+        self.lbl_active_dns_pill.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_active_dns_pill.setFixedHeight(30)
+        self.lbl_active_dns_pill.setStyleSheet("""
+            color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
+            border: 1px solid rgba(239, 68, 68, 0.40); border-radius: 6px;
+            padding: 3px 10px; font-weight: bold; font-size: 11px;
+        """)
+        conn_row.addWidget(self.lbl_active_dns_pill)
         layout.addLayout(conn_row)
 
         # 3x2 Grid of 6 DNS Providers
@@ -4228,16 +4239,28 @@ class DnsOptimizerPanel(QFrame):
             lbl_ip.setStyleSheet("color: #cbd5e1; font-size: 10.5px; font-weight: bold; border: none; background: transparent;")
             b_lay.addWidget(lbl_ip)
 
-            lbl_dot = QLabel(f"TLS (DoT): {p['dot']}")
+            bot_h = QHBoxLayout()
+            bot_h.setSpacing(6)
+            lbl_dot = FitLabel(f"TLS (DoT): {p['dot']}")
             lbl_dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_dot.setStyleSheet("color: #888894; font-size: 10.5px; border: none; background: transparent;")
-            b_lay.addWidget(lbl_dot)
+            lbl_active_badge = QLabel(f"<span style='color:#ef4444;'>●</span> {tr('ACTIVE')}")
+            lbl_active_badge.setTextFormat(Qt.TextFormat.RichText)
+            lbl_active_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            lbl_active_badge.setStyleSheet("""
+                color: #ffffff; background-color: rgba(239, 68, 68, 0.18);
+                border: 1px solid rgba(239, 68, 68, 0.50); border-radius: 5px;
+                padding: 1px 6px; font-weight: bold; font-size: 9.5px;
+            """)
+            lbl_active_badge.setVisible(False)
+            bot_h.addWidget(lbl_dot, 1)
+            bot_h.addWidget(lbl_active_badge, 0)
+            b_lay.addLayout(bot_h)
 
-            self.provider_buttons.append((btn, lbl_ms))
+            self.provider_buttons.append((btn, lbl_ms, lbl_active_badge))
             grid.addWidget(btn, i // 3, i % 3)
 
         layout.addLayout(grid)
-        self.select_provider(0)
 
         btm_row = QHBoxLayout()
         btm_row.setSpacing(10)
@@ -4296,6 +4319,93 @@ class DnsOptimizerPanel(QFrame):
         self.status_lbl.setFixedHeight(16)
         layout.addWidget(self.status_lbl)
 
+        self.conn_combo.currentIndexChanged.connect(lambda _idx: self.refresh_active_dns(select_active=True))
+        self.refresh_active_dns(select_active=True)
+
+    @staticmethod
+    def _query_connection_dns(conn):
+        """Lee ipv4.dns, ignore-auto-dns y dns-over-tls reales de NetworkManager para la conexión dada."""
+        if not conn:
+            return None, None, None
+        try:
+            res = subprocess.run(
+                ["nmcli", "-t", "-f", "ipv4.dns,ipv4.ignore-auto-dns,connection.dns-over-tls", "connection", "show", conn],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2
+            )
+            if res.returncode != 0:
+                return None, None, None
+            dns_ips = []
+            ignore_auto = False
+            dot_enabled = None
+            for line in res.stdout.splitlines():
+                if ":" not in line:
+                    continue
+                k, v = line.split(":", 1)
+                k = k.strip()
+                v = v.strip()
+                if k == "ipv4.dns" and v:
+                    dns_ips = [ip.strip() for ip in re.split(r"[,\s]+", v) if ip.strip()]
+                elif k == "ipv4.ignore-auto-dns":
+                    ignore_auto = (v.lower() == "yes")
+                elif k == "connection.dns-over-tls":
+                    if v in ("2", "yes", "strict"):
+                        dot_enabled = True
+                    elif v in ("0", "no"):
+                        dot_enabled = False
+                    else:
+                        dot_enabled = None
+            if not dns_ips and not ignore_auto:
+                return None, None, dot_enabled
+            for i, p in enumerate(DNS_PROVIDERS):
+                prov_ips = [x.strip() for x in p["ipv4"].split(",")]
+                if dns_ips and dns_ips[0] in prov_ips:
+                    return i, dns_ips[0], dot_enabled
+            return None, (dns_ips[0] if dns_ips else None), dot_enabled
+        except Exception:
+            return None, None, None
+
+    def refresh_active_dns(self, select_active=False):
+        conn = self.conn_combo.currentText().strip()
+        active_idx, primary_ip, dot_enabled = self._query_connection_dns(conn)
+        self.active_provider_idx = active_idx
+
+        for i, (_btn, _lbl_ms, lbl_badge) in enumerate(self.provider_buttons):
+            lbl_badge.setVisible(active_idx is not None and i == active_idx)
+
+        if active_idx is not None:
+            pname = DNS_PROVIDERS[active_idx]["name"]
+            dot_tag = " (DoT)" if dot_enabled else ""
+            self.lbl_active_dns_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{pname}{dot_tag}")
+            self.lbl_active_dns_pill.setStyleSheet("""
+                color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
+                border: 1px solid rgba(239, 68, 68, 0.40); border-radius: 6px;
+                padding: 3px 10px; font-weight: bold; font-size: 11px;
+            """)
+        elif primary_ip:
+            dot_tag = " (DoT)" if dot_enabled else ""
+            self.lbl_active_dns_pill.setText(f"<span style='color:#f59e0b;'>●</span>&nbsp;&nbsp;{tr('Custom DNS')}: {primary_ip}{dot_tag}")
+            self.lbl_active_dns_pill.setStyleSheet("""
+                color: #f4f4f5; background-color: rgba(245, 158, 11, 0.08);
+                border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px;
+                padding: 3px 10px; font-weight: bold; font-size: 11px;
+            """)
+        else:
+            self.lbl_active_dns_pill.setText(f"<span style='color:#a1a1aa;'>●</span>&nbsp;&nbsp;{tr('Automatic (DHCP)')}")
+            self.lbl_active_dns_pill.setStyleSheet("""
+                color: #d4d4d8; background-color: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 6px;
+                padding: 3px 10px; font-weight: bold; font-size: 11px;
+            """)
+
+        if select_active:
+            if active_idx is not None:
+                self.select_provider(active_idx)
+                if dot_enabled is not None:
+                    self.chk_dot.setChecked(dot_enabled)
+            else:
+                self.select_provider(self.selected_idx)
+                self.chk_dot.setChecked(True if dot_enabled is None else dot_enabled)
+
     def populate_connections(self):
         self.conn_combo.clear()
         try:
@@ -4326,7 +4436,7 @@ class DnsOptimizerPanel(QFrame):
 
     def select_provider(self, idx):
         self.selected_idx = idx
-        for i, (btn, _) in enumerate(self.provider_buttons):
+        for i, (btn, _, _) in enumerate(self.provider_buttons):
             if i == idx:
                 btn.setStyleSheet("""
                     QPushButton {
@@ -4354,6 +4464,7 @@ class DnsOptimizerPanel(QFrame):
         if self._ping_worker and self._ping_worker.isRunning():
             return
         self._has_benchmarked = True
+        self.status_lbl.setTextFormat(Qt.TextFormat.PlainText)
         self.status_lbl.setStyleSheet("color: #f59e0b; font-size: 12px; font-weight: bold; background: transparent; border: none;")
         self.status_lbl.setText(tr("Testing ping to all DNS servers..."))
         worker = DnsPingWorker()
@@ -4372,7 +4483,7 @@ class DnsOptimizerPanel(QFrame):
             padding: 2px 7px; font-weight: bold; font-size: 10.5px;
         """
         for i, p in enumerate(DNS_PROVIDERS):
-            _, lbl_ms = self.provider_buttons[i]
+            _, lbl_ms, _ = self.provider_buttons[i]
             lbl_ms.setTextFormat(Qt.TextFormat.RichText)
             ms = latencies.get(p["ping_ip"])
             if ms is not None:
@@ -4394,11 +4505,11 @@ class DnsOptimizerPanel(QFrame):
                     border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px;
                     padding: 2px 7px; font-weight: bold; font-size: 10.5px;
                 """)
+        # Never override the user's currently selected or active DNS card when benchmarking
         if best_idx is not None:
-            self.select_provider(best_idx)
             self.status_lbl.setStyleSheet("color: #d4d4d8; font-size: 12px; font-weight: bold; background: transparent; border: none;")
             self.status_lbl.setTextFormat(Qt.TextFormat.RichText)
-            self.status_lbl.setText(f"<span style='color:#ef4444;'>✓</span> {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
+            self.status_lbl.setText(f"<span style='color:#ef4444;'>⚡</span> {tr('Fastest DNS:')} {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
         else:
             self.status_lbl.setText("")
 
@@ -4413,6 +4524,7 @@ class DnsOptimizerPanel(QFrame):
             if exit_code == 0:
                 self.status_lbl.setStyleSheet("color: #ef4444; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✓ {success_msg}")
+                self.refresh_active_dns(select_active=False)
             else:
                 self.status_lbl.setStyleSheet("color: #ff4d4d; font-size: 12px; font-weight: bold; background: transparent; border: none;")
                 self.status_lbl.setText(f"✕ {tr('Operation canceled or authentication failed.')}")
@@ -4427,12 +4539,13 @@ class DnsOptimizerPanel(QFrame):
             return
         p = DNS_PROVIDERS[self.selected_idx]
         dot_val = "2" if self.chk_dot.isChecked() else "0"
+        q_conn = shlex.quote(conn)
         sh_cmd = (
-            f"nmcli connection modify '{conn}' "
-            f"ipv4.ignore-auto-dns yes ipv4.dns '{p['ipv4']}' "
-            f"ipv6.ignore-auto-dns yes ipv6.dns '{p['ipv6']}' "
+            f"nmcli connection modify {q_conn} "
+            f"ipv4.ignore-auto-dns yes ipv4.dns {shlex.quote(p['ipv4'])} "
+            f"ipv6.ignore-auto-dns yes ipv6.dns {shlex.quote(p['ipv6'])} "
             f"connection.dns-over-tls {dot_val} && "
-            f"nmcli connection up '{conn}'"
+            f"nmcli connection up {q_conn}"
         )
         self._run_dns_pkexec(
             sh_cmd,
@@ -4444,12 +4557,13 @@ class DnsOptimizerPanel(QFrame):
         conn = self.conn_combo.currentText().strip()
         if not conn:
             return
+        q_conn = shlex.quote(conn)
         sh_cmd = (
-            f"nmcli connection modify '{conn}' "
+            f"nmcli connection modify {q_conn} "
             f"ipv4.ignore-auto-dns no ipv4.dns '' "
             f"ipv6.ignore-auto-dns no ipv6.dns '' "
             f"connection.dns-over-tls -1 && "
-            f"nmcli connection up '{conn}'"
+            f"nmcli connection up {q_conn}"
         )
         self._run_dns_pkexec(
             sh_cmd,
