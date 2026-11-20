@@ -165,6 +165,15 @@ Rectangle {
       Component.onCompleted: bgVideo.play()
   }
 
+  Image {
+      id: fallbackWallpaper
+      anchors.fill: parent
+      source: Qt.resolvedUrl("fallback.jpg")
+      fillMode: Image.PreserveAspectCrop
+      opacity: bgVideo.playbackState === MediaPlayer.PlayingState ? 0.0 : 0.5
+      Behavior on opacity { NumberAnimation { duration: 400 } }
+  }
+
   VideoOutput {
       id: videoOutput
       anchors.fill: parent
