@@ -563,7 +563,7 @@ function clean_previous_desktops -a target_id
     test -f /etc/profile.d/omarchy.sh; and set has_omarchy 1
     test -d /etc/mise; and set has_omarchy 1
     test -f /etc/pam.d/omarchy-lock-password; and set has_omarchy 1
-    test (count (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-speedtest omarchy-keyring owe monologue herdr hype signed superwhisper-bin gliff mise-bin mise folio plain hyprland-preview-share-picker qtengine tzupdate ufw-docker yaru-icon-theme google-chrome cmake 2>/dev/null)) -gt 0; and set has_omarchy 1
+    test (count (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-speedtest omarchy-keyring omarchy-themes-intros omaview cards fantasi checkmate owe monologue herdr hype signed superwhisper-bin gliff mise-bin mise folio plain hyprland-preview-share-picker qtengine tzupdate ufw-docker yaru-icon-theme google-chrome cmake 2>/dev/null)) -gt 0; and set has_omarchy 1
 
     if test "$target_id" != "8"; and test $has_omarchy -eq 1
         if test $is_es -eq 1
@@ -571,12 +571,12 @@ function clean_previous_desktops -a target_id
         else
             echo -e "  \e[0;37m-> Purging packages, webapps, and configurations of X64 LIOS + Omarchy...\e[0m"
         end
-        # 1. Purgar paquetes específicos y suite de aplicaciones de Omarchy (incluyendo mise y hyprland si no vamos a Hyprland nativo)
+        # 1. Purgar paquetes específicos y suite de aplicaciones de Omarchy (incluyendo mise, fcitx5, uwsm, qtengine y hyprland si no vamos a Hyprland nativo)
         set -l oma_extra_hypr
         if test "$target_id" != "1"
-            set oma_extra_hypr hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland yaru-icon-theme hyprland-preview-share-picker qtengine
+            set oma_extra_hypr hyprland quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset xdg-desktop-portal-hyprland
         end
-        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise folio plain tzupdate ufw-docker yaru-icon-theme google-chrome cmake $oma_extra_hypr 2>/dev/null | sort -u)
+        set -l oma_pkgs (pacman -Qq omacalc omacut omasnap omawrite omarchy-nvim omarchy-screensaver omarchy-speedtest omarchy-local-ai omarchy-themes-intros omaview cards fantasi checkmate owe monologue herdr hype signed superwhisper-bin foot imv gliff asdcontrol cliamp disktree-bin ttfx tobi-try ttf-ia-writer omarchy-keyring aether obsidian localsend pinta moonlight-qt nautilus nautilus-python libreoffice-fresh mise-bin mise folio plain tzupdate ufw-docker yaru-icon-theme google-chrome cmake uwsm hyprland-preview-share-picker qtengine fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools pamixer udiskie gum luarocks usage wtype $oma_extra_hypr 2>/dev/null | sort -u)
         if test (count $oma_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $oma_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $oma_pkgs 2>/dev/null
         end
@@ -593,16 +593,19 @@ function clean_previous_desktops -a target_id
         sudo bash -c 'shopt -s nullglob
             rm -rf /usr/share/omarchy /etc/profile.d/omarchy.sh /usr/share/wayland-sessions/x64-lios-omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop
             rm -f /usr/local/bin/omarchy* /usr/bin/omarchy /usr/bin/omarchy-* /usr/local/bin/x64-launch-tiled-terminal /usr/share/bash-completion/completions-fallback/mise.bash
-            rm -rf /etc/skel/.config/omarchy /etc/skel/.config/btop /etc/skel/.config/chromium /etc/skel/.config/git /etc/skel/.config/opencode /etc/skel/.config/wireplumber /etc/skel/.config/autostart/limine-snapper-notify.desktop /etc/skel/.config/autostart/print-applet.desktop /etc/skel/.local /etc/skel/Fondos /etc/skel/Temas /usr/share/fonts/omarchy /usr/share/xdg-terminal-exec
+            rm -rf /etc/skel/.config/{omarchy,alacritty,btop,chrome-flags.conf,chromium,chromium-flags.conf,fcitx5,foot,ghostty,git,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,imv,lazygit,obsidian,opencode,qtengine,tmux,wireplumber,wofi-x64,xdg-desktop-portal} /etc/skel/.config/autostart/{limine-snapper-notify.desktop,org.fcitx.Fcitx5.desktop,print-applet.desktop} /etc/skel/.local /etc/skel/Fondos /etc/skel/Temas /usr/share/fonts/omarchy
+            if [ -f /etc/xdg/kitty/kitty.conf ] && grep -qi "omarchy" /etc/skel/.config/kitty/kitty.conf 2>/dev/null; then
+                cp -f /etc/xdg/kitty/kitty.conf /etc/skel/.config/kitty/kitty.conf
+            fi
             rm -rf /etc/mise /var/lib/pacman/sync/omarchy.*
             fc-cache -f /usr/share/fonts
         ' 2>/dev/null
 
         # 3. Eliminar servicios systemd y drop-ins (ejecutado en bash como root con nullglob)
-        systemctl --user stop omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
-        systemctl --user disable omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed 2>/dev/null
+        systemctl --user stop omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed bt-agent.service 2>/dev/null
+        systemctl --user disable omarchy-crash-watch omarchy-fcitx5 omarchy-sleep-lock owed bt-agent.service 2>/dev/null
         sudo bash -c 'shopt -s nullglob
-            rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service
+            rm -f /usr/lib/systemd/user/omarchy-*.service /usr/lib/systemd/user/owed.service /usr/lib/systemd/user/bt-agent.service /etc/systemd/user/bt-agent.service /etc/systemd/user/*.wants/bt-agent.service
             rm -rf /usr/lib/systemd/user/owed.service.d /etc/systemd/user/owed.service.d /usr/lib/systemd/user/app.slice.d/10-oomd.conf /usr/lib/systemd/user/wireplumber.service.d
             rmdir /usr/lib/systemd/user/app.slice.d 2>/dev/null || true
             rm -rf /etc/systemd/user/wayland-wm@hyprland.desktop.service.d
@@ -611,6 +614,7 @@ function clean_previous_desktops -a target_id
             rm -f /etc/systemd/user/graphical-session.target.wants/owed.service
             rm -f /etc/systemd/logind.conf.d/20-inhibit-delay.conf /etc/systemd/logind.conf.d/10-ignore-power-button.conf
             rm -f /etc/systemd/resolved.conf.d/10-disable-multicast.conf /etc/systemd/resolved.conf.d/20-docker-dns.conf
+            rmdir /etc/systemd/logind.conf.d /etc/systemd/oomd.conf.d /etc/systemd/resolved.conf.d /etc/systemd/system.conf.d /etc/systemd/system/cups-browsed.service.d /etc/systemd/system/docker.service.d /etc/systemd/system/proc-sys-fs-binfmt_misc.mount.d /etc/systemd/system/systemd-binfmt.service.d /etc/systemd/system/user@.service.d 2>/dev/null || true
             rm -f /usr/lib/systemd/system-sleep/force-igpu /usr/lib/systemd/system-sleep/fprintd-resume /usr/lib/systemd/system-sleep/keyboard-backlight /usr/lib/systemd/system-sleep/unmount-fuse /usr/lib/systemd/system-sleep/yoga-slim7x-lid-wake
             systemctl daemon-reload
         ' 2>/dev/null
@@ -650,15 +654,24 @@ except Exception:
                     done
                     rm -f "$u"/.local/share/applications/{foot.desktop,imv.desktop,mpv.desktop,opencode.desktop,intent.cache}
                     update-desktop-database "$u/.local/share/applications" 2>/dev/null || true
-                    rm -rf "$u"/.config/omarchy "$u"/.local/state/omarchy "$u"/.cache/omarchy
+                    rm -rf "$u"/.config/omarchy "$u"/.local/state/omarchy "$u"/.local/state/Omarchy "$u"/.cache/omarchy
                     rm -rf "$u"/.local/share/mise "$u"/.config/mise "$u"/.local/state/mise "$u"/.cache/mise
-                    rm -rf "$u"/.local/share/fcitx5/themes/omarchy "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service
+                    rm -rf "$u"/.local/share/fcitx5 "$u"/.local/share/superwhisper "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service
                     rm -f "$u"/.XCompose "$u"/.local/bin/superwhisper "$u"/.config/btop/themes/current.theme "$u"/.config/nvim/lua/plugins/theme.lua "$u"/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua
+                    rm -rf "$u"/.config/{AGENTS.md,alacritty,chrome-flags.conf,chromium-flags.conf,fcitx,fcitx5,folio,foot,ghostty,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,ibus,imv,obsidian,plain,qtengine,superwhisper,uwsm,wofi-x64}
+                    rm -f "$u"/.config/xdg-desktop-portal/hyprland-portals.conf "$u"/.config/autostart/{limine-snapper-notify.desktop,org.fcitx.Fcitx5.desktop,print-applet.desktop}
+                    rmdir "$u"/.config/xdg-desktop-portal 2>/dev/null || true
+                    if [ -f /etc/xdg/kitty/kitty.conf ] && grep -qi "omarchy" "$u"/.config/kitty/kitty.conf 2>/dev/null; then
+                        cp -f /etc/xdg/kitty/kitty.conf "$u"/.config/kitty/kitty.conf
+                    fi
+                    if [ -f "$u"/.config/tmux/tmux.conf ]; then
+                        sed -i "/omarchy-menu-tmux-keybindings/d" "$u"/.config/tmux/tmux.conf 2>/dev/null || true
+                    fi
                     rm -rf "$u"/.config/opencode/herdr-opencode "$u"/.config/opencode/herdr-tui-session.js "$u"/.config/opencode/tui.jsonc "$u"/.config/opencode/plugins/herdr-agent-state.js
                     rm -rf "$u"/.config/wireplumber/wireplumber.conf.d/kef-lsx-no-suspend.conf "$u"/.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf
                     rm -rf "$u"/.config/BraveSoftware "$u"/.config/google-chrome "$u"/.config/google-chrome-beta "$u"/.config/google-chrome-unstable "$u"/.config/microsoft-edge "$u"/.config/microsoft-edge-dev
                     rm -f "$u"/.config/hypr/{autostart.lua,bindings.lua,input.lua,looknfeel.lua,monitors.lua,xdph.conf,.luarc.json,hyprsunset.conf}
-                    rm -f "$u"/.config/systemd/user/*.wants/omarchy-* "$u"/.config/systemd/user/*.wants/superwhisper.service "$u"/.config/uwsm/env.d/*omarchy*
+                    rm -f "$u"/.config/systemd/user/*.wants/omarchy-* "$u"/.config/systemd/user/*.wants/superwhisper.service "$u"/.config/systemd/user/*.wants/bt-agent.service "$u"/.config/uwsm/env.d/*omarchy*
                     rm -f "$u"/.pi/agent/themes/omarchy-system.json "$u"/.pi/agent/settings.json
                     find "$u/.config" -name "com.omarchy.*" -delete 2>/dev/null || true
                     for sdir in "$u/.agents/skills" "$u/.claude/skills" "$u/.codex/skills" "$u/.pi/agent/skills" "$u/.hermes/skills" "$u/.gemini/config/skills" "$u/.local/share/icons/hicolor/scalable/apps" "$u/.config/systemd/user"; do
@@ -875,32 +888,53 @@ except Exception:
             end
         end
     end
-    if not contains "$target_id" "1" "8"
-        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools pamixer udiskie gum luarocks usage 2>/dev/null | sort -u)
-        if test (count $unused_hypr) -gt 0
-            sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
+    if test "$target_id" != "8"
+        set -l unused_omarchy (pacman -Qq omarchy-themes-intros omaview cards fantasi checkmate uwsm qtengine hyprland-preview-share-picker fcitx5 fcitx5-chewing fcitx5-chinese-addons fcitx5-gtk fcitx5-hangul fcitx5-mozc fcitx5-qt fcitx5-table-extra fcitx5-configtool bluez-tools pamixer udiskie gum luarocks usage wtype 2>/dev/null | sort -u)
+        if test (count $unused_omarchy) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_omarchy 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_omarchy 2>/dev/null
         end
         systemctl --user stop bt-agent.service 2>/dev/null
         systemctl --user disable bt-agent.service 2>/dev/null
         sudo bash -c 'shopt -s nullglob
-            rm -f /etc/systemd/user/bt-agent.service /etc/systemd/user/default.target.wants/bt-agent.service /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol
-            rm -rf /etc/systemd/user/wayland-wm@hyprland.desktop.service.d /usr/lib/systemd/user/app.slice.d/10-oomd.conf /usr/lib/systemd/user/wireplumber.service.d /usr/share/xdg-terminal-exec
+            rm -f /usr/lib/systemd/user/bt-agent.service /etc/systemd/user/bt-agent.service /etc/systemd/user/*.wants/bt-agent.service /etc/sudoers.d/omarchy-* /etc/sudoers.d/zz-asdcontrol
+            rm -rf /etc/systemd/user/wayland-wm@hyprland.desktop.service.d /usr/lib/systemd/user/app.slice.d/10-oomd.conf /usr/lib/systemd/user/wireplumber.service.d
             rmdir /usr/lib/systemd/user/app.slice.d 2>/dev/null || true
             rm -f /etc/systemd/logind.conf.d/10-ignore-power-button.conf /etc/systemd/resolved.conf.d/10-disable-multicast.conf /etc/systemd/resolved.conf.d/20-docker-dns.conf /etc/systemd/system.conf.d/10-faster-shutdown.conf /etc/systemd/system.conf.d/20-mount-events.conf /etc/systemd/system/docker.service.d/no-block-boot.conf /etc/systemd/system/plocate-updatedb.service.d/ac-only.conf /etc/systemd/system/systemd-binfmt.service.d/10-eager-mount.conf /etc/systemd/system/user@.service.d/10-faster-shutdown.conf /usr/lib/systemd/system-sleep/yoga-slim7x-lid-wake
-            rm -rf /etc/skel/.config/{alacritty,btop,chromium,fcitx5,foot,ghostty,git,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,imv,lazygit,obsidian,opencode,qtengine,tmux,wireplumber,wofi-x64,xdg-desktop-portal} /etc/skel/.config/autostart/{limine-snapper-notify.desktop,print-applet.desktop} /etc/skel/.local
+            rmdir /etc/systemd/logind.conf.d /etc/systemd/oomd.conf.d /etc/systemd/resolved.conf.d /etc/systemd/system.conf.d /etc/systemd/system/cups-browsed.service.d /etc/systemd/system/docker.service.d /etc/systemd/system/proc-sys-fs-binfmt_misc.mount.d /etc/systemd/system/systemd-binfmt.service.d /etc/systemd/system/user@.service.d 2>/dev/null || true
+            rm -rf /etc/skel/.config/{alacritty,btop,chrome-flags.conf,chromium,chromium-flags.conf,fcitx5,foot,ghostty,git,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,imv,lazygit,obsidian,opencode,qtengine,tmux,wireplumber,wofi-x64,xdg-desktop-portal} /etc/skel/.config/autostart/{limine-snapper-notify.desktop,org.fcitx.Fcitx5.desktop,print-applet.desktop} /etc/skel/.local
+            if [ -f /etc/xdg/kitty/kitty.conf ] && grep -qi "omarchy" /etc/skel/.config/kitty/kitty.conf 2>/dev/null; then
+                cp -f /etc/xdg/kitty/kitty.conf /etc/skel/.config/kitty/kitty.conf
+            fi
             git config --system --unset-all safe.directory /usr/share/omarchy 2>/dev/null || true
         ' 2>/dev/null
         for udir in /home/*
             if test -d $udir
                 bash -c 'shopt -s nullglob
                     u="$1"
-                    rm -f "$u"/.config/systemd/user/default.target.wants/bt-agent.service "$u"/.config/xdg-desktop-portal/hyprland-portals.conf "$u"/.XCompose "$u"/.local/bin/superwhisper "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service "$u"/.config/btop/themes/current.theme "$u"/.config/nvim/lua/plugins/theme.lua "$u"/.pi/agent/themes/omarchy-system.json "$u"/.pi/agent/settings.json
+                    rm -f "$u"/.config/systemd/user/*.wants/bt-agent.service "$u"/.config/xdg-desktop-portal/hyprland-portals.conf "$u"/.config/autostart/{limine-snapper-notify.desktop,org.fcitx.Fcitx5.desktop,print-applet.desktop} "$u"/.XCompose "$u"/.local/bin/superwhisper "$u"/.local/share/dbus-1/services/org.fcitx.Fcitx5.service "$u"/.config/btop/themes/current.theme "$u"/.config/nvim/lua/plugins/theme.lua "$u"/.config/nvim/lua/plugins/omarchy-theme-hotreload.lua "$u"/.pi/agent/themes/omarchy-system.json "$u"/.pi/agent/settings.json
                     rmdir "$u"/.config/xdg-desktop-portal 2>/dev/null || true
-                    rm -rf "$u"/.config/{AGENTS.md,alacritty,fcitx,fcitx5,folio,foot,ghostty,herdr,ibus,imv,obsidian,qtengine,superwhisper,BraveSoftware,google-chrome,google-chrome-beta,google-chrome-unstable,microsoft-edge,microsoft-edge-dev} "$u"/.config/opencode/{herdr-opencode,herdr-tui-session.js,tui.jsonc,plugins/herdr-agent-state.js} "$u"/.config/wireplumber/wireplumber.conf.d/{kef-lsx-no-suspend.conf,bluetooth-a2dp-autoconnect.conf} "$u"/.local/share/{fcitx5,hyprland,superwhisper,wayland-sessions} "$u"/.local/state/Omarchy "$u"/.cache/{cliphist,quickshell,xdg-terminal-exec,folio,aube}
+                    rm -rf "$u"/.config/{AGENTS.md,alacritty,chrome-flags.conf,chromium-flags.conf,fcitx,fcitx5,folio,foot,ghostty,herdr,hyprland-mimeapps.list,hyprland-preview-share-picker,ibus,imv,obsidian,plain,qtengine,superwhisper,uwsm,wofi-x64,BraveSoftware,google-chrome,google-chrome-beta,google-chrome-unstable,microsoft-edge,microsoft-edge-dev} "$u"/.config/opencode/{herdr-opencode,herdr-tui-session.js,tui.jsonc,plugins/herdr-agent-state.js} "$u"/.config/wireplumber/wireplumber.conf.d/{kef-lsx-no-suspend.conf,bluetooth-a2dp-autoconnect.conf} "$u"/.local/share/{fcitx5,superwhisper,wayland-sessions} "$u"/.local/state/Omarchy "$u"/.cache/{folio,aube}
+                    if [ -f /etc/xdg/kitty/kitty.conf ] && grep -qi "omarchy" "$u"/.config/kitty/kitty.conf 2>/dev/null; then
+                        cp -f /etc/xdg/kitty/kitty.conf "$u"/.config/kitty/kitty.conf
+                    fi
+                    if [ -f "$u"/.config/tmux/tmux.conf ]; then
+                        sed -i "/omarchy-menu-tmux-keybindings/d" "$u"/.config/tmux/tmux.conf 2>/dev/null || true
+                    fi
                     for sdir in "$u/.agents/skills" "$u/.claude/skills" "$u/.codex/skills" "$u/.pi/agent/skills" "$u/.hermes/skills" "$u/.gemini/config/skills" "$u/.local/share/icons/hicolor/scalable/apps" "$u/.config/systemd/user"; do
                         [ -d "$sdir" ] && find "$sdir" -xtype l -delete 2>/dev/null || true
                     done
                 ' _ "$udir" 2>/dev/null
+            end
+        end
+    end
+    if not contains "$target_id" "1" "8"
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils 2>/dev/null | sort -u)
+        if test (count $unused_hypr) -gt 0
+            sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
+        end
+        for udir in /home/*
+            if test -d $udir
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/hyprland "$u"/.cache/{cliphist,quickshell,xdg-terminal-exec}' _ "$udir" 2>/dev/null
             end
         end
     end
