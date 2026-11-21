@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-update
 pkgver=1.0.0
-pkgrel=41
+pkgrel=42
 pkgdesc="Notificador y gestor de actualizaciones del sistema para X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -34,7 +34,7 @@ source=(
     'x64-update-tray.service'
     '90-x64-update-tray.preset'
 )
-sha256sums=('742d42c8c6f9a7ec5e68d122aede64687ca0744e984c17ce92b405ded0f7dc8b'
+sha256sums=('9691447ed60279df0755af4bc6a4dd0d12bc4a2dac807e41f95587e113bdfe8e'
             'f19319d02bfb40bc0db7d337ab73026afe0ecb01535736857ae81bc5654f4f11'
             'd79151c6b310521a0c4ae374862b2b7d3130662f06a8819d74724a6b899934d9'
             'e8dc06813b80282aa71644d23c36a550dbe6416546902fb2876d12517c60047c'

@@ -1,6 +1,8 @@
+singleton ThemeState 1.0 ThemeState.qml
 singleton Theme 1.0 Theme.qml
 singleton I18n 1.0 I18n.qml
 singleton SysState 1.0 SysState.qml
+Wallpaper 1.0 Wallpaper.qml
 Bar 1.0 Bar.qml
 AppLauncher 1.0 AppLauncher.qml
 ControlCenter 1.0 ControlCenter.qml
@@ -15,3 +17,4 @@ ScreenFilter 1.0 ScreenFilter.qml
 ShortcutsPopup 1.0 ShortcutsPopup.qml
 ClipboardPopup 1.0 ClipboardPopup.qml
 OverviewPopup 1.0 OverviewPopup.qml
+ThemeStudio 1.0 ThemeStudio.qml

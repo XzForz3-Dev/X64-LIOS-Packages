@@ -546,11 +546,11 @@ PanelWindow {
                                     anchors.fill: parent
                                     anchors.margins: -2
                                     radius: 10
-                                    color: "#2dff2b2b"
+                                    color: Theme.accentDim
                                 }
 
                                 color: isToday ? Theme.accent : (dayArea.containsMouse && isCurrent ? Theme.bgHover : "transparent")
-                                border.color: isToday ? "#99ff7a7a" : (dayArea.containsMouse && isCurrent ? Theme.borderSubtle : "transparent")
+                                border.color: isToday ? Theme.accentHover : (dayArea.containsMouse && isCurrent ? Theme.borderSubtle : "transparent")
                                 border.width: 1
 
                                 Text {

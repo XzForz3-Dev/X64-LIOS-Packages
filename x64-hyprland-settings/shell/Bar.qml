@@ -112,7 +112,7 @@ PanelWindow {
     Rectangle {
         id: barBackground
         anchors.fill: parent
-        color: "#f20a0b10" // Deep obsidian OLED glass (Qt #AARRGGBB)
+        color: Theme.bgBar
 
         // Top 1px specular highlight line
         Rectangle {
@@ -123,13 +123,13 @@ PanelWindow {
             color: "#18ffffff"
         }
 
-        // Bottom 1px razor-sharp crimson neon glow line
+        // Bottom 1px razor-sharp theme accent neon glow line
         Rectangle {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             height: 1
-            color: "#44ff2b2b"
+            color: Theme.accentGlowLine
         }
 
         // =====================================================================
@@ -147,7 +147,7 @@ PanelWindow {
             implicitHeight: 30
             implicitWidth: navRow.implicitWidth + 10
             radius: 15
-            color: "#f512131a"
+            color: Theme.bgCapsule
             border.color: "#1affffff"
             border.width: 1
 
@@ -162,7 +162,7 @@ PanelWindow {
                         implicitWidth: brandRow.implicitWidth + 10
                         implicitHeight: 24
                         radius: 12
-                        color: brandArea.containsMouse ? "#22ff2b2b" : "transparent"
+                        color: brandArea.containsMouse ? Theme.accentSubtle : "transparent"
                         scale: brandArea.pressed ? 0.90 : (brandArea.containsMouse ? 1.05 : 1.0)
                         Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack; easing.overshoot: 1.5 } }
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -264,7 +264,7 @@ PanelWindow {
                                         radius: height / 2
 
                                         color: {
-                                            if (wsItem.isFocused) return (barWindow.monitorFocused || wsItem.isGlobalFocused) ? Theme.accent : "#88ff2b2b";
+                                            if (wsItem.isFocused) return (barWindow.monitorFocused || wsItem.isGlobalFocused) ? Theme.accent : Theme.accentHalf;
                                             if (wsArea.containsMouse) return "#ffffff";
                                             if (wsItem.isOccupied) return "#c0c0d0";
                                             return "#404050";
@@ -387,7 +387,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: Math.min(220, mprisRow.implicitWidth + 16)
                     radius: 15
-                    color: mprisArea.containsMouse ? "#fa1c1d26" : "#f512131a"
+                    color: mprisArea.containsMouse ? Theme.bgHover : Theme.bgCapsule
                     border.color: mprisArea.containsMouse ? Theme.accent : "#1affffff"
                     border.width: 1
 
@@ -444,7 +444,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: clockRow.implicitWidth + 24
                     radius: 15
-                    color: clockArea.containsMouse ? Theme.bgHover : "#f512131a"
+                    color: clockArea.containsMouse ? Theme.bgHover : Theme.bgCapsule
                     border.color: clockArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
                     border.width: 1
                     scale: clockArea.pressed ? 0.94 : (clockArea.containsMouse ? 1.02 : 1.0)
@@ -498,7 +498,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: recRow.implicitWidth + 16
                     radius: 15
-                    color: recArea.containsMouse ? Theme.accent : "#f52a0b0f"
+                    color: recArea.containsMouse ? Theme.accent : Theme.accentPillBg
                     border.color: Theme.accent
                     border.width: 1
 
@@ -550,7 +550,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: gameRow.implicitWidth + 16
                     radius: 15
-                    color: gameArea.containsMouse ? Theme.accent : "#f52a0b0f"
+                    color: gameArea.containsMouse ? Theme.accent : Theme.accentPillBg
                     border.color: Theme.accent
                     border.width: 1
                     scale: gameArea.pressed ? 0.94 : (gameArea.containsMouse ? 1.02 : 1.0)
@@ -610,7 +610,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: telemetryRow.implicitWidth + 20
                     radius: 15
-                    color: teleArea.containsMouse ? Theme.bgHover : "#f512131a"
+                    color: teleArea.containsMouse ? Theme.bgHover : Theme.bgCapsule
                     border.color: teleArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
                     border.width: 1
                     scale: teleArea.pressed ? 0.94 : (teleArea.containsMouse ? 1.02 : 1.0)
@@ -734,7 +734,7 @@ PanelWindow {
                     implicitHeight: 30
                     implicitWidth: systemRow.implicitWidth + 16
                     radius: 15
-                    color: "#f512131a"
+                    color: Theme.bgCapsule
                     border.color: Theme.borderGlass
                     border.width: 1
 
@@ -1237,7 +1237,7 @@ PanelWindow {
                     implicitWidth: 32
                     implicitHeight: 30
                     radius: 15
-                    color: ctrlArea.containsMouse ? Theme.accentDim : "#f512131a"
+                    color: ctrlArea.containsMouse ? Theme.accentDim : Theme.bgCapsule
                     border.color: ctrlArea.containsMouse ? Theme.borderAccent : Theme.borderGlass
                     border.width: 1
                     scale: ctrlArea.pressed ? 0.90 : (ctrlArea.containsMouse ? 1.06 : 1.0)
@@ -1267,7 +1267,7 @@ PanelWindow {
                     implicitWidth: 32
                     implicitHeight: 30
                     radius: 15
-                    color: pwrArea.containsMouse ? Theme.accent : "#f512131a"
+                    color: pwrArea.containsMouse ? Theme.accent : Theme.bgCapsule
                     border.color: pwrArea.containsMouse ? Theme.accentLight : Theme.borderGlass
                     border.width: 1
                     scale: pwrArea.pressed ? 0.90 : (pwrArea.containsMouse ? 1.06 : 1.0)

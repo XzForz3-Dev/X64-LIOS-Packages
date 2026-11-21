@@ -527,7 +527,7 @@ PanelWindow {
                                     implicitWidth: 28
                                     implicitHeight: 28
                                     radius: 6
-                                    color: itemDelegate.isSel ? "#25ff2b2b" : (itemMouseArea.containsMouse ? "#20ffffff" : "#14ffffff")
+                                    color: itemDelegate.isSel ? Theme.accentSubtle : (itemMouseArea.containsMouse ? "#20ffffff" : "#14ffffff")
                                     border.color: itemDelegate.isSel ? Theme.accent : (itemMouseArea.containsMouse ? "#33ffffff" : "#22ffffff")
                                     border.width: 1
 

@@ -2,40 +2,88 @@ pragma Singleton
 import QtQuick
 
 // =============================================================================
-// X64 LIOS - Quickshell Global Theme & Color Palette (Theme.qml)
-// Customize colors, borders, and typography here.
-// Modifying 'accent' ensures this Theme.qml is preserved across system updates.
+// X64 LIOS - Quickshell Live Animated Theme & Color Palette (Theme.qml)
+// Driven dynamically by ThemeState (~/.config/x64-theme/palette.json).
+// Smooth 350ms GPU ColorAnimation on core tokens cascades automatically to all
+// derived alpha glows, borders, capsules, and sliders with zero restarts.
 // =============================================================================
 QtObject {
-    // Obsidian & Crimson Monochromatic Palette (Qt6 #AARRGGBB format)
-    readonly property color bgDark: "#0b0c10"
-    readonly property color bgGlass: "#f70b0c10"
-    readonly property color bgCard: "#fa13151c"
-    readonly property color bgElevated: "#ff1a1d26"
-    readonly property color bgHover: "#ff222530"
-    readonly property color bgActive: "#ff2c303e"
+    id: theme
 
-    // Accents (Crimson X64 — used strictly for active state & alerts)
-    readonly property color accent: "#ff2b2b"
-    readonly property color accentHover: "#ff4747"
-    readonly property color accentLight: "#ff4747"
-    readonly property color accentDim: "#2eff2b2b"
-    readonly property color accentGlow: "#4dff2b2b"
-    readonly property color accentBorder: "#73ff2b2b"
+    // Core Surface Colors (animated on live theme switches)
+    property color bgDark: ThemeState.bgDark
+    Behavior on bgDark { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
-    // Semantic Status Colors (Threshold-only)
-    readonly property color statusOk: "#34d399"
-    readonly property color statusWarn: "#f5a524"
+    property color bgCardBase: ThemeState.bgCard
+    Behavior on bgCardBase { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color bgElevated: ThemeState.bgElevated
+    Behavior on bgElevated { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color bgHover: ThemeState.bgHover
+    Behavior on bgHover { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color bgActive: ThemeState.bgActive
+    Behavior on bgActive { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color bgBarBase: ThemeState.bgBar
+    Behavior on bgBarBase { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color bgCapsuleBase: ThemeState.bgCapsule
+    Behavior on bgCapsuleBase { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    // Glass & Surface Derived Tokens (exact alpha parity with original X64 glass)
+    readonly property color bgGlass: Qt.rgba(bgDark.r, bgDark.g, bgDark.b, 0.968)
+    readonly property color bgCard: Qt.rgba(bgCardBase.r, bgCardBase.g, bgCardBase.b, 0.98)
+    readonly property color bgBar: Qt.rgba(bgBarBase.r, bgBarBase.g, bgBarBase.b, 0.95)
+    readonly property color bgCapsule: Qt.rgba(bgCapsuleBase.r, bgCapsuleBase.g, bgCapsuleBase.b, 0.96)
+
+    // Accents (Dynamic per theme / user override; defaults to Crimson X64 #ff2b2b)
+    property color accent: ThemeState.accent
+    Behavior on accent { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color accentHover: ThemeState.accentHover
+    Behavior on accentHover { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color accentText: ThemeState.accentText
+    Behavior on accentText { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color accentPillBase: ThemeState.accentPillBg
+    Behavior on accentPillBase { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    readonly property color accentLight: accentHover
+    readonly property color accentSubtle: Qt.rgba(accent.r, accent.g, accent.b, 0.14)
+    readonly property color accentDim: Qt.rgba(accent.r, accent.g, accent.b, 0.18)
+    readonly property color accentTint: Qt.rgba(accent.r, accent.g, accent.b, 0.22)
+    readonly property color accentGlowLine: Qt.rgba(accent.r, accent.g, accent.b, 0.27)
+    readonly property color accentGlow: Qt.rgba(accent.r, accent.g, accent.b, 0.30)
+    readonly property color accentBorder: Qt.rgba(accent.r, accent.g, accent.b, 0.45)
+    readonly property color accentHalf: Qt.rgba(accent.r, accent.g, accent.b, 0.53)
+    readonly property color accentSliderStart: Qt.rgba(accent.r, accent.g, accent.b, 0.22)
+    readonly property color accentSliderEnd: Qt.rgba(accent.r, accent.g, accent.b, 0.50)
+    readonly property color accentPillBg: Qt.rgba(accentPillBase.r, accentPillBase.g, accentPillBase.b, 0.96)
+
+    // Semantic Status Colors
+    property color statusOk: ThemeState.statusOk
+    Behavior on statusOk { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color statusWarn: ThemeState.statusWarn
+    Behavior on statusWarn { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
     // Borders & Dividers
     readonly property color borderGlass: "#17ffffff"
     readonly property color borderSubtle: "#12ffffff"
-    readonly property color borderAccent: "#73ff2b2b"
+    readonly property color borderAccent: accentBorder
 
-    // Text & Foregrounds (Bone White & Neutral Silver)
-    readonly property color textPrimary: "#ebe8e3"
-    readonly property color textSecondary: "#8e909a"
-    readonly property color textMuted: "#565863"
+    // Text & Foregrounds
+    property color textPrimary: ThemeState.textPrimary
+    Behavior on textPrimary { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color textSecondary: ThemeState.textSecondary
+    Behavior on textSecondary { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    property color textMuted: ThemeState.textMuted
+    Behavior on textMuted { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
     // Metrics & Radius
     readonly property int radiusSm: 8

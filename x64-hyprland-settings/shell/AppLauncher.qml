@@ -217,8 +217,8 @@ PanelWindow {
         height: Math.min(parent.height - 60, 640)
         anchors.centerIn: parent
         radius: 20
-        color: "#0f1118"
-        border.color: "#222636"
+        color: Theme.bgCard
+        border.color: Theme.borderSubtle
         border.width: 1
 
         // Subtle Top Satin Glass Highlight
@@ -248,8 +248,8 @@ PanelWindow {
                 Layout.fillWidth: true
                 height: 48
                 radius: 24
-                color: "#161924"
-                border.color: searchInput.activeFocus ? "#ff2b2b" : "#262a3a"
+                color: Theme.bgElevated
+                border.color: searchInput.activeFocus ? Theme.accent : Theme.borderSubtle
                 border.width: searchInput.activeFocus ? 1.5 : 1
 
                 Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -264,7 +264,7 @@ PanelWindow {
                         text: ""
                         font.family: "JetBrainsMono Nerd Font"
                         font.pixelSize: 16
-                        color: searchInput.activeFocus ? "#ff2b2b" : "#707688"
+                        color: searchInput.activeFocus ? Theme.accent : "#707688"
                     }
 
                     TextInput {
@@ -373,8 +373,8 @@ PanelWindow {
                         implicitHeight: 28
                         implicitWidth: pillText.implicitWidth + 22
                         radius: 14
-                        color: isActive ? "#ff2b2b" : (pillArea.containsMouse ? "#1c202d" : "#141722")
-                        border.color: isActive ? "#ff4d4d" : (pillArea.containsMouse ? "#303648" : "#222636")
+                        color: isActive ? Theme.accent : (pillArea.containsMouse ? Theme.bgHover : Theme.bgCard)
+                        border.color: isActive ? Theme.accentHover : (pillArea.containsMouse ? "#303648" : Theme.borderSubtle)
                         border.width: 1
 
                         Behavior on color { ColorAnimation { duration: 120 } }
@@ -435,19 +435,19 @@ PanelWindow {
                             anchors.fill: parent
                             anchors.margins: 5
                             radius: 14
-                            color: appItem.isSelected ? "#1e2230" : "#131620"
-                            border.color: appItem.isSelected ? "#ff2b2b" : "#1e2232"
+                            color: appItem.isSelected ? Theme.bgHover : Theme.bgCard
+                            border.color: appItem.isSelected ? Theme.accent : Theme.borderSubtle
                             border.width: appItem.isSelected ? 1.5 : 1
 
                             Behavior on color { ColorAnimation { duration: 120 } }
                             Behavior on border.color { ColorAnimation { duration: 120 } }
 
-                            // Subtle Crimson Halo on Hover / Focus
+                            // Subtle Accent Halo on Hover / Focus
                             Rectangle {
                                 visible: appItem.isSelected
                                 anchors.fill: parent
                                 radius: 14
-                                color: "#1aff2b2b"
+                                color: Theme.accentSubtle
                             }
 
                             ColumnLayout {
@@ -485,7 +485,7 @@ PanelWindow {
                                     text: appItem.modelData.category || "Sistema"
                                     font.family: Theme.fontSans
                                     font.pixelSize: 9
-                                    color: appItem.isSelected ? "#ff6060" : "#757c90"
+                                    color: appItem.isSelected ? Theme.accentText : Theme.textMuted
                                     elide: Text.ElideRight
                                 }
                             }
@@ -510,7 +510,7 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
-                color: "#1c202c"
+                color: Theme.borderSubtle
             }
 
             RowLayout {
@@ -520,16 +520,16 @@ PanelWindow {
                     text: launcherWindow.filteredAppList.length + " de " + launcherWindow.fullAppList.length + " aplicaciones disponibles  •  ENTER Ejecutar  •  TAB Categorías  •  ESC Cerrar"
                     font.family: Theme.fontSans
                     font.pixelSize: 10
-                    color: "#6c7285"
+                    color: Theme.textSecondary
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Text {
-                    text: "X64 LIOS • Obsidian & Crimson 2026"
+                    text: "X64 LIOS • " + ThemeState.themeName
                     font.family: "JetBrainsMono Nerd Font"
                     font.pixelSize: 10
-                    color: "#4a5065"
+                    color: Theme.textMuted
                 }
             }
         }

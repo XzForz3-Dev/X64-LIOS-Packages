@@ -1,0 +1,8 @@
+id = "x64-lios-cosmic-eyes"
+name = "X64 Cosmic Eyes"
+author = "X64 Studios"
+description = "Violeta cósmico y cian eléctrico con visuales animados"
+order = 3
+mode = "dark"
+papirus_color = "violet"
+default_background = "binary.mp4"

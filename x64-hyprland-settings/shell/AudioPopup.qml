@@ -318,8 +318,8 @@ PanelWindow {
                             implicitWidth: 38
                             implicitHeight: 20
                             radius: 10
-                            color: audioWindow.overdrive ? "#b80000" : "#1a1a20"
-                            border.color: audioWindow.overdrive ? "#ff3333" : (boostMouseArea.containsMouse ? "#555562" : "#383842")
+                            color: audioWindow.overdrive ? Theme.accent : Theme.bgElevated
+                            border.color: audioWindow.overdrive ? Theme.accentHover : (boostMouseArea.containsMouse ? Theme.textMuted : Theme.borderSubtle)
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 150 } }
                             Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -331,7 +331,7 @@ PanelWindow {
                                 radius: 7
                                 y: 3
                                 x: audioWindow.overdrive ? 21 : 3
-                                color: audioWindow.overdrive ? "#ffffff" : "#777782"
+                                color: audioWindow.overdrive ? ((0.2126 * Theme.accent.r + 0.7152 * Theme.accent.g + 0.0722 * Theme.accent.b) > 0.48 ? "#0a0b10" : "#ffffff") : Theme.textMuted
                                 Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                                 Behavior on color { ColorAnimation { duration: 150 } }
                             }
@@ -482,11 +482,11 @@ PanelWindow {
                             orientation: Gradient.Horizontal
                             GradientStop {
                                 position: 0.0
-                                color: audioWindow.sinkMuted ? "#221111" : (audioWindow.sinkVol > 1.0 ? "#40ff2b2b" : "#2534d399")
+                                color: audioWindow.sinkMuted ? "#221111" : (audioWindow.sinkVol > 1.0 ? Theme.accentGlow : "#2534d399")
                             }
                             GradientStop {
                                 position: 1.0
-                                color: audioWindow.sinkMuted ? "#381818" : (audioWindow.sinkVol > 1.0 ? "#e6ff2b2b" : "#9934d399")
+                                color: audioWindow.sinkMuted ? "#381818" : (audioWindow.sinkVol > 1.0 ? Theme.accent : "#9934d399")
                             }
                         }
                         Behavior on width { NumberAnimation { duration: masterVolArea.pressed ? 0 : 50 } }

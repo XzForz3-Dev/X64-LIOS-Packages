@@ -1,0 +1,8 @@
+id = "x64-lios-cyberpunk"
+name = "X64 Cyberpunk"
+author = "X64 Studios"
+description = "Cian neón de alto contraste sobre negro nocturno"
+order = 4
+mode = "dark"
+papirus_color = "cyan"
+default_background = "01-cyberpunk-monolith.jpg"

@@ -1,10 +1,10 @@
 pkgname=x64-hyprland-settings
 pkgver=1.0.0
-pkgrel=81
+pkgrel=82
 pkgdesc="Official X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua Engine)"
 arch=('any')
 license=('GPL')
-depends=('hyprland' 'hyprlock' 'hypridle' 'hyprpolkitagent' 'hyprpwcenter' 'hyprpicker' 'hyprsunset' 'quickshell' 'swaybg' 'kitty' 'opencode' 'dolphin' 'breeze' 'adw-gtk-theme' 'xdg-terminal-exec' 'xdg-user-dirs' 'ark' 'ffmpegthumbs' 'kdegraphics-thumbnailers' 'loupe' 'papers' 'gnome-text-editor' 'qalculate-gtk' 'blueman' 'gnome-disk-utility' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'cliphist' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'libnotify' 'jq')
+depends=('hyprland' 'hyprlock' 'hypridle' 'hyprpolkitagent' 'hyprpwcenter' 'hyprpicker' 'hyprsunset' 'quickshell' 'qt6-multimedia' 'swaybg' 'mpvpaper' 'socat' 'x64-themes' 'kitty' 'opencode' 'dolphin' 'breeze' 'adw-gtk-theme' 'xdg-terminal-exec' 'xdg-user-dirs' 'ark' 'ffmpegthumbs' 'kdegraphics-thumbnailers' 'loupe' 'papers' 'gnome-text-editor' 'qalculate-gtk' 'blueman' 'gnome-disk-utility' 'papirus-icon-theme' 'ttf-jetbrains-mono-nerd' 'grim' 'slurp' 'wl-clipboard' 'cliphist' 'wf-recorder' 'gpu-screen-recorder' 'brightnessctl' 'libnotify' 'jq')
 install=x64-hyprland-settings.install
 source=(
     'hyprland.lua'
@@ -14,6 +14,7 @@ source=(
     '01-monolith.jpg'
     'x64-hyprland-scale'
     'x64-hyprland-ctl'
+    'x64-theme'
     'kdeglobals'
     'papirus-folders'
     '10-qt.conf'
@@ -22,16 +23,17 @@ source=(
     'chromium-flags.conf'
     '90-x64-polkit.preset'
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
     # Install documentation
     mkdir -p "${pkgdir}/usr/share/doc/${pkgname}"
     echo "X64 LIOS Hyprland Desktop Settings (Quickshell Qt6 + Native Lua)" > "${pkgdir}/usr/share/doc/${pkgname}/README"
 
-    # Install monitor scaling & desktop control CLI engines
+    # Install monitor scaling, theme & desktop control CLI engines
     install -Dm755 "${srcdir}/x64-hyprland-scale" "${pkgdir}/usr/bin/x64-hyprland-scale"
     install -Dm755 "${srcdir}/x64-hyprland-ctl" "${pkgdir}/usr/bin/x64-hyprland-ctl"
+    install -Dm755 "${srcdir}/x64-theme" "${pkgdir}/usr/bin/x64-theme"
     install -Dm755 "${srcdir}/papirus-folders" "${pkgdir}/usr/bin/papirus-folders"
 
     # Install skeleton and system-wide default configuration

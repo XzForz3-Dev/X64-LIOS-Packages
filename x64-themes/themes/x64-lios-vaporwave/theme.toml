@@ -1,0 +1,8 @@
+id = "x64-lios-vaporwave"
+name = "X64 Vaporwave"
+author = "X64 Studios"
+description = "Rosa retro-futurista y violeta nocturno synthwave"
+order = 6
+mode = "dark"
+papirus_color = "magenta"
+default_background = "01-vaporwave-monolith.jpg"

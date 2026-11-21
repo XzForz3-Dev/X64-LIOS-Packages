@@ -36,15 +36,15 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("xdg-user-dirs-update 2>/dev/null &")
 
     -- Export Wayland & Desktop session variables to DBus / Systemd
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
-    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION GTK_THEME")
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE QT_QPA_PLATFORMTHEME KDE_SESSION_VERSION")
 
     -- Official Hyprland Polkit Authentication Agent (Qt6/QML) via systemd user service + fallback
     hl.exec_cmd("systemctl --user start hyprpolkitagent.service 2>/dev/null || (/usr/lib/hyprpolkitagent/hyprpolkitagent || /usr/lib/polkit-kde-authentication-agent-1) &")
-    hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null &")
+    hl.exec_cmd("[ -s ~/.config/x64-theme/state.json ] || (gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null; gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null) &")
 
-    -- Monolith 4K Wallpaper Daemon
-    hl.exec_cmd("killall swaybg 2>/dev/null; swaybg -i /usr/share/backgrounds/x64-lios/01-monolith.jpg -m fill &")
+    -- X64 Sovereign Wallpaper & Live Theme State Restore (Wallpaper.qml + optional mpvpaper)
+    hl.exec_cmd("killall swaybg 2>/dev/null; x64-theme restore &")
 
     -- Quickshell Cyberpunk Desktop Shell (Auto GPU-accelerated on bare-metal, software fallback on VMs)
     hl.exec_cmd("x64-hyprland-ctl launch-shell &")
@@ -65,9 +65,8 @@ end)
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("KDE_SESSION_VERSION", "6")
-hl.env("GTK_THEME", "adw-gtk3-dark")
 hl.env("GDK_SCALE", "1")
 hl.env("GDK_BACKEND", "wayland,x11,*")
 hl.env("SDL_VIDEODRIVER", "wayland")
@@ -245,6 +244,7 @@ hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + Space",  hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + C",      hl.dsp.exec_cmd("quickshell ipc call control toggle"))
+hl.bind(mainMod .. " + T",      hl.dsp.exec_cmd("quickshell ipc call theme toggle"))
 hl.bind(mainMod .. " + CTRL + N", hl.dsp.exec_cmd("quickshell ipc call network toggle"))
 hl.bind(mainMod .. " + L",      hl.dsp.exec_cmd("quickshell ipc call lock lock"))
 hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("quickshell ipc call clipboard toggle"))
@@ -364,6 +364,13 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("x64-hyprland-ctl record togg
 -- Managed automatically by x64-hyprland-scale / Control Center and preserved across package updates.
 local monitors_cfg = (os.getenv("HOME") or "") .. "/.config/hypr/monitors.lua"
 pcall(dofile, monitors_cfg)
+
+---------------------------------------------------
+---- SOVEREIGN LIVE THEME BORDERS (theme.lua)  ----
+---------------------------------------------------
+-- Managed automatically by x64-theme / X64 Theme Studio and preserved across package updates.
+local theme_cfg = (os.getenv("HOME") or "") .. "/.config/hypr/theme.lua"
+pcall(dofile, theme_cfg)
 
 -----------------------------------------
 ---- USER CUSTOMIZATION (custom.lua) ----

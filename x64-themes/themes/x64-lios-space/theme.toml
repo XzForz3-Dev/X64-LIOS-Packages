@@ -1,0 +1,8 @@
+id = "x64-lios-space"
+name = "X64 Space"
+author = "X64 Studios"
+description = "Vacío estelar profundo con acentos ámbar y agujeros negros"
+order = 2
+mode = "dark"
+papirus_color = "orange"
+default_background = "background.mp4"

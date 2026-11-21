@@ -1,0 +1,8 @@
+id = "x64-lios-matrix"
+name = "X64 Matrix"
+author = "X64 Studios"
+description = "Verde fósforo clásico de terminal sobre negro puro"
+order = 5
+mode = "dark"
+papirus_color = "green"
+default_background = "01-matrix-monolith.jpg"

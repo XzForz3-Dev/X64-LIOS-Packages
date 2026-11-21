@@ -1,0 +1,8 @@
+id = "x64-lios-crimson"
+name = "X64 Crimson"
+author = "X64 Studios"
+description = "Obsidiana OLED y neón carmesí — estética oficial X64 LIOS"
+order = 1
+mode = "dark"
+papirus_color = "red"
+default_background = "01-monolith.jpg"

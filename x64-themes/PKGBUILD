@@ -1,0 +1,23 @@
+# Maintainer: X64 Studios <dev@x64lios.com>
+pkgname=x64-themes
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS Theme Collection for X64 Theme Studio (Crimson, Space, Cosmic Eyes, Cyberpunk, Matrix, Vaporwave, Monochrome)"
+arch=('any')
+url="https://x64lios.com"
+license=('GPL-3.0-or-later')
+
+package() {
+    local dst="${pkgdir}/usr/share/x64-themes"
+    install -dm755 "${dst}"
+
+    local tdir tname
+    for tdir in "${startdir}/themes/"*; do
+        [ -d "${tdir}" ] || continue
+        tname=$(basename "${tdir}")
+        cp -r "${tdir}" "${dst}/${tname}"
+    done
+
+    find "${dst}" -type d -exec chmod 755 {} +
+    find "${dst}" -type f -exec chmod 644 {} +
+}

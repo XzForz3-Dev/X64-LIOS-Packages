@@ -8,6 +8,7 @@ import webbrowser
 import locale
 import fcntl
 import re
+import json
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QFrame, QStackedWidget, QGraphicsDropShadowEffect,
@@ -3967,14 +3968,15 @@ def format_rich_tooltip(title, badge="", guide_key=None, fallback_desc=""):
             f"</td></tr></table>"
         )
     what_txt, for_txt, when_txt = guide
+    acc_col = ACTIVE_THEME["accent_light"]
     return (
         f"<table width='430' cellspacing='0' cellpadding='2'><tr><td>"
         f"<b style='color:#ffffff; font-size:13px;'>{title}</b>{badge_html}"
         f"<hr style='border:none; background-color:#2e2e3a; height:1px; margin:5px 0;'>"
         f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-        f"<b style='color:#ef4444;'>• {lbl_what}</b> {what_txt}</p>"
+        f"<b style='color:{acc_col};'>• {lbl_what}</b> {what_txt}</p>"
         f"<p style='margin:4px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
-        f"<b style='color:#ef4444;'>• {lbl_for}</b> {for_txt}</p>"
+        f"<b style='color:{acc_col};'>• {lbl_for}</b> {for_txt}</p>"
         f"<p style='margin:3px 0; line-height:1.35; font-size:11.5px; color:#e2e2ea;'>"
         f"</td></tr></table>"
     )
@@ -4041,6 +4043,285 @@ SCROLLBAR_STYLE = """
 """
 
 
+# ==============================================================================
+# X64 THEME STUDIO — DYNAMIC LIVE THEME ENGINE (HYPRLAND / OMARCHY / FALLBACK)
+# ==============================================================================
+
+def _theme_hex_to_rgb(h):
+    h = str(h or "").strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6:
+        return (220, 38, 38)
+    try:
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    except Exception:
+        return (220, 38, 38)
+
+
+def _theme_rgb_to_hex(rgb):
+    return f"#{int(max(0, min(255, rgb[0]))):02x}{int(max(0, min(255, rgb[1]))):02x}{int(max(0, min(255, rgb[2]))):02x}"
+
+
+def _theme_blend(c1, c2, factor=0.5):
+    r1, g1, b1 = _theme_hex_to_rgb(c1)
+    r2, g2, b2 = _theme_hex_to_rgb(c2)
+    return _theme_rgb_to_hex((
+        r1 + (r2 - r1) * factor,
+        g1 + (g2 - g1) * factor,
+        b1 + (b2 - b1) * factor,
+    ))
+
+
+def _theme_contrast_fg(hex_color):
+    r, g, b = _theme_hex_to_rgb(hex_color)
+    def _lin(c):
+        x = c / 255.0
+        return x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+    lum = 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+    return "#0a0b10" if lum > 0.38 else "#ffffff"
+
+
+DEFAULT_X64_THEME = {
+    "is_default": True,
+    "id": "x64-lios-crimson",
+    "accent": "#dc2626",
+    "accent_light": "#ef4444",
+    "accent_soft": "#ff9999",
+    "accent_deep": "#991b1b",
+    "accent_fg": "#ffffff",
+    "bg": "#080808",
+    "bg_dark": "#050505",
+    "bg_surface": "#121217",
+    "bg_elevated": "#18181f",
+    "sidebar_bottom": "#110000",
+    "border_mid": "#33333e",
+    "fg": "#f2f2f2",
+}
+
+
+def load_x64_theme_palette():
+    t = dict(DEFAULT_X64_THEME)
+    has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
+    x64_pal = os.path.expanduser("~/.config/x64-theme/palette.json")
+
+    raw_accent = None
+    raw_accent_hover = None
+    raw_accent_deep = None
+    raw_accent_fg = None
+    raw_bg = None
+    raw_bg_dark = None
+    raw_bg_surface = None
+    raw_bg_elevated = None
+    raw_fg = None
+    theme_id = "x64-lios-crimson"
+
+    if not has_omarchy and os.path.isfile(x64_pal):
+        try:
+            with open(x64_pal, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and data.get("accent"):
+                theme_id = str(data.get("theme") or data.get("id") or "custom")
+                raw_accent = data.get("accent")
+                raw_accent_hover = data.get("accentHover")
+                raw_accent_deep = data.get("accentDeep")
+                raw_accent_fg = data.get("accentFg")
+                raw_bg = data.get("bgDark") or data.get("bg")
+                raw_bg_dark = data.get("darkBackground") or data.get("bgBar")
+                raw_bg_surface = data.get("bgCard") or data.get("bgSurface")
+                raw_bg_elevated = data.get("bgElevated")
+                raw_fg = data.get("textPrimary") or data.get("fg")
+                if theme_id == "x64-lios-crimson" and not str(data.get("accentOverride") or "").strip():
+                    return t
+        except Exception:
+            pass
+    else:
+        om_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+        if os.path.isfile(om_file):
+            try:
+                import tomllib
+                with open(om_file, "rb") as f:
+                    om = tomllib.load(f)
+                theme_id = "omarchy"
+                raw_accent = om.get("accent") or om.get("red") or om.get("color1")
+                raw_accent_hover = om.get("bright_accent") or om.get("bright_red")
+                raw_bg = om.get("background") or om.get("bg")
+                raw_bg_dark = om.get("dark_background")
+                raw_bg_surface = om.get("lighter_background")
+                raw_fg = om.get("foreground") or om.get("fg")
+            except Exception:
+                pass
+
+    if not raw_accent:
+        return t
+
+    accent = raw_accent
+    accent_light = raw_accent_hover or _theme_blend(accent, "#ffffff", 0.16)
+    accent_soft = _theme_blend(accent_light, "#ffffff", 0.38)
+    accent_deep = raw_accent_deep or _theme_blend(accent, "#000000", 0.34)
+    accent_fg = raw_accent_fg or _theme_contrast_fg(accent)
+
+    bg = raw_bg or "#080808"
+    bg_dark = raw_bg_dark or _theme_blend(bg, "#000000", 0.28)
+    bg_surface = raw_bg_surface or _theme_blend(bg, "#ffffff", 0.06)
+    bg_elevated = raw_bg_elevated or _theme_blend(bg, "#ffffff", 0.11)
+    fg = raw_fg or "#f2f2f2"
+    sidebar_bottom = _theme_blend(bg_dark, accent, 0.14)
+    border_mid = _theme_blend(bg_elevated, fg, 0.18)
+
+    t.update({
+        "is_default": False,
+        "id": theme_id,
+        "accent": accent,
+        "accent_light": accent_light,
+        "accent_soft": accent_soft,
+        "accent_deep": accent_deep,
+        "accent_fg": accent_fg,
+        "bg": bg,
+        "bg_dark": bg_dark,
+        "bg_surface": bg_surface,
+        "bg_elevated": bg_elevated,
+        "sidebar_bottom": sidebar_bottom,
+        "border_mid": border_mid,
+        "fg": fg,
+    })
+    return t
+
+
+ACTIVE_THEME = load_x64_theme_palette()
+
+_SOLID_ACCENT_BG_RE = re.compile(
+    r"background(?:-color)?\s*:[^;]*(?:#(?:d60000|cc0000|ff1a1a|ff3333|ff4d4d|ef4444|dc2626|b80000|850000|800000))",
+    re.IGNORECASE,
+)
+_WHITE_COLOR_PROP_RE = re.compile(r"(?<![a-zA-Z0-9_-])(color\s*:\s*)(?:#ffffff|#fff|white)\b", re.IGNORECASE)
+_SEL_BG_ACCENT_RE = re.compile(r"(selection-background-color\s*:\s*#(?:cc0000|dc2626|ef4444)\s*;)", re.IGNORECASE)
+_QSS_HEX_RE = re.compile(
+    r"#(?:ff9999|ff4d4d|ff3333|ff1a1a|ef4444|dc2626|d60000|cc0000|"
+    r"b80000|b31b1b|b30000|a30000|991b1b|850000|800000|110000|"
+    r"080808|050505|0d0d11|0e0e12|0f0f0f|121212|121216|121217|141419|"
+    r"15151c|16161c|16161d|18181f|1a1a1a|1a1a20|24242c|2e2e3a|333333|33333c|33333e|383842)\b",
+    re.IGNORECASE,
+)
+_QSS_RGBA_RE = re.compile(
+    r"rgba\(\s*(204\s*,\s*0\s*,\s*0|220\s*,\s*38\s*,\s*38|239\s*,\s*68\s*,\s*68|45\s*,\s*0\s*,\s*0)\s*,\s*([^)]+)\)",
+    re.IGNORECASE,
+)
+
+
+def recolor_qss(css):
+    if not css or ACTIVE_THEME.get("is_default"):
+        return css
+    t = ACTIVE_THEME
+    accent_fg = t["accent_fg"]
+
+    # 1. Preserve WCAG text contrast on solid accent buttons / selections
+    if accent_fg.lower() != "#ffffff":
+        if "{" in css:
+            def _fix_block(m):
+                blk = m.group(0)
+                if _SOLID_ACCENT_BG_RE.search(blk):
+                    blk = _WHITE_COLOR_PROP_RE.sub(lambda cm: cm.group(1) + accent_fg, blk)
+                return blk
+            css = re.sub(r"\{[^{}]*\}", _fix_block, css)
+        elif _SOLID_ACCENT_BG_RE.search(css):
+            css = _WHITE_COLOR_PROP_RE.sub(lambda cm: cm.group(1) + accent_fg, css)
+        css = _SEL_BG_ACCENT_RE.sub(lambda m: f"{m.group(1)} selection-color: {accent_fg};", css)
+
+    # 2. Recolor crimson rgba(...) tints to active theme accent RGB
+    ar, ag, ab = _theme_hex_to_rgb(t["accent"])
+    lr, lg, lb = _theme_hex_to_rgb(t["accent_light"])
+    dr, dg, db = _theme_hex_to_rgb(t["accent_deep"])
+
+    def _sub_rgba(m):
+        rgb_key = re.sub(r"\s+", "", m.group(1))
+        alpha = m.group(2).strip()
+        if rgb_key == "239,68,68":
+            return f"rgba({lr}, {lg}, {lb}, {alpha})"
+        if rgb_key == "45,0,0":
+            return f"rgba({dr}, {dg}, {db}, {alpha})"
+        return f"rgba({ar}, {ag}, {ab}, {alpha})"
+
+    css = _QSS_RGBA_RE.sub(_sub_rgba, css)
+
+    # 3. Recolor crimson accents & dark neutral surfaces
+    hex_map = {
+        "#ff9999": t["accent_soft"],
+        "#ff4d4d": t["accent_light"],
+        "#ff3333": t["accent_light"],
+        "#ff1a1a": t["accent_light"],
+        "#ef4444": t["accent_light"],
+        "#dc2626": t["accent"],
+        "#d60000": t["accent"],
+        "#cc0000": t["accent"],
+        "#b80000": t["accent_deep"],
+        "#b31b1b": t["accent_deep"],
+        "#b30000": t["accent_deep"],
+        "#a30000": t["accent_deep"],
+        "#991b1b": t["accent_deep"],
+        "#850000": t["accent_deep"],
+        "#800000": t["accent_deep"],
+        "#110000": t["sidebar_bottom"],
+        "#080808": t["bg"],
+        "#050505": t["bg_dark"],
+        "#0d0d11": t["bg_dark"],
+        "#0e0e12": t["bg_dark"],
+        "#0f0f0f": t["bg_dark"],
+        "#121212": t["bg_surface"],
+        "#121216": t["bg_surface"],
+        "#121217": t["bg_surface"],
+        "#141419": t["bg_surface"],
+        "#15151c": t["bg_elevated"],
+        "#16161c": t["bg_elevated"],
+        "#16161d": t["bg_elevated"],
+        "#18181f": t["bg_elevated"],
+        "#1a1a1a": t["bg_elevated"],
+        "#1a1a20": t["bg_elevated"],
+        "#24242c": t["border_mid"],
+        "#2e2e3a": t["border_mid"],
+        "#333333": t["border_mid"],
+        "#33333c": t["border_mid"],
+        "#33333e": t["border_mid"],
+        "#383842": t["border_mid"],
+    }
+    return _QSS_HEX_RE.sub(lambda m: hex_map.get(m.group(0).lower(), m.group(0)), css)
+
+
+_ORIG_QWIDGET_SET_STYLESHEET = QWidget.setStyleSheet
+
+
+def _x64_themed_set_stylesheet(self, css):
+    return _ORIG_QWIDGET_SET_STYLESHEET(self, recolor_qss(css))
+
+
+QWidget.setStyleSheet = _x64_themed_set_stylesheet
+
+
+def apply_x64_hello_app_theme(app):
+    t = ACTIVE_THEME
+    pal = app.palette()
+    pal.setColor(QPalette.ColorRole.Window, QColor(t["bg_surface"]))
+    pal.setColor(QPalette.ColorRole.WindowText, QColor(t["fg"]))
+    pal.setColor(QPalette.ColorRole.Base, QColor(t["bg_dark"]))
+    pal.setColor(QPalette.ColorRole.AlternateBase, QColor(t["bg_elevated"]))
+    pal.setColor(QPalette.ColorRole.Text, QColor(t["fg"]))
+    pal.setColor(QPalette.ColorRole.Button, QColor(t["bg_elevated"]))
+    pal.setColor(QPalette.ColorRole.ButtonText, QColor(t["fg"]))
+    pal.setColor(QPalette.ColorRole.Highlight, QColor(t["accent"]))
+    pal.setColor(QPalette.ColorRole.HighlightedText, QColor(t["accent_fg"]))
+    app.setPalette(pal)
+    app.setStyleSheet(f"""
+        QToolTip {{
+            background-color: {t['bg_surface']};
+            color: {t['fg']};
+            border: 1px solid {t['accent']};
+            border-radius: 7px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }}
+    """)
+
+
 SVG_ICONS = {
     "home": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#ff3333" fill-opacity="0.14"/><polyline points="9 22 9 12 15 12 15 22" stroke="#ffffff"/></svg>''',
     "info": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#ff3333" fill-opacity="0.14"/><line x1="12" y1="16" x2="12" y2="12" stroke="#ffffff" stroke-width="2.4"/><line x1="12" y1="8" x2="12.01" y2="8" stroke="#ffffff" stroke-width="3"/></svg>''',
@@ -4078,12 +4359,20 @@ SVG_ICONS = {
     "sunshine": b'''<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff3333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5" fill="#ff3333" fill-opacity="0.22" stroke="#ffffff" stroke-width="2.2"/><line x1="12" y1="1" x2="12" y2="3" stroke="#ff3333" stroke-width="2.4"/><line x1="12" y1="21" x2="12" y2="23" stroke="#ff3333" stroke-width="2.4"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="#ffffff" stroke-width="2.2"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="#ffffff" stroke-width="2.2"/><line x1="1" y1="12" x2="3" y2="12" stroke="#ff3333" stroke-width="2.4"/><line x1="21" y1="12" x2="23" y2="12" stroke="#ff3333" stroke-width="2.4"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="#ffffff" stroke-width="2.2"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="#ffffff" stroke-width="2.2"/></svg>'''
 }
 
-def make_svg_pixmap(icon_key, size=28, accent="#ff3333"):
+def make_svg_pixmap(icon_key, size=28, accent=None):
     if icon_key in SVG_ICONS:
         pix = QPixmap()
         svg_data = SVG_ICONS[icon_key]
-        if accent and accent != "#ff3333":
-            svg_data = svg_data.replace(b"#ff3333", accent.encode("utf-8"))
+        if accent is None:
+            resolved_accent = ACTIVE_THEME["accent_light"] if not ACTIVE_THEME.get("is_default") else "#ff3333"
+        elif not ACTIVE_THEME.get("is_default") and accent.lower() in ("#ff3333", "#ef4444"):
+            resolved_accent = ACTIVE_THEME["accent_light"] if accent.lower() == "#ff3333" else ACTIVE_THEME["accent"]
+        else:
+            resolved_accent = accent
+        if resolved_accent and resolved_accent != "#ff3333":
+            svg_data = svg_data.replace(b"#ff3333", resolved_accent.encode("utf-8"))
+        if not ACTIVE_THEME.get("is_default"):
+            svg_data = svg_data.replace(b"#180a0c", ACTIVE_THEME["bg_surface"].encode("utf-8"))
         if pix.loadFromData(svg_data, "SVG"):
             return pix.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     icon = QIcon.fromTheme(icon_key)
@@ -4351,7 +4640,7 @@ class DnsOptimizerPanel(QFrame):
             lbl_dot = FitLabel(f"TLS (DoT): {p['dot']}")
             lbl_dot.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_dot.setStyleSheet("color: #888894; font-size: 10.5px; border: none; background: transparent;")
-            lbl_active_badge = QLabel(f"<span style='color:#ef4444;'>●</span> {tr('ACTIVE')}")
+            lbl_active_badge = QLabel(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span> {tr('ACTIVE')}")
             lbl_active_badge.setTextFormat(Qt.TextFormat.RichText)
             lbl_active_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             lbl_active_badge.setStyleSheet("""
@@ -4482,7 +4771,7 @@ class DnsOptimizerPanel(QFrame):
         if active_idx is not None:
             pname = DNS_PROVIDERS[active_idx]["name"]
             dot_tag = " (DoT)" if dot_enabled else ""
-            self.lbl_active_dns_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{pname}{dot_tag}")
+            self.lbl_active_dns_pill.setText(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span>&nbsp;&nbsp;{pname}{dot_tag}")
             self.lbl_active_dns_pill.setStyleSheet("""
                 color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
                 border: 1px solid rgba(239, 68, 68, 0.40); border-radius: 6px;
@@ -4624,7 +4913,7 @@ class DnsOptimizerPanel(QFrame):
         if best_idx is not None:
             self.status_lbl.setStyleSheet("color: #d4d4d8; font-size: 12px; font-weight: bold; background: transparent; border: none;")
             self.status_lbl.setTextFormat(Qt.TextFormat.RichText)
-            self.status_lbl.setText(f"<span style='color:#ef4444;'>⚡</span> {tr('Fastest DNS:')} {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
+            self.status_lbl.setText(f"<span style='color:{ACTIVE_THEME['accent_light']};'>⚡</span> {tr('Fastest DNS:')} {DNS_PROVIDERS[best_idx]['name']} ({best_ms:.1f} ms)")
         else:
             self.status_lbl.setText("")
 
@@ -4844,7 +5133,7 @@ class ScxSchedulerPanel(QFrame):
         lbl_act_title.setStyleSheet("color: #bbbbbb; font-size: 12.5px; font-weight: bold; border: none;")
         top_bar.addWidget(lbl_act_title)
 
-        self.lbl_active_pill = QLabel("<span style='color:#ef4444;'>●</span> BORE")
+        self.lbl_active_pill = QLabel(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span> BORE")
         self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_active_pill.setStyleSheet("""
             color: #ffffff; background-color: rgba(220, 38, 38, 0.10);
@@ -5024,7 +5313,7 @@ class ScxSchedulerPanel(QFrame):
         self.active_sched_id = s_id
         self.active_mode_id = m_id
         self.lbl_active_pill.setTextFormat(Qt.TextFormat.RichText)
-        self.lbl_active_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{pretty}</span>")
+        self.lbl_active_pill.setText(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{pretty}</span>")
         self.lbl_active_pill.setToolTip(format_rich_tooltip(
             pretty,
             tr("ACTIVE"),
@@ -5041,7 +5330,7 @@ class ScxSchedulerPanel(QFrame):
             if s_info["id"] == s_id:
                 found_idx = i
                 lbl_badge.setTextFormat(Qt.TextFormat.RichText)
-                lbl_badge.setText(f"<span style='color:#ef4444;'>●</span> {tr('ACTIVE')}")
+                lbl_badge.setText(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span> {tr('ACTIVE')}")
                 lbl_badge.setStyleSheet("""
                     color: #ffffff; background-color: rgba(239, 68, 68, 0.18);
                     border: 1px solid rgba(239, 68, 68, 0.50); border-radius: 6px;
@@ -5274,7 +5563,7 @@ class KernelStatusCard(QFrame):
         vbox.addStretch(1)
         hbox.addLayout(vbox, 1)
 
-        lbl_badge = QLabel(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;{badge_text}")
+        lbl_badge = QLabel(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span>&nbsp;&nbsp;{badge_text}")
         lbl_badge.setTextFormat(Qt.TextFormat.RichText)
         lbl_badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         lbl_badge.setStyleSheet("""
@@ -5499,18 +5788,25 @@ class CardToggleSwitch(QPushButton):
         if not self.isEnabled():
             p.setOpacity(0.55)
         hovered = self.underMouse() and self.isEnabled()
+        t = ACTIVE_THEME
         if self._checked:
-            border_col = "#ff4d4d" if hovered else "#ff3333"
-            fill_col = "#d60000" if hovered else "#b80000"
+            if t.get("is_default"):
+                border_col = "#ff4d4d" if hovered else "#ff3333"
+                fill_col = "#d60000" if hovered else "#b80000"
+                thumb_col = "#ffffff"
+            else:
+                border_col = t["accent_light"] if hovered else t["accent"]
+                fill_col = t["accent"] if hovered else t["accent_deep"]
+                thumb_col = t["accent_fg"]
             p.setPen(QPen(QColor(border_col), 1.2))
             p.setBrush(QBrush(QColor(fill_col)))
             p.drawRoundedRect(1, 1, 42, 22, 11, 11)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QBrush(QColor("#ffffff")))
+            p.setBrush(QBrush(QColor(thumb_col)))
             p.drawEllipse(23, 4, 16, 16)
         else:
-            border_col = "#ef4444" if hovered else "#383842"
-            fill_col = "#24242c" if hovered else "#1a1a20"
+            border_col = (t["accent_light"] if not t.get("is_default") else "#ef4444") if hovered else (t["border_mid"] if not t.get("is_default") else "#383842")
+            fill_col = (t["bg_elevated"] if not t.get("is_default") else "#24242c") if hovered else (t["bg_surface"] if not t.get("is_default") else "#1a1a20")
             thumb_col = "#d4d4d8" if hovered else "#777782"
             p.setPen(QPen(QColor(border_col), 1.2))
             p.setBrush(QBrush(QColor(fill_col)))
@@ -5715,7 +6011,7 @@ class MitigationsSwitchCard(QFrame):
                 font-size: 10px;
             """)
         else:
-            self.status_pill.setText(f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{tr('MITIGATIONS ACTIVE (SECURE)')}</span>")
+            self.status_pill.setText(f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span>&nbsp;&nbsp;<span style='color:#ffffff;'>{tr('MITIGATIONS ACTIVE (SECURE)')}</span>")
             self.status_pill.setStyleSheet("""
                 color: #ffffff;
                 background-color: rgba(220, 38, 38, 0.10);
@@ -6168,16 +6464,22 @@ class MiniToggleSwitch(QWidget):
     def paintEvent(self, _event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        t = ACTIVE_THEME
         if self._checked:
-            p.setPen(QPen(QColor("#ff3333"), 1))
-            p.setBrush(QBrush(QColor("#b80000")))
+            pen_col = "#ff3333" if t.get("is_default") else t["accent_light"]
+            fill_col = "#b80000" if t.get("is_default") else t["accent_deep"]
+            thumb_col = "#ffffff" if t.get("is_default") else t["accent_fg"]
+            p.setPen(QPen(QColor(pen_col), 1))
+            p.setBrush(QBrush(QColor(fill_col)))
             p.drawRoundedRect(1, 1, 32, 16, 8, 8)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QBrush(QColor("#ffffff")))
+            p.setBrush(QBrush(QColor(thumb_col)))
             p.drawEllipse(18, 3, 12, 12)
         else:
-            p.setPen(QPen(QColor("#383842"), 1))
-            p.setBrush(QBrush(QColor("#1a1a20")))
+            pen_col = "#383842" if t.get("is_default") else t["border_mid"]
+            fill_col = "#1a1a20" if t.get("is_default") else t["bg_surface"]
+            p.setPen(QPen(QColor(pen_col), 1))
+            p.setBrush(QBrush(QColor(fill_col)))
             p.drawRoundedRect(1, 1, 32, 16, 8, 8)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QBrush(QColor("#777782")))
@@ -6540,11 +6842,80 @@ class X64Hello(QWidget):
         self.pacman_watcher = QFileSystemWatcher(["/var/lib/pacman/local"], self)
         self.pacman_watcher.directoryChanged.connect(self.on_pacman_db_changed)
 
+        self._setup_theme_watcher()
+
         self.hw_timer = QTimer(self)
         self.hw_timer.timeout.connect(self.update_hardware_telemetry)
         self.hw_timer.start(1500)
         self.update_hardware_telemetry(force=True)
 
+        self.refresh_services_async()
+
+    def _setup_theme_watcher(self):
+        self.theme_watcher = QFileSystemWatcher(self)
+        self._last_theme_stamp = self._read_theme_stamp()
+        self._arm_theme_watcher()
+        self.theme_watcher.fileChanged.connect(self._on_theme_fs_event)
+        self.theme_watcher.directoryChanged.connect(self._on_theme_fs_event)
+        self.theme_poll_timer = QTimer(self)
+        self.theme_poll_timer.timeout.connect(self._check_theme_poll)
+        self.theme_poll_timer.start(1000)
+
+    def _read_theme_stamp(self):
+        x64_f = os.path.expanduser("~/.config/x64-theme/palette.json")
+        om_f = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+        try:
+            m1 = os.path.getmtime(x64_f) if os.path.isfile(x64_f) else None
+        except Exception:
+            m1 = None
+        try:
+            m2 = os.path.getmtime(om_f) if os.path.isfile(om_f) else None
+        except Exception:
+            m2 = None
+        return (m1, m2)
+
+    def _arm_theme_watcher(self):
+        paths = [
+            os.path.expanduser("~/.config/x64-theme"),
+            os.path.expanduser("~/.config/x64-theme/palette.json"),
+            os.path.expanduser("~/.local/state/omarchy/current"),
+            os.path.expanduser("~/.local/state/omarchy/current/theme"),
+            os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml"),
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                if os.path.isdir(p) and p not in self.theme_watcher.directories():
+                    self.theme_watcher.addPath(p)
+                elif os.path.isfile(p) and p not in self.theme_watcher.files():
+                    self.theme_watcher.addPath(p)
+
+    def _check_theme_poll(self):
+        stamp = self._read_theme_stamp()
+        if stamp != self._last_theme_stamp:
+            self._last_theme_stamp = stamp
+            self._on_theme_fs_event()
+
+    def _on_theme_fs_event(self, _path=None):
+        global ACTIVE_THEME
+        new_t = load_x64_theme_palette()
+        self._arm_theme_watcher()
+        if all(
+            ACTIVE_THEME.get(k) == new_t.get(k)
+            for k in ("is_default", "accent", "accent_light", "accent_fg", "bg", "bg_surface")
+        ):
+            return
+        ACTIVE_THEME = new_t
+        QTimer.singleShot(0, self._apply_theme_hotreload)
+
+    def _apply_theme_hotreload(self):
+        app_inst = QApplication.instance()
+        if app_inst is not None:
+            apply_x64_hello_app_theme(app_inst)
+        self._apply_root_stylesheet()
+        current_idx = self.stacked_widget.currentIndex() if hasattr(self, "stacked_widget") else 0
+        self._svc_worker = None
+        self.build_ui(initial_page=current_idx)
+        self.update_hardware_telemetry(force=True)
         self.refresh_services_async()
 
     def refresh_gpu_telemetry_async(self):
@@ -6749,6 +7120,16 @@ class X64Hello(QWidget):
         except Exception:
             pass
         self.resize(init_w, init_h)
+        self._apply_root_stylesheet()
+
+        self.main_layout = QHBoxLayout()
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(0)
+        self.setLayout(self.main_layout)
+
+        self.build_ui(initial_page=0)
+
+    def _apply_root_stylesheet(self):
         self.setStyleSheet("""
             QWidget#X64HelloRoot {
                 background-color: #080808;
@@ -6762,13 +7143,6 @@ class X64Hello(QWidget):
                 font-size: 12px;
             }
         """)
-
-        self.main_layout = QHBoxLayout()
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
-        self.setLayout(self.main_layout)
-
-        self.build_ui(initial_page=0)
 
     def build_ui(self, initial_page=0):
         while self.main_layout.count():
@@ -6906,7 +7280,7 @@ class X64Hello(QWidget):
         pill_hbox.setSpacing(6)
 
         pill_lbl = QLabel(
-            f"<span style='color:#ef4444;'>●</span>&nbsp;&nbsp;"
+            f"<span style='color:{ACTIVE_THEME['accent_light']};'>●</span>&nbsp;&nbsp;"
             f"<span style='color:#f4f4f5; font-weight:bold;'>{current_lang_str}</span>"
             f"&nbsp;&nbsp;<span style='color:#71717a;'>·</span>&nbsp;&nbsp;"
             f"<span style='color:#a1a1aa; font-size:10.5px; font-weight:bold;'>{iso_code}</span>"
@@ -8463,6 +8837,8 @@ class X64Hello(QWidget):
         try:
             if hasattr(self, "hw_timer") and self.hw_timer:
                 self.hw_timer.stop()
+            if hasattr(self, "theme_poll_timer") and self.theme_poll_timer:
+                self.theme_poll_timer.stop()
         except Exception:
             pass
         for w in list(_BG_WORKERS):
@@ -8528,27 +8904,7 @@ if __name__ == '__main__':
     app.setWindowIcon(icon)
     QIcon.setThemeName("breeze-dark")
     app.setStyle("Fusion")
-    _pal = app.palette()
-    _pal.setColor(QPalette.ColorRole.Window, QColor("#121217"))
-    _pal.setColor(QPalette.ColorRole.WindowText, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Base, QColor("#0d0d11"))
-    _pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#16161c"))
-    _pal.setColor(QPalette.ColorRole.Text, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Button, QColor("#18181f"))
-    _pal.setColor(QPalette.ColorRole.ButtonText, QColor("#f2f2f2"))
-    _pal.setColor(QPalette.ColorRole.Highlight, QColor("#cc0000"))
-    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-    app.setPalette(_pal)
-    app.setStyleSheet("""
-        QToolTip {
-            background-color: #121217;
-            color: #f2f2f2;
-            border: 1px solid #cc0000;
-            border-radius: 7px;
-            padding: 8px 12px;
-            font-size: 12px;
-        }
-    """)
+    apply_x64_hello_app_theme(app)
     hello = X64Hello()
     hello.setWindowIcon(icon)
     hello.show()

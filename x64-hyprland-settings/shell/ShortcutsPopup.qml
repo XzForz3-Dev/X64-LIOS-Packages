@@ -645,8 +645,8 @@ PanelWindow {
                                                 implicitWidth: Math.max(keyLabel.implicitWidth + 12, 24)
                                                 radius: 5
                                                 readonly property bool isSpecial: modelData === "SUPER" || modelData === "ALT" || modelData === "SHIFT" || modelData === "CTRL" || modelData === "G" || modelData === "S" || modelData === "A" || modelData === "F1"
-                                                color: isSpecial ? "#29ff2b2b" : "#1b1d24"
-                                                border.color: isSpecial ? "#77ff2b2b" : "#2b303d"
+                                                color: isSpecial ? Theme.accentDim : Theme.bgElevated
+                                                border.color: isSpecial ? Theme.accentBorder : Theme.borderSubtle
                                                 border.width: 1
 
                                                 // 3D bottom bevel line
@@ -656,7 +656,7 @@ PanelWindow {
                                                     anchors.right: parent.right
                                                     height: 2
                                                     radius: 1
-                                                    color: parent.isSpecial ? "#55ff2b2b" : "#121419"
+                                                    color: parent.isSpecial ? Theme.accentGlow : Theme.bgDark
                                                 }
 
                                                 Text {

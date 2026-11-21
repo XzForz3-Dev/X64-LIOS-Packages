@@ -310,7 +310,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: cpuGaugeCanvas.val >= 85 ? "#ff2b2b" : (cpuGaugeCanvas.val >= 65 ? "#f5a524" : "#d8d6d0")
+                                    strokeColor: cpuGaugeCanvas.val >= 85 ? Theme.accent : (cpuGaugeCanvas.val >= 65 ? Theme.statusWarn : "#d8d6d0")
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {
@@ -389,7 +389,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: ramGaugeCanvas.val >= 85 ? "#ff2b2b" : (ramGaugeCanvas.val >= 70 ? "#f5a524" : "#d8d6d0")
+                                    strokeColor: ramGaugeCanvas.val >= 85 ? Theme.accent : (ramGaugeCanvas.val >= 70 ? Theme.statusWarn : "#d8d6d0")
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {
@@ -468,7 +468,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: diskGaugeCanvas.val >= 90 ? "#ff2b2b" : (diskGaugeCanvas.val >= 75 ? "#f5a524" : "#d8d6d0")
+                                    strokeColor: diskGaugeCanvas.val >= 90 ? Theme.accent : (diskGaugeCanvas.val >= 75 ? Theme.statusWarn : "#d8d6d0")
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {

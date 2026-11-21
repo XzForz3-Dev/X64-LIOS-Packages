@@ -68,45 +68,38 @@ sync_user_configs() {
             fi
 
             # 2. Quickshell QML Shell (~/.config/quickshell)
+            # Dynamic theme preferences now persist cleanly in ~/.config/x64-theme/
             if [ -d /etc/skel/.config/quickshell ]; then
-                # If user customized Theme.qml (modified accent color), preserve their custom theme
-                local preserve_theme=0
-                if [ "$mode" = "upgrade" ] && [ -f "$target_qs/Theme.qml" ]; then
-                    if ! grep -q 'accent: "#ff2b2b"' "$target_qs/Theme.qml" 2>/dev/null; then
-                        preserve_theme=1
-                        cp -f "$target_qs/Theme.qml" "$target_qs/Theme.qml.user_keep" 2>/dev/null || true
-                    fi
-                fi
-
                 cp -rf /etc/skel/.config/quickshell/* "$target_qs/" 2>/dev/null || true
-
-                if [ "$preserve_theme" -eq 1 ] && [ -f "$target_qs/Theme.qml.user_keep" ]; then
-                    cp -f /etc/skel/.config/quickshell/Theme.qml "$target_qs/Theme.qml.pacnew" 2>/dev/null || true
-                    mv -f "$target_qs/Theme.qml.user_keep" "$target_qs/Theme.qml" 2>/dev/null || true
-                fi
             fi
 
+            local has_live_theme=0
+            [ -s "$user_dir/.config/x64-theme/state.json" ] && has_live_theme=1
+
             # 3. KDE & Qt6 Global Theme (~/.config/kdeglobals)
-            if [ -f /etc/skel/.config/kdeglobals ]; then
+            # Preserve user's active X64 Theme Studio palette on upgrades
+            if [ -f /etc/skel/.config/kdeglobals ] && [ "$has_live_theme" -eq 0 ]; then
                 cp -f /etc/skel/.config/kdeglobals "$user_dir/.config/kdeglobals" 2>/dev/null || true
                 chown "$u:$g" "$user_dir/.config/kdeglobals" 2>/dev/null || true
             fi
 
             # 4. GTK 3 & GTK 4 Global Dark Theme (~/.config/gtk-3.0 and ~/.config/gtk-4.0)
             mkdir -p "$user_dir/.config/gtk-3.0" "$user_dir/.config/gtk-4.0" 2>/dev/null || true
-            if [ -f /etc/skel/.config/gtk-3.0/settings.ini ]; then
-                cp -f /etc/skel/.config/gtk-3.0/settings.ini "$user_dir/.config/gtk-3.0/settings.ini" 2>/dev/null || true
-                cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
-                chown -R "$u:$g" "$user_dir/.config/gtk-3.0" 2>/dev/null || true
-            fi
-            if [ -f /etc/skel/.config/gtk-4.0/settings.ini ]; then
-                cp -f /etc/skel/.config/gtk-4.0/settings.ini "$user_dir/.config/gtk-4.0/settings.ini" 2>/dev/null || true
-                cp -f /etc/skel/.config/gtk-4.0/gtk.css "$user_dir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
-                chown -R "$u:$g" "$user_dir/.config/gtk-4.0" 2>/dev/null || true
-            fi
-            if [ -f "$user_dir/.config/xsettingsd/xsettingsd.conf" ]; then
-                sed -i 's/Net\/ThemeName .*/Net\/ThemeName "adw-gtk3-dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
-                sed -i 's/Net\/IconThemeName .*/Net\/IconThemeName "Papirus-Dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+            if [ "$has_live_theme" -eq 0 ]; then
+                if [ -f /etc/skel/.config/gtk-3.0/settings.ini ]; then
+                    cp -f /etc/skel/.config/gtk-3.0/settings.ini "$user_dir/.config/gtk-3.0/settings.ini" 2>/dev/null || true
+                    cp -f /etc/skel/.config/gtk-3.0/gtk.css "$user_dir/.config/gtk-3.0/gtk.css" 2>/dev/null || true
+                    chown -R "$u:$g" "$user_dir/.config/gtk-3.0" 2>/dev/null || true
+                fi
+                if [ -f /etc/skel/.config/gtk-4.0/settings.ini ]; then
+                    cp -f /etc/skel/.config/gtk-4.0/settings.ini "$user_dir/.config/gtk-4.0/settings.ini" 2>/dev/null || true
+                    cp -f /etc/skel/.config/gtk-4.0/gtk.css "$user_dir/.config/gtk-4.0/gtk.css" 2>/dev/null || true
+                    chown -R "$u:$g" "$user_dir/.config/gtk-4.0" 2>/dev/null || true
+                fi
+                if [ -f "$user_dir/.config/xsettingsd/xsettingsd.conf" ]; then
+                    sed -i 's/Net\/ThemeName .*/Net\/ThemeName "adw-gtk3-dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+                    sed -i 's/Net\/IconThemeName .*/Net\/IconThemeName "Papirus-Dark"/' "$user_dir/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+                fi
             fi
 
             # 5. Enable Hyprland Polkit Agent in systemd user session
@@ -142,12 +135,15 @@ EOF
 
 setup_qt_environment() {
     touch /etc/environment 2>/dev/null || true
-    if ! grep -q "QT_QPA_PLATFORMTHEME=kde" /etc/environment 2>/dev/null; then
-        echo "QT_QPA_PLATFORMTHEME=kde" >> /etc/environment
+    if grep -q "^QT_QPA_PLATFORMTHEME=" /etc/environment 2>/dev/null; then
+        sed -i 's|^QT_QPA_PLATFORMTHEME=.*|QT_QPA_PLATFORMTHEME=gtk3|' /etc/environment 2>/dev/null || true
+    else
+        echo "QT_QPA_PLATFORMTHEME=gtk3" >> /etc/environment
     fi
-    if ! grep -q "KDE_SESSION_VERSION=6" /etc/environment 2>/dev/null; then
+    if ! grep -q "^KDE_SESSION_VERSION=6" /etc/environment 2>/dev/null; then
         echo "KDE_SESSION_VERSION=6" >> /etc/environment
     fi
+    sed -i '/^GTK_THEME=/d' /etc/environment 2>/dev/null || true
 }
 
 post_install() {

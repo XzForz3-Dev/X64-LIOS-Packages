@@ -256,7 +256,36 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Top-Right Circular Session Buttons (Clipboard History, Shortcuts Help, Lock, Reboot, Power Off)
+                // Top-Right Circular Session Buttons (Theme Studio, Clipboard History, Shortcuts Help, Lock, Reboot, Power Off)
+                Rectangle {
+                    implicitWidth: 28
+                    implicitHeight: 28
+                    radius: 14
+                    color: themeBtnArea.containsMouse ? Theme.accentDim : Theme.bgCard
+                    border.color: themeBtnArea.containsMouse ? Theme.accentBorder : Theme.borderSubtle
+                    border.width: 1
+                    Behavior on color { ColorAnimation { duration: 130 } }
+                    Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰏘"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 13
+                        color: themeBtnArea.containsMouse ? Theme.accent : Theme.textSecondary
+                    }
+
+                    MouseArea {
+                        id: themeBtnArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            controlWindow.launchApp("quickshell ipc call theme toggle");
+                        }
+                    }
+                }
+
                 Rectangle {
                     implicitWidth: 28
                     implicitHeight: 28
@@ -376,7 +405,7 @@ PanelWindow {
                     implicitWidth: 28
                     implicitHeight: 28
                     radius: 14
-                    color: offArea.containsMouse ? Theme.accent : "#1fff2b2b"
+                    color: offArea.containsMouse ? Theme.accent : Theme.accentSubtle
                     border.color: offArea.containsMouse ? Theme.accentLight : Theme.borderAccent
                     border.width: 1
                     Behavior on color { ColorAnimation { duration: 130 } }
@@ -428,7 +457,7 @@ PanelWindow {
                             implicitWidth: 22
                             implicitHeight: 22
                             radius: 6
-                            color: controlWindow.caffeineActive ? "#28ff2b2b" : "#0fffffff"
+                            color: controlWindow.caffeineActive ? Theme.accentDim : "#0fffffff"
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰅶"
@@ -453,7 +482,7 @@ PanelWindow {
                             font.family: Theme.fontSans
                             font.pixelSize: 9
                             font.weight: Font.Medium
-                            color: controlWindow.caffeineActive ? "#ff9494" : Theme.textMuted
+                            color: controlWindow.caffeineActive ? Theme.accentText : Theme.textMuted
                         }
                     }
 
@@ -491,7 +520,7 @@ PanelWindow {
                             implicitWidth: 22
                             implicitHeight: 22
                             radius: 6
-                            color: controlWindow.nightlightActive ? "#28ff2b2b" : "#0fffffff"
+                            color: controlWindow.nightlightActive ? Theme.accentDim : "#0fffffff"
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰖔"
@@ -516,7 +545,7 @@ PanelWindow {
                             font.family: Theme.fontSans
                             font.pixelSize: 9
                             font.weight: Font.Medium
-                            color: controlWindow.nightlightActive ? "#ff9494" : Theme.textMuted
+                            color: controlWindow.nightlightActive ? Theme.accentText : Theme.textMuted
                         }
                     }
 
@@ -555,7 +584,7 @@ PanelWindow {
                             implicitWidth: 22
                             implicitHeight: 22
                             radius: 6
-                            color: controlWindow.dndActive ? "#28ff2b2b" : "#0fffffff"
+                            color: controlWindow.dndActive ? Theme.accentDim : "#0fffffff"
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰂛"
@@ -580,7 +609,7 @@ PanelWindow {
                             font.family: Theme.fontSans
                             font.pixelSize: 9
                             font.weight: Font.Medium
-                            color: controlWindow.dndActive ? "#ff9494" : Theme.textMuted
+                            color: controlWindow.dndActive ? Theme.accentText : Theme.textMuted
                         }
                     }
 
@@ -619,7 +648,7 @@ PanelWindow {
                             implicitWidth: 22
                             implicitHeight: 22
                             radius: 6
-                            color: controlWindow.zoomEnabled ? "#28ff2b2b" : "#0fffffff"
+                            color: controlWindow.zoomEnabled ? Theme.accentDim : "#0fffffff"
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰍉"
@@ -646,7 +675,7 @@ PanelWindow {
                             font.family: Theme.fontSans
                             font.pixelSize: 9
                             font.weight: Font.Medium
-                            color: controlWindow.zoomEnabled ? "#ff9494" : Theme.textMuted
+                            color: controlWindow.zoomEnabled ? Theme.accentText : Theme.textMuted
                         }
                     }
 
@@ -1014,8 +1043,8 @@ PanelWindow {
                             radius: 10
                             gradient: Gradient {
                                 orientation: Gradient.Horizontal
-                                GradientStop { position: 0.0; color: slidersCard.isMuted ? "#14ffffff" : "#38ff2b2b" }
-                                GradientStop { position: 1.0; color: slidersCard.isMuted ? "#24ffffff" : "#80ff2b2b" }
+                                GradientStop { position: 0.0; color: slidersCard.isMuted ? "#14ffffff" : Theme.accentSliderStart }
+                                GradientStop { position: 1.0; color: slidersCard.isMuted ? "#24ffffff" : Theme.accentSliderEnd }
                             }
 
                             // Subtle vertical thumb line at right edge of fill
@@ -1246,7 +1275,7 @@ PanelWindow {
                         implicitWidth: 26
                         implicitHeight: 26
                         radius: 7
-                        color: controlWindow.gamingModeActive ? "#33ff2b2b" : "#0fffffff"
+                        color: controlWindow.gamingModeActive ? Theme.accentTint : "#0fffffff"
                         Text {
                             anchors.centerIn: parent
                             text: "󰊴"
@@ -1279,7 +1308,7 @@ PanelWindow {
                             font.pixelSize: 9
                             elide: Text.ElideRight
                             Layout.fillWidth: true
-                            color: controlWindow.gamingModeActive ? "#ff9494" : Theme.textMuted
+                            color: controlWindow.gamingModeActive ? Theme.accentText : Theme.textMuted
                         }
                     }
 
@@ -1290,7 +1319,7 @@ PanelWindow {
                         implicitWidth: autoGameLabel.implicitWidth + 12
                         radius: 10
                         color: controlWindow.autoGamingEnabled
-                            ? (autoGameArea.containsMouse ? "#40ff2b2b" : "#26ff2b2b")
+                            ? (autoGameArea.containsMouse ? Theme.accentGlow : Theme.accentDim)
                             : (autoGameArea.containsMouse ? "#22ffffff" : "#12ffffff")
                         border.color: controlWindow.autoGamingEnabled ? Theme.accentBorder : Theme.borderSubtle
                         border.width: 1

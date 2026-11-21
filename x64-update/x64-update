@@ -19,6 +19,7 @@ import re
 import fcntl
 import termios
 import struct
+import json
 
 STATE_DIR = os.path.expanduser("~/.local/state/x64-update")
 COUNT_FILE = os.path.join(STATE_DIR, "count")
@@ -754,11 +755,23 @@ def blend_colors(c1, c2, factor=0.5):
     except Exception:
         return c1
 
+def contrast_fg_for(hex_color):
+    try:
+        r, g, b = hex_to_rgb(hex_color)
+        def lin(c):
+            x = c / 255.0
+            return x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+        lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+        return "#0a0b10" if lum > 0.38 else "#ffffff"
+    except Exception:
+        return "#ffffff"
+
 DEFAULT_PALETTE = {
     "mode": "dark",
     "accent": "#ff2b2b",
     "accent_hover": "#ff4d4d",
     "accent_subtle": "#b91c1c",
+    "accent_fg": "#ffffff",
     "background": "#0a0a0e",
     "dark_background": "#0d0d13",
     "darker_background": "#07070b",
@@ -787,6 +800,87 @@ DEFAULT_PALETTE = {
 
 def load_theme_palette():
     palette = dict(DEFAULT_PALETTE)
+    has_omarchy = os.path.isdir("/usr/share/omarchy/.git")
+    x64_palette_file = os.path.expanduser("~/.config/x64-theme/palette.json")
+
+    # 1. X64 Theme Studio (native Hyprland & X64 LIOS) takes priority outside Omarchy
+    if not has_omarchy and os.path.isfile(x64_palette_file):
+        try:
+            with open(x64_palette_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and data.get("accent"):
+                mode = str(data.get("mode", "dark")).lower()
+                palette["mode"] = mode
+
+                accent = data.get("accent") or "#dc2626"
+                palette["accent"] = accent
+                palette["accent_hover"] = data.get("accentHover") or (
+                    blend_colors(accent, "#000000", 0.15) if mode == "light" else blend_colors(accent, "#ffffff", 0.18)
+                )
+                palette["accent_subtle"] = data.get("accentDeep") or blend_colors(accent, "#000000", 0.32)
+                palette["accent_fg"] = data.get("accentFg") or contrast_fg_for(accent)
+
+                bg = data.get("bgDark") or data.get("bg") or ("#ffffff" if mode == "light" else "#0a0a0e")
+                palette["background"] = bg
+                dark_bg = data.get("darkBackground") or data.get("bgBar") or (
+                    blend_colors(bg, "#000000", 0.04) if mode == "light" else blend_colors(bg, "#000000", 0.22)
+                )
+                palette["dark_background"] = dark_bg
+                palette["darker_background"] = blend_colors(dark_bg, "#000000", 0.20) if mode != "light" else dark_bg
+
+                lighter_bg = data.get("bgCard") or data.get("bgSurface") or data.get("bgElevated") or (
+                    blend_colors(bg, "#000000", 0.05) if mode == "light" else blend_colors(bg, "#ffffff", 0.07)
+                )
+                palette["lighter_background"] = lighter_bg
+                palette["card_bg"] = data.get("bgElevated") or lighter_bg
+
+                selection = data.get("selection") or blend_colors(bg, accent, 0.22)
+                palette["selection"] = selection
+
+                border = data.get("border") or blend_colors(
+                    data.get("bgElevated") or lighter_bg,
+                    data.get("textPrimary") or "#f4f4f8",
+                    0.16,
+                )
+                palette["card_border"] = border
+                palette["table_border"] = border
+
+                palette["table_bg"] = bg
+                palette["table_alt_bg"] = lighter_bg
+
+                fg = data.get("textPrimary") or data.get("fg") or ("#18181b" if mode == "light" else "#f4f4f8")
+                palette["foreground"] = fg
+                palette["muted"] = data.get("textSecondary") or data.get("fgMuted") or blend_colors(fg, bg, 0.45)
+                palette["sub_text"] = blend_colors(fg, bg, 0.28)
+
+                cols = data.get("colors") if isinstance(data.get("colors"), dict) else {}
+                palette["laser_stop0"] = accent
+                palette["laser_stop1"] = palette["accent_hover"]
+
+                if cols.get("green"):
+                    palette["green"] = cols["green"]
+                    palette["green_text"] = cols.get("bright_green") or cols["green"]
+                    if mode == "light":
+                        palette["green_bg"] = blend_colors(cols["green"], "#ffffff", 0.85)
+                        palette["green_border"] = blend_colors(cols["green"], "#ffffff", 0.50)
+                    else:
+                        palette["green_bg"] = blend_colors(cols["green"], "#000000", 0.82)
+                        palette["green_border"] = blend_colors(cols["green"], "#000000", 0.65)
+                if cols.get("yellow"):
+                    palette["yellow"] = cols["yellow"]
+                    palette["yellow_text"] = cols.get("bright_yellow") or cols["yellow"]
+                if cols.get("blue"):
+                    palette["blue"] = cols["blue"]
+                if cols.get("cyan"):
+                    palette["cyan"] = cols["cyan"]
+                if cols.get("magenta"):
+                    palette["magenta"] = cols["magenta"]
+
+                return palette
+        except Exception:
+            pass
+
+    # 2. Fallback: Omarchy theme colors.toml
     theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
     if not os.path.isfile(theme_file):
         return palette
@@ -812,6 +906,7 @@ def load_theme_palette():
 
     accent = raw.get("accent") or raw.get("red") or raw.get("color1") or "#dc2626"
     palette["accent"] = accent
+    palette["accent_fg"] = contrast_fg_for(accent)
 
     if mode == "light":
         palette["accent_hover"] = blend_colors(accent, "#000000", 0.15)
@@ -1481,7 +1576,12 @@ def run_gui():
                 fp_n = self.breakdown.get("fp", 0)
 
                 if x64_n > 0:
-                    pills_row.addWidget(make_pill(f"X64 LIOS: {x64_n}", "#ff4d4d", "#2a0a0e", "#5c161e"))
+                    pills_row.addWidget(make_pill(
+                        f"X64 LIOS: {x64_n}",
+                        p["accent_hover"],
+                        blend_colors(p["accent"], p["background"], 0.84),
+                        blend_colors(p["accent"], p["background"], 0.60),
+                    ))
                 if repo_n > 0:
                     pills_row.addWidget(make_pill(f"Sistema: {repo_n}", "#38bdf8", "#092030", "#123b56"))
                 if aur_n > 0:
@@ -1951,7 +2051,7 @@ def run_gui():
                 pf = QFont()
                 pf.setBold(True)
                 pkg_item.setFont(pf)
-                pkg_item.setForeground(QColor("#ff4d4d") if is_x64_package(e["pkg"]) else QColor(p["foreground"]))
+                pkg_item.setForeground(QColor(p["accent_hover"]) if is_x64_package(e["pkg"]) else QColor(p["foreground"]))
                 self.tbl.setItem(row, 1, pkg_item)
 
                 v_item = QTableWidgetItem(e["version"])
@@ -2010,7 +2110,7 @@ def run_gui():
 
         def setup_theme_watcher(self):
             self.theme_watcher = QFileSystemWatcher(self)
-            self._last_theme_mtime = 0
+            self._last_theme_stamp = (None, None)
             self._arm_theme_watcher()
             self.theme_watcher.fileChanged.connect(self.on_theme_changed)
             self.theme_watcher.directoryChanged.connect(self.on_theme_changed)
@@ -2021,11 +2121,13 @@ def run_gui():
             self.theme_poll_timer.start(1000)
 
         def _arm_theme_watcher(self):
+            x64_dir = os.path.expanduser("~/.config/x64-theme")
+            x64_file = os.path.expanduser("~/.config/x64-theme/palette.json")
             theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
             theme_name_file = os.path.expanduser("~/.local/state/omarchy/current/theme.name")
             current_dir = os.path.expanduser("~/.local/state/omarchy/current")
             theme_dir = os.path.expanduser("~/.local/state/omarchy/current/theme")
-            for p in [current_dir, theme_dir, theme_name_file, theme_file]:
+            for p in [x64_dir, x64_file, current_dir, theme_dir, theme_name_file, theme_file]:
                 if os.path.exists(p):
                     if os.path.isdir(p) and p not in self.theme_watcher.directories():
                         self.theme_watcher.addPath(p)
@@ -2033,24 +2135,45 @@ def run_gui():
                         self.theme_watcher.addPath(p)
 
         def check_theme_poll(self):
+            x64_file = os.path.expanduser("~/.config/x64-theme/palette.json")
             theme_file = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
-            if os.path.isfile(theme_file):
-                try:
-                    mtime = os.path.getmtime(theme_file)
-                    if mtime != self._last_theme_mtime:
-                        self._last_theme_mtime = mtime
-                        self.on_theme_changed()
-                except Exception:
-                    pass
+            try:
+                m_x64 = os.path.getmtime(x64_file) if os.path.isfile(x64_file) else None
+            except Exception:
+                m_x64 = None
+            try:
+                m_om = os.path.getmtime(theme_file) if os.path.isfile(theme_file) else None
+            except Exception:
+                m_om = None
+            stamp = (m_x64, m_om)
+            if stamp != self._last_theme_stamp:
+                self._last_theme_stamp = stamp
+                self.on_theme_changed()
 
         def on_theme_changed(self, path=None):
             new_pal = load_theme_palette()
             # Si no ha cambiado la paleta visual real, no redibujar innecesariamente
-            if getattr(self, "palette", None) and self.palette.get("accent") == new_pal.get("accent") and self.palette.get("background") == new_pal.get("background"):
+            if getattr(self, "palette", None) and all(
+                self.palette.get(k) == new_pal.get(k)
+                for k in ("accent", "accent_hover", "accent_fg", "background", "card_bg", "foreground")
+            ):
                 self._arm_theme_watcher()
                 return
 
             self.palette = new_pal
+            app_inst = QApplication.instance()
+            if app_inst is not None:
+                _pal = app_inst.palette()
+                _pal.setColor(QPalette.ColorRole.Window, QColor(new_pal["background"]))
+                _pal.setColor(QPalette.ColorRole.WindowText, QColor(new_pal["foreground"]))
+                _pal.setColor(QPalette.ColorRole.Base, QColor(new_pal["table_bg"]))
+                _pal.setColor(QPalette.ColorRole.AlternateBase, QColor(new_pal["lighter_background"]))
+                _pal.setColor(QPalette.ColorRole.Text, QColor(new_pal["foreground"]))
+                _pal.setColor(QPalette.ColorRole.Button, QColor(new_pal["lighter_background"]))
+                _pal.setColor(QPalette.ColorRole.ButtonText, QColor(new_pal["foreground"]))
+                _pal.setColor(QPalette.ColorRole.Highlight, QColor(new_pal["accent"]))
+                _pal.setColor(QPalette.ColorRole.HighlightedText, QColor(new_pal["accent_fg"]))
+                app_inst.setPalette(_pal)
             if hasattr(self, "badge_delegate"):
                 self.badge_delegate.update_palette(self.palette)
             self.apply_theme()
@@ -2080,7 +2203,7 @@ def run_gui():
                     }}
                 """)
             if hasattr(self, "lbl_badge"):
-                self.lbl_badge.setStyleSheet(f"background-color: {p['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 7px; border-radius: 4px;")
+                self.lbl_badge.setStyleSheet(f"background-color: {p['accent']}; color: {p['accent_fg']}; font-weight: 900; font-size: 12px; padding: 2px 7px; border-radius: 4px;")
             if hasattr(self, "lbl_title"):
                 self.lbl_title.setStyleSheet(f"color: {p['foreground']}; font-weight: 800; font-size: 19px; letter-spacing: 0.8px;")
             if hasattr(self, "lbl_sub"):
@@ -2296,6 +2419,27 @@ def run_gui():
                 self.lbl_summary.setStyleSheet(f"color: {p['foreground']}; font-weight: 700; font-size: 13px;")
             if hasattr(self, "lbl_sub_summary"):
                 self.lbl_sub_summary.setStyleSheet(f"color: {p['muted']}; font-size: 11px;")
+            if hasattr(self, "btn_hdr_close"):
+                self.btn_hdr_close.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {p['lighter_background']};
+                        color: {p['sub_text']};
+                        border: 1px solid {p['card_border']};
+                        border-radius: 15px;
+                        font-size: 13px;
+                        font-weight: bold;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {p['accent']};
+                        color: {p['accent_fg']};
+                        border: 1px solid {p['accent']};
+                    }}
+                    QPushButton:pressed {{
+                        background-color: {p['accent_subtle']};
+                        color: {p['accent_fg']};
+                        border: 1px solid {p['accent_subtle']};
+                    }}
+                """)
             if hasattr(self, "btn_close"):
                 self.btn_close.setStyleSheet(f"""
                     QPushButton {{
@@ -2317,7 +2461,7 @@ def run_gui():
                 self.btn_update.setStyleSheet(f"""
                     QPushButton {{
                         background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent']}, stop:1 {p['accent_subtle']});
-                        color: #ffffff;
+                        color: {p['accent_fg']};
                         border: 1px solid {p['accent_hover']};
                         border-radius: 8px;
                         padding: 0px 26px;
@@ -2335,7 +2479,26 @@ def run_gui():
                 """)
 
             if hasattr(self, "lbl_live"):
-                self.lbl_live.setStyleSheet(f"background-color: {p['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+                self.lbl_live.setStyleSheet(f"background-color: {p['accent']}; color: {p['accent_fg']}; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            if hasattr(self, "btn_tx_reboot"):
+                self.btn_tx_reboot.setIcon(render_svg_icon("power", color=p["accent_fg"], size=14))
+                self.btn_tx_reboot.setStyleSheet(f"""
+                    QPushButton {{
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent']}, stop:1 {p['accent_subtle']});
+                        color: {p['accent_fg']};
+                        border: 1px solid {p['accent_hover']};
+                        border-radius: 8px;
+                        padding: 10px 22px;
+                        font-weight: 700;
+                        font-size: 13px;
+                    }}
+                    QPushButton:hover {{
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {p['accent_hover']}, stop:1 {p['accent']});
+                    }}
+                    QPushButton:pressed {{
+                        background: {p['accent_subtle']};
+                    }}
+                """)
             if hasattr(self, "lbl_tx_title"):
                 self.lbl_tx_title.setStyleSheet(f"color: {p['foreground']}; font-weight: 800; font-size: 18px; letter-spacing: 0.5px;")
             if hasattr(self, "lbl_elapsed"):
@@ -2482,41 +2645,21 @@ def run_gui():
             self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
             self.btn_refresh.clicked.connect(self.trigger_refresh)
 
-            self.btn_close = QPushButton("✕")
-            self.btn_close.setFixedSize(30, 30)
-            self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_close.setToolTip("Cerrar")
-            self.btn_close.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #a1a1aa;
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 15px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #ff2b2b;
-                    color: #ffffff;
-                    border: 1px solid #ff2b2b;
-                }
-                QPushButton:pressed {
-                    background-color: #d91e26;
-                    color: #ffffff;
-                    border: 1px solid #d91e26;
-                }
-            """)
-            self.btn_close.clicked.connect(self.close)
+            self.btn_hdr_close = QPushButton("✕")
+            self.btn_hdr_close.setFixedSize(30, 30)
+            self.btn_hdr_close.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_hdr_close.setToolTip("Cerrar")
+            self.btn_hdr_close.clicked.connect(self.close)
 
             header_layout.addWidget(self.lbl_telemetry)
             header_layout.addWidget(self.btn_history)
             header_layout.addWidget(self.btn_refresh)
             header_layout.addSpacing(6)
-            header_layout.addWidget(self.btn_close)
+            header_layout.addWidget(self.btn_hdr_close)
             desktop_name = (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower()
             session_name = (os.environ.get("DESKTOP_SESSION") or "").lower()
             is_tiling = any(k in desktop_name or k in session_name for k in ["hyprland", "niri", "sway", "i3", "river", "bspwm", "qtile", "dwm"])
-            self.btn_close.setVisible(is_tiling)
+            self.btn_hdr_close.setVisible(is_tiling)
             layout.addLayout(header_layout)
 
             # Search & Segmented Filter Control Bar
@@ -2758,7 +2901,7 @@ def run_gui():
                     }}
                     QPushButton:checked {{
                         background-color: {p['accent']};
-                        color: #ffffff;
+                        color: {p['accent_fg']};
                         border: 1px solid {p['accent_hover']};
                         font-weight: 700;
                     }}
@@ -2820,26 +2963,8 @@ def run_gui():
             footer_box.addWidget(self.lbl_tx_status, stretch=2)
 
             self.btn_tx_reboot = QPushButton(" Reiniciar Ahora")
-            self.btn_tx_reboot.setIcon(render_svg_icon("power", color="#ffffff", size=14))
             self.btn_tx_reboot.setIconSize(QSize(14, 14))
             self.btn_tx_reboot.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.btn_tx_reboot.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff2b2b, stop:1 #b91c1c);
-                    color: #ffffff;
-                    border: 1px solid #ff4d4d;
-                    border-radius: 8px;
-                    padding: 10px 22px;
-                    font-weight: 700;
-                    font-size: 13px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ff4d4d, stop:1 #dc2626);
-                }
-                QPushButton:pressed {
-                    background: #991b1b;
-                }
-            """)
             self.btn_tx_reboot.setVisible(False)
             self.btn_tx_reboot.clicked.connect(lambda: os.system("systemctl reboot 2>/dev/null || sudo systemctl reboot"))
             footer_box.addWidget(self.btn_tx_reboot)
@@ -2987,7 +3112,7 @@ def run_gui():
             self.log_view.setHtml(self.vt_screen.to_html())
 
             self.lbl_live.setText("EN VIVO")
-            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: #ffffff; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: {self.palette['accent_fg']}; font-weight: 900; font-size: 12px; padding: 2px 8px; border-radius: 4px;")
             self.lbl_tx_title.setText("MANTENIMIENTO RÁPIDO EN PROGRESO")
             self.lbl_tx_stage.setText("Limpiando caché de paquetes y dependencias residuales...")
             self.lbl_tx_stage.setStyleSheet(f"color: {self.palette['sub_text']}; font-size: 13px; font-weight: 600;")
@@ -3245,7 +3370,7 @@ def run_gui():
             self.stacked_widget.setCurrentIndex(1)
             cmd_display = " && ".join(display_cmds).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             header_html = (
-                f"<div style=\"color: #ef4444; font-weight: bold; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
+                f"<div style=\"color: {self.palette['accent']}; font-weight: bold; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
                 f"[X64 LIOS UPDATE] INICIANDO TRANSACCIÓN DE ACTUALIZACIÓN DEL SISTEMA...</div>"
                 f"<div style=\"color: #71717a; font-family: 'JetBrainsMono Nerd Font', 'Noto Sans Mono', monospace; font-size: 12px;\">"
                 f"Comandos: {cmd_display}</div>"
@@ -3262,7 +3387,7 @@ def run_gui():
 
             # Reset header and transaction state
             self.lbl_live.setText("EN VIVO")
-            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: #ffffff; font-weight: 900; font-size: 11px; padding: 2px 8px; border-radius: 4px;")
+            self.lbl_live.setStyleSheet(f"background-color: {self.palette['accent']}; color: {self.palette['accent_fg']}; font-weight: 900; font-size: 11px; padding: 2px 8px; border-radius: 4px;")
             self.lbl_tx_title.setText("ACTUALIZACIÓN DEL SISTEMA EN PROGRESO")
             self.lbl_tx_stage.setText("Inicializando transacción de paquetes...")
             self.lbl_tx_stage.setStyleSheet(f"color: {self.palette['sub_text']}; font-size: 13px; font-weight: 600;")
@@ -3463,7 +3588,7 @@ def run_gui():
     _pal.setColor(QPalette.ColorRole.Button, QColor(_palette["lighter_background"]))
     _pal.setColor(QPalette.ColorRole.ButtonText, QColor(_palette["foreground"]))
     _pal.setColor(QPalette.ColorRole.Highlight, QColor(_palette["accent"]))
-    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor(_palette["accent_fg"]))
     app.setPalette(_pal)
     win = X64UpdateWindow()
     win.show()

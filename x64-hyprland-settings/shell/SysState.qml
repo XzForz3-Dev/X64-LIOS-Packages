@@ -179,6 +179,34 @@ QtObject {
         }
     }
 
+    // Automatic 0%-overhead video wallpaper pause in Fullscreen / Gaming Mode + Battery Poster guard
+    readonly property bool shouldPauseVideo: fullscreenActive || gamingModeActive
+    readonly property bool onBatteryDischarging: hasBattery && batStatus === "Discharging"
+
+    onShouldPauseVideoChanged: {
+        if (ThemeState.anyLiveVideo) {
+            if (videoPauseProc.running) videoPauseProc.running = false;
+            videoPauseProc.command = ["/usr/bin/x64-theme", "pause-video", shouldPauseVideo ? "on" : "off"];
+            videoPauseProc.running = true;
+        }
+    }
+
+    onOnBatteryDischargingChanged: {
+        if (ThemeState.videoEnabled && ThemeState.batteryPoster) {
+            if (videoBatteryProc.running) videoBatteryProc.running = false;
+            videoBatteryProc.command = ["/usr/bin/x64-theme", "restore"];
+            videoBatteryProc.running = true;
+        }
+    }
+
+    readonly property Process _videoPauseProc: Process {
+        id: videoPauseProc
+    }
+
+    readonly property Process _videoBatteryProc: Process {
+        id: videoBatteryProc
+    }
+
     readonly property Timer _toggleGuardTimer: Timer {
         id: toggleGuardTimer
         interval: 900

@@ -1,0 +1,2286 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# X64 LIOS - Sovereign Theme & Wallpaper Engine (x64-theme)
+# Compatible with Omarchy colors.toml + X64 theme.toml metadata.
+# Manages live palette state, GPU static/video wallpapers (Wallpaper.qml +
+# mpvpaper NVDEC), automatic fullscreen/gaming/battery pausing, and thumbnails.
+# ==============================================================================
+
+set -u
+export LC_ALL=C.UTF-8
+export LC_NUMERIC=C
+
+UID_NUM=$(id -u)
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${UID_NUM}}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && [ -d "${XDG_RUNTIME_DIR}/hypr" ]; then
+    export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "${XDG_RUNTIME_DIR}/hypr/" 2>/dev/null | head -n1)
+fi
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    for sock in "${XDG_RUNTIME_DIR}"/wayland-*; do
+        if [ -S "$sock" ]; then
+            export WAYLAND_DISPLAY=$(basename "$sock")
+            break
+        fi
+    done
+fi
+
+SYS_THEMES_DIR="/usr/share/x64-themes"
+USER_THEMES_DIR="${HOME}/.config/x64-themes"
+CONF_DIR="${HOME}/.config/x64-theme"
+STATE_FILE="${CONF_DIR}/state.json"
+PALETTE_FILE="${CONF_DIR}/palette.json"
+RUNTIME_DIR="${XDG_RUNTIME_DIR}/x64-theme"
+CACHE_DIR="${HOME}/.cache/x64-theme/thumbs"
+FALLBACK_BG="/usr/share/backgrounds/x64-lios/01-monolith.jpg"
+DEFAULT_THEME="x64-lios-crimson"
+
+mkdir -p "$CONF_DIR" "$CACHE_DIR" "$RUNTIME_DIR"
+
+valid_hex() {
+    [[ "${1:-}" =~ ^#[0-9A-Fa-f]{6}$ ]]
+}
+
+valid_theme_id() {
+    [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+valid_monitor_name() {
+    [[ "${1:-}" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+is_video_file() {
+    case "${1,,}" in
+        *.mp4|*.webm|*.mkv|*.mov) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+is_image_file() {
+    case "${1,,}" in
+        *.jpg|*.jpeg|*.png|*.webp) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+is_on_battery_discharging() {
+    for bat_dir in /sys/class/power_supply/BAT*; do
+        [ -d "$bat_dir" ] || continue
+        local cap st
+        cap=$(cat "${bat_dir}/capacity" 2>/dev/null || echo 0)
+        st=$(cat "${bat_dir}/status" 2>/dev/null || echo "")
+        if [ "$st" = "Discharging" ] && [ "${cap:-0}" -gt 0 ] 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_gaming_or_fullscreen_paused() {
+    local gm
+    gm=$(cat "${XDG_RUNTIME_DIR}/x64-shell/gaming_mode" 2>/dev/null || echo "0")
+    [ "$gm" = "1" ] && return 0
+    if hyprctl activeworkspace -j 2>/dev/null | grep -q '"hasfullscreen": true'; then
+        return 0
+    fi
+    return 1
+}
+
+resolve_theme_dir() {
+    local id="$1"
+    valid_theme_id "$id" || return 1
+    if [ -f "${USER_THEMES_DIR}/${id}/colors.toml" ]; then
+        printf '%s' "${USER_THEMES_DIR}/${id}"
+        return 0
+    fi
+    if [ -f "${SYS_THEMES_DIR}/${id}/colors.toml" ]; then
+        printf '%s' "${SYS_THEMES_DIR}/${id}"
+        return 0
+    fi
+    return 1
+}
+
+toml_to_json() {
+    local f="$1"
+    if [ ! -r "$f" ]; then
+        printf '{}'
+        return 0
+    fi
+    awk '
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        /^[[:space:]]*\[/ { next }
+        match($0, /^[[:space:]]*([A-Za-z0-9_-]+)[[:space:]]*=[[:space:]]*(.*)$/, m) {
+            k = m[1];
+            v = m[2];
+            sub(/[[:space:]]*$/, "", v);
+            if (substr(v, 1, 1) == "\"") {
+                if (match(v, /^"([^"]*)"/, q)) {
+                    val = q[1];
+                    gsub(/\\/, "\\\\", val);
+                    gsub(/"/, "\\\"", val);
+                    items[k] = "\"" val "\"";
+                }
+            } else if (substr(v, 1, 1) == "\x27") {
+                if (match(v, /^\x27([^\x27]*)\x27/, q)) {
+                    val = q[1];
+                    gsub(/\\/, "\\\\", val);
+                    gsub(/"/, "\\\"", val);
+                    items[k] = "\"" val "\"";
+                }
+            } else {
+                sub(/[[:space:]]*#.*$/, "", v);
+                if (v ~ /^-?[0-9]+(\.[0-9]+)?$/ || v == "true" || v == "false") {
+                    items[k] = v;
+                } else {
+                    gsub(/"/, "\\\"", v);
+                    items[k] = "\"" v "\"";
+                }
+            }
+        }
+        END {
+            printf "{";
+            first = 1;
+            for (k in items) {
+                if (!first) printf ",";
+                printf "\"%s\":%s", k, items[k];
+                first = 0;
+            }
+            printf "}";
+        }
+    ' "$f"
+}
+
+thumb_path_for() {
+    local src="$1"
+    local stat_sig hash
+    stat_sig=$(stat -c '%s_%Y' "$src" 2>/dev/null || echo "0_0")
+    hash=$(printf '%s|%s' "$src" "$stat_sig" | sha1sum | awk '{print $1}')
+    printf '%s/%s.jpg' "$CACHE_DIR" "$hash"
+}
+
+poster_path_for() {
+    local src="$1"
+    local stat_sig hash
+    stat_sig=$(stat -c '%s_%Y' "$src" 2>/dev/null || echo "0_0")
+    hash=$(printf '%s|%s|poster' "$src" "$stat_sig" | sha1sum | awk '{print $1}')
+    printf '%s/%s.jpg' "$CACHE_DIR" "$hash"
+}
+
+ensure_thumb_for() {
+    local src="$1"
+    local generate="${2:-0}"
+    local out
+    out=$(thumb_path_for "$src")
+    if [ -s "$out" ]; then
+        printf '%s' "$out"
+        return 0
+    fi
+    if [ "$generate" -eq 1 ] && command -v ffmpeg >/dev/null 2>&1; then
+        local tmp="${out}.tmp.$$.jpg"
+        if is_video_file "$src"; then
+            ffmpeg -nostdin -loglevel error -ss 1 -i "$src" -frames:v 1 -vf "scale=480:-2:flags=lanczos" -q:v 4 "$tmp" 2>/dev/null || \
+                ffmpeg -nostdin -loglevel error -i "$src" -frames:v 1 -vf "scale=480:-2:flags=lanczos" -q:v 4 "$tmp" 2>/dev/null || true
+        else
+            ffmpeg -nostdin -loglevel error -i "$src" -frames:v 1 -vf "scale=480:-2:flags=lanczos" -q:v 4 "$tmp" 2>/dev/null || true
+        fi
+        if [ -s "$tmp" ]; then
+            mv -f "$tmp" "$out"
+            printf '%s' "$out"
+            return 0
+        fi
+        rm -f "$tmp"
+    fi
+    if is_image_file "$src"; then
+        printf '%s' "$src"
+    else
+        printf ''
+    fi
+}
+
+# Full-HD poster frame for crisp video fallback & battery/static poster display
+ensure_poster_for() {
+    local src="$1"
+    if ! is_video_file "$src"; then
+        printf '%s' "$src"
+        return 0
+    fi
+    local out
+    out=$(poster_path_for "$src")
+    if [ -s "$out" ]; then
+        printf '%s' "$out"
+        return 0
+    fi
+    if command -v ffmpeg >/dev/null 2>&1; then
+        local tmp="${out}.tmp.$$.jpg"
+        ffmpeg -nostdin -loglevel error -ss 1 -i "$src" -frames:v 1 -vf "scale='min(1920,iw)':-2:flags=lanczos" -q:v 2 "$tmp" 2>/dev/null || \
+            ffmpeg -nostdin -loglevel error -i "$src" -frames:v 1 -vf "scale='min(1920,iw)':-2:flags=lanczos" -q:v 2 "$tmp" 2>/dev/null || true
+        if [ -s "$tmp" ]; then
+            mv -f "$tmp" "$out"
+            printf '%s' "$out"
+            return 0
+        fi
+        rm -f "$tmp"
+    fi
+    ensure_thumb_for "$src" 1
+}
+
+mix_hex() {
+    awk -v c1="$1" -v c2="$2" -v t="$3" 'BEGIN {
+        gsub(/^#/, "", c1); gsub(/^#/, "", c2);
+        r1 = strtonum("0x" substr(c1,1,2)); g1 = strtonum("0x" substr(c1,3,2)); b1 = strtonum("0x" substr(c1,5,2));
+        r2 = strtonum("0x" substr(c2,1,2)); g2 = strtonum("0x" substr(c2,3,2)); b2 = strtonum("0x" substr(c2,5,2));
+        r = int(r1 + (r2 - r1) * t + 0.5);
+        g = int(g1 + (g2 - g1) * t + 0.5);
+        b = int(b1 + (b2 - b1) * t + 0.5);
+        if (r<0) r=0; if (r>255) r=255;
+        if (g<0) g=0; if (g>255) g=255;
+        if (b<0) b=0; if (b>255) b=255;
+        printf "#%02x%02x%02x", r, g, b;
+    }'
+}
+
+contrast_fg_for() {
+    awk -v c="$1" 'BEGIN {
+        gsub(/^#/, "", c);
+        r = strtonum("0x" substr(c,1,2)) / 255.0;
+        g = strtonum("0x" substr(c,3,2)) / 255.0;
+        b = strtonum("0x" substr(c,5,2)) / 255.0;
+        rl = (r <= 0.03928) ? (r / 12.92) : ((r + 0.055) / 1.055) ^ 2.4;
+        gl = (g <= 0.03928) ? (g / 12.92) : ((g + 0.055) / 1.055) ^ 2.4;
+        bl = (b <= 0.03928) ? (b / 12.92) : ((b + 0.055) / 1.055) ^ 2.4;
+        lum = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+        printf "%s", (lum > 0.38 ? "#0a0b10" : "#ffffff");
+    }'
+}
+
+nearest_papirus_color() {
+    awk -v c="$1" 'BEGIN {
+        gsub(/^#/, "", c);
+        r = strtonum("0x" substr(c,1,2));
+        g = strtonum("0x" substr(c,3,2));
+        b = strtonum("0x" substr(c,5,2));
+        n = split("red:229,57,53 carmine:163,0,52 deeporange:255,87,34 orange:245,158,11 yellow:250,204,21 green:34,197,94 teal:20,184,166 cyan:6,182,212 blue:59,130,246 indigo:99,102,241 violet:168,85,247 magenta:236,72,153 pink:244,114,182 white:235,235,235 grey:142,142,147 black:56,56,64", arr, " ");
+        best = "red"; best_d = 1e18;
+        for (i = 1; i <= n; i++) {
+            split(arr[i], kv, ":");
+            split(kv[2], rgb, ",");
+            dr = r - rgb[1]; dg = g - rgb[2]; db = b - rgb[3];
+            d = 2*dr*dr + 4*dg*dg + 3*db*db;
+            if (d < best_d) { best_d = d; best = kv[1]; }
+        }
+        printf "%s", best;
+    }'
+}
+
+nearest_gtk_accent_name() {
+    awk -v c="$1" 'BEGIN {
+        gsub(/^#/, "", c);
+        r = strtonum("0x" substr(c,1,2));
+        g = strtonum("0x" substr(c,3,2));
+        b = strtonum("0x" substr(c,5,2));
+        mx = (r > g ? (r > b ? r : b) : (g > b ? g : b));
+        mn = (r < g ? (r < b ? r : b) : (g < b ? g : b));
+        if ((mx - mn) < 28) { printf "slate"; exit; }
+        n = split("red:237,51,59 orange:245,158,11 yellow:246,211,45 green:46,194,126 teal:6,182,212 blue:53,132,228 purple:168,85,247 pink:255,113,206 slate:142,142,152", arr, " ");
+        best = "red"; best_d = 1e18;
+        for (i = 1; i <= n; i++) {
+            split(arr[i], kv, ":");
+            split(kv[2], rgb, ",");
+            dr = r - rgb[1]; dg = g - rgb[2]; db = b - rgb[3];
+            d = 2*dr*dr + 4*dg*dg + 3*db*db;
+            if (d < best_d) { best_d = d; best = kv[1]; }
+        }
+        printf "%s", best;
+    }'
+}
+
+hex_to_hypr_rgba() {
+    local hex="${1#\#}"
+    local alpha="${2:-ee}"
+    printf 'rgba(%s%s)' "${hex,,}" "$alpha"
+}
+
+hex_to_rgb_space() {
+    awk -v c="$1" 'BEGIN {
+        gsub(/^#/, "", c);
+        printf "%d, %d, %d", strtonum("0x" substr(c,1,2)), strtonum("0x" substr(c,3,2)), strtonum("0x" substr(c,5,2));
+    }'
+}
+
+ensure_state_file() {
+    if [ ! -s "$STATE_FILE" ] || ! jq -e '.theme | type == "string"' "$STATE_FILE" >/dev/null 2>&1; then
+        printf '{"theme":"%s","accentOverride":"","background":"%s","videoEnabled":false,"batteryPoster":true,"transition":"wave","perMonitorBg":{}}\n' \
+            "$DEFAULT_THEME" "$FALLBACK_BG" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# VIDEO WALLPAPER ENGINE (mpvpaper per monitor + IPC pause/resume)
+# ------------------------------------------------------------------------------
+stop_mpv_for_monitor() {
+    local mon="$1"
+    local pid_f="${RUNTIME_DIR}/mpv-${mon}.pid"
+    local sock_f="${RUNTIME_DIR}/mpv-${mon}.sock"
+    local src_f="${RUNTIME_DIR}/mpv-${mon}.src"
+    if [ -f "$pid_f" ]; then
+        local pid
+        pid=$(cat "$pid_f" 2>/dev/null || echo "")
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+            for _ in 1 2 3 4 5; do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep 0.04
+            done
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    fi
+    rm -f "$pid_f" "$sock_f" "$src_f"
+}
+
+stop_all_mpv() {
+    local pf
+    for pf in "${RUNTIME_DIR}"/mpv-*.pid; do
+        [ -f "$pf" ] || continue
+        local mon
+        mon=$(basename "$pf" .pid)
+        mon="${mon#mpv-}"
+        stop_mpv_for_monitor "$mon"
+    done
+    # Sweep any stray unmanaged mpvpaper belonging to this user
+    pkill -u "$UID_NUM" -x mpvpaper 2>/dev/null || true
+    rm -f "${RUNTIME_DIR}"/mpv-*.sock "${RUNTIME_DIR}"/mpv-*.src "${RUNTIME_DIR}"/mpv-*.pid
+}
+
+start_mpv_for_monitor() {
+    local mon="$1"
+    local vid="$2"
+    valid_monitor_name "$mon" || return 1
+    [ -f "$vid" ] || return 1
+    command -v mpvpaper >/dev/null 2>&1 || return 1
+
+    local pid_f="${RUNTIME_DIR}/mpv-${mon}.pid"
+    local sock_f="${RUNTIME_DIR}/mpv-${mon}.sock"
+    local src_f="${RUNTIME_DIR}/mpv-${mon}.src"
+
+    # Skip restart if exact same video is already playing cleanly on this monitor
+    if [ -f "$pid_f" ] && [ -f "$src_f" ] && [ -S "$sock_f" ]; then
+        local cur_pid cur_src
+        cur_pid=$(cat "$pid_f" 2>/dev/null || echo "")
+        cur_src=$(cat "$src_f" 2>/dev/null || echo "")
+        if [ -n "$cur_pid" ] && kill -0 "$cur_pid" 2>/dev/null \
+           && grep -q "mpvpaper" "/proc/${cur_pid}/comm" 2>/dev/null \
+           && [ "$cur_src" = "$vid" ]; then
+            return 0
+        fi
+    fi
+
+    stop_mpv_for_monitor "$mon"
+
+    local hwdec="auto-safe"
+    if command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt -q 2>/dev/null; then
+        hwdec="no"
+    fi
+
+    local extra_pause=""
+    if is_gaming_or_fullscreen_paused; then
+        extra_pause=" pause=yes"
+    fi
+
+    local opts="no-config load-scripts=no no-audio loop panscan=1.0 hwdec=${hwdec} vd-lavc-threads=2 input-ipc-server=${sock_f}${extra_pause}"
+    local log_f="${RUNTIME_DIR}/mpv-${mon}.log"
+    setsid mpvpaper -p -a full -l background -o "$opts" "$mon" "$vid" >"$log_f" 2>&1 </dev/null 9>&- &
+    local mpid=$!
+    disown "$mpid" 2>/dev/null || true
+    printf '%s\n' "$mpid" > "$pid_f"
+    printf '%s\n' "$vid" > "$src_f"
+}
+
+cmd_pause_video() {
+    local mode="${1:-on}"
+    local val="true"
+    [ "$mode" = "off" ] || [ "$mode" = "0" ] || [ "$mode" = "resume" ] && val="false"
+
+    command -v socat >/dev/null 2>&1 || return 0
+    local sock
+    for sock in "${RUNTIME_DIR}"/mpv-*.sock; do
+        [ -S "$sock" ] || continue
+        printf '{"command":["set_property","pause",%s]}\n' "$val" | socat -t 0.2 - "UNIX-CONNECT:${sock}" >/dev/null 2>&1 || true
+    done
+}
+
+# Reconcile live wallpaper daemons (kills swaybg, starts/stops mpvpaper per monitor)
+reconcile_live_wallpapers() {
+    ensure_state_file
+    # Wallpaper.qml owns static backgrounds & video posters; swaybg must never block mpvpaper
+    pkill -u "$UID_NUM" -x swaybg 2>/dev/null || true
+
+    local video_en bat_poster global_bg
+    video_en=$(jq -r 'if .videoEnabled == true then "1" else "0" end' "$STATE_FILE")
+    bat_poster=$(jq -r 'if .batteryPoster == false then "0" else "1" end' "$STATE_FILE")
+    global_bg=$(jq -r '.background // ""' "$STATE_FILE")
+
+    if [ "$video_en" != "1" ]; then
+        stop_all_mpv
+        return 0
+    fi
+    if [ "$bat_poster" = "1" ] && is_on_battery_discharging; then
+        stop_all_mpv
+        return 0
+    fi
+
+    local mons=()
+    while IFS= read -r m; do
+        [ -n "$m" ] && mons+=("$m")
+    done < <(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.disabled != true) | .name' 2>/dev/null)
+
+    # Stop mpvpaper on any disconnected monitor
+    local pf mname
+    for pf in "${RUNTIME_DIR}"/mpv-*.pid; do
+        [ -f "$pf" ] || continue
+        mname=$(basename "$pf" .pid)
+        mname="${mname#mpv-}"
+        local still_connected=0
+        for cm in "${mons[@]}"; do
+            [ "$cm" = "$mname" ] && still_connected=1 && break
+        done
+        [ "$still_connected" -eq 0 ] && stop_mpv_for_monitor "$mname"
+    done
+
+    local m bg
+    for m in "${mons[@]}"; do
+        bg=$(jq -r --arg mon "$m" '.perMonitorBg[$mon] // .background // ""' "$STATE_FILE")
+        [ -z "$bg" ] && bg="$global_bg"
+        if [ -n "$bg" ] && [ -f "$bg" ] && is_video_file "$bg"; then
+            start_mpv_for_monitor "$m" "$bg"
+        else
+            stop_mpv_for_monitor "$m"
+        fi
+    done
+}
+
+collect_theme_backgrounds_json() {
+    local id="$1"
+    local tdir="$2"
+    local gen_thumbs="${3:-0}"
+    local preview_fallback="${4:-}"
+    local entries=()
+    local f name is_vid th
+
+    local dirs=("${tdir}/backgrounds" "${USER_THEMES_DIR}/backgrounds/${id}")
+    for d in "${dirs[@]}"; do
+        [ -d "$d" ] || continue
+        while IFS= read -r -d '' f; do
+            if is_video_file "$f"; then
+                is_vid="true"
+            elif is_image_file "$f"; then
+                is_vid="false"
+            else
+                continue
+            fi
+            name=$(basename "$f")
+            th=$(ensure_thumb_for "$f" "$gen_thumbs")
+            [ -z "$th" ] && th="$preview_fallback"
+            entries+=("$(jq -cn --arg p "$f" --arg n "$name" --argjson v "$is_vid" --arg t "$th" '{path:$p,name:$n,isVideo:$v,thumb:$t}')")
+        done < <(find "$d" -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+    done
+
+    if [ "${#entries[@]}" -eq 0 ]; then
+        printf '[]'
+    else
+        printf '%s\n' "${entries[@]}" | jq -cs '.'
+    fi
+}
+
+build_theme_record_json() {
+    local id="$1"
+    local tdir="$2"
+    local is_user="$3"
+    local gen_thumbs="${4:-0}"
+
+    local c_json m_json
+    c_json=$(toml_to_json "${tdir}/colors.toml")
+    m_json=$(toml_to_json "${tdir}/theme.toml")
+
+    local preview=""
+    for cand in "${tdir}/preview.jpg" "${tdir}/preview.png" "${tdir}/preview.webp"; do
+        if [ -f "$cand" ]; then
+            preview="$cand"
+            break
+        fi
+    done
+
+    local bgs_json
+    bgs_json=$(collect_theme_backgrounds_json "$id" "$tdir" "$gen_thumbs" "$preview")
+
+    if [ -z "$preview" ]; then
+        preview=$(printf '%s' "$bgs_json" | jq -r '.[0].thumb // .[0].path // ""')
+    fi
+    [ -z "$preview" ] && [ -f "$FALLBACK_BG" ] && preview="$FALLBACK_BG"
+
+    jq -cn \
+        --arg id "$id" \
+        --arg dir "$tdir" \
+        --argjson isUser "$is_user" \
+        --arg preview "$preview" \
+        --argjson colors "$c_json" \
+        --argjson meta "$m_json" \
+        --argjson bgs "$bgs_json" '
+        ($colors.accent // "#ff2b2b") as $acc |
+        ($colors.background // "#0b0c10") as $bg |
+        ($colors.dark_background // $bg) as $dbg |
+        ($colors.lighter_background // "#1a1d26") as $lbg |
+        ($colors.foreground // "#ebe8e3") as $fg |
+        ($colors.dark_foreground // "#8e909a") as $dfg |
+        ($colors.muted // "#565863") as $mut |
+        ($colors.selection // $lbg) as $sel |
+        {
+            id: $id,
+            name: ($meta.name // ($id | gsub("[-_]"; " "))),
+            author: ($meta.author // "X64 Studios"),
+            description: ($meta.description // ""),
+            order: ($meta.order // 99),
+            mode: ($meta.mode // $colors.mode // "dark"),
+            papirusColor: ($meta.papirus_color // "red"),
+            defaultBackground: ($meta.default_background // ""),
+            isUser: $isUser,
+            dir: $dir,
+            preview: $preview,
+            hasVideo: (any($bgs[]; .isVideo == true)),
+            bgCount: ($bgs | length),
+            swatches: [
+                $bg, $lbg, $acc,
+                ($colors.red // $acc),
+                ($colors.orange // $colors.yellow // "#f5a524"),
+                ($colors.green // "#34d399"),
+                ($colors.cyan // $colors.blue // "#06b6d4"),
+                ($colors.magenta // $fg)
+            ],
+            palette: {
+                accent: $acc,
+                background: $bg,
+                dark_background: $dbg,
+                lighter_background: $lbg,
+                selection: $sel,
+                foreground: $fg,
+                dark_foreground: $dfg,
+                muted: $mut,
+                red: ($colors.red // "#ff2b2b"),
+                yellow: ($colors.yellow // "#f5a524"),
+                orange: ($colors.orange // "#ff7b00"),
+                green: ($colors.green // "#34d399"),
+                cyan: ($colors.cyan // "#06b6d4"),
+                blue: ($colors.blue // "#3b82f6"),
+                magenta: ($colors.magenta // "#a855f7"),
+                bright_red: ($colors.bright_red // "#ff4d4d"),
+                bright_yellow: ($colors.bright_yellow // "#fde047"),
+                bright_green: ($colors.bright_green // "#34d399"),
+                bright_cyan: ($colors.bright_cyan // "#22d3ee"),
+                bright_blue: ($colors.bright_blue // "#60a5fa"),
+                bright_magenta: ($colors.bright_magenta // "#d8b4fe"),
+                hyprland_active_border: ($colors.hyprland_active_border // ""),
+                hyprland_inactive_border: ($colors.hyprland_inactive_border // "")
+            },
+            backgrounds: $bgs
+        }
+    '
+}
+
+discover_theme_ids() {
+    local -A seen=()
+    local d id
+    for base in "$USER_THEMES_DIR" "$SYS_THEMES_DIR"; do
+        [ -d "$base" ] || continue
+        for d in "$base"/*/; do
+            [ -f "${d}colors.toml" ] || continue
+            id=$(basename "$d")
+            valid_theme_id "$id" || continue
+            if [ -z "${seen[$id]:-}" ]; then
+                seen[$id]=1
+                printf '%s\n' "$id"
+            fi
+        done
+    done | sort
+}
+
+collect_user_backgrounds_json() {
+    local user_dir=""
+    if [ -d "${HOME}/Imágenes/Wallpapers" ]; then
+        user_dir="${HOME}/Imágenes/Wallpapers"
+    elif [ -d "${HOME}/Pictures/Wallpapers" ]; then
+        user_dir="${HOME}/Pictures/Wallpapers"
+    elif [ -d "${HOME}/Imágenes" ]; then
+        user_dir="${HOME}/Imágenes/Wallpapers"
+    else
+        user_dir="${HOME}/Pictures/Wallpapers"
+    fi
+
+    local dirs=("$user_dir" "${HOME}/Imágenes/Wallpapers" "${HOME}/Pictures/Wallpapers" "${USER_THEMES_DIR}/backgrounds")
+    local -A seen_dirs=()
+    local entries=()
+    local d f name is_vid th
+    for d in "${dirs[@]}"; do
+        [ -d "$d" ] || continue
+        local rd
+        rd=$(realpath "$d" 2>/dev/null || echo "$d")
+        [ -n "${seen_dirs[$rd]:-}" ] && continue
+        seen_dirs[$rd]=1
+        while IFS= read -r -d '' f; do
+            if is_video_file "$f"; then
+                is_vid="true"
+            elif is_image_file "$f"; then
+                is_vid="false"
+            else
+                continue
+            fi
+            name=$(basename "$f")
+            th=$(ensure_thumb_for "$f" 0)
+            entries+=("$(jq -cn --arg p "$f" --arg n "$name" --argjson v "$is_vid" --arg t "$th" '{path:$p,name:$n,isVideo:$v,thumb:$t}')")
+        done < <(find "$d" -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+    done
+
+    local bgs="[]"
+    if [ "${#entries[@]}" -gt 0 ]; then
+        bgs=$(printf '%s\n' "${entries[@]}" | jq -cs '.')
+    fi
+    jq -cn --arg dir "$user_dir" --argjson bgs "$bgs" '{dir:$dir, items:$bgs}'
+}
+
+cmd_list() {
+    ensure_state_file
+    local items=()
+    local id tdir is_user
+    while IFS= read -r id; do
+        [ -n "$id" ] || continue
+        if [ -f "${USER_THEMES_DIR}/${id}/colors.toml" ]; then
+            tdir="${USER_THEMES_DIR}/${id}"
+            is_user="true"
+        else
+            tdir="${SYS_THEMES_DIR}/${id}"
+            is_user="false"
+        fi
+        items+=("$(build_theme_record_json "$id" "$tdir" "$is_user" 0)")
+    done < <(discover_theme_ids)
+
+    local themes_arr="[]"
+    if [ "${#items[@]}" -gt 0 ]; then
+        themes_arr=$(printf '%s\n' "${items[@]}" | jq -cs 'sort_by(.order, .name)')
+    fi
+
+    local user_bgs
+    user_bgs=$(collect_user_backgrounds_json)
+
+    jq -cn --slurpfile st "$STATE_FILE" --argjson themes "$themes_arr" --argjson ubgs "$user_bgs" '
+        ($st[0] // {}) as $s |
+        {
+            activeTheme: ($s.theme // "x64-lios-crimson"),
+            accentOverride: ($s.accentOverride // ""),
+            activeBackground: ($s.background // ""),
+            perMonitorBg: ($s.perMonitorBg // {}),
+            videoEnabled: ($s.videoEnabled // false),
+            batteryPoster: (if $s.batteryPoster == false then false else true end),
+            transition: ($s.transition // "wave"),
+            userBgDir: $ubgs.dir,
+            userBackgrounds: $ubgs.items,
+            themes: $themes
+        }
+    '
+}
+
+build_per_monitor_bg_resolved_json() {
+    local preview_fallback="$1"
+    local video_en="$2"
+    local bat_poster="$3"
+    local on_bat="false"
+    if [ "$bat_poster" = "true" ] && is_on_battery_discharging; then
+        on_bat="true"
+    fi
+
+    local map_json="{}"
+    local mon path poster is_vid live_vid
+    while IFS=$'\t' read -r mon path; do
+        [ -n "$mon" ] && [ -n "$path" ] && [ -f "$path" ] || continue
+        if is_video_file "$path"; then
+            is_vid="true"
+            poster=$(ensure_poster_for "$path")
+            [ -z "$poster" ] && poster="$preview_fallback"
+            if [ "$video_en" = "true" ] && [ "$on_bat" = "false" ]; then
+                live_vid="true"
+            else
+                live_vid="false"
+            fi
+        else
+            is_vid="false"
+            poster="$path"
+            live_vid="false"
+        fi
+        map_json=$(printf '%s' "$map_json" | jq -c \
+            --arg m "$mon" --arg p "$path" --arg po "$poster" \
+            --argjson iv "$is_vid" --argjson lv "$live_vid" \
+            '.[$m] = {path:$p, poster:$po, isVideo:$iv, liveVideo:$lv}')
+    done < <(jq -r '.perMonitorBg // {} | to_entries[] | [.key, .value] | @tsv' "$STATE_FILE" 2>/dev/null)
+
+    printf '%s' "$map_json"
+}
+
+write_palette_from_state() {
+    ensure_state_file
+    local -a st_vals=()
+    mapfile -t st_vals < <(
+        jq -r '
+            (.theme // "x64-lios-crimson"),
+            (.accentOverride // ""),
+            (.background // ""),
+            (if .videoEnabled == true then "true" else "false" end),
+            (if .batteryPoster == false then "false" else "true" end),
+            (.transition // "wave")
+        ' "$STATE_FILE"
+    )
+    local id="${st_vals[0]:-x64-lios-crimson}"
+    local accent_override="${st_vals[1]:-}"
+    local active_bg="${st_vals[2]:-}"
+    local video_en="${st_vals[3]:-false}"
+    local bat_poster="${st_vals[4]:-true}"
+    local transition="${st_vals[5]:-wave}"
+
+    local tdir
+    tdir=$(resolve_theme_dir "$id") || { id="$DEFAULT_THEME"; tdir=$(resolve_theme_dir "$id") || return 1; }
+
+    local is_user="false"
+    [ "$tdir" = "${USER_THEMES_DIR}/${id}" ] && is_user="true"
+
+    local rec
+    rec=$(build_theme_record_json "$id" "$tdir" "$is_user" 0)
+
+    local -a rv=()
+    mapfile -t rv < <(
+        printf '%s' "$rec" | jq -r '
+            (.name // ""), (.mode // "dark"), (.papirusColor // "red"), (.preview // ""),
+            (.palette.accent // "#ff2b2b"), (.palette.background // "#0b0c10"),
+            (.palette.dark_background // "#0b0c10"), (.palette.lighter_background // "#1a1d26"),
+            (.palette.foreground // "#ebe8e3"), (.palette.dark_foreground // "#8e909a"), (.palette.muted // "#565863"),
+            (.palette.red // "#ff2b2b"), (.palette.yellow // "#f5a524"), (.palette.orange // "#ff7b00"),
+            (.palette.green // "#34d399"), (.palette.cyan // "#06b6d4"), (.palette.blue // "#3b82f6"),
+            (.palette.magenta // "#a855f7"), (.palette.hyprland_active_border // ""), (.palette.hyprland_inactive_border // ""),
+            (.palette.bright_red // "#ff4d4d"), (.palette.bright_yellow // "#fde047"), (.palette.bright_green // "#34d399"),
+            (.palette.bright_cyan // "#22d3ee"), (.palette.bright_blue // "#60a5fa"), (.palette.bright_magenta // "#d8b4fe"),
+            (.palette.selection // "#2a0a0a")
+        '
+    )
+    local theme_name="${rv[0]:-X64}" theme_mode="${rv[1]:-dark}" papirus_col="${rv[2]:-red}" preview_fallback="${rv[3]:-}"
+    local base_acc="${rv[4]:-#ff2b2b}" base_bg="${rv[5]:-#0b0c10}" base_dark="${rv[6]:-#0b0c10}" base_light="${rv[7]:-#1a1d26}"
+    local base_fg="${rv[8]:-#ebe8e3}" base_fg2="${rv[9]:-#8e909a}" base_muted="${rv[10]:-#565863}"
+    local c_red="${rv[11]:-#ff2b2b}" c_yellow="${rv[12]:-#f5a524}" c_orange="${rv[13]:-#ff7b00}"
+    local c_green="${rv[14]:-#34d399}" c_cyan="${rv[15]:-#06b6d4}" c_blue="${rv[16]:-#3b82f6}"
+    local c_magenta="${rv[17]:-#a855f7}" hypr_act="${rv[18]:-}" hypr_inact="${rv[19]:-}"
+    local b_red="${rv[20]:-#ff4d4d}" b_yellow="${rv[21]:-#fde047}" b_green="${rv[22]:-#34d399}"
+    local b_cyan="${rv[23]:-#22d3ee}" b_blue="${rv[24]:-#60a5fa}" b_magenta="${rv[25]:-#d8b4fe}"
+    local c_sel="${rv[26]:-#2a0a0a}"
+
+    local eff_acc="$base_acc"
+    local eff_papirus="$papirus_col"
+    if valid_hex "$accent_override"; then
+        eff_acc="$accent_override"
+        eff_papirus=$(nearest_papirus_color "$eff_acc")
+        c_sel=$(mix_hex "$base_bg" "$eff_acc" 0.22)
+    fi
+    local gtk_accent_name
+    gtk_accent_name=$(nearest_gtk_accent_name "$eff_acc")
+
+    local bg_dark bg_card bg_elev bg_hover bg_active acc_hover acc_text acc_deep acc_fg text_pri text_sec text_mut status_ok status_warn
+    if [ "$id" = "x64-lios-crimson" ] && [ -z "$accent_override" ]; then
+        bg_dark="#0b0c10"
+        bg_card="#13151c"
+        bg_elev="#1a1d26"
+        bg_hover="#222530"
+        bg_active="#2c303e"
+        acc_hover="#ff4747"
+        acc_text="#ff9494"
+        acc_deep="#b80000"
+        text_pri="#ebe8e3"
+        text_sec="#8e909a"
+        text_mut="#565863"
+        status_ok="#34d399"
+        status_warn="#f5a524"
+    else
+        bg_dark="$base_bg"
+        bg_card=$(mix_hex "$base_bg" "$base_light" 0.60)
+        bg_elev="$base_light"
+        bg_hover=$(mix_hex "$base_light" "$base_fg" 0.09)
+        bg_active=$(mix_hex "$base_light" "$base_fg" 0.16)
+        acc_hover=$(mix_hex "$eff_acc" "#ffffff" 0.16)
+        acc_text=$(mix_hex "$eff_acc" "#ffffff" 0.45)
+        acc_deep=$(mix_hex "$eff_acc" "#000000" 0.30)
+        text_pri="$base_fg"
+        text_sec="$base_fg2"
+        text_mut=$(mix_hex "$base_fg2" "$base_bg" 0.35)
+        status_ok="$c_green"
+        status_warn="$c_yellow"
+    fi
+    acc_fg=$(contrast_fg_for "$eff_acc")
+
+    local bg_bar bg_capsule acc_pill
+    bg_bar=$(mix_hex "$bg_dark" "#000000" 0.08)
+    bg_capsule=$(mix_hex "$bg_dark" "$bg_card" 0.85)
+    acc_pill=$(mix_hex "$bg_dark" "$eff_acc" 0.18)
+
+    [ -z "$active_bg" ] || [ ! -f "$active_bg" ] && active_bg="$FALLBACK_BG"
+    local bg_is_video="false" bg_poster="$active_bg" live_vid_global="false"
+    if is_video_file "$active_bg"; then
+        bg_is_video="true"
+        bg_poster=$(ensure_poster_for "$active_bg")
+        [ -z "$bg_poster" ] && bg_poster="$preview_fallback"
+        if [ "$video_en" = "true" ] && ! ([ "$bat_poster" = "true" ] && is_on_battery_discharging); then
+            live_vid_global="true"
+        fi
+    fi
+
+    local per_mon_json
+    per_mon_json=$(build_per_monitor_bg_resolved_json "$preview_fallback" "$video_en" "$bat_poster")
+
+    jq -cn \
+        --arg id "$id" \
+        --arg name "$theme_name" \
+        --arg mode "$theme_mode" \
+        --arg papirus "$papirus_col" \
+        --arg papirusEff "$eff_papirus" \
+        --arg gtkAccent "$gtk_accent_name" \
+        --arg accentOverride "$accent_override" \
+        --arg bg "$active_bg" \
+        --arg bgPoster "$bg_poster" \
+        --argjson bgIsVideo "$bg_is_video" \
+        --argjson liveVideoGlobal "$live_vid_global" \
+        --argjson videoEnabled "$video_en" \
+        --argjson batteryPoster "$bat_poster" \
+        --arg transition "$transition" \
+        --argjson perMonitorBg "$per_mon_json" \
+        --arg bgDark "$bg_dark" \
+        --arg darkBg "$base_dark" \
+        --arg bgCard "$bg_card" \
+        --arg bgElevated "$bg_elev" \
+        --arg bgHover "$bg_hover" \
+        --arg bgActive "$bg_active" \
+        --arg bgBar "$bg_bar" \
+        --arg bgCapsule "$bg_capsule" \
+        --arg selection "$c_sel" \
+        --arg accent "$eff_acc" \
+        --arg accentHover "$acc_hover" \
+        --arg accentText "$acc_text" \
+        --arg accentDeep "$acc_deep" \
+        --arg accentFg "$acc_fg" \
+        --arg accentPillBg "$acc_pill" \
+        --arg statusOk "$status_ok" \
+        --arg statusWarn "$status_warn" \
+        --arg textPrimary "$text_pri" \
+        --arg textSecondary "$text_sec" \
+        --arg textMuted "$text_mut" \
+        --arg red "$c_red" \
+        --arg yellow "$c_yellow" \
+        --arg orange "$c_orange" \
+        --arg green "$c_green" \
+        --arg cyan "$c_cyan" \
+        --arg blue "$c_blue" \
+        --arg magenta "$c_magenta" \
+        --arg bRed "$b_red" \
+        --arg bYellow "$b_yellow" \
+        --arg bGreen "$b_green" \
+        --arg bCyan "$b_cyan" \
+        --arg bBlue "$b_blue" \
+        --arg bMagenta "$b_magenta" \
+        --arg hyprActive "$hypr_act" \
+        --arg hyprInactive "$hypr_inact" '
+        {
+            theme: $id,
+            name: $name,
+            mode: $mode,
+            papirusColor: $papirus,
+            papirusEffectiveColor: $papirusEff,
+            gtkAccentName: $gtkAccent,
+            accentOverride: $accentOverride,
+            background: $bg,
+            backgroundPoster: $bgPoster,
+            backgroundIsVideo: $bgIsVideo,
+            liveVideoGlobal: $liveVideoGlobal,
+            videoEnabled: $videoEnabled,
+            batteryPoster: $batteryPoster,
+            transition: $transition,
+            perMonitorBg: $perMonitorBg,
+            bgDark: $bgDark,
+            darkBackground: $darkBg,
+            bgCard: $bgCard,
+            bgElevated: $bgElevated,
+            bgHover: $bgHover,
+            bgActive: $bgActive,
+            bgBar: $bgBar,
+            bgCapsule: $bgCapsule,
+            selection: $selection,
+            accent: $accent,
+            accentHover: $accentHover,
+            accentText: $accentText,
+            accentDeep: $accentDeep,
+            accentFg: $accentFg,
+            accentPillBg: $accentPillBg,
+            statusOk: $statusOk,
+            statusWarn: $statusWarn,
+            textPrimary: $textPrimary,
+            textSecondary: $textSecondary,
+            textMuted: $textMuted,
+            colors: {
+                red: $red, yellow: $yellow, orange: $orange,
+                green: $green, cyan: $cyan, blue: $blue, magenta: $magenta,
+                bright_red: $bRed, bright_yellow: $bYellow, bright_green: $bGreen,
+                bright_cyan: $bCyan, bright_blue: $bBlue, bright_magenta: $bMagenta
+            },
+            hyprlandActiveBorder: $hyprActive,
+            hyprlandInactiveBorder: $hyprInactive
+        }
+    ' > "${PALETTE_FILE}.tmp.$$" && mv -f "${PALETTE_FILE}.tmp.$$" "$PALETTE_FILE"
+}
+
+# ------------------------------------------------------------------------------
+# SYSTEM RETHEMING ENGINE (Sub-phase 3.1-D)
+# Syncs: Hyprland borders, Hyprlock, Kitty, btop, Papirus Folders (A/B overlay),
+#        Qt/KDE (kdeglobals + D-Bus), GTK3 (A/B live CSS) & GTK4/Libadwaita.
+# ------------------------------------------------------------------------------
+apply_hyprland_borders() {
+    [ -s "$PALETTE_FILE" ] || return 0
+    local -a hv=()
+    mapfile -t hv < <(
+        jq -r '
+            (.accent // "#ff2b2b"),
+            (.accentHover // "#ff4d4d"),
+            (.bgElevated // "#1a1d26"),
+            (.accentOverride // ""),
+            (.hyprlandActiveBorder // ""),
+            (.hyprlandInactiveBorder // "")
+        ' "$PALETTE_FILE"
+    )
+    local acc="${hv[0]:-#ff2b2b}" acc_hov="${hv[1]:-#ff4d4d}" bg_el="${hv[2]:-#1a1d26}"
+    local acc_ov="${hv[3]:-}" raw_act="${hv[4]:-}" raw_inact="${hv[5]:-}"
+
+    local c1 c2 inact
+    if [ -z "$acc_ov" ] && [ -n "$raw_act" ]; then
+        read -r c1 c2 _ <<< "$raw_act"
+        [ -z "${c1:-}" ] && c1=$(hex_to_hypr_rgba "$acc" "ee")
+        [ -z "${c2:-}" ] && c2=$(hex_to_hypr_rgba "$acc_hov" "ee")
+    else
+        c1=$(hex_to_hypr_rgba "$acc" "ee")
+        c2=$(hex_to_hypr_rgba "$acc_hov" "ee")
+    fi
+
+    if [ -z "$acc_ov" ] && [ -n "$raw_inact" ]; then
+        inact="$raw_inact"
+    else
+        inact=$(hex_to_hypr_rgba "$bg_el" "aa")
+    fi
+
+    local hypr_dir="${HOME}/.config/hypr"
+    mkdir -p "$hypr_dir"
+
+    cat > "${hypr_dir}/theme.lua.tmp.$$" <<EOF
+-- Auto-generated by x64-theme (X64 Theme Studio)
+-- Preserved across package updates; personal overrides belong in ~/.config/hypr/custom.lua
+hl.config({
+    general = {
+        col = {
+            active_border   = { colors = { "${c1}", "${c2}" }, angle = 45 },
+            inactive_border = "${inact}",
+        },
+    },
+})
+EOF
+    mv -f "${hypr_dir}/theme.lua.tmp.$$" "${hypr_dir}/theme.lua"
+
+    cat > "${hypr_dir}/theme.conf.tmp.$$" <<EOF
+# Auto-generated by x64-theme (X64 Theme Studio)
+general {
+    col.active_border = ${c1} ${c2} 45deg
+    col.inactive_border = ${inact}
+}
+EOF
+    mv -f "${hypr_dir}/theme.conf.tmp.$$" "${hypr_dir}/theme.conf"
+
+    if command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+        hyprctl eval "hl.config({ general = { col = { active_border = { colors = { \"${c1}\", \"${c2}\" }, angle = 45 }, inactive_border = \"${inact}\" } } })" >/dev/null 2>&1 || \
+            hyprctl --batch "keyword general:col.active_border ${c1} ${c2} 45deg; keyword general:col.inactive_border ${inact}" >/dev/null 2>&1 || true
+    fi
+}
+
+write_hyprlock_theme() {
+    [ -s "$PALETTE_FILE" ] || return 0
+    local -a lv=()
+    mapfile -t lv < <(
+        jq -r '
+            (.backgroundPoster // .background // "/usr/share/backgrounds/x64-lios/01-monolith.jpg"),
+            (.bgDark // "#0b0c10"),
+            (.bgCard // "#13151c"),
+            (.accent // "#ff2b2b"),
+            (.textPrimary // "#ebe8e3"),
+            (.textSecondary // "#8e909a"),
+            (.statusOk // "#34d399"),
+            (.statusWarn // "#f5a524")
+        ' "$PALETTE_FILE"
+    )
+    local bg="${lv[0]:-$FALLBACK_BG}"
+    [ -f "$bg" ] || bg="$FALLBACK_BG"
+    local bg_dark="${lv[1]:-#0b0c10}" bg_card="${lv[2]:-#13151c}" acc="${lv[3]:-#ff2b2b}"
+    local fg="${lv[4]:-#ebe8e3}" fg2="${lv[5]:-#8e909a}" ok="${lv[6]:-#34d399}" warn="${lv[7]:-#f5a524}"
+    local fg_rgb
+    fg_rgb=$(hex_to_rgb_space "$fg")
+
+    local hypr_dir="${HOME}/.config/hypr"
+    mkdir -p "$hypr_dir"
+    cat > "${hypr_dir}/hyprlock-theme.conf.tmp.$$" <<EOF
+# Auto-generated by x64-theme (X64 Theme Studio)
+\$x64_bg = ${bg}
+\$x64_bg_color = $(hex_to_hypr_rgba "$bg_dark" "ff")
+\$x64_surface = $(hex_to_hypr_rgba "$bg_card" "f5")
+\$x64_accent = $(hex_to_hypr_rgba "$acc" "ee")
+\$x64_accent_solid = $(hex_to_hypr_rgba "$acc" "ff")
+\$x64_fg = $(hex_to_hypr_rgba "$fg" "ff")
+\$x64_fg_rgb = rgb(${fg_rgb})
+\$x64_fg_muted = $(hex_to_hypr_rgba "$fg2" "ee")
+\$x64_ok = $(hex_to_hypr_rgba "$ok" "ee")
+\$x64_warn = $(hex_to_hypr_rgba "$warn" "ee")
+EOF
+    mv -f "${hypr_dir}/hyprlock-theme.conf.tmp.$$" "${hypr_dir}/hyprlock-theme.conf"
+}
+
+run_system_retheme_sync() {
+    local expected_gen="${1:-}"
+    local gen_file="${RUNTIME_DIR}/retheme.gen"
+    [ -s "$PALETTE_FILE" ] || return 0
+
+    if [ -n "$expected_gen" ] && [ -f "$gen_file" ]; then
+        [ "$(cat "$gen_file" 2>/dev/null)" = "$expected_gen" ] || return 0
+    fi
+
+    # Single atomic Python pass writes Kitty, btop, Papirus user overlay (A/B),
+    # GTK3/4 CSS + A/B wrappers + settings.ini, and Qt/KDE kdeglobals + color-scheme (~35ms total).
+    local out_vars
+    out_vars=$(python3 - "$PALETTE_FILE" "$CONF_DIR" "$RUNTIME_DIR" <<'PYEOF'
+import json
+import os
+import re
+import sys
+
+palette_path = sys.argv[1]
+conf_dir = sys.argv[2]
+runtime_dir = sys.argv[3]
+home = os.path.expanduser("~")
+
+with open(palette_path, "r", encoding="utf-8") as f:
+    p = json.load(f)
+
+def atomic_write(path, content):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp.{os.getpid()}"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(content)
+    os.replace(tmp, path)
+
+def hex_rgb_tuple(h, default=(255, 43, 43)):
+    h = (h or "").strip().lstrip("#")
+    if len(h) != 6:
+        return default
+    try:
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    except ValueError:
+        return default
+
+def hex_rgb_csv(h, default="255,43,43"):
+    r, g, b = hex_rgb_tuple(h)
+    return f"{r},{g},{b}"
+
+def mix_hex(c1, c2, t):
+    r1, g1, b1 = hex_rgb_tuple(c1, (11, 12, 16))
+    r2, g2, b2 = hex_rgb_tuple(c2, (255, 255, 255))
+    r = max(0, min(255, int(round(r1 + (r2 - r1) * t))))
+    g = max(0, min(255, int(round(g1 + (g2 - g1) * t))))
+    b = max(0, min(255, int(round(b1 + (b2 - b1) * t))))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+bg_dark = p.get("bgDark", "#0b0c10")
+dark_bg = p.get("darkBackground", bg_dark)
+bg_card = p.get("bgCard", "#13151c")
+bg_elev = p.get("bgElevated", "#1a1d26")
+bg_hover = p.get("bgHover", "#222530")
+bg_active = p.get("bgActive", "#2c303e")
+selection = p.get("selection", mix_hex(bg_dark, p.get("accent", "#ff2b2b"), 0.22))
+accent = p.get("accent", "#ff2b2b")
+accent_hover = p.get("accentHover", "#ff4747")
+accent_deep = p.get("accentDeep", mix_hex(accent, "#000000", 0.30))
+accent_fg = p.get("accentFg", "#ffffff")
+fg = p.get("textPrimary", "#ebe8e3")
+fg2 = p.get("textSecondary", "#8e909a")
+muted = p.get("textMuted", "#565863")
+status_ok = p.get("statusOk", "#34d399")
+status_warn = p.get("statusWarn", "#f5a524")
+cols = p.get("colors", {})
+c_red = cols.get("red", "#ff2b2b")
+c_yellow = cols.get("yellow", "#f5a524")
+c_orange = cols.get("orange", "#ff7b00")
+c_green = cols.get("green", "#34d399")
+c_cyan = cols.get("cyan", "#06b6d4")
+c_blue = cols.get("blue", "#3b82f6")
+c_magenta = cols.get("magenta", "#a855f7")
+b_red = cols.get("bright_red", "#ff4d4d")
+b_yellow = cols.get("bright_yellow", "#fde047")
+b_green = cols.get("bright_green", "#34d399")
+b_cyan = cols.get("bright_cyan", "#22d3ee")
+b_blue = cols.get("bright_blue", "#60a5fa")
+b_magenta = cols.get("bright_magenta", "#d8b4fe")
+papirus_color = p.get("papirusEffectiveColor") or p.get("papirusColor") or "red"
+gtk_accent_name = p.get("gtkAccentName") or "red"
+
+# Load persistent A/B slot state for live GTK3 and Papirus icon reload
+slots_path = os.path.join(conf_dir, "retheme_slots.json")
+slots = {}
+try:
+    with open(slots_path, "r", encoding="utf-8") as fh:
+        slots = json.load(fh)
+except Exception:
+    slots = {}
+
+palette_sig = f"{bg_dark}|{bg_card}|{bg_elev}|{accent}|{fg}"
+gtk_slot = slots.get("gtkSlot", "A")
+if slots.get("lastPaletteSig") != palette_sig:
+    gtk_slot = "B" if gtk_slot == "A" else "A"
+gtk_theme_name = f"X64-GTK-{gtk_slot}"
+
+# ------------------------------------------------------------------
+# 1. KITTY (~/.config/kitty/x64-theme.conf + globinclude)
+# ------------------------------------------------------------------
+kitty_dir = os.path.join(home, ".config", "kitty")
+kitty_theme_conf = f"""# Auto-generated by x64-theme ({p.get('name', 'X64')})
+foreground            {fg}
+background            {bg_dark}
+background_opacity    0.96
+selection_foreground  {accent_fg}
+selection_background  {accent}
+
+cursor                {accent}
+cursor_text_color     {accent_fg}
+url_color             {accent_hover}
+
+active_border_color   {accent}
+inactive_border_color {bg_elev}
+
+active_tab_foreground   {accent_fg}
+active_tab_background   {accent}
+inactive_tab_foreground {fg2}
+inactive_tab_background {bg_card}
+tab_bar_background      {dark_bg}
+
+color0  {bg_elev}
+color8  {muted}
+color1  {c_red}
+color9  {b_red}
+color2  {c_green}
+color10 {b_green}
+color3  {c_yellow}
+color11 {b_yellow}
+color4  {c_blue}
+color12 {b_blue}
+color5  {c_magenta}
+color13 {b_magenta}
+color6  {c_cyan}
+color14 {b_cyan}
+color7  {fg2}
+color15 {fg}
+
+# Dedicated live-recolor slots for Starship & Fastfetch (retroactive on open Kitty windows,
+# while degrading safely to X64 Crimson/White/Obsidian on non-Kitty 256-color terminals)
+color196 {accent}
+color231 {accent_fg}
+color236 {bg_elev}
+color253 {fg}
+"""
+atomic_write(os.path.join(kitty_dir, "x64-theme.conf"), kitty_theme_conf)
+
+kitty_conf_path = os.path.join(kitty_dir, "kitty.conf")
+if not os.path.exists(kitty_conf_path) and os.path.exists("/etc/xdg/kitty/kitty.conf"):
+    with open("/etc/xdg/kitty/kitty.conf", "r", encoding="utf-8") as sf:
+        kitty_base = sf.read()
+else:
+    kitty_base = ""
+    if os.path.exists(kitty_conf_path):
+        with open(kitty_conf_path, "r", encoding="utf-8") as sf:
+            kitty_base = sf.read()
+
+if "x64-theme.conf" not in kitty_base:
+    sep = "\n" if kitty_base and not kitty_base.endswith("\n") else ""
+    kitty_base = (
+        f"{kitty_base}{sep}\n"
+        "# X64 Theme Studio live color override\n"
+        "globinclude x64-theme.conf\n"
+    )
+    atomic_write(kitty_conf_path, kitty_base)
+
+# ------------------------------------------------------------------
+# 1b. STARSHIP & FASTFETCH (use live-recolored Kitty palette slots 196/231/236/253)
+# ------------------------------------------------------------------
+starship_path = os.path.join(home, ".config", "starship.toml")
+starship_existing = ""
+if os.path.exists(starship_path):
+    try:
+        with open(starship_path, "r", encoding="utf-8") as sf:
+            starship_existing = sf.read()
+    except Exception:
+        starship_existing = ""
+if not starship_existing or "X64 LIOS" in starship_existing:
+    starship_conf = """# Auto-generated by x64-theme (live-linked to Kitty palette slots 196/231/236/253)
+format = \"\"\"
+[](196)\\
+$username\\
+[](196) \\
+[](236)\\
+$directory\\
+[](236) \\
+$character\"\"\"
+
+[username]
+show_always = true
+style_user = "bg:196 fg:231 bold"
+style_root = "bg:196 fg:231 bold"
+format = "[X64 LIOS]($style)"
+
+[directory]
+style = "bg:236 fg:253"
+format = "[ $path]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[character]
+success_symbol = "[❯](196)"
+error_symbol = "[✗](1)"
+"""
+    if starship_conf != starship_existing:
+        atomic_write(starship_path, starship_conf)
+
+fastfetch_path = os.path.join(home, ".config", "fastfetch", "config.jsonc")
+if os.path.exists(fastfetch_path):
+    try:
+        with open(fastfetch_path, "r", encoding="utf-8") as ff:
+            ff_txt = ff.read()
+        ff_slot = "38;5;196"
+        ff_new = re.sub(r'("1"\s*:\s*)"[^"]*"', rf'\1"{ff_slot}"', ff_txt)
+        ff_new = re.sub(r'("keys"\s*:\s*)"[^"]*"', rf'\1"{ff_slot}"', ff_new)
+        ff_new = re.sub(r'("keyColor"\s*:\s*)"[^"]*"', rf'\1"{ff_slot}"', ff_new)
+        if ff_new != ff_txt:
+            atomic_write(fastfetch_path, ff_new)
+    except Exception:
+        pass
+
+# ------------------------------------------------------------------
+# 2. BTOP (~/.config/btop/themes/x64-theme.theme + btop.conf)
+# Harmonized strictly with active theme accent family (no foreign mixed hues)
+# ------------------------------------------------------------------
+btop_dir = os.path.join(home, ".config", "btop")
+is_mono = (p.get("theme") == "x64-lios-monochrome" and not (p.get("accentOverride") or "").strip())
+acc_soft = mix_hex(accent, fg, 0.35)
+acc_mid = mix_hex(accent, bg_elev, 0.25)
+acc_dim = mix_hex(accent, fg2, 0.45)
+btop_theme = f"""# Auto-generated by x64-theme ({p.get('name', 'X64')})
+theme[main_bg]="{bg_dark}"
+theme[main_fg]="{fg}"
+theme[title]="{fg}"
+theme[hi_fg]="{accent}"
+theme[selected_bg]="{accent}"
+theme[selected_fg]="{accent_fg}"
+theme[inactive_fg]="{muted}"
+theme[graph_text]="{fg2}"
+theme[meter_bg]="{bg_elev}"
+theme[proc_misc]="{accent_hover}"
+
+theme[cpu_box]="{accent}"
+theme[mem_box]="{acc_dim}"
+theme[net_box]="{acc_dim}"
+theme[proc_box]="{mix_hex(accent, bg_elev, 0.55)}"
+theme[div_line]="{bg_elev}"
+
+theme[temp_start]="{fg2 if is_mono else c_green}"
+theme[temp_mid]="{fg if is_mono else c_yellow}"
+theme[temp_end]="{accent}"
+
+theme[cpu_start]="{accent_deep}"
+theme[cpu_mid]="{accent}"
+theme[cpu_end]="{accent_hover}"
+
+theme[free_start]="{mix_hex(fg2, bg_elev, 0.35)}"
+theme[free_mid]="{fg2}"
+theme[free_end]="{fg}"
+
+theme[cached_start]="{mix_hex(accent_deep, bg_elev, 0.35)}"
+theme[cached_mid]="{acc_dim}"
+theme[cached_end]="{acc_soft}"
+
+theme[available_start]="{acc_mid}"
+theme[available_mid]="{accent}"
+theme[available_end]="{accent_hover}"
+
+theme[used_start]="{accent_deep}"
+theme[used_mid]="{accent}"
+theme[used_end]="{accent_hover}"
+
+theme[download_start]="{acc_mid}"
+theme[download_mid]="{accent}"
+theme[download_end]="{accent_hover}"
+
+theme[upload_start]="{accent_deep}"
+theme[upload_mid]="{acc_dim}"
+theme[upload_end]="{acc_soft}"
+
+theme[process_start]="{acc_dim}"
+theme[process_mid]="{accent}"
+theme[process_end]="{accent_hover}"
+"""
+atomic_write(os.path.join(btop_dir, "themes", "x64-theme.theme"), btop_theme)
+
+btop_conf_path = os.path.join(btop_dir, "btop.conf")
+if os.path.isfile(btop_conf_path):
+    with open(btop_conf_path, "r", encoding="utf-8") as fh:
+        bc = fh.read()
+    if re.search(r'^\s*color_theme\s*=', bc, flags=re.MULTILINE):
+        bc_new = re.sub(r'^\s*color_theme\s*=.*$', 'color_theme = "x64-theme"', bc, count=1, flags=re.MULTILINE)
+    else:
+        bc_new = 'color_theme = "x64-theme"\n' + bc
+    if bc_new != bc:
+        atomic_write(btop_conf_path, bc_new)
+else:
+    atomic_write(btop_conf_path, 'color_theme = "x64-theme"\ntheme_background = true\n')
+
+# ------------------------------------------------------------------
+# 3. PAPIRUS USER-SPACE OVERLAY (~/.local/share/icons/Papirus-Dark-X64-{A,B})
+# Zero sudo, ~15ms, flips A<->B only when folder color actually changes.
+# ------------------------------------------------------------------
+icons_root = os.path.join(home, ".local", "share", "icons")
+sys_papirus = "/usr/share/icons/Papirus-Dark"
+icon_slot = slots.get("iconSlot", "A")
+last_papirus_color = slots.get("lastPapirusColor", "")
+icon_changed = False
+
+if os.path.isdir(sys_papirus):
+    slot_a_idx = os.path.join(icons_root, "Papirus-Dark-X64-A", "index.theme")
+    slot_b_idx = os.path.join(icons_root, "Papirus-Dark-X64-B", "index.theme")
+    need_rebuild = (
+        (last_papirus_color != papirus_color)
+        or (not os.path.isfile(slot_a_idx))
+        or (not os.path.isfile(slot_b_idx))
+    )
+    if need_rebuild:
+        if last_papirus_color and last_papirus_color != papirus_color:
+            icon_slot = "B" if icon_slot == "A" else "A"
+
+        color_pat = re.compile(
+            r'^(folder|user)-(adwaita|black|blue|bluegrey|breeze|brown|carmine|cyan|'
+            r'darkcyan|deeporange|green|grey|indigo|magenta|nordic|orange|palebrown|'
+            r'paleorange|pink|red|teal|violet|white|yaru|yellow)(-.*)?\.svg$'
+        )
+        sizes = ["16x16", "22x22", "24x24", "32x32", "48x48", "64x64", "96x96", "128x128"]
+
+        # Precompute symlink plan once, then materialize BOTH slots (A & B) so:
+        # 1) GTK3 & Qt6 see the A<->B theme name flip (instant cache invalidation)
+        # 2) Already-open KF6/Dolphin windows pinned to either A or B ALSO get the new color live!
+        per_size_links = []
+        valid_dirs = []
+        valid_scaled = []
+        for sz in sizes:
+            src_places = os.path.join(sys_papirus, sz, "places")
+            if not os.path.isdir(src_places):
+                continue
+            entries = os.listdir(src_places)
+            primary_links = []
+            recolored_names = set()
+            for name in entries:
+                full = os.path.join(src_places, name)
+                if not os.path.islink(full):
+                    continue
+                tgt = os.readlink(full)
+                m = color_pat.match(tgt)
+                if not m:
+                    continue
+                prefix, _old_col, suffix = m.group(1), m.group(2), (m.group(3) or "")
+                cand = os.path.join(src_places, f"{prefix}-{papirus_color}{suffix}.svg")
+                if not os.path.exists(cand):
+                    cand = os.path.join(src_places, f"folder-{papirus_color}{suffix}.svg")
+                if not os.path.exists(cand):
+                    cand = os.path.join(src_places, f"{prefix}-{papirus_color}.svg")
+                if os.path.exists(cand):
+                    primary_links.append((name, os.path.realpath(cand)))
+                    recolored_names.add(name)
+
+            alias_links = []
+            for _ in range(2):
+                added = False
+                for name in entries:
+                    if name in recolored_names:
+                        continue
+                    full = os.path.join(src_places, name)
+                    if not os.path.islink(full):
+                        continue
+                    tgt = os.readlink(full)
+                    if tgt in recolored_names:
+                        alias_links.append((name, tgt))
+                        recolored_names.add(name)
+                        added = True
+                if not added:
+                    break
+
+            if recolored_names:
+                per_size_links.append((sz, primary_links + alias_links))
+                valid_dirs.append(f"{sz}/places")
+                if sz in ("16x16", "22x22", "24x24", "32x32", "48x48", "64x64"):
+                    valid_scaled.append(f"{sz}@2x/places")
+
+        for slot_lbl in ("A", "B"):
+            target_theme_name = f"Papirus-Dark-X64-{slot_lbl}"
+            target_dir = os.path.join(icons_root, target_theme_name)
+            os.makedirs(target_dir, exist_ok=True)
+            for sz, links in per_size_links:
+                dst_places = os.path.join(target_dir, sz, "places")
+                os.makedirs(dst_places, exist_ok=True)
+                for existing in os.listdir(dst_places):
+                    ep = os.path.join(dst_places, existing)
+                    if os.path.islink(ep) or os.path.isfile(ep):
+                        try:
+                            os.unlink(ep)
+                        except OSError:
+                            pass
+                for name, link_tgt in links:
+                    os.symlink(link_tgt, os.path.join(dst_places, name))
+                if sz in ("16x16", "22x22", "24x24", "32x32", "48x48", "64x64"):
+                    sz2x = os.path.join(target_dir, f"{sz}@2x")
+                    if not os.path.lexists(sz2x):
+                        os.symlink(sz, sz2x)
+
+            idx_lines = [
+                "[Icon Theme]",
+                f"Name={target_theme_name}",
+                f"Comment=X64 Theme Studio Papirus Overlay ({papirus_color})",
+                "Inherits=Papirus-Dark,breeze-dark,hicolor",
+                "Example=folder",
+                "FollowsColorScheme=true",
+                f"Directories={','.join(valid_dirs)}",
+                f"ScaledDirectories={','.join(valid_scaled)}",
+                "",
+            ]
+            for d in valid_dirs:
+                sz_num = d.split("x", 1)[0]
+                idx_lines.extend([
+                    f"[{d}]",
+                    "Context=Places",
+                    f"Size={sz_num}",
+                    "Type=Fixed",
+                    "",
+                ])
+            for d in valid_scaled:
+                sz_num = d.split("x", 1)[0]
+                idx_lines.extend([
+                    f"[{d}]",
+                    "Context=Places",
+                    f"Size={sz_num}",
+                    "Scale=2",
+                    "Type=Fixed",
+                    "",
+                ])
+            atomic_write(os.path.join(target_dir, "index.theme"), "\n".join(idx_lines))
+        icon_changed = True
+    icon_theme_name = f"Papirus-Dark-X64-{icon_slot}"
+else:
+    icon_theme_name = "Papirus-Dark"
+
+# ------------------------------------------------------------------
+# 4. GTK 3 & GTK 4 / LIBADWAITA CSS + A/B LIVE WRAPPERS
+# ------------------------------------------------------------------
+sel_bg_hex = mix_hex(bg_dark, accent, 0.28)
+header_bg = mix_hex(bg_dark, bg_card, 0.55)
+gtk_vars_css = f"""/* Auto-generated by x64-theme ({p.get('name', 'X64')}) */
+@define-color accent_color {accent};
+@define-color accent_fg_color {accent_fg};
+@define-color accent_bg_color {accent};
+@define-color window_bg_color {bg_dark};
+@define-color window_fg_color {fg};
+@define-color headerbar_bg_color {header_bg};
+@define-color headerbar_fg_color {fg};
+@define-color popover_bg_color {bg_card};
+@define-color popover_fg_color {fg};
+@define-color dialog_bg_color {bg_card};
+@define-color dialog_fg_color {fg};
+@define-color view_bg_color {bg_card};
+@define-color view_fg_color {fg};
+@define-color card_bg_color {bg_elev};
+@define-color card_fg_color {fg};
+@define-color sidebar_bg_color @window_bg_color;
+@define-color sidebar_fg_color @window_fg_color;
+@define-color sidebar_border_color @window_bg_color;
+@define-color sidebar_backdrop_color @window_bg_color;
+@define-color theme_bg_color {bg_dark};
+@define-color theme_fg_color {fg};
+@define-color theme_base_color {bg_card};
+@define-color theme_text_color {fg};
+@define-color theme_selected_bg_color {accent};
+@define-color theme_selected_fg_color {accent_fg};
+@define-color insensitive_bg_color {bg_card};
+@define-color insensitive_fg_color {fg2};
+"""
+gtk4_css = gtk_vars_css + f"""
+:root {{
+    --accent-color: {accent};
+    --accent-bg-color: {accent};
+    --accent-fg-color: {accent_fg};
+    --window-bg-color: {bg_dark};
+    --window-fg-color: {fg};
+    --headerbar-bg-color: {header_bg};
+    --headerbar-fg-color: {fg};
+    --view-bg-color: {bg_card};
+    --view-fg-color: {fg};
+    --card-bg-color: {bg_elev};
+    --card-fg-color: {fg};
+    --popover-bg-color: {bg_card};
+    --popover-fg-color: {fg};
+    --dialog-bg-color: {bg_card};
+    --dialog-fg-color: {fg};
+    --sidebar-bg-color: {bg_dark};
+    --sidebar-fg-color: {fg};
+}}
+"""
+gtk3_css_path = os.path.join(home, ".config", "gtk-3.0", "gtk.css")
+gtk4_css_path = os.path.join(home, ".config", "gtk-4.0", "gtk.css")
+atomic_write(gtk4_css_path, gtk4_css)
+
+# Build lightweight GTK3 live wrappers (X64-GTK-A & X64-GTK-B) with inlined colors
+# and keep ~/.config/gtk-3.0/gtk.css non-shadowing so priority-800 user CSS never
+# freezes already-open GTK3/Qt6-gtk3 windows on the startup color!
+themes_root = os.path.join(home, ".local", "share", "themes")
+adw_gtk3_dir = "/usr/share/themes/adw-gtk3-dark/gtk-3.0"
+if os.path.isdir(adw_gtk3_dir):
+    inlined_gtk3_css = (
+        f'@import url("file://{adw_gtk3_dir}/gtk.css");\n'
+        f"{gtk_vars_css}"
+        f"treeview.view:selected, treeview.view:selected:focus, row:selected {{\n"
+        f"    background-color: {sel_bg_hex};\n"
+        f"    color: {fg};\n"
+        f"}}\n"
+    )
+    atomic_write(
+        gtk3_css_path,
+        "/* Managed by x64-theme: active colors are inlined in ~/.local/share/themes/X64-GTK-{A,B} for instant live reload. */\n",
+    )
+    for slot_lbl in ("A", "B"):
+        tname = f"X64-GTK-{slot_lbl}"
+        tdir = os.path.join(themes_root, tname)
+        g3dir = os.path.join(tdir, "gtk-3.0")
+        os.makedirs(g3dir, exist_ok=True)
+        atomic_write(
+            os.path.join(tdir, "index.theme"),
+            f"[Desktop Entry]\nType=X-GNOME-Metatheme\nName={tname}\nComment=X64 Live GTK3 Wrapper\nEncoding=UTF-8\n\n"
+            f"[X-GNOME-Metatheme]\nGtkTheme={tname}\nIconTheme={icon_theme_name}\nCursorTheme=breeze_cursors\n",
+        )
+        atomic_write(os.path.join(g3dir, "gtk.css"), inlined_gtk3_css)
+        atomic_write(os.path.join(g3dir, "gtk-dark.css"), inlined_gtk3_css)
+        assets_dst = os.path.join(g3dir, "assets")
+        if os.path.isdir(os.path.join(adw_gtk3_dir, "assets")) and not os.path.lexists(assets_dst):
+            os.symlink(os.path.join(adw_gtk3_dir, "assets"), assets_dst)
+else:
+    atomic_write(gtk3_css_path, gtk_vars_css)
+    gtk_theme_name = "adw-gtk3-dark"
+
+gtk3_settings = f"""[Settings]
+gtk-theme-name={gtk_theme_name}
+gtk-icon-theme-name={icon_theme_name}
+gtk-application-prefer-dark-theme=true
+gtk-cursor-theme-name=breeze_cursors
+gtk-cursor-theme-size=24
+gtk-font-name=Inter, 10
+gtk-button-images=true
+gtk-menu-images=true
+gtk-enable-animations=true
+gtk-primary-button-warps-slider=true
+gtk-toolbar-style=3
+gtk-xft-dpi=98304
+"""
+gtk4_settings = f"""[Settings]
+gtk-theme-name={gtk_theme_name}
+gtk-icon-theme-name={icon_theme_name}
+gtk-application-prefer-dark-theme=true
+gtk-cursor-theme-name=breeze_cursors
+gtk-cursor-theme-size=24
+gtk-font-name=Inter, 10
+gtk-enable-animations=true
+gtk-primary-button-warps-slider=true
+gtk-xft-dpi=98304
+"""
+atomic_write(os.path.join(home, ".config", "gtk-3.0", "settings.ini"), gtk3_settings)
+atomic_write(os.path.join(home, ".config", "gtk-4.0", "settings.ini"), gtk4_settings)
+
+# ------------------------------------------------------------------
+# 5. QT / KDE (~/.config/kdeglobals + ~/.local/share/color-schemes/X64LiveTheme.colors)
+# ------------------------------------------------------------------
+acc_rgb = hex_rgb_csv(accent)
+acc_deep_rgb = hex_rgb_csv(accent_deep)
+acc_fg_rgb = hex_rgb_csv(accent_fg)
+acc_fg_inact_rgb = hex_rgb_csv(mix_hex(accent_fg, accent, 0.25))
+acc_link_rgb = hex_rgb_csv(mix_hex(accent_fg, accent_hover, 0.25))
+bg_dark_rgb = hex_rgb_csv(bg_dark)
+bg_card_rgb = hex_rgb_csv(bg_card)
+bg_elev_rgb = hex_rgb_csv(bg_elev)
+bg_hover_rgb = hex_rgb_csv(bg_hover)
+bg_alt_view_rgb = hex_rgb_csv(mix_hex(bg_dark, bg_card, 0.65))
+fg_rgb = hex_rgb_csv(fg)
+fg2_rgb = hex_rgb_csv(fg2)
+ok_rgb = hex_rgb_csv(status_ok)
+warn_rgb = hex_rgb_csv(status_warn)
+neg_rgb = hex_rgb_csv(c_red)
+visited_rgb = hex_rgb_csv(mix_hex(accent, fg2, 0.45))
+
+color_sections = f"""[ColorEffects:Disabled]
+ChangeSelectionColor=
+Color=56,56,56
+ColorAmount=0
+ColorEffect=0
+ContrastAmount=0.65
+ContrastEffect=1
+Enable=
+IntensityAmount=0.1
+IntensityEffect=2
+
+[ColorEffects:Inactive]
+ChangeSelectionColor=true
+Color=112,111,110
+ColorAmount=0.025
+ColorEffect=2
+ContrastAmount=0.1
+ContrastEffect=2
+Enable=false
+IntensityAmount=0
+IntensityEffect=0
+
+[Colors:Button]
+BackgroundAlternate={bg_hover_rgb}
+BackgroundNormal={bg_elev_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Complementary]
+BackgroundAlternate={bg_elev_rgb}
+BackgroundNormal={bg_card_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Header]
+BackgroundAlternate={bg_elev_rgb}
+BackgroundNormal={bg_card_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Header][Inactive]
+BackgroundAlternate={bg_alt_view_rgb}
+BackgroundNormal={bg_dark_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Selection]
+BackgroundAlternate={acc_deep_rgb}
+BackgroundNormal={acc_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_fg_rgb}
+ForegroundInactive={acc_fg_inact_rgb}
+ForegroundLink={acc_link_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={acc_fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Tooltip]
+BackgroundAlternate={bg_elev_rgb}
+BackgroundNormal={bg_card_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:View]
+BackgroundAlternate={bg_alt_view_rgb}
+BackgroundNormal={bg_dark_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+
+[Colors:Window]
+BackgroundAlternate={bg_elev_rgb}
+BackgroundNormal={bg_card_rgb}
+DecorationFocus={acc_rgb}
+DecorationHover={acc_rgb}
+ForegroundActive={acc_rgb}
+ForegroundInactive={fg2_rgb}
+ForegroundLink={acc_rgb}
+ForegroundNegative={neg_rgb}
+ForegroundNeutral={warn_rgb}
+ForegroundNormal={fg_rgb}
+ForegroundPositive={ok_rgb}
+ForegroundVisited={visited_rgb}
+"""
+
+kdeglobals_content = f"""{color_sections}
+[General]
+AccentColor={acc_rgb}
+ColorScheme=BreezeDark
+LastUsedCustomAccentColor={acc_rgb}
+
+[Icons]
+Theme={icon_theme_name}
+
+[KDE]
+AnimationDurationFactor=0.25
+contrast=4
+frameContrast=0.2
+widgetStyle=Breeze
+
+[WM]
+activeBackground={acc_rgb}
+activeBlend={acc_fg_rgb}
+activeForeground={acc_fg_rgb}
+inactiveBackground={bg_card_rgb}
+inactiveBlend={fg2_rgb}
+inactiveForeground={fg2_rgb}
+"""
+atomic_write(os.path.join(home, ".config", "kdeglobals"), kdeglobals_content)
+
+# Write user color-scheme overrides for BreezeDark & BreezeLight (shadowing /usr/share/color-schemes/)
+# so KF6 KColorSchemeManager reloads 100% natively (Toolbar, Places, Dolphin MainGrid filenames &
+# selection highlight, TabBar, StatusBar) without QSS overrides or white flash!
+schemes_dir = os.path.join(home, ".local", "share", "color-schemes")
+for scheme_id, scheme_name in (
+    ("BreezeDark", "Breeze Dark"),
+    ("BreezeLight", "Breeze Light"),
+    ("X64LiveTheme", f"X64 Live Theme ({p.get('name', 'X64')})"),
+):
+    scheme_content = f"""{color_sections}
+[General]
+ColorScheme={scheme_id}
+Name={scheme_name}
+shadeSortColumn=true
+"""
+    atomic_write(os.path.join(schemes_dir, f"{scheme_id}.colors"), scheme_content)
+
+# Remove legacy kde-live.qss if present from earlier builds
+try:
+    os.remove(os.path.join(runtime_dir, "kde-live.qss"))
+except OSError:
+    pass
+
+# Save updated slot state
+atomic_write(slots_path, json.dumps({
+    "gtkSlot": gtk_slot,
+    "lastPaletteSig": palette_sig,
+    "iconSlot": icon_slot,
+    "lastPapirusColor": papirus_color,
+}))
+
+print(f"{gtk_theme_name}\t{icon_theme_name}\t{gtk_accent_name}\t{'1' if icon_changed else '0'}")
+PYEOF
+    ) || return 0
+
+    local gtk_theme_name icon_theme_name gtk_accent_name icon_changed
+    IFS=$'\t' read -r gtk_theme_name icon_theme_name gtk_accent_name icon_changed <<< "$out_vars"
+
+    if [ -n "$expected_gen" ] && [ -f "$gen_file" ]; then
+        [ "$(cat "$gen_file" 2>/dev/null)" = "$expected_gen" ] || return 0
+    fi
+
+    # Live reload Kitty instances
+    pkill -u "$UID_NUM" -USR1 -x kitty 2>/dev/null || true
+
+    # Live reload running btop instances
+    pkill -u "$UID_NUM" -USR2 -x btop 2>/dev/null || true
+
+    # Update xsettingsd if user runs it
+    if [ -f "${HOME}/.config/xsettingsd/xsettingsd.conf" ]; then
+        sed -i "s|Net/ThemeName .*|Net/ThemeName \"${gtk_theme_name}\"|" "${HOME}/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+        sed -i "s|Net/IconThemeName .*|Net/IconThemeName \"${icon_theme_name}\"|" "${HOME}/.config/xsettingsd/xsettingsd.conf" 2>/dev/null || true
+        pkill -u "$UID_NUM" -HUP -x xsettingsd 2>/dev/null || true
+    fi
+
+    # Clear stale KF6 icon cache & recycle idle thumbnail kioworkers BEFORE broadcasting icon theme
+    # switch so folder previews (directorythumbnail) regenerate with the new folder color immediately.
+    if [ "$icon_changed" = "1" ]; then
+        rm -f "${HOME}/.cache/icon-cache.kcache" 2>/dev/null || true
+        local kw_pid kw_cmd
+        while IFS= read -r kw_pid; do
+            [ -n "$kw_pid" ] || continue
+            kw_cmd=$(tr '\0' ' ' < "/proc/${kw_pid}/cmdline" 2>/dev/null || true)
+            case "$kw_cmd" in
+                *thumbnail*) kill -TERM "$kw_pid" 2>/dev/null || true ;;
+            esac
+        done < <(pgrep -u "$UID_NUM" -x kioworker 2>/dev/null || true)
+    fi
+
+    # Discover running KDE/KF6 apps once (Dolphin, Ark, Gwenview, Kate, etc.)
+    local -a kde_svcs=()
+    if command -v busctl >/dev/null 2>&1; then
+        mapfile -t kde_svcs < <(busctl --user list --no-pager 2>/dev/null | awk '/^org\.kde\.(dolphin|ark|gwenview|kate|kwrite|okular|konsole|kcalc|spectacle)-/{print $1}')
+    fi
+
+    # Live reload GTK3 + Qt6 (via libqgtk3.so) and GTK4/Libadwaita portal hints.
+    # When KF6 apps are running, a brief color-scheme toggle (prefer-light -> 120ms -> prefer-dark)
+    # guarantees dconf/QGtk3Theme delivers colorSchemeChanged without coalescing, so KColorSchemeManager
+    # reloads ~/.local/share/color-schemes/BreezeDark.colors natively (zero light flash on KF6 because
+    # BreezeLight.colors mirrors the active dark palette, and DolphinView::eventFilter clears QPixmapCache!).
+    if command -v gsettings >/dev/null 2>&1; then
+        [ -n "$gtk_accent_name" ] && gsettings set org.gnome.desktop.interface accent-color "$gtk_accent_name" 2>/dev/null || true
+        [ -n "$gtk_theme_name" ] && gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme_name" 2>/dev/null || true
+        [ -n "$icon_theme_name" ] && gsettings set org.gnome.desktop.interface icon-theme "$icon_theme_name" 2>/dev/null || true
+        if [ "${#kde_svcs[@]}" -gt 0 ]; then
+            sleep 0.05
+            gsettings set org.gnome.desktop.interface color-scheme 'prefer-light' 2>/dev/null || true
+            sleep 0.12
+            gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+        else
+            gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+        fi
+    fi
+
+    # Allow libqgtk3.so + KColorSchemeManager (~100ms) to finish propagating QPalette & QIcon::themeName()
+    sleep 0.10
+
+    # Live reload Qt/KDE apps (Dolphin, Ark, Gwenview, Kate, etc.)
+    if command -v gdbus >/dev/null 2>&1; then
+        gdbus emit --session --object-path /kdeglobals --signal org.kde.kconfig.notify.ConfigChanged \
+            "@a{saay} {'General': [b'AccentColor', b'ColorScheme', b'LastUsedCustomAccentColor'], 'Icons': [b'Theme'], 'KDE': [b'widgetStyle'], 'Colors:Window': [b'BackgroundNormal', b'ForegroundNormal', b'DecorationFocus'], 'Colors:View': [b'BackgroundNormal', b'BackgroundAlternate', b'ForegroundNormal', b'ForegroundInactive', b'DecorationFocus'], 'Colors:Selection': [b'BackgroundNormal', b'ForegroundNormal'], 'Colors:Button': [b'BackgroundNormal', b'ForegroundNormal', b'DecorationFocus'], 'Colors:Header': [b'BackgroundNormal', b'ForegroundNormal']}" \
+            >/dev/null 2>&1 || true
+        gdbus emit --session --object-path /BreezeStyle --signal org.kde.Breeze.Style.reparseConfiguration >/dev/null 2>&1 || true
+    fi
+    if command -v dbus-send >/dev/null 2>&1; then
+        dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0 >/dev/null 2>&1 || true
+        dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:2 int32:0 >/dev/null 2>&1 || true
+        if [ "$icon_changed" = "1" ]; then
+            dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:4 int32:0 >/dev/null 2>&1 || true
+            for grp in 0 1 2 3 4 5; do
+                dbus-send --session --type=signal /KIconLoader org.kde.KIconLoader.iconChanged "int32:${grp}" >/dev/null 2>&1 || true
+            done
+        fi
+    fi
+
+    # Refresh open Dolphin views after KIconLoader finishes reconfiguring (avoids 1-step folder icon lag)
+    if [ "${#kde_svcs[@]}" -gt 0 ] && command -v gdbus >/dev/null 2>&1; then
+        local svc win_path cur_qss
+        if [ "$icon_changed" = "1" ]; then
+            sleep 0.14
+        fi
+        for svc in "${kde_svcs[@]}"; do
+            [ -n "$svc" ] || continue
+            # Clear legacy kde-live.qss if an app was opened prior to native BreezeDark reload
+            cur_qss=$(gdbus call --session --timeout=1 --dest "$svc" --object-path /MainApplication \
+                --method org.freedesktop.DBus.Properties.Get org.qtproject.Qt.QApplication styleSheet 2>/dev/null || true)
+            case "$cur_qss" in
+                *"QAbstractScrollArea QWidget"*|*"QGraphicsView QWidget"*)
+                    gdbus call --session --timeout=1 --dest "$svc" --object-path /MainApplication \
+                        --method org.qtproject.Qt.QApplication.setStyleSheet "" >/dev/null 2>&1 || true
+                    ;;
+            esac
+            if [ "$icon_changed" = "1" ]; then
+                case "$svc" in
+                    org.kde.dolphin-*)
+                        while IFS= read -r win_path; do
+                            [ -n "$win_path" ] || continue
+                            gdbus call --session --timeout=1 --dest "$svc" --object-path "$win_path" \
+                                --method org.qtproject.Qt.QAction.trigger >/dev/null 2>&1 || true
+                        done < <(busctl --user tree --list "$svc" 2>/dev/null | grep -E '^/dolphin/Dolphin_[0-9]+/actions/view_redisplay$' || echo '/dolphin/Dolphin_1/actions/view_redisplay')
+                        ;;
+                esac
+            fi
+        done
+    fi
+}
+
+dispatch_system_retheme() {
+    local gen_file="${RUNTIME_DIR}/retheme.gen"
+    local gen
+    gen=$(( $(cat "$gen_file" 2>/dev/null || echo 0) + 1 ))
+    printf '%s\n' "$gen" > "${gen_file}.tmp.$$" && mv -f "${gen_file}.tmp.$$" "$gen_file"
+
+    local self_bin="${BASH_SOURCE[0]}"
+    [ -x "$self_bin" ] || self_bin="/usr/bin/x64-theme"
+    setsid "$self_bin" _retheme-worker "$gen" >"${RUNTIME_DIR}/retheme.log" 2>&1 </dev/null 9>&- &
+    disown "$!" 2>/dev/null || true
+}
+
+notify_quickshell_reload() {
+    local pid cmd
+    while IFS= read -r pid; do
+        [ -n "$pid" ] || continue
+        cmd=$(tr '\0' ' ' < "/proc/${pid}/cmdline" 2>/dev/null || true)
+        case "$cmd" in
+            *"quickshell -n"*|*"/shell.qml"*)
+                quickshell ipc --pid "$pid" call theme reload >/dev/null 2>&1 && return 0
+                ;;
+        esac
+    done < <(pgrep -u "$UID_NUM" -x quickshell 2>/dev/null || true)
+    quickshell ipc call theme reload >/dev/null 2>&1 || true
+}
+
+sync_shell_and_wallpapers() {
+    write_palette_from_state
+    # Notify Quickshell FIRST so Wallpaper.qml displays/transitions the poster cleanly before mpvpaper starts/stops
+    notify_quickshell_reload
+    write_hyprlock_theme
+    reconcile_live_wallpapers
+}
+
+sync_full_theme() {
+    write_palette_from_state
+    notify_quickshell_reload
+    apply_hyprland_borders
+    write_hyprlock_theme
+    reconcile_live_wallpapers
+    dispatch_system_retheme
+}
+
+cmd_apply() {
+    ensure_state_file
+    local target_id="${1:-}"
+    shift || true
+
+    if [ -z "$target_id" ]; then
+        target_id=$(jq -r '.theme // "x64-lios-crimson"' "$STATE_FILE")
+    fi
+
+    local tdir
+    if ! tdir=$(resolve_theme_dir "$target_id"); then
+        echo "ERR: theme not found: $target_id" >&2
+        return 1
+    fi
+
+    local accent_ov bg_arg video_arg trans_arg mon_arg="ALL"
+    accent_ov=$(jq -r '.accentOverride // ""' "$STATE_FILE")
+    bg_arg=""
+    video_arg=$(jq -r 'if .videoEnabled == true then "true" else "false" end' "$STATE_FILE")
+    trans_arg=$(jq -r '.transition // "wave"' "$STATE_FILE")
+    local reset_accent=0
+
+    local prev_theme
+    prev_theme=$(jq -r '.theme // ""' "$STATE_FILE")
+    [ "$prev_theme" != "$target_id" ] && accent_ov=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --accent)
+                shift
+                if [ "${1:-}" = "none" ] || [ "${1:-}" = "reset" ] || [ -z "${1:-}" ]; then
+                    accent_ov=""
+                    reset_accent=1
+                elif valid_hex "${1:-}"; then
+                    accent_ov="$1"
+                fi
+                ;;
+            --bg)
+                shift
+                [ -f "${1:-}" ] && bg_arg="$1"
+                ;;
+            --monitor)
+                shift
+                [ -n "${1:-}" ] && mon_arg="$1"
+                ;;
+            --video)
+                shift
+                case "${1:-}" in
+                    on|1|true)   video_arg="true" ;;
+                    off|0|false) video_arg="false" ;;
+                esac
+                ;;
+            --transition)
+                shift
+                case "${1:-}" in
+                    fade|zoom|wave) trans_arg="$1" ;;
+                esac
+                ;;
+        esac
+        shift || true
+    done
+    [ "$reset_accent" -eq 1 ] && accent_ov=""
+
+    if [ -z "$bg_arg" ]; then
+        local m_json def_bg
+        m_json=$(toml_to_json "${tdir}/theme.toml")
+        def_bg=$(printf '%s' "$m_json" | jq -r '.default_background // ""')
+        if [ -n "$def_bg" ] && [ -f "${tdir}/backgrounds/${def_bg}" ]; then
+            bg_arg="${tdir}/backgrounds/${def_bg}"
+        else
+            bg_arg=$(find "${tdir}/backgrounds" -maxdepth 1 -type f 2>/dev/null | sort | head -n1)
+        fi
+        [ -z "$bg_arg" ] && [ -f "${tdir}/preview.jpg" ] && bg_arg="${tdir}/preview.jpg"
+        [ -z "$bg_arg" ] && bg_arg="$FALLBACK_BG"
+    fi
+
+    if [ "$mon_arg" = "ALL" ] || [ -z "$mon_arg" ]; then
+        jq --arg t "$target_id" \
+           --arg acc "$accent_ov" \
+           --arg bg "$bg_arg" \
+           --argjson vid "$video_arg" \
+           --arg tr "$trans_arg" \
+           '.theme = $t | .accentOverride = $acc | .background = $bg | .perMonitorBg = {} | .videoEnabled = $vid | .transition = $tr' \
+           "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    elif valid_monitor_name "$mon_arg"; then
+        jq --arg t "$target_id" \
+           --arg acc "$accent_ov" \
+           --arg mon "$mon_arg" \
+           --arg bg "$bg_arg" \
+           --argjson vid "$video_arg" \
+           --arg tr "$trans_arg" \
+           '.theme = $t | .accentOverride = $acc | .perMonitorBg = ((.perMonitorBg // {}) + {($mon): $bg}) | .videoEnabled = $vid | .transition = $tr' \
+           "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    fi
+
+    sync_full_theme
+    printf '%s\n' "$target_id"
+}
+
+cmd_set_bg() {
+    ensure_state_file
+    local bg_path="${1:-}"
+    shift || true
+    if [ -z "$bg_path" ] || [ ! -f "$bg_path" ]; then
+        echo "ERR: background file not found: $bg_path" >&2
+        return 1
+    fi
+
+    local mon_arg="ALL"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --monitor)
+                shift
+                [ -n "${1:-}" ] && mon_arg="$1"
+                ;;
+        esac
+        shift || true
+    done
+
+    if [ "$mon_arg" = "ALL" ] || [ -z "$mon_arg" ]; then
+        jq --arg bg "$bg_path" '.background = $bg | .perMonitorBg = {}' \
+            "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    elif valid_monitor_name "$mon_arg"; then
+        jq --arg mon "$mon_arg" --arg bg "$bg_path" \
+            '.perMonitorBg = ((.perMonitorBg // {}) + {($mon): $bg})' \
+            "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    else
+        echo "ERR: invalid monitor name: $mon_arg" >&2
+        return 1
+    fi
+
+    sync_shell_and_wallpapers
+    printf '%s\n' "$bg_path"
+}
+
+cmd_set_video() {
+    ensure_state_file
+    local action="${1:-toggle}"
+    local cur
+    cur=$(jq -r 'if .videoEnabled == true then "true" else "false" end' "$STATE_FILE")
+    local next="$cur"
+    case "$action" in
+        on|1|true)   next="true" ;;
+        off|0|false) next="false" ;;
+        toggle)      [ "$cur" = "true" ] && next="false" || next="true" ;;
+        get)         printf '%s\n' "$cur"; return 0 ;;
+    esac
+
+    jq --argjson v "$next" '.videoEnabled = $v' "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    sync_shell_and_wallpapers
+    printf '%s\n' "$next"
+}
+
+cmd_set_battery_poster() {
+    ensure_state_file
+    local action="${1:-toggle}"
+    local cur
+    cur=$(jq -r 'if .batteryPoster == false then "false" else "true" end' "$STATE_FILE")
+    local next="$cur"
+    case "$action" in
+        on|1|true)   next="true" ;;
+        off|0|false) next="false" ;;
+        toggle)      [ "$cur" = "true" ] && next="false" || next="true" ;;
+        get)         printf '%s\n' "$cur"; return 0 ;;
+    esac
+
+    jq --argjson v "$next" '.batteryPoster = $v' "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    sync_shell_and_wallpapers
+    printf '%s\n' "$next"
+}
+
+cmd_set_transition() {
+    ensure_state_file
+    local tr="${1:-wave}"
+    case "$tr" in
+        fade|zoom|wave) ;;
+        *) echo "ERR: transition must be fade|zoom|wave" >&2; return 1 ;;
+    esac
+    jq --arg t "$tr" '.transition = $t' "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    write_palette_from_state
+    notify_quickshell_reload
+    printf '%s\n' "$tr"
+}
+
+cmd_set_accent() {
+    ensure_state_file
+    local cur_theme
+    cur_theme=$(jq -r '.theme // "x64-lios-crimson"' "$STATE_FILE")
+    local arg="${1:-reset}"
+    local acc=""
+    if [ "$arg" != "reset" ] && [ "$arg" != "none" ] && valid_hex "$arg"; then
+        acc="$arg"
+    fi
+    jq --arg a "$acc" '.accentOverride = $a' "$STATE_FILE" > "${STATE_FILE}.tmp.$$" && mv -f "${STATE_FILE}.tmp.$$" "$STATE_FILE"
+    write_palette_from_state
+    notify_quickshell_reload
+    apply_hyprland_borders
+    write_hyprlock_theme
+    dispatch_system_retheme
+    printf '%s\n' "${acc:-default}"
+}
+
+cmd_thumbs() {
+    local filter="${1:---all}"
+    local id tdir f count=0
+    while IFS= read -r id; do
+        [ -n "$id" ] || continue
+        if [ "$filter" != "--all" ] && [ "$filter" != "$id" ]; then
+            continue
+        fi
+        tdir=$(resolve_theme_dir "$id") || continue
+        for d in "${tdir}/backgrounds" "${USER_THEMES_DIR}/backgrounds/${id}"; do
+            [ -d "$d" ] || continue
+            while IFS= read -r -d '' f; do
+                if is_video_file "$f"; then
+                    ensure_thumb_for "$f" 1 >/dev/null
+                    ensure_poster_for "$f" >/dev/null
+                    count=$(( count + 1 ))
+                elif is_image_file "$f"; then
+                    ensure_thumb_for "$f" 1 >/dev/null
+                    count=$(( count + 1 ))
+                fi
+            done < <(find "$d" -maxdepth 1 -type f -print0 2>/dev/null)
+        done
+    done < <(discover_theme_ids)
+    printf '{"generated":%d,"cacheDir":"%s"}\n' "$count" "$CACHE_DIR"
+}
+
+cmd_restore() {
+    ensure_state_file
+    sync_full_theme
+}
+
+cmd_retheme() {
+    cmd_init
+    apply_hyprland_borders
+    write_hyprlock_theme
+    run_system_retheme_sync ""
+}
+
+cmd_init() {
+    ensure_state_file
+    if [ ! -s "$PALETTE_FILE" ] || ! jq -e '.theme | type == "string"' "$PALETTE_FILE" >/dev/null 2>&1; then
+        write_palette_from_state
+    fi
+}
+
+cmd_current() {
+    cmd_init
+    cat "$PALETTE_FILE"
+}
+
+cmd_random() {
+    ensure_state_file
+    local cur
+    cur=$(jq -r '.theme // ""' "$STATE_FILE")
+    local -a ids=()
+    local id
+    while IFS= read -r id; do
+        [ -n "$id" ] && [ "$id" != "$cur" ] && ids+=("$id")
+    done < <(discover_theme_ids)
+    if [ "${#ids[@]}" -eq 0 ]; then
+        ids=("$DEFAULT_THEME")
+    fi
+    local pick="${ids[$(( RANDOM % ${#ids[@]} ))]}"
+    cmd_apply "$pick"
+}
+
+with_mutation_lock() {
+    local lock_file="${RUNTIME_DIR}/x64-theme.lock"
+    exec 9>"$lock_file"
+    flock -w 8 9 || true
+    "$@"
+    local rc=$?
+    flock -u 9 2>/dev/null || true
+    exec 9>&- 2>/dev/null || true
+    return "$rc"
+}
+
+case "${1:-current}" in
+    list)           cmd_list ;;
+    apply)          shift; with_mutation_lock cmd_apply "$@" ;;
+    random)         with_mutation_lock cmd_random ;;
+    set-bg)         shift; with_mutation_lock cmd_set_bg "$@" ;;
+    video)          shift; with_mutation_lock cmd_set_video "${1:-toggle}" ;;
+    battery-poster) shift; with_mutation_lock cmd_set_battery_poster "${1:-toggle}" ;;
+    transition)     shift; with_mutation_lock cmd_set_transition "${1:-wave}" ;;
+    pause-video)    shift; cmd_pause_video "${1:-on}" ;;
+    set-accent)     shift; with_mutation_lock cmd_set_accent "${1:-reset}" ;;
+    thumbs)         shift; cmd_thumbs "${1:---all}" ;;
+    restore)        with_mutation_lock cmd_restore ;;
+    retheme)        with_mutation_lock cmd_retheme ;;
+    _retheme-worker) shift; run_system_retheme_sync "${1:-}" ;;
+    init)           cmd_init ;;
+    current)        cmd_current ;;
+    *)
+        echo "Usage: x64-theme {list|apply|set-bg|video|battery-poster|transition|pause-video|set-accent|thumbs|restore|retheme|current|init}" >&2
+        exit 1
+        ;;
+esac

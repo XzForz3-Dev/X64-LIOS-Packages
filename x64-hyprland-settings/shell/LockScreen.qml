@@ -85,10 +85,15 @@ Scope {
 
         WlSessionLockSurface {
             id: lockSurface
-            color: "#08090e"
+            color: Theme.bgDark
 
             property string clockTime: "12:00"
             property string clockDate: "MARTES, 03 DE NOVIEMBRE"
+            readonly property string lockWallpaperUrl: {
+                var _rev = ThemeState.wallpaperRev;
+                var mon = (lockSurface.screen && lockSurface.screen.name) ? lockSurface.screen.name : "";
+                return ThemeState.wallpaperUrlFor(mon);
+            }
 
             function updateClock() {
                 var now = new Date();
@@ -115,18 +120,18 @@ Scope {
                 onTriggered: lockSurface.updateClock()
             }
 
-            // Fondo Monolith 4K Oficial
+            // Fondo Dinámico del Tema Activo (Imagen o Póster del Monitor)
             Image {
                 anchors.fill: parent
-                source: "file:///usr/share/backgrounds/x64-lios/01-monolith.jpg"
+                source: lockSurface.lockWallpaperUrl ? Qt.resolvedUrl(lockSurface.lockWallpaperUrl) : Qt.resolvedUrl("file:///usr/share/backgrounds/x64-lios/01-monolith.jpg")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: false
             }
 
-            // Velo Obsidian Glass Oscuro
+            // Velo Obsidian Glass Dinámico
             Rectangle {
                 anchors.fill: parent
-                color: "#c807080d"
+                color: Qt.rgba(Theme.bgDark.r, Theme.bgDark.g, Theme.bgDark.b, 0.76)
             }
 
             // Píldora Superior de Seguridad Wayland
@@ -137,8 +142,8 @@ Scope {
                 height: 30
                 width: secRow.implicitWidth + 28
                 radius: 15
-                color: "#e611131c"
-                border.color: "#44ff2b2b"
+                color: Theme.bgCapsule
+                border.color: Theme.accentGlowLine
                 border.width: 1
 
                 RowLayout {
@@ -227,7 +232,7 @@ Scope {
                                 width: 42
                                 height: 42
                                 radius: 21
-                                color: "#26ff2b2b"
+                                color: Theme.accentDim
                                 border.color: Theme.accent
                                 border.width: 1
 
@@ -290,7 +295,7 @@ Scope {
                                 Layout.fillWidth: true
                                 height: 42
                                 radius: 8
-                                color: "#141622"
+                                color: Theme.bgElevated
                                 border.color: passInput.activeFocus ? Theme.accent : "#32ffffff"
                                 border.width: 1
 
@@ -340,14 +345,14 @@ Scope {
                                 width: 46
                                 height: 42
                                 radius: 8
-                                color: unlockArea.containsMouse ? "#ff4242" : Theme.accent
+                                color: unlockArea.containsMouse ? Theme.accentHover : Theme.accent
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: root.isVerifying ? "󰑐" : "󰌿"
                                     font.family: Theme.fontMono
                                     font.pixelSize: 16
-                                    color: "#ffffff"
+                                    color: (0.2126 * Theme.accent.r + 0.7152 * Theme.accent.g + 0.0722 * Theme.accent.b) > 0.48 ? "#0a0b10" : "#ffffff"
                                 }
 
                                 MouseArea {
@@ -372,7 +377,7 @@ Scope {
                             font.family: Theme.fontMono
                             font.pixelSize: 11
                             font.weight: root.isError ? Font.DemiBold : Font.Normal
-                            color: root.isError ? Theme.accent : (root.isVerifying ? "#f59e0b" : Theme.textMuted)
+                            color: root.isError ? Theme.accent : (root.isVerifying ? Theme.statusWarn : Theme.textMuted)
                             elide: Text.ElideRight
                         }
                     }

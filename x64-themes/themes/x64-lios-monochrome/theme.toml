@@ -1,0 +1,8 @@
+id = "x64-lios-monochrome"
+name = "X64 Monochrome"
+author = "X64 Studios"
+description = "Minimalismo monocromático titanio sobre negro mate"
+order = 7
+mode = "dark"
+papirus_color = "grey"
+default_background = "01-monochrome-monolith.jpg"

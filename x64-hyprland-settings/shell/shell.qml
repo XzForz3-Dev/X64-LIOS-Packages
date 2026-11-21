@@ -57,6 +57,7 @@ ShellRoot {
         if (targetName !== "shortcuts") shortcutsPopup.visible = false;
         if (targetName !== "clipboard") clipboardPopup.visible = false;
         if (targetName !== "overview") overviewPopup.visible = false;
+        if (targetName !== "theme") themeStudio.visible = false;
     }
 
     function toggleAnimatedPopup(popup, keyName, targetScreen) {
@@ -380,6 +381,41 @@ ShellRoot {
         }
     }
 
+    // Live Theme Engine IPC reload, circular wave origin & Theme Studio (SUPER + T)
+    IpcHandler {
+        target: "theme"
+
+        function reload() {
+            ThemeState.reload();
+        }
+
+        function setOrigin(nx: string, ny: string) {
+            ThemeState.setWaveOrigin(nx, ny);
+        }
+
+        function toggle() {
+            root.toggleAnimatedPopup(themeStudio, "theme", root.focusedScreen);
+        }
+
+        function open() {
+            root.openAnimatedPopup(themeStudio, "theme", root.focusedScreen);
+        }
+
+        function close() {
+            themeStudio.closeAnimated();
+        }
+    }
+
+    // GPU Wallpaper Layer replicated across ALL connected displays (replaces swaybg)
+    Variants {
+        model: Quickshell.screens
+
+        Wallpaper {
+            required property var modelData
+            screen: modelData
+        }
+    }
+
     // Direct OSD trigger for hardware brightness keys (XF86MonBrightnessUp/Down)
     IpcHandler {
         target: "osd"
@@ -523,6 +559,14 @@ ShellRoot {
         screen: root.activePopupScreen
         visible: false
         onCloseRequested: overviewPopup.visible = false
+    }
+
+    // X64 Theme Studio — 3D Coverflow Theme, Palette & Video Wallpaper Picker (SUPER + T)
+    ThemeStudio {
+        id: themeStudio
+        screen: root.activePopupScreen
+        visible: false
+        onCloseRequested: themeStudio.visible = false
     }
 
     // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)
