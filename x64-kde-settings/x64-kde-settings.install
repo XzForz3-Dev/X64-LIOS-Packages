@@ -121,9 +121,40 @@ sync_kde_user_configs() {
             rm -f "$udir/.cache/icon-cache.kcache" "$udir/.cache/ksycoca6"* 2>/dev/null || true
             rm -rf "$udir/.cache/plasmashell" 2>/dev/null || true
 
+            # Rehabilitar autoarranque de KDE Connect eliminando el override Hidden=true heredado
+            if [ -f "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" ] && grep -q "Hidden=true" "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" 2>/dev/null; then
+                rm -f "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" 2>/dev/null || true
+            fi
+
             chown -R "$ug" "$udir/.config" 2>/dev/null || true
+
+            # Si hay sesión gráfica activa del usuario y kdeconnectd no está corriendo, levantarlo en vivo sin requerir reinicio
+            local uid="${ug%%:*}"
+            local uname
+            uname=$(id -nu "$uid" 2>/dev/null || true)
+            if [ -d /run/systemd/system ] && [ -x /usr/lib/kdeconnectd ] && [ -n "$uname" ] && [ -S "/run/user/${uid}/bus" ]; then
+                if ! pgrep -u "$uid" -x kdeconnectd >/dev/null 2>&1; then
+                    runuser -u "$uname" -- env XDG_RUNTIME_DIR="/run/user/${uid}" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${uid}/bus" /usr/lib/kdeconnectd >/dev/null 2>&1 &
+                fi
+            fi
         fi
     done
+
+    # Limpiar posible residuo en /etc/skel y abrir puertos oficiales de KDE Connect (1714:1764 UDP/TCP) en UFW
+    rm -f /etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop 2>/dev/null || true
+    if [ -f /etc/ufw/user.rules ] && ! grep -q "1714:1764" /etc/ufw/user.rules 2>/dev/null; then
+        sed -i '/^### END RULES ###/i ### tuple ### allow udp 1714:1764 0.0.0.0/0 any 0.0.0.0/0 in\n-A ufw-user-input -p udp -m multiport --dports 1714:1764 -j ACCEPT\n\n### tuple ### allow tcp 1714:1764 0.0.0.0/0 any 0.0.0.0/0 in\n-A ufw-user-input -p tcp -m multiport --dports 1714:1764 -j ACCEPT\n' /etc/ufw/user.rules 2>/dev/null || true
+    fi
+    if [ -f /etc/ufw/user6.rules ] && ! grep -q "1714:1764" /etc/ufw/user6.rules 2>/dev/null; then
+        sed -i '/^### END RULES ###/i ### tuple ### allow udp 1714:1764 ::/0 any ::/0 in\n-A ufw6-user-input -p udp -m multiport --dports 1714:1764 -j ACCEPT\n\n### tuple ### allow tcp 1714:1764 ::/0 any ::/0 in\n-A ufw6-user-input -p tcp -m multiport --dports 1714:1764 -j ACCEPT\n' /etc/ufw/user6.rules 2>/dev/null || true
+    fi
+    if [ -d /run/systemd/system ] && command -v ufw >/dev/null 2>&1; then
+        ufw allow 1714:1764/udp >/dev/null 2>&1 || true
+        ufw allow 1714:1764/tcp >/dev/null 2>&1 || true
+        if systemctl is-active --quiet ufw.service 2>/dev/null; then
+            ufw reload >/dev/null 2>&1 || true
+        fi
+    fi
 }
 
 post_install() {

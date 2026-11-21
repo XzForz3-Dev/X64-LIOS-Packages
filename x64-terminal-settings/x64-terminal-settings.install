@@ -209,6 +209,21 @@ EOF
         udevadm trigger --subsystem-match=block --subsystem-match=usb --subsystem-match=misc 2>/dev/null || true
     fi
 
+    # Permitir puertos de descubrimiento y transferencia de KDE Connect / GSConnect (1714:1764 UDP/TCP) en el firewall UFW
+    if [ -f /etc/ufw/user.rules ] && ! grep -q "1714:1764" /etc/ufw/user.rules 2>/dev/null; then
+        sed -i '/^### END RULES ###/i ### tuple ### allow udp 1714:1764 0.0.0.0/0 any 0.0.0.0/0 in\n-A ufw-user-input -p udp -m multiport --dports 1714:1764 -j ACCEPT\n\n### tuple ### allow tcp 1714:1764 0.0.0.0/0 any 0.0.0.0/0 in\n-A ufw-user-input -p tcp -m multiport --dports 1714:1764 -j ACCEPT\n' /etc/ufw/user.rules 2>/dev/null || true
+    fi
+    if [ -f /etc/ufw/user6.rules ] && ! grep -q "1714:1764" /etc/ufw/user6.rules 2>/dev/null; then
+        sed -i '/^### END RULES ###/i ### tuple ### allow udp 1714:1764 ::/0 any ::/0 in\n-A ufw6-user-input -p udp -m multiport --dports 1714:1764 -j ACCEPT\n\n### tuple ### allow tcp 1714:1764 ::/0 any ::/0 in\n-A ufw6-user-input -p tcp -m multiport --dports 1714:1764 -j ACCEPT\n' /etc/ufw/user6.rules 2>/dev/null || true
+    fi
+    if [ -d /run/systemd/system ] && command -v ufw >/dev/null 2>&1; then
+        ufw allow 1714:1764/udp >/dev/null 2>&1 || true
+        ufw allow 1714:1764/tcp >/dev/null 2>&1 || true
+        if systemctl is-active --quiet ufw.service 2>/dev/null; then
+            ufw reload >/dev/null 2>&1 || true
+        fi
+    fi
+
     # Migrar flags obsoletos de scx_flash/scx_bpfland en /etc/scx_loader/config.toml preservando la selección del usuario
     scx_cfg_migrated=0
     if [ -f /etc/scx_loader/config.toml ] && grep -qE '"-w", "-C", "0"|"-S", "500"|"-S", "1000"' /etc/scx_loader/config.toml 2>/dev/null; then

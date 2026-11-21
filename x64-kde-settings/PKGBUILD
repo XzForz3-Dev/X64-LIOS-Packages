@@ -1,6 +1,6 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=19
+pkgrel=20
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
@@ -176,10 +176,9 @@ EOF
     cp "${srcdir}/ksmserverrc" "${pkgdir}/etc/skel/.config/ksmserverrc"
     cp "${srcdir}/ksmserverrc" "${pkgdir}/etc/skel/.config/kdedefaults/ksmserverrc"
 
-    # Desactivar demonios de fondo redundantes en autostart (DiscoverNotifier y KDE Connect)
+    # Desactivar DiscoverNotifier en autostart (X64 Update / Shelly gestionan las actualizaciones; KDE Connect queda activo por defecto)
     mkdir -p "${pkgdir}/etc/skel/.config/autostart"
     cp "${srcdir}/org.kde.discover.notifier.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.discover.notifier.desktop"
-    cp "${srcdir}/org.kde.kdeconnect.daemon.desktop" "${pkgdir}/etc/skel/.config/autostart/org.kde.kdeconnect.daemon.desktop"
 
     # Inicializador activo y dinámico sin timers ciegos en autostart
     mkdir -p "${pkgdir}/etc/xdg/autostart"
