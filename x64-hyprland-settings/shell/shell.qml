@@ -58,6 +58,8 @@ ShellRoot {
         if (targetName !== "clipboard") clipboardPopup.visible = false;
         if (targetName !== "overview") overviewPopup.visible = false;
         if (targetName !== "theme") themeStudio.visible = false;
+        if (targetName !== "notifications") notifCenter.visible = false;
+        if (targetName !== "power") powerMenu.visible = false;
     }
 
     function toggleAnimatedPopup(popup, keyName, targetScreen) {
@@ -406,6 +408,27 @@ ShellRoot {
         }
     }
 
+    // Persistent Notification Center IPC (SUPER + N & Bar Bell)
+    IpcHandler {
+        target: "notifications"
+
+        function toggle() {
+            root.toggleAnimatedPopup(notifCenter, "notifications", root.focusedScreen);
+        }
+
+        function open() {
+            root.openAnimatedPopup(notifCenter, "notifications", root.focusedScreen);
+        }
+
+        function close() {
+            notifCenter.closeAnimated();
+        }
+
+        function clear() {
+            NotifState.clearAll();
+        }
+    }
+
     // GPU Wallpaper Layer replicated across ALL connected displays (replaces swaybg)
     Variants {
         model: Quickshell.screens
@@ -417,6 +440,22 @@ ShellRoot {
     }
 
     // Direct OSD trigger for hardware brightness keys (XF86MonBrightnessUp/Down)
+    IpcHandler {
+        target: "power"
+
+        function toggle() {
+            root.toggleAnimatedPopup(powerMenu, "power", root.focusedScreen);
+        }
+
+        function open() {
+            root.openAnimatedPopup(powerMenu, "power", root.focusedScreen);
+        }
+
+        function close() {
+            powerMenu.closeAnimated();
+        }
+    }
+
     IpcHandler {
         target: "osd"
 
@@ -438,14 +477,22 @@ ShellRoot {
             required property var modelData
             screen: modelData
             isPrimaryBar: root.primaryScreen !== null && modelData.name === root.primaryScreen.name
+            calendarOpen: calendarPopup.visible && (root.activePopupScreen === modelData)
+            telemetryOpen: telemetryPopup.visible && (root.activePopupScreen === modelData)
+            networkOpen: networkPopup.visible && (root.activePopupScreen === modelData)
+            audioOpen: audioPopup.visible && (root.activePopupScreen === modelData)
+            notifCenterOpen: notifCenter.visible && (root.activePopupScreen === modelData)
+            controlCenterOpen: controlCenter.visible && (root.activePopupScreen === modelData)
+            powerMenuOpen: powerMenu.visible && (root.activePopupScreen === modelData)
 
             onToggleLauncher: root.toggleInstantPopup(launcher, "launcher", modelData, null)
             onToggleCalendar: root.toggleAnimatedPopup(calendarPopup, "calendar", modelData)
             onToggleControl: root.toggleAnimatedPopup(controlCenter, "control", modelData)
-            onTogglePower: root.toggleAnimatedPopup(controlCenter, "control", modelData)
+            onTogglePower: root.toggleAnimatedPopup(powerMenu, "power", modelData)
             onToggleTelemetry: root.toggleAnimatedPopup(telemetryPopup, "telemetry", modelData)
             onToggleNetwork: root.toggleAnimatedPopup(networkPopup, "network", modelData)
             onToggleAudio: (tab) => root.toggleAudioOnScreen(modelData, tab)
+            onToggleNotifications: root.toggleAnimatedPopup(notifCenter, "notifications", modelData)
             onBrightnessChangedOsd: (val) => volumeOsd.showBrightness(val)
         }
     }
@@ -534,7 +581,17 @@ ShellRoot {
         id: notifPopup
         screen: root.focusedScreen
         dndEnabled: SysState.dndActive
-        sidePanelOpen: (controlCenter.visible || networkPopup.visible) && (root.activePopupScreen === root.focusedScreen)
+        sidePanelOpen: (controlCenter.visible || networkPopup.visible || notifCenter.visible) && (root.activePopupScreen === root.focusedScreen)
+        customRightMargin: (telemetryPopup.visible && root.activePopupScreen === root.focusedScreen) ? 610 : 0
+    }
+
+    // Persistent Notification Center Drawer (SUPER + N & Bar Bell)
+    NotificationCenterPopup {
+        id: notifCenter
+        screen: root.activePopupScreen
+        visible: false
+        lockClose: root.lockPopups
+        onCloseRequested: notifCenter.visible = false
     }
 
     // Native Interactive Shortcuts Guide & HUD (SUPER + F1)
@@ -567,6 +624,18 @@ ShellRoot {
         screen: root.activePopupScreen
         visible: false
         onCloseRequested: themeStudio.visible = false
+    }
+
+    // Cinematic Power & Session Overlay (SUPER + M & Bar Power Button)
+    PowerMenuPopup {
+        id: powerMenu
+        screen: root.activePopupScreen
+        visible: false
+        onCloseRequested: powerMenu.visible = false
+        onLockRequested: {
+            root.closeAllExcept("none");
+            lockScreen.lockSession();
+        }
     }
 
     // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)

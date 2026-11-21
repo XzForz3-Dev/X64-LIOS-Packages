@@ -159,5 +159,59 @@ QtObject {
     readonly property string audioNoStreams: isEs ? "No hay aplicaciones reproduciendo audio" : "No applications playing audio"
     readonly property string audioVuMeter: isEs ? "Nivel de Entrada en Vivo" : "Live Input Level"
     readonly property string audioAdvancedSettings: isEs ? "Ajustes Avanzados de Sonido" : "Advanced Audio Settings"
+
+    // -------------------------------------------------------------------------
+    // 7. NOTIFICATION CENTER & X64 GAMING TELEMETRY ENGINE
+    // -------------------------------------------------------------------------
+    readonly property string notifCenterTitle: isEs ? "NOTIFICACIONES" : "NOTIFICATIONS"
+    readonly property string notifClearAll: isEs ? "Limpiar" : "Clear all"
+    readonly property string notifEmptyTitle: isEs ? "Todo al día" : "All caught up"
+    readonly property string notifEmptySub: isEs
+        ? "Las notificaciones del sistema aparecerán aquí guardadas."
+        : "System notifications will be archived here."
+    readonly property string notifEmptyDndSub: isEs
+        ? "No Molestar activo — las nuevas alertas se archivarán aquí en silencio."
+        : "Do Not Disturb active — incoming alerts will be archived here silently."
+
+    readonly property string teleX64Engine: isEs ? "MOTOR X64 GAMING" : "X64 GAMING ENGINE"
+    readonly property string teleSchedSwitch: isEs ? "Cambiar" : "Switch"
+    readonly property string teleSchedOpenHello: "X64 Hello"
+
+    // -------------------------------------------------------------------------
+    // 8. POWER / SESSION OVERLAY (SUPER + M & BAR POWER BUTTON)
+    // -------------------------------------------------------------------------
+    readonly property string powerTitle: isEs ? "SESIÓN Y ENERGÍA" : "POWER & SESSION"
+    readonly property string powerLock: isEs ? "Bloquear" : "Lock"
+    readonly property string powerSuspend: isEs ? "Suspender" : "Suspend"
+    readonly property string powerLogout: isEs ? "Cerrar sesión" : "Log Out"
+    readonly property string powerReboot: isEs ? "Reiniciar" : "Reboot"
+    readonly property string powerUefi: "BIOS / UEFI"
+    readonly property string powerShutdown: isEs ? "Apagar" : "Power Off"
+    readonly property string powerCancel: isEs ? "Cancelar" : "Cancel"
+    readonly property string powerConfirmBtn: isEs ? "Confirmar" : "Confirm"
+
+    readonly property string powerConfirmLogoutTitle: isEs ? "¿Cerrar la sesión actual?" : "Log out of current session?"
+    readonly property string powerConfirmLogoutDesc: isEs
+        ? "Se cerrarán las ventanas abiertas y volverás a la pantalla de inicio de sesión."
+        : "Open applications will close and you will return to the login screen."
+    readonly property string powerConfirmRebootTitle: isEs ? "¿Reiniciar el equipo?" : "Restart the system?"
+    readonly property string powerConfirmRebootDesc: isEs
+        ? "Se cerrarán todos los programas activos y el equipo se reiniciará."
+        : "All running applications will close and the computer will restart."
+    readonly property string powerConfirmUefiTitle: isEs ? "¿Reiniciar hacia BIOS / UEFI?" : "Reboot to BIOS / UEFI firmware?"
+    readonly property string powerConfirmUefiDesc: isEs
+        ? "El equipo se reiniciará entrando directamente al menú de configuración UEFI."
+        : "The system will restart directly into the UEFI firmware setup menu."
+    readonly property string powerConfirmShutdownTitle: isEs ? "¿Apagar el equipo?" : "Power off the system?"
+    readonly property string powerConfirmShutdownDesc: isEs
+        ? "Se cerrarán todas las aplicaciones abiertas y el equipo se apagará por completo."
+        : "All open applications will close and the computer will shut down completely."
+
+    readonly property string powerHintMain: isEs
+        ? "← → Navegar  •  Enter Elegir  •  L S E R U P Atajo  •  Esc Cerrar"
+        : "← → Navigate  •  Enter Select  •  L S E R U P Hotkey  •  Esc Close"
+    readonly property string powerHintConfirm: isEs
+        ? "Enter Confirmar acción  •  Esc Volver atrás"
+        : "Enter Confirm action  •  Esc Go back"
 }
 

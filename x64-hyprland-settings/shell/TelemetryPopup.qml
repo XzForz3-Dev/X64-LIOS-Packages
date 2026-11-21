@@ -266,7 +266,7 @@ PanelWindow {
 
             // =========================================================
             // 1. THREE CIRCULAR RING GAUGES (CPU, RAM, DISCO)
-            // Monochromatic Silver at rest; Amber/Crimson only on high load
+            // Theme accent stroke on calm Obsidian cards; Warn/Crit on overload
             // =========================================================
             RowLayout {
                 Layout.fillWidth: true
@@ -278,7 +278,7 @@ PanelWindow {
                     implicitHeight: 106
                     radius: Theme.radiusMd
                     color: Theme.bgCard
-                    border.color: teleWindow.cpuUsage >= 85 ? Theme.borderAccent : Theme.borderSubtle
+                    border.color: teleWindow.cpuUsage >= 85 ? Theme.statusCrit : Theme.borderSubtle
                     border.width: 1
 
                     ColumnLayout {
@@ -310,7 +310,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: cpuGaugeCanvas.val >= 85 ? Theme.accent : (cpuGaugeCanvas.val >= 65 ? Theme.statusWarn : "#d8d6d0")
+                                    strokeColor: cpuGaugeCanvas.val >= 85 ? Theme.statusCrit : (cpuGaugeCanvas.val >= 65 ? Theme.statusWarn : Theme.accent)
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {
@@ -328,7 +328,7 @@ PanelWindow {
                                 font.family: Theme.fontMono
                                 font.pixelSize: 11
                                 font.bold: true
-                                color: teleWindow.cpuUsage >= 85 ? Theme.accent : (teleWindow.cpuUsage >= 65 ? Theme.statusWarn : Theme.textPrimary)
+                                color: teleWindow.cpuUsage >= 85 ? Theme.statusCrit : (teleWindow.cpuUsage >= 65 ? Theme.statusWarn : Theme.textPrimary)
                             }
                         }
 
@@ -346,7 +346,7 @@ PanelWindow {
                             text: teleWindow.cpuTemp + "°C"
                             font.family: Theme.fontMono
                             font.pixelSize: 9
-                            color: teleWindow.cpuTemp >= 78 ? Theme.accent : (teleWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textMuted)
+                            color: teleWindow.cpuTemp >= 78 ? Theme.statusCrit : (teleWindow.cpuTemp >= 65 ? Theme.statusWarn : Theme.textMuted)
                         }
                     }
                 }
@@ -357,7 +357,7 @@ PanelWindow {
                     implicitHeight: 106
                     radius: Theme.radiusMd
                     color: Theme.bgCard
-                    border.color: teleWindow.ramPct >= 85 ? Theme.borderAccent : Theme.borderSubtle
+                    border.color: teleWindow.ramPct >= 85 ? Theme.statusCrit : Theme.borderSubtle
                     border.width: 1
 
                     ColumnLayout {
@@ -389,7 +389,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: ramGaugeCanvas.val >= 85 ? Theme.accent : (ramGaugeCanvas.val >= 70 ? Theme.statusWarn : "#d8d6d0")
+                                    strokeColor: ramGaugeCanvas.val >= 85 ? Theme.statusCrit : (ramGaugeCanvas.val >= 70 ? Theme.statusWarn : Theme.accent)
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {
@@ -407,7 +407,7 @@ PanelWindow {
                                 font.family: Theme.fontMono
                                 font.pixelSize: 11
                                 font.bold: true
-                                color: teleWindow.ramPct >= 85 ? Theme.accent : (teleWindow.ramPct >= 70 ? Theme.statusWarn : Theme.textPrimary)
+                                color: teleWindow.ramPct >= 85 ? Theme.statusCrit : (teleWindow.ramPct >= 70 ? Theme.statusWarn : Theme.textPrimary)
                             }
                         }
 
@@ -436,7 +436,7 @@ PanelWindow {
                     implicitHeight: 106
                     radius: Theme.radiusMd
                     color: Theme.bgCard
-                    border.color: teleWindow.diskPct >= 90 ? Theme.borderAccent : Theme.borderSubtle
+                    border.color: teleWindow.diskPct >= 90 ? Theme.statusCrit : Theme.borderSubtle
                     border.width: 1
 
                     ColumnLayout {
@@ -468,7 +468,7 @@ PanelWindow {
 
                                 ShapePath {
                                     strokeWidth: 4.5
-                                    strokeColor: diskGaugeCanvas.val >= 90 ? Theme.accent : (diskGaugeCanvas.val >= 75 ? Theme.statusWarn : "#d8d6d0")
+                                    strokeColor: diskGaugeCanvas.val >= 90 ? Theme.statusCrit : (diskGaugeCanvas.val >= 75 ? Theme.statusWarn : Theme.accent)
                                     fillColor: "transparent"
                                     capStyle: ShapePath.RoundCap
                                     PathAngleArc {
@@ -486,7 +486,7 @@ PanelWindow {
                                 font.family: Theme.fontMono
                                 font.pixelSize: 11
                                 font.bold: true
-                                color: teleWindow.diskPct >= 90 ? Theme.accent : (teleWindow.diskPct >= 75 ? Theme.statusWarn : Theme.textPrimary)
+                                color: teleWindow.diskPct >= 90 ? Theme.statusCrit : (teleWindow.diskPct >= 75 ? Theme.statusWarn : Theme.textPrimary)
                             }
                         }
 
@@ -568,7 +568,8 @@ PanelWindow {
                                         height: Math.max(2, parent.height * (Math.min(100, (typeof modelData === "number" ? modelData : 0)) / 100.0))
                                         anchors.bottom: parent.bottom
                                         radius: 2
-                                        color: modelData >= 85 ? Theme.accent : (modelData >= 65 ? Theme.statusWarn : "#c8c6c0")
+                                        color: modelData >= 85 ? Theme.statusCrit : (modelData >= 65 ? Theme.statusWarn : Theme.accent)
+                                        opacity: modelData >= 65 ? 1.0 : 0.78
                                         Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
                                     }
                                 }
@@ -666,7 +667,7 @@ PanelWindow {
                                 implicitHeight: 58
                                 radius: Theme.radiusSm
                                 color: Theme.bgElevated
-                                border.color: (modelData.temp >= 78 || modelData.util >= 85) ? Theme.borderAccent : Theme.borderSubtle
+                                border.color: (modelData.temp >= 78 || modelData.util >= 85) ? Theme.statusCrit : Theme.borderSubtle
                                 border.width: 1
 
                                 ColumnLayout {
@@ -689,7 +690,7 @@ PanelWindow {
                                             font.family: Theme.fontMono
                                             font.pixelSize: 9
                                             font.bold: true
-                                            color: modelData.temp >= 78 ? Theme.accent : (modelData.temp >= 65 ? Theme.statusWarn : Theme.textSecondary)
+                                            color: modelData.temp >= 78 ? Theme.statusCrit : (modelData.temp >= 65 ? Theme.statusWarn : Theme.textSecondary)
                                         }
                                     }
 
@@ -699,7 +700,7 @@ PanelWindow {
                                             text: (I18n.isEs ? "Carga: " : "Load: ") + modelData.util + "%"
                                             font.family: Theme.fontMono
                                             font.pixelSize: 8
-                                            color: modelData.util >= 85 ? Theme.accent : (modelData.util >= 65 ? Theme.statusWarn : Theme.textMuted)
+                                            color: modelData.util >= 85 ? Theme.statusCrit : (modelData.util >= 65 ? Theme.statusWarn : Theme.textMuted)
                                         }
                                         Item { Layout.fillWidth: true }
                                         Text {
@@ -710,7 +711,7 @@ PanelWindow {
                                         }
                                     }
 
-                                    // VRAM Usage Progress Bar (Monochromatic neutral silver at rest)
+                                    // VRAM Usage Progress Bar (Theme accent at rest; Warn/Crit on overload)
                                     Rectangle {
                                         Layout.fillWidth: true
                                         height: 4
@@ -721,7 +722,8 @@ PanelWindow {
                                             width: Math.max(3, parent.width * (Math.min(100, modelData.vramPct) / 100.0))
                                             height: parent.height
                                             radius: 2
-                                            color: modelData.vramPct >= 85 ? Theme.accent : (modelData.vramPct >= 65 ? Theme.statusWarn : "#c8c6c0")
+                                            color: modelData.vramPct >= 85 ? Theme.statusCrit : (modelData.vramPct >= 65 ? Theme.statusWarn : Theme.accent)
+                                            opacity: modelData.vramPct >= 65 ? 1.0 : 0.85
                                         }
                                     }
                                 }
@@ -752,7 +754,7 @@ PanelWindow {
                                 font.family: Theme.fontMono
                                 font.pixelSize: 9
                                 font.bold: true
-                                color: teleWindow.gpuTemp >= 78 ? Theme.accent : (teleWindow.gpuTemp >= 65 ? Theme.statusWarn : Theme.textSecondary)
+                                color: teleWindow.gpuTemp >= 78 ? Theme.statusCrit : (teleWindow.gpuTemp >= 65 ? Theme.statusWarn : Theme.textSecondary)
                             }
                         }
 
@@ -773,7 +775,7 @@ PanelWindow {
                             }
                         }
 
-                        // VRAM Progress Bar (Monochromatic neutral silver at rest)
+                        // VRAM Progress Bar (Theme accent at rest; Warn/Crit on overload)
                         Rectangle {
                             Layout.fillWidth: true
                             height: 4
@@ -784,7 +786,254 @@ PanelWindow {
                                 width: Math.max(3, parent.width * (Math.min(100, (teleWindow.gpus.length > 0 ? teleWindow.gpus[0].vramPct : 0)) / 100.0))
                                 height: parent.height
                                 radius: 2
-                                color: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 85) ? Theme.accent : ((teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 65) ? Theme.statusWarn : "#c8c6c0")
+                                color: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 85) ? Theme.statusCrit : ((teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 65) ? Theme.statusWarn : Theme.accent)
+                                opacity: (teleWindow.gpus.length > 0 && teleWindow.gpus[0].vramPct >= 65) ? 1.0 : 0.85
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =========================================================
+            // 2B. MOTOR X64 GAMING (scx_lavd/BORE + FalconD + dmemcg + Ananicy)
+            // Neutral Obsidian container + crisp live status indicators
+            // =========================================================
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: x64EngCol.implicitHeight + 18
+                radius: Theme.radiusMd
+                color: Theme.bgCard
+                border.color: Theme.borderSubtle
+                border.width: 1
+
+                ColumnLayout {
+                    id: x64EngCol
+                    anchors.fill: parent
+                    anchors.margins: 9
+                    spacing: 7
+
+                    // Top row: Title + Direct Switcher (scx_lavd <-> BORE) + X64 Hello --scheduler
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Text {
+                            text: "󰓅"
+                            font.family: Theme.fontMono
+                            font.pixelSize: 12
+                            color: Theme.textSecondary
+                        }
+
+                        Text {
+                            text: I18n.teleX64Engine
+                            font.family: Theme.fontMono
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 0.7
+                            color: Theme.textSecondary
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Button 1: Direct Hot-Switch scx_lavd <-> BORE
+                        Rectangle {
+                            implicitHeight: 22
+                            implicitWidth: swRow.implicitWidth + 12
+                            radius: 7
+                            color: SysState.x64SchedBusy
+                                ? Theme.bgElevated
+                                : (schedSwArea.containsMouse ? Theme.accentDim : Theme.bgElevated)
+                            border.color: schedSwArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                id: swRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    text: "󰑐"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: schedSwArea.containsMouse ? Theme.accent : Theme.textSecondary
+                                }
+                                Text {
+                                    text: SysState.x64SchedBusy
+                                        ? "..."
+                                        : (SysState.x64SchedScx ? "→ BORE" : "→ scx_lavd")
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    color: schedSwArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                                }
+                            }
+
+                            MouseArea {
+                                id: schedSwArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: SysState.toggleX64Scheduler()
+                            }
+                        }
+
+                        // Button 2: Open X64 Hello (--scheduler)
+                        Rectangle {
+                            implicitHeight: 22
+                            implicitWidth: hiRow.implicitWidth + 12
+                            radius: 7
+                            color: helloSchedArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            border.color: helloSchedArea.containsMouse ? Theme.borderGlass : Theme.borderSubtle
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                id: hiRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    text: "󰒓"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 10
+                                    color: helloSchedArea.containsMouse ? Theme.accent : Theme.textSecondary
+                                }
+                                Text {
+                                    text: I18n.teleSchedOpenHello
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 9
+                                    font.weight: Font.DemiBold
+                                    color: helloSchedArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                                }
+                            }
+
+                            MouseArea {
+                                id: helloSchedArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: teleWindow.launchApp("x64-hello --scheduler")
+                            }
+                        }
+                    }
+
+                    // Bottom row: Live status pills (unified neutral cards + clean status dots)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 5
+
+                        // Pill 1: Active CPU Scheduler (scx_lavd / BORE)
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 24
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: SysState.x64SchedScx ? Theme.accent : Theme.statusOk
+                                }
+                                Text {
+                                    text: SysState.x64Sched.toUpperCase() + (SysState.x64SchedScx && SysState.x64SchedMode !== "" ? (" • " + SysState.x64SchedMode) : "")
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: Theme.textPrimary
+                                }
+                            }
+                        }
+
+                        // Pill 2: FalconD
+                        Rectangle {
+                            implicitHeight: 24
+                            implicitWidth: falcRow.implicitWidth + 12
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            RowLayout {
+                                id: falcRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: SysState.x64Falcond ? Theme.statusOk : Theme.textMuted
+                                }
+                                Text {
+                                    text: "FALCOND"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: SysState.x64Falcond ? Theme.textPrimary : Theme.textMuted
+                                }
+                            }
+                        }
+
+                        // Pill 3: dmemcg-booster
+                        Rectangle {
+                            implicitHeight: 24
+                            implicitWidth: dmemRow.implicitWidth + 12
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            RowLayout {
+                                id: dmemRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: SysState.x64Dmemcg ? Theme.statusOk : Theme.textMuted
+                                }
+                                Text {
+                                    text: "DMEMCG"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: SysState.x64Dmemcg ? Theme.textPrimary : Theme.textMuted
+                                }
+                            }
+                        }
+
+                        // Pill 4: Ananicy-cpp
+                        Rectangle {
+                            implicitHeight: 24
+                            implicitWidth: anaRow.implicitWidth + 12
+                            radius: 7
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            RowLayout {
+                                id: anaRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Rectangle {
+                                    width: 5
+                                    height: 5
+                                    radius: 2.5
+                                    color: SysState.x64Ananicy ? Theme.statusOk : Theme.textMuted
+                                }
+                                Text {
+                                    text: "ANANICY"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    color: SysState.x64Ananicy ? Theme.textPrimary : Theme.textMuted
+                                }
                             }
                         }
                     }

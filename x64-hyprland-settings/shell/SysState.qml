@@ -72,6 +72,16 @@ QtObject {
     property int gpuUtil: 0
     property var gpus: []
 
+    // X64 Gaming Engine Telemetry (scx_lavd / BORE + FalconD + dmemcg-booster + Ananicy + Thermald)
+    property string x64Sched: "BORE"
+    property string x64SchedMode: ""
+    property bool x64SchedScx: false
+    property bool x64Falcond: false
+    property bool x64Dmemcg: false
+    property bool x64Ananicy: false
+    property bool x64Thermald: false
+    property bool x64SchedBusy: false
+
     // Toggles, Power, Recording & Display State
     property bool caffeineActive: false
     property bool nightlightActive: false
@@ -151,6 +161,13 @@ QtObject {
     function switchKeyboardLayout() {
         kbGuardTimer.restart();
         if (!kbSwitchProc.running) kbSwitchProc.running = true;
+    }
+
+    function toggleX64Scheduler() {
+        if (schedSwitchProc.running) return;
+        sys.x64SchedBusy = true;
+        schedSwitchProc.command = ["/usr/bin/x64-hyprland-ctl", "scheduler", "toggle"];
+        schedSwitchProc.running = true;
     }
 
     function _updateClock() {
@@ -236,6 +253,14 @@ QtObject {
         }
     }
 
+    readonly property Process _schedSwitchProc: Process {
+        id: schedSwitchProc
+        onExited: {
+            sys.x64SchedBusy = false;
+            sys.refreshNow(true, true);
+        }
+    }
+
     readonly property Process _statusProc: Process {
         id: statusProc
         command: ["/usr/bin/x64-hyprland-ctl", "status-lite"]
@@ -262,6 +287,15 @@ QtObject {
                     if (d.gpuTemp !== undefined && d.gpuTemp >= 0) sys.gpuTemp = d.gpuTemp;
                     if (d.gpuUtil !== undefined && d.gpuUtil >= 0) sys.gpuUtil = d.gpuUtil;
                     if (d.gpus !== undefined) sys.gpus = d.gpus;
+
+                    // X64 Gaming Engine telemetry (only present in full status)
+                    if (d.x64Sched !== undefined) sys.x64Sched = String(d.x64Sched);
+                    if (d.x64SchedMode !== undefined) sys.x64SchedMode = String(d.x64SchedMode);
+                    if (d.x64SchedScx !== undefined) sys.x64SchedScx = Boolean(d.x64SchedScx);
+                    if (d.x64Falcond !== undefined) sys.x64Falcond = Boolean(d.x64Falcond);
+                    if (d.x64Dmemcg !== undefined) sys.x64Dmemcg = Boolean(d.x64Dmemcg);
+                    if (d.x64Ananicy !== undefined) sys.x64Ananicy = Boolean(d.x64Ananicy);
+                    if (d.x64Thermald !== undefined) sys.x64Thermald = Boolean(d.x64Thermald);
 
                     // Expanded fields (only present in full status)
                     if (d.cpuModel) sys.cpuModel = d.cpuModel;

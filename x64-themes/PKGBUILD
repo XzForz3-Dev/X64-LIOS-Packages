@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-themes
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Official X64 LIOS Theme Collection for X64 Theme Studio (Crimson, Space, Cosmic Eyes, Cyberpunk, Matrix, Vaporwave, Monochrome)"
 arch=('any')
 url="https://x64lios.com"

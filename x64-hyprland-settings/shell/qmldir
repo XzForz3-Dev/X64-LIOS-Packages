@@ -2,6 +2,7 @@ singleton ThemeState 1.0 ThemeState.qml
 singleton Theme 1.0 Theme.qml
 singleton I18n 1.0 I18n.qml
 singleton SysState 1.0 SysState.qml
+singleton NotifState 1.0 NotifState.qml
 Wallpaper 1.0 Wallpaper.qml
 Bar 1.0 Bar.qml
 AppLauncher 1.0 AppLauncher.qml
@@ -12,9 +13,11 @@ TelemetryPopup 1.0 TelemetryPopup.qml
 NetworkPopup 1.0 NetworkPopup.qml
 AudioPopup 1.0 AudioPopup.qml
 NotificationPopup 1.0 NotificationPopup.qml
+NotificationCenterPopup 1.0 NotificationCenterPopup.qml
 LockScreen 1.0 LockScreen.qml
 ScreenFilter 1.0 ScreenFilter.qml
 ShortcutsPopup 1.0 ShortcutsPopup.qml
 ClipboardPopup 1.0 ClipboardPopup.qml
 OverviewPopup 1.0 OverviewPopup.qml
 ThemeStudio 1.0 ThemeStudio.qml
+PowerMenuPopup 1.0 PowerMenuPopup.qml

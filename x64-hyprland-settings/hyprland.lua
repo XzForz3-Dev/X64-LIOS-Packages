@@ -225,6 +225,13 @@ hl.layer_rule({
     blur  = false,
 })
 
+-- Cinematic Frosted-Glass Blur for the fullscreen Power & Session Overlay (SUPER + M)
+hl.layer_rule({
+    name  = "quickshell-power-blur",
+    match = { namespace = "^quickshell-power$" },
+    blur  = true,
+})
+
 -- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games
 hl.window_rule({
     name      = "x64-gaming-immediate",
@@ -244,9 +251,11 @@ hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + Space",  hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("quickshell ipc call menu toggle"))
 hl.bind(mainMod .. " + C",      hl.dsp.exec_cmd("quickshell ipc call control toggle"))
+hl.bind(mainMod .. " + N",      hl.dsp.exec_cmd("quickshell ipc call notifications toggle"))
 hl.bind(mainMod .. " + T",      hl.dsp.exec_cmd("quickshell ipc call theme toggle"))
 hl.bind(mainMod .. " + CTRL + N", hl.dsp.exec_cmd("quickshell ipc call network toggle"))
 hl.bind(mainMod .. " + L",      hl.dsp.exec_cmd("quickshell ipc call lock lock"))
+hl.bind(mainMod .. " + M",      hl.dsp.exec_cmd("quickshell ipc call power toggle"))
 hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("quickshell ipc call clipboard toggle"))
 hl.bind(mainMod .. " + W",      hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({ action = "toggle" }))

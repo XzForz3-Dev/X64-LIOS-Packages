@@ -215,6 +215,20 @@ PanelWindow {
             catLabel: "X64 Suite"
         },
         {
+            keys: ["SUPER", "N"],
+            title: I18n.isEs ? "Centro de Notificaciones" : "Notification Center",
+            desc: I18n.isEs ? "Historial persistente (25 alertas) y modo No Molestar" : "Persistent history (25 alerts) & Do Not Disturb toggle",
+            category: "x64",
+            catLabel: "X64 Suite"
+        },
+        {
+            keys: ["SUPER", "T"],
+            title: "X64 Theme Studio",
+            desc: I18n.isEs ? "Temas, paletas de acento, fondos y vídeos en vivo" : "Live themes, accent palettes, wallpapers & video backgrounds",
+            category: "x64",
+            catLabel: "X64 Suite"
+        },
+        {
             keys: ["SUPER", "CTRL", "N"],
             title: I18n.isEs ? "Gestor de Redes Wi-Fi" : "Wi-Fi Network Manager",
             desc: I18n.isEs ? "Escaneo y conexión rápida de redes Wi-Fi" : "Direct Wi-Fi scanning & connection popup",

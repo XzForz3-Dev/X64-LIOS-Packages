@@ -52,6 +52,7 @@ QtObject {
     Behavior on accentPillBase { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
     readonly property color accentLight: accentHover
+    readonly property color accentFg: (0.2126 * accent.r + 0.7152 * accent.g + 0.0722 * accent.b) > 0.52 ? "#0a0b10" : "#ffffff"
     readonly property color accentSubtle: Qt.rgba(accent.r, accent.g, accent.b, 0.14)
     readonly property color accentDim: Qt.rgba(accent.r, accent.g, accent.b, 0.18)
     readonly property color accentTint: Qt.rgba(accent.r, accent.g, accent.b, 0.22)
@@ -69,6 +70,8 @@ QtObject {
 
     property color statusWarn: ThemeState.statusWarn
     Behavior on statusWarn { ColorAnimation { duration: 350; easing.type: Easing.OutCubic } }
+
+    readonly property color statusCrit: "#ff3b3b"
 
     // Borders & Dividers
     readonly property color borderGlass: "#17ffffff"

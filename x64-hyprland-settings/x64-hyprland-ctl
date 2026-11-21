@@ -1154,7 +1154,46 @@ cmd_status() {
     local gpu_count=0 gpu_primary_temp=0 gpu_primary_util=0 gpus_json="[]"
     collect_gpu_telemetry 2
 
-    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","cpuCoresLoad":%s,"ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"autoGaming":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d,"gpus":%s}\n' \
+    # 12. X64 Gaming Engine Telemetry (only queried in full status when TelemetryPopup is open -> 0 overhead in bar/games)
+    local x64_sched="BORE" x64_sched_mode="" x64_sched_scx="false"
+    if [ -r /sys/kernel/sched_ext/state ]; then
+        local scx_state="" scx_ops=""
+        read -r scx_state < /sys/kernel/sched_ext/state 2>/dev/null || true
+        if [ "$scx_state" = "enabled" ]; then
+            x64_sched_scx="true"
+            read -r scx_ops < /sys/kernel/sched_ext/root/ops 2>/dev/null || true
+            local scx_short="${scx_ops%%_*}"
+            if [ -n "$scx_short" ]; then
+                x64_sched="scx_${scx_short}"
+            else
+                x64_sched="scx_ext"
+            fi
+            if command -v scxctl >/dev/null 2>&1; then
+                local scx_out=""
+                scx_out=$(scxctl get 2>/dev/null || true)
+                case "$scx_out" in
+                    *"Gaming"*)    x64_sched_mode="Gaming" ;;
+                    *"LowLatency"*) x64_sched_mode="LowLat" ;;
+                    *"PowerSave"*) x64_sched_mode="PowerSave" ;;
+                    *"Server"*)    x64_sched_mode="Server" ;;
+                    *"Auto"*)      x64_sched_mode="Auto" ;;
+                esac
+            fi
+        fi
+    fi
+
+    local x64_falcond="false" x64_dmemcg="false" x64_ananicy="false" x64_thermald="false"
+    local -a svc_states=()
+    mapfile -t svc_states < <(systemctl is-active falcond.service dmemcg-booster-system.service ananicy-cpp.service thermald.service 2>/dev/null || true)
+    [ "${svc_states[0]:-}" = "active" ] && x64_falcond="true"
+    [ "${svc_states[1]:-}" = "active" ] && x64_dmemcg="true"
+    [ "${svc_states[2]:-}" = "active" ] && x64_ananicy="true"
+    [ "${svc_states[3]:-}" = "active" ] && x64_thermald="true"
+    if [ "$x64_dmemcg" = "false" ] && systemctl --user is-active --quiet dmemcg-booster-user.service 2>/dev/null; then
+        x64_dmemcg="true"
+    fi
+
+    printf '{"cpu":%d,"cpuModel":"%s","cpuCores":%d,"cpuFreq":"%s","loadAvg":"%s","cpuCoresLoad":%s,"ramUsed":"%s","ramTotal":"%s","ramPct":%d,"ramCached":"%s","swapUsed":"%s","swapTotal":"%s","temp":%d,"diskUsed":"%s","diskTotal":"%s","diskFree":"%s","diskFs":"%s","diskPct":%d,"netDown":"%s","netUp":"%s","netIp":"%s","netIface":"%s","kernel":"%s","uptime":"%s","topProcs":"%s","topList":%s,"caffeine":%s,"nightlight":%s,"dnd":%s,"recording":%s,"recTime":"%s","hasBattery":%s,"batPct":%d,"batStatus":"%s","powerProfile":"%s","brightness":%d,"osdBrTs":%s,"aiEngine":"%s","zoomEnabled":%s,"zoomFactor":"%s","gamingMode":%s,"autoGaming":%s,"gpuCount":%d,"gpuTemp":%d,"gpuUtil":%d,"gpus":%s,"x64Sched":"%s","x64SchedMode":"%s","x64SchedScx":%s,"x64Falcond":%s,"x64Dmemcg":%s,"x64Ananicy":%s,"x64Thermald":%s}\n' \
         "$cpu_pct" "$cpu_model" "${cpu_cores:-4}" "$cpu_freq" "$load_avg" "$cpu_cores_json" \
         "$ram_used" "$ram_total" "$ram_pct" "$ram_cached" "$swap_used" "$swap_total" "$temp_c" \
         "$disk_used" "$disk_total" "$disk_free" "$disk_fs" "$disk_pct" \
@@ -1168,7 +1207,8 @@ cmd_status() {
         "$([ "$zoom_en" = "1" ] && echo true || echo false)" "$zoom_fac" \
         "$([ "$game_en" = "1" ] && echo true || echo false)" \
         "$([ "$auto_game_en" = "1" ] && echo true || echo false)" \
-        "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}" "$gpus_json"
+        "${gpu_count:-0}" "${gpu_primary_temp:-0}" "${gpu_primary_util:-0}" "$gpus_json" \
+        "$x64_sched" "$x64_sched_mode" "$x64_sched_scx" "$x64_falcond" "$x64_dmemcg" "$x64_ananicy" "$x64_thermald"
 }
 
 # -----------------------------------------------------------------------------
@@ -2148,6 +2188,87 @@ cmd_launch_shell() {
     fi
 }
 
+cmd_scheduler() {
+    local action="${1:-toggle}"
+    if ! command -v scxctl >/dev/null 2>&1; then
+        if [ "$IS_ES" -eq 1 ]; then
+            notify-send -a "Gaming X64" "Planificador X64" "scxctl no está instalado en el sistema" 2>/dev/null || true
+        else
+            notify-send -a "X64 Gaming" "X64 Scheduler" "scxctl is not installed on this system" 2>/dev/null || true
+        fi
+        return 1
+    fi
+
+    local cur_state="disabled"
+    [ -r /sys/kernel/sched_ext/state ] && read -r cur_state < /sys/kernel/sched_ext/state 2>/dev/null || true
+
+    local target="$action"
+    if [ "$action" = "toggle" ]; then
+        if [ "$cur_state" = "enabled" ]; then
+            target="bore"
+        else
+            target="lavd"
+        fi
+    fi
+
+    local ok=0
+    case "$target" in
+        bore|stop|off)
+            if scxctl stop >/dev/null 2>&1; then
+                ok=1
+            fi
+            ;;
+        lavd|scx_lavd|on)
+            if [ "$cur_state" = "enabled" ]; then
+                if scxctl switch -s lavd -m gaming >/dev/null 2>&1; then
+                    ok=1
+                fi
+            else
+                if scxctl start -s lavd -m gaming >/dev/null 2>&1; then
+                    ok=1
+                fi
+            fi
+            ;;
+        status|get)
+            scxctl get 2>/dev/null || echo "BORE"
+            return 0
+            ;;
+    esac
+
+    if [ "$ok" -eq 1 ]; then
+        if [ "$target" = "bore" ] || [ "$target" = "stop" ] || [ "$target" = "off" ]; then
+            # Wait briefly for sched_ext BPF ops to detach cleanly before notifying UI
+            for _i in $(seq 1 20); do
+                _st="disabled"
+                [ -r /sys/kernel/sched_ext/state ] && read -r _st < /sys/kernel/sched_ext/state 2>/dev/null || true
+                [ "$_st" != "enabled" ] && break
+                sleep 0.1
+            done
+            if [ "$IS_ES" -eq 1 ]; then
+                notify-send -a "Gaming X64" "Planificador CPU: BORE" "Cambiado al planificador nativo del kernel (BORE)" 2>/dev/null || true
+            else
+                notify-send -a "X64 Gaming" "CPU Scheduler: BORE" "Switched to native kernel scheduler (BORE)" 2>/dev/null || true
+            fi
+        else
+            # Wait briefly for eBPF verifier + sched_ext ops to finish attaching
+            for _i in $(seq 1 30); do
+                _st="disabled"
+                [ -r /sys/kernel/sched_ext/state ] && read -r _st < /sys/kernel/sched_ext/state 2>/dev/null || true
+                [ "$_st" = "enabled" ] && break
+                sleep 0.1
+            done
+            if [ "$IS_ES" -eq 1 ]; then
+                notify-send -a "Gaming X64" "Planificador CPU: scx_lavd" "Activado scx_lavd en modo Gaming (1% Low FPS)" 2>/dev/null || true
+            else
+                notify-send -a "X64 Gaming" "CPU Scheduler: scx_lavd" "Activated scx_lavd in Gaming mode (1% Low FPS)" 2>/dev/null || true
+            fi
+        fi
+        quickshell ipc call sys refresh >/dev/null 2>&1 || true
+        return 0
+    fi
+    return 1
+}
+
 cmd_init() {
     # Synchronize keyboard layout with system settings
     cmd_keyboard sync >/dev/null 2>&1 || true
@@ -2200,6 +2321,7 @@ case "${1:-status}" in
     zoom)              cmd_zoom "${2:-toggle}" ;;
     gamemode|gaming)        cmd_gamemode "${2:-toggle}" ;;
     auto-gaming|autogaming) cmd_auto_gaming "${2:-toggle}" ;;
+    scheduler|sched)        cmd_scheduler "${2:-toggle}" ;;
     shortcuts|guide)   quickshell ipc call shortcuts "${2:-toggle}" 2>/dev/null || true ;;
     clipboard|clip)    shift; cmd_clipboard "$@" ;;
     overview)          quickshell ipc call overview "${2:-toggle}" 2>/dev/null || true ;;

@@ -9,6 +9,7 @@ PanelWindow {
 
     property bool dndEnabled: false
     property bool sidePanelOpen: false
+    property int customRightMargin: 0
 
     // Active toast queue (up to 3 recent notifications)
     ListModel {
@@ -20,7 +21,15 @@ PanelWindow {
         var cleanSum = sum || "Notificación";
         var cleanBod = bod || "";
 
-        // Block all notifications while DND is active EXCEPT DND & Gaming Mode state confirmations
+        // Always archive incoming notifications in persistent history (even while DND is active)
+        NotifState.recordNotification(cleanApp, cleanSum, cleanBod);
+
+        // Skip floating toast while the Notification Center drawer is already open
+        if (NotifState.drawerOpen) {
+            return;
+        }
+
+        // Block floating toasts while DND is active EXCEPT DND & Gaming Mode state confirmations
         if (notifWindow.dndEnabled
             && cleanApp !== "No Molestar" && cleanApp !== "Do Not Disturb"
             && cleanApp !== "Gaming X64" && cleanApp !== "X64 Gaming") {
@@ -57,7 +66,7 @@ PanelWindow {
 
     margins {
         top: 46
-        right: notifWindow.sidePanelOpen ? 380 : 12
+        right: notifWindow.customRightMargin > 0 ? notifWindow.customRightMargin : (notifWindow.sidePanelOpen ? 392 : 12)
     }
 
     implicitWidth: 340
@@ -123,17 +132,7 @@ PanelWindow {
             model: toastModel
             delegate: Rectangle {
                 id: toastCard
-                readonly property string lowerSum: (model.summary || "").toLowerCase()
-                readonly property string lowerApp: (model.appName || "").toLowerCase()
-                readonly property string toastIcon: {
-                    if (lowerApp.indexOf("molestar") !== -1 || lowerApp.indexOf("disturb") !== -1 || lowerSum.indexOf("molestar") !== -1) return "󰂛";
-                    if (lowerSum.indexOf("noche") !== -1 || lowerSum.indexOf("nocturna") !== -1 || lowerSum.indexOf("night") !== -1) return "󰖔";
-                    if (lowerSum.indexOf("café") !== -1 || lowerSum.indexOf("cafe") !== -1 || lowerSum.indexOf("caffeine") !== -1) return "󰅶";
-                    if (lowerSum.indexOf("captura") !== -1 || lowerSum.indexOf("screen") !== -1 || lowerSum.indexOf("grab") !== -1) return "󰄀";
-                    if (lowerSum.indexOf("energía") !== -1 || lowerSum.indexOf("power") !== -1 || lowerSum.indexOf("perfil") !== -1) return "󰾅";
-                    if (lowerSum.indexOf("red") !== -1 || lowerSum.indexOf("wi-fi") !== -1 || lowerSum.indexOf("ethernet") !== -1) return "󰈀";
-                    return "󰂚";
-                }
+                readonly property string toastIcon: NotifState.iconFor(model.appName, model.summary)
 
                 Layout.fillWidth: true
                 implicitHeight: cardInner.implicitHeight + 24
