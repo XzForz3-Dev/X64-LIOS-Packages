@@ -40,9 +40,15 @@ HOME_URL="https://x64lios.com/"
 DOCUMENTATION_URL="https://x64lios.com/"
 SUPPORT_URL="https://x64lios.com/"
 BUG_REPORT_URL="https://x64lios.com/"
-LOGO=x64-logo
+LOGO=x64lios
 EOF
     ln -sf ../usr/lib/os-release /etc/os-release
+
+    # Purgar cache de iconos de KDE / GTK para que kcm_about-distro muestre inmediatamente el Cubo 3D oficial (x64lios.png)
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+    rm -f /home/*/.cache/icon-cache.kcache 2>/dev/null || true
 
     cat << 'EOF' > /etc/lsb-release
 DISTRIB_ID="X64 LIOS"

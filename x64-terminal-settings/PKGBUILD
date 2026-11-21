@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-terminal-settings
 pkgver=1.2.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Official terminal and shell environment settings for X64 LIOS"
 arch=('any')
 url="https://x64lios.com"
@@ -46,6 +46,8 @@ source=(
     '60-x64-gaming-io-usb.rules'
     'x64-gamemode'
     'falcond.service'
+    'x64lios.png'
+    'kcm-about-distrorc'
 )
 sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             'b727fde05cbd61b3a0be086c02445a63d90b75d63147b827e878f61e365bd417'
@@ -67,7 +69,7 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             '3cd9887684a0f2909f0eb0cc31e516317b2a6981671dd812fa251347e8eadc7b'
             '7d46a20d2f882a26851aa731a4bf03b208b26a3562ecddb379b89743a3ffdff5'
             '3846449227f3598aa10ddfaa232e7f1e935eef6921800041f1b2c158c31c7f5f'
-            '6bf718270636a86861b098ef20db507f90948a96cd7d93322224d30f51323700'
+            'f4b0fdd8f09917e92e82e6bff5511eedf94e48640103d268c5bc3287f4cfeb05'
             'c848efb713a710ca29f0d3c6b15ef01cbfc1d5d7c96c256077c9606996eb8a7a'
             '90e1b1ed4f627e66e3812ab556faca14f1d18129b46e160b676b486453cde8f5'
             '90bc386c7ef127ec8554010160e828cb91005c932a133fcaad6266c55ea24a81'
@@ -80,7 +82,9 @@ sha256sums=('3ce8a80ab91e973a6548718062cf8ebf021a01562cd1422012daf4778df2edc3'
             'b637e5d6dac27b47587428b83cc24ec6c20bc90a1d7a4babcc3a15254d81f887'
             'a70e3c8e8ba5477eef632c98e8e34a62b2faa7b2d2463f03f4f00c4c32ff9ff9'
             'a4c3e1f5a584c7f49f9b7ed74dd00d7af2dd7117f7d607f670a08283dc58483e'
-            '3cc6e913148367c32e5ff4a33b95cf8f7fc5ccb034c673c6cfe1806abf645d93')
+            '3cc6e913148367c32e5ff4a33b95cf8f7fc5ccb034c673c6cfe1806abf645d93'
+            '76896fb7dc7f69f3fe932530956865a5b276ca81c8441b1221c1f748025388b3'
+            '1bd1668dca50e33e0530c1cd925f23f38161ef36d547fe20658a1ef7cf8fc19f')
 
 package() {
     # Fish shell skel configuration and system-wide conf.d drop-in
@@ -219,5 +223,11 @@ package() {
     # FalconD multi-user.target Service Override (runs cleanly in Console Mode and Desktop Mode)
     install -d "${pkgdir}/etc/systemd/system"
     install -m644 "${srcdir}/falcond.service" "${pkgdir}/etc/systemd/system/falcond.service"
+
+    # Official X64 LIOS 3D Cube Distro Logo for KDE kcm_about-distro, GNOME/COSMIC/Cinnamon About & os-release (LOGO=x64lios)
+    install -Dm644 "${srcdir}/x64lios.png" "${pkgdir}/usr/share/pixmaps/x64lios.png"
+    install -Dm644 "${srcdir}/x64lios.png" "${pkgdir}/usr/share/icons/hicolor/256x256/apps/x64lios.png"
+    install -Dm644 "${srcdir}/x64lios.png" "${pkgdir}/usr/share/icons/hicolor/128x128/apps/x64lios.png"
+    install -Dm644 "${srcdir}/kcm-about-distrorc" "${pkgdir}/etc/xdg/kcm-about-distrorc"
 }
 
