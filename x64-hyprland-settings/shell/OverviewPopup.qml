@@ -547,7 +547,7 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
 
                 Text {
-                    text: "X64 LIOS Hyprland • Obsidian & Crimson 2026"
+                    text: "X64 LIOS Hyprland • " + ThemeState.themeName
                     font.family: Theme.fontMono
                     font.pixelSize: 9
                     color: Theme.textMuted

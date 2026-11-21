@@ -83,6 +83,13 @@ PanelWindow {
             category: "essentials",
             catLabel: I18n.isEs ? "Básicos" : "Basics"
         },
+        {
+            keys: ["ALT", "SHIFT"],
+            title: I18n.isEs ? "Cambiar Idioma de Teclado" : "Switch Keyboard Layout",
+            desc: I18n.isEs ? "Alterna la distribución activa del teclado (ES ↔ US)" : "Toggle active keyboard layout (ES ↔ US)",
+            category: "essentials",
+            catLabel: I18n.isEs ? "Básicos" : "Basics"
+        },
 
         // ---------------------------------------------------------------------
         // 2. MOSAICO Y CONTROL DE VENTANAS (TILING & WINDOWS)
@@ -160,6 +167,27 @@ PanelWindow {
             desc: I18n.isEs ? "Envía la ventana al monitor secundario/adyacente" : "Moves focused window across connected monitors",
             category: "mouse",
             catLabel: I18n.isEs ? "Pantallas" : "Displays"
+        },
+        {
+            keys: ["2× Clic Izq", "Fondo"],
+            title: I18n.isEs ? "Gesto: X64 Theme Studio" : "Gesture: X64 Theme Studio",
+            desc: I18n.isEs ? "Doble clic izquierdo en el escritorio abre Theme Studio" : "Double left-click on empty desktop opens Theme Studio",
+            category: "mouse",
+            catLabel: I18n.isEs ? "Escritorio" : "Desktop"
+        },
+        {
+            keys: ["Clic Der", "Fondo"],
+            title: I18n.isEs ? "Gesto: Menú Contextual" : "Gesture: Context Menu",
+            desc: I18n.isEs ? "Clic derecho en el escritorio o iconos de bandeja abre su menú" : "Right-click on desktop or tray icons opens context menu",
+            category: "mouse",
+            catLabel: I18n.isEs ? "Escritorio" : "Desktop"
+        },
+        {
+            keys: ["2× Clic Der", "Fondo"],
+            title: I18n.isEs ? "Gesto: Vista General" : "Gesture: Workspaces Overview",
+            desc: I18n.isEs ? "Doble clic derecho en el escritorio abre Mission Control" : "Double right-click on empty desktop opens Mission Control",
+            category: "mouse",
+            catLabel: I18n.isEs ? "Escritorio" : "Desktop"
         },
 
         // ---------------------------------------------------------------------
@@ -275,23 +303,23 @@ PanelWindow {
         // 5. ESCRITORIOS VIRTUALES (WORKSPACES)
         // ---------------------------------------------------------------------
         {
-            keys: ["SUPER", "1 .. 6"],
-            title: I18n.isEs ? "Ir al Escritorio 1 al 6" : "Go to Workspace 1..6",
-            desc: I18n.isEs ? "Cambia al espacio de trabajo correspondiente" : "Switch directly to workspaces 1 through 6",
+            keys: ["SUPER", "1 .. 7 (0)"],
+            title: I18n.isEs ? "Ir al Escritorio 1 al 7 (hasta 10)" : "Go to Workspace 1..7 (up to 10)",
+            desc: I18n.isEs ? "7 escritorios base en barra, expandibles dinámicamente a 10" : "7 base workspaces in bar, dynamically expanding up to 10",
             category: "workspaces",
             catLabel: I18n.isEs ? "Escritorios" : "Workspaces"
         },
         {
-            keys: ["SUPER", "SHIFT", "1 .. 6"],
+            keys: ["SUPER", "SHIFT", "1 .. 7 (0)"],
             title: I18n.isEs ? "Mover Ventana a Escritorio" : "Move Window to Workspace",
-            desc: I18n.isEs ? "Traslada la ventana activa al escritorio 1..6" : "Transfer active window to workspace 1..6",
+            desc: I18n.isEs ? "Traslada la ventana activa al escritorio 1..10" : "Transfer active window to workspace 1..10",
             category: "workspaces",
             catLabel: I18n.isEs ? "Escritorios" : "Workspaces"
         },
         {
             keys: ["SUPER", "Rueda Ratón"],
             title: I18n.isEs ? "Ciclar Escritorios" : "Cycle Workspaces Key+Scroll",
-            desc: I18n.isEs ? "Recorre en bucle 1 ↔ 6 sin saltar escritorios vacíos" : "Cycle workspaces 1..6 without skipping empty ones",
+            desc: I18n.isEs ? "Recorre en bucle 1 ↔ 7 (o hasta 10 si están ocupados)" : "Cycle workspaces 1..7 (or up to 10 when occupied)",
             category: "workspaces",
             catLabel: I18n.isEs ? "Escritorios" : "Workspaces"
         },
@@ -818,7 +846,7 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
 
                 Text {
-                    text: "X64 LIOS Hyprland • Obsidian & Crimson 2026"
+                    text: "X64 LIOS Hyprland • " + ThemeState.themeName
                     font.family: Theme.fontMono
                     font.pixelSize: 9
                     color: Theme.textMuted
