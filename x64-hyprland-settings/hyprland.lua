@@ -268,7 +268,7 @@ hl.layer_rule({
 -- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games
 hl.window_rule({
     name      = "x64-gaming-immediate",
-    match     = { class = "(steam_app_.*|gamescope|cs2|dota2|heroic|lutris|osu!|retroarch|wine|Proton).*" },
+    match     = { class = "((steam_app_.*|gamescope|cs2|dota2|heroic|lutris|osu!|retroarch|wine|Proton|Minecraft.*|sober|factorio|valheim|baldursgate3|cyberpunk2077|eldenring|warthunder|aces|gzdoom|uzdoom|dolphin-emu|pcsx2|rpcs3|ryujinx|yuzu|suyu|eden|citra|azahar|cemu|shadps4|xenia|duckstation|flycast|xemu|ppsspp).*|.*\\.(x86_64|exe))$" },
     immediate = true,
 })
 

@@ -237,7 +237,7 @@ PanelWindow {
 
                         Timer {
                             interval: 1000
-                            running: true
+                            running: calWindow.visible
                             repeat: true
                             triggeredOnStart: true
                             onTriggered: {
@@ -248,6 +248,13 @@ PanelWindow {
                                 heroHm.text = h + ":" + m;
                                 heroSec.text = ":" + s;
                                 calWindow.today = now;
+                                var dName = I18n.dayFullNames[now.getDay()];
+                                var mName = I18n.monthFullNames[now.getMonth()];
+                                if (I18n.isEs) {
+                                    heroDate.text = dName + ", " + now.getDate() + " de " + mName + " de " + now.getFullYear();
+                                } else {
+                                    heroDate.text = dName + ", " + mName + " " + now.getDate() + ", " + now.getFullYear();
+                                }
                             }
                         }
                     }

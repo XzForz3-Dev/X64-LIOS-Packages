@@ -191,8 +191,11 @@ QtObject {
     }
 
     onFullscreenActiveChanged: {
-        if (!fullscreenActive && shouldPoll) {
-            refreshNow(false, false);
+        if (!fullscreenActive) {
+            sys._updateClock();
+            if (shouldPoll) {
+                refreshNow(false, false);
+            }
         }
     }
 
@@ -392,11 +395,11 @@ QtObject {
         fsCheckDebounce.restart();
     }
 
-    // Shared Keyboard Layout, Network Capsule & Clock (0 duplication on multi-monitor bars)
+    // Shared Keyboard Layout, Network Capsule & Clock (0 duplication on multi-monitor bars, paused in fullscreen)
     readonly property Timer _clockTimer: Timer {
         id: clockTimer
         interval: 1000
-        running: true
+        running: !sys.fullscreenActive
         repeat: true
         triggeredOnStart: true
         onTriggered: sys._updateClock()

@@ -2434,10 +2434,14 @@ cmd_fullscreen_state() {
         if command -v jq >/dev/null 2>&1; then
             gm=$(hyprctl clients -j 2>/dev/null | jq -r '
                 any(.[];
-                    ((.fullscreen // 0) >= 2) and (
-                        ((.class // "") | test("^(steam_app_|gamescope|cs2|dota2|osu!|retroarch|wine|proton|minecraft|factorio|hl2_linux|portal2_linux|tf_linux64|dolphin-emu|pcsx2|rpcs3|ryujinx|cemu|duckstation|flycast|xemu|ppsspp|mgba|melonds)"; "i"))
+                    ((.fullscreen // 0) >= 1) and (
+                        ((.contentType // .content // "") == "game")
                         or
-                        ((.initialClass // "") | test("^(steam_app_|gamescope|wine|proton)"; "i"))
+                        ((.xdgTag // "") == "proton-game")
+                        or
+                        ((.class // "") | test("^(steam_app_|gamescope|cs2|dota2|osu!|retroarch|wine|proton|minecraft|lunarclient|sober|factorio|valheim|terraria|stardew|celeste|hollow_knight|baldursgate3|bg3|cyberpunk2077|eldenring|overwatch|apex|warthunder|aces|x-plane|flightgear|gzdoom|uzdoom|hl2_linux|portal2_linux|tf_linux64|dolphin-emu|pcsx2|rpcs3|ryujinx|yuzu|suyu|eden|citra|azahar|cemu|shadps4|xenia|duckstation|flycast|xemu|ppsspp|mgba|melonds|mame|scummvm|dosbox|chiaki|moonlight|parsec)|(\\.x86_64$|\\.exe$)"; "i"))
+                        or
+                        ((.initialClass // "") | test("^(steam_app_|gamescope|wine|proton|minecraft|sober)|(\\.x86_64$|\\.exe$)"; "i"))
                     )
                 ) | if . then "1" else "0" end
             ' 2>/dev/null || echo "0")
