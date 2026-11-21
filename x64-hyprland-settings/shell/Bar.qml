@@ -227,11 +227,33 @@ PanelWindow {
                         color: "#1cffffff"
                     }
 
-                    // Morphic Geometric Workspaces (Reactive Pills & Dots)
+                    // Morphic Geometric Workspaces (Always 1..7 + dynamic 8..10 when occupied/active)
                     Item {
                         id: wsContainer
                         implicitWidth: wsLayout.implicitWidth
                         implicitHeight: 24
+
+                        readonly property var visibleWorkspaces: {
+                            var list = [1, 2, 3, 4, 5, 6, 7];
+                            var extras = {};
+                            if (barWindow.monitorActiveWsId > 7 && barWindow.monitorActiveWsId <= 10) {
+                                extras[barWindow.monitorActiveWsId] = true;
+                            }
+                            if (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id > 7 && Hyprland.focusedWorkspace.id <= 10) {
+                                extras[Hyprland.focusedWorkspace.id] = true;
+                            }
+                            if (Hyprland.workspaces && Hyprland.workspaces.values) {
+                                var wsList = Hyprland.workspaces.values;
+                                for (var i = 0; i < wsList.length; i++) {
+                                    var wid = wsList[i].id;
+                                    if (wid > 7 && wid <= 10) extras[wid] = true;
+                                }
+                            }
+                            for (var id = 8; id <= 10; id++) {
+                                if (extras[id]) list.push(id);
+                            }
+                            return list;
+                        }
 
                         RowLayout {
                             id: wsLayout
@@ -239,7 +261,7 @@ PanelWindow {
                             spacing: 5
 
                             Repeater {
-                                model: [1, 2, 3, 4, 5, 6, 7]
+                                model: wsContainer.visibleWorkspaces
 
                                 Item {
                                     id: wsItem

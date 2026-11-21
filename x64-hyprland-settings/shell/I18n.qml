@@ -213,5 +213,25 @@ QtObject {
     readonly property string powerHintConfirm: isEs
         ? "Enter Confirmar acción  •  Esc Volver atrás"
         : "Enter Confirm action  •  Esc Go back"
+
+    // -------------------------------------------------------------------------
+    // 9. DESKTOP RIGHT-CLICK CONTEXT MENU
+    // -------------------------------------------------------------------------
+    readonly property string ctxApps: isEs ? "Aplicaciones" : "Applications"
+    readonly property string ctxOverview: isEs ? "Vista General" : "Workspaces Overview"
+    readonly property string ctxTerminal: isEs ? "Terminal (Kitty)" : "Terminal (Kitty)"
+    readonly property string ctxFiles: isEs ? "Archivos (Dolphin)" : "Files (Dolphin)"
+    readonly property string ctxThemes: "X64 Theme Studio"
+    readonly property string ctxScreenshot: isEs ? "Captura de pantalla" : "Screenshot"
+    readonly property string ctxPower: isEs ? "Sesión y Energía" : "Power & Session"
+
+    // -------------------------------------------------------------------------
+    // 10. FREEZE-FRAME SCREENSHOT OVERLAY & QUICK ACTIONS
+    // -------------------------------------------------------------------------
+    readonly property string shotFreezeHint: isEs
+        ? "Arrastra para recortar  •  Enter Pantalla completa  •  Esc / Clic der. Cancelar"
+        : "Drag to crop  •  Enter Full monitor  •  Esc / Right-click Cancel"
+    readonly property string shotActionOpen: isEs ? "Abrir" : "Open"
+    readonly property string shotActionFolder: isEs ? "Carpeta" : "Folder"
 }
 

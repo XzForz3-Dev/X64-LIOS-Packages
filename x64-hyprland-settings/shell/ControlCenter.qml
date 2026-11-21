@@ -247,7 +247,7 @@ PanelWindow {
                         }
                     }
                     Text {
-                        text: I18n.isEs ? "X64 LIOS v28 • Sesión activa" : "X64 LIOS v28 • Active session"
+                        text: "X64 LIOS • Hyprland"
                         font.family: Theme.fontSans
                         font.pixelSize: 10
                         color: Theme.textMuted
@@ -256,7 +256,7 @@ PanelWindow {
 
                 Item { Layout.fillWidth: true }
 
-                // Top-Right Circular Session Buttons (Theme Studio, Clipboard History, Shortcuts Help, Lock, Reboot, Power Off)
+                // Top-Right Quick Utility Buttons (Theme Studio, Clipboard History, Shortcuts Help)
                 Rectangle {
                     implicitWidth: 28
                     implicitHeight: 28
@@ -343,91 +343,6 @@ PanelWindow {
                         }
                     }
                 }
-
-                Rectangle {
-                    implicitWidth: 28
-                    implicitHeight: 28
-                    radius: 14
-                    color: lockArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: lockArea.containsMouse ? "#33ffffff" : Theme.borderSubtle
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 130 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰌾"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: lockArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
-                    }
-
-                    MouseArea {
-                        id: lockArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.closeRequested();
-                            controlWindow.lockRequested();
-                        }
-                    }
-                }
-
-                Rectangle {
-                    implicitWidth: 28
-                    implicitHeight: 28
-                    radius: 14
-                    color: rebootArea.containsMouse ? Theme.bgHover : Theme.bgCard
-                    border.color: rebootArea.containsMouse ? "#33ffffff" : Theme.borderSubtle
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 130 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰑓"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: rebootArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
-                    }
-
-                    MouseArea {
-                        id: rebootArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.launchApp("systemctl reboot");
-                        }
-                    }
-                }
-
-                Rectangle {
-                    implicitWidth: 28
-                    implicitHeight: 28
-                    radius: 14
-                    color: offArea.containsMouse ? Theme.accent : Theme.accentSubtle
-                    border.color: offArea.containsMouse ? Theme.accentLight : Theme.borderAccent
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 130 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰐥"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
-                        color: offArea.containsMouse ? "#ffffff" : Theme.accent
-                    }
-
-                    MouseArea {
-                        id: offArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            controlWindow.launchApp("systemctl poweroff");
-                        }
-                    }
-                }
             }
 
             // =================================================================
@@ -500,7 +415,7 @@ PanelWindow {
                     }
                 }
 
-                // Luz Noche (4200K Filter — Unified Crimson State)
+                // Luz Noche (4800K Warm Filter)
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: 74
@@ -541,7 +456,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: controlWindow.nightlightActive ? "4200K" : (I18n.isEs ? "Apagado" : "Off")
+                            text: controlWindow.nightlightActive ? "4800K" : (I18n.isEs ? "Apagado" : "Off")
                             font.family: Theme.fontSans
                             font.pixelSize: 9
                             font.weight: Font.Medium

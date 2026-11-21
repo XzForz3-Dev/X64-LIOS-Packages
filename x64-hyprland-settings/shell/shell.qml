@@ -60,6 +60,7 @@ ShellRoot {
         if (targetName !== "theme") themeStudio.visible = false;
         if (targetName !== "notifications") notifCenter.visible = false;
         if (targetName !== "power") powerMenu.visible = false;
+        if (targetName !== "desktopContext") desktopContextMenu.visible = false;
     }
 
     function toggleAnimatedPopup(popup, keyName, targetScreen) {
@@ -133,15 +134,15 @@ ShellRoot {
         target: "menu"
 
         function toggle() {
-            root.toggleInstantPopup(launcher, "launcher", root.focusedScreen, null);
+            root.toggleAnimatedPopup(launcher, "launcher", root.focusedScreen);
         }
 
         function open() {
-            root.openInstantPopup(launcher, "launcher", root.focusedScreen, null);
+            root.openAnimatedPopup(launcher, "launcher", root.focusedScreen);
         }
 
         function close() {
-            launcher.visible = false;
+            launcher.closeAnimated();
         }
     }
 
@@ -439,6 +440,72 @@ ShellRoot {
         }
     }
 
+    // Invisible Multi-Monitor Desktop Gesture Surface (WlrLayer.Bottom)
+    // Double Left-Click -> X64 Theme Studio (with GPU wave origin at cursor)
+    // Single Right-Click -> Obsidian Context Menu | Double Right-Click -> Overview
+    Variants {
+        model: Quickshell.screens
+
+        DesktopSurface {
+            required property var modelData
+            screen: modelData
+
+            onOpenThemeAt: (s, nx, ny) => {
+                ThemeState.setWaveOrigin(nx, ny);
+                root.openAnimatedPopup(themeStudio, "theme", s);
+            }
+
+            onOpenOverview: (s) => {
+                root.openInstantPopup(overviewPopup, "overview", s, function() {
+                    overviewPopup.reload();
+                });
+            }
+
+            onOpenContextMenu: (s, px, py) => {
+                root.targetScreenName = root._screenName(s);
+                root.closeAllExcept("desktopContext");
+                desktopContextMenu.openAt(px, py);
+            }
+
+            onDismissPopups: () => {
+                if (desktopContextMenu.visible) desktopContextMenu.closeAnimated();
+            }
+        }
+    }
+
+    Process {
+        id: desktopExecProc
+    }
+
+    Timer {
+        id: desktopScreenshotTimer
+        interval: 140
+        repeat: false
+        onTriggered: {
+            if (desktopExecProc.running) desktopExecProc.running = false;
+            desktopExecProc.command = ["sh", "-c", "nohup /usr/bin/x64-hyprland-ctl screenshot region >/dev/null 2>&1 &"];
+            desktopExecProc.running = true;
+        }
+    }
+
+    IpcHandler {
+        target: "desktop"
+
+        function contextMenu(px: string, py: string) {
+            var xVal = parseFloat(px);
+            var yVal = parseFloat(py);
+            if (isNaN(xVal)) xVal = 420;
+            if (isNaN(yVal)) yVal = 260;
+            root.targetScreenName = root._screenName(root.focusedScreen);
+            root.closeAllExcept("desktopContext");
+            desktopContextMenu.openAt(xVal, yVal);
+        }
+
+        function closeMenu() {
+            desktopContextMenu.closeAnimated();
+        }
+    }
+
     // Direct OSD trigger for hardware brightness keys (XF86MonBrightnessUp/Down)
     IpcHandler {
         target: "power"
@@ -453,6 +520,36 @@ ShellRoot {
 
         function close() {
             powerMenu.closeAnimated();
+        }
+    }
+
+    // Freeze-Frame Screenshot Overlay State (Multi-Monitor)
+    property bool screenshotFreezeActive: false
+    property string screenshotFreezeDir: ""
+    property string screenshotFreezeToken: ""
+    property string screenshotDragMonitor: ""
+
+    Process {
+        id: shotActionProc
+    }
+
+    IpcHandler {
+        target: "screenshot"
+
+        function start(dir: string, token: string) {
+            root.screenshotFreezeDir = dir || "";
+            root.screenshotFreezeToken = token || String(Date.now());
+            root.screenshotDragMonitor = "";
+            root.screenshotFreezeActive = true;
+        }
+
+        function cancel() {
+            root.screenshotFreezeActive = false;
+            root.screenshotDragMonitor = "";
+        }
+
+        function notify(filePath: string, title: string, subtitle: string) {
+            notifPopup.pushScreenshot(filePath, title, subtitle);
         }
     }
 
@@ -485,7 +582,7 @@ ShellRoot {
             controlCenterOpen: controlCenter.visible && (root.activePopupScreen === modelData)
             powerMenuOpen: powerMenu.visible && (root.activePopupScreen === modelData)
 
-            onToggleLauncher: root.toggleInstantPopup(launcher, "launcher", modelData, null)
+            onToggleLauncher: root.toggleAnimatedPopup(launcher, "launcher", modelData)
             onToggleCalendar: root.toggleAnimatedPopup(calendarPopup, "calendar", modelData)
             onToggleControl: root.toggleAnimatedPopup(controlCenter, "control", modelData)
             onTogglePower: root.toggleAnimatedPopup(powerMenu, "power", modelData)
@@ -635,6 +732,87 @@ ShellRoot {
         onLockRequested: {
             root.closeAllExcept("none");
             lockScreen.lockSession();
+        }
+    }
+
+    // Obsidian Right-Click Desktop Context Menu
+    DesktopContextMenu {
+        id: desktopContextMenu
+        screen: root.activePopupScreen
+        visible: false
+        onCloseRequested: desktopContextMenu.visible = false
+        onTriggerAction: (actionId, s, nx, ny) => {
+            if (actionId === "launcher") {
+                root.openAnimatedPopup(launcher, "launcher", s);
+            } else if (actionId === "overview") {
+                root.openInstantPopup(overviewPopup, "overview", s, function() {
+                    overviewPopup.reload();
+                });
+            } else if (actionId === "terminal") {
+                if (desktopExecProc.running) desktopExecProc.running = false;
+                desktopExecProc.command = ["sh", "-c", "nohup kitty >/dev/null 2>&1 &"];
+                desktopExecProc.running = true;
+            } else if (actionId === "files") {
+                if (desktopExecProc.running) desktopExecProc.running = false;
+                desktopExecProc.command = ["sh", "-c", "nohup dolphin >/dev/null 2>&1 &"];
+                desktopExecProc.running = true;
+            } else if (actionId === "themes") {
+                ThemeState.setWaveOrigin(nx, ny);
+                root.openAnimatedPopup(themeStudio, "theme", s);
+            } else if (actionId === "screenshot") {
+                desktopScreenshotTimer.restart();
+            } else if (actionId === "power") {
+                root.openAnimatedPopup(powerMenu, "power", s);
+            }
+        }
+    }
+
+    // Native Multi-Monitor Freeze-Frame Screenshot Overlay (SUPER + SHIFT + S)
+    Variants {
+        model: Quickshell.screens
+
+        ScreenshotOverlay {
+            required property var modelData
+            screen: modelData
+            active: root.screenshotFreezeActive
+            isFocusedMonitor: root.focusedScreen !== null && modelData.name === root.focusedScreen.name
+            freezeDir: root.screenshotFreezeDir
+            freezeToken: root.screenshotFreezeToken
+            activeDragMonitor: root.screenshotDragMonitor
+
+            onDragBegan: (monName) => {
+                root.screenshotDragMonitor = monName;
+            }
+
+            onRegionSelected: (monName, nx, ny, nw, nh) => {
+                root.screenshotFreezeActive = false;
+                root.screenshotDragMonitor = "";
+                if (shotActionProc.running) shotActionProc.running = false;
+                shotActionProc.command = [
+                    "/usr/bin/x64-hyprland-ctl", "screenshot-crop",
+                    monName, String(nx), String(ny), String(nw), String(nh)
+                ];
+                shotActionProc.running = true;
+            }
+
+            onFullMonitorSelected: (monName) => {
+                root.screenshotFreezeActive = false;
+                root.screenshotDragMonitor = "";
+                if (shotActionProc.running) shotActionProc.running = false;
+                shotActionProc.command = [
+                    "/usr/bin/x64-hyprland-ctl", "screenshot-crop",
+                    monName, "0", "0", "1", "1"
+                ];
+                shotActionProc.running = true;
+            }
+
+            onCancelRequested: () => {
+                root.screenshotFreezeActive = false;
+                root.screenshotDragMonitor = "";
+                if (shotActionProc.running) shotActionProc.running = false;
+                shotActionProc.command = ["/usr/bin/x64-hyprland-ctl", "screenshot-cancel"];
+                shotActionProc.running = true;
+            }
         }
     }
 

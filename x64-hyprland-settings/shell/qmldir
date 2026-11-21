@@ -21,3 +21,6 @@ ClipboardPopup 1.0 ClipboardPopup.qml
 OverviewPopup 1.0 OverviewPopup.qml
 ThemeStudio 1.0 ThemeStudio.qml
 PowerMenuPopup 1.0 PowerMenuPopup.qml
+DesktopSurface 1.0 DesktopSurface.qml
+DesktopContextMenu 1.0 DesktopContextMenu.qml
+ScreenshotOverlay 1.0 ScreenshotOverlay.qml

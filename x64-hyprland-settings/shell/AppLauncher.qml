@@ -14,6 +14,13 @@ PanelWindow {
     property var filteredAppList: []
     property string activeCategory: "Todas"
     property int selectedIndex: 0
+    property bool closing: false
+
+    function closeAnimated() {
+        if (closing || !visible) return;
+        closing = true;
+        closeAnim.start();
+    }
 
     // High-precision XDG Categorization
     function detectCategory(app) {
@@ -188,24 +195,45 @@ PanelWindow {
     }
 
     color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-launcher"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-    // Dismiss on background click
-    MouseArea {
-        anchors.fill: parent
-        onClicked: launcherWindow.closeRequested()
+    ParallelAnimation {
+        id: openAnim
+        NumberAnimation { target: scrim; property: "opacity"; to: 1.0; duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation { target: card; property: "opacity"; to: 1.0; duration: 170; easing.type: Easing.OutCubic }
+        NumberAnimation { target: card; property: "scale"; to: 1.0; duration: 190; easing.type: Easing.OutCubic }
     }
 
-    // Outer Ambient Shadow for floating depth
+    SequentialAnimation {
+        id: closeAnim
+        ParallelAnimation {
+            NumberAnimation { target: scrim; property: "opacity"; to: 0.0; duration: 120; easing.type: Easing.InCubic }
+            NumberAnimation { target: card; property: "opacity"; to: 0.0; duration: 115; easing.type: Easing.InCubic }
+            NumberAnimation { target: card; property: "scale"; to: 0.96; duration: 120; easing.type: Easing.InCubic }
+        }
+        ScriptAction {
+            script: {
+                launcherWindow.closing = false;
+                launcherWindow.closeRequested();
+            }
+        }
+    }
+
+    // Full-screen dimmed veil (paired with Hyprland Kawase blur on quickshell-launcher)
     Rectangle {
-        anchors.centerIn: card
-        width: card.width + 16
-        height: card.height + 16
-        radius: card.radius + 6
-        color: "#70000000"
-        z: -1
+        id: scrim
+        anchors.fill: parent
+        color: "#a805060a"
+        opacity: 0
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: launcherWindow.closeAnimated()
+        }
     }
 
     // =========================================================================
@@ -217,17 +245,23 @@ PanelWindow {
         height: Math.min(parent.height - 60, 640)
         anchors.centerIn: parent
         radius: 20
-        color: Theme.bgCard
-        border.color: Theme.borderSubtle
+        color: Theme.bgGlass
+        border.color: Theme.borderGlass
         border.width: 1
+        opacity: 0
+        scale: 0.96
+        transformOrigin: Item.Center
 
-        // Subtle Top Satin Glass Highlight
+        // Delicate Top Shimmer Accent Line (matches PowerMenuPopup & Obsidian family)
         Rectangle {
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width - 40
+            anchors.topMargin: 1
+            width: parent.width * 0.36
             height: 1
-            color: "#30ffffff"
+            radius: 0.5
+            color: Theme.accent
+            opacity: 0.45
         }
 
         // Consume clicks inside the card
@@ -249,22 +283,23 @@ PanelWindow {
                 height: 48
                 radius: 24
                 color: Theme.bgElevated
-                border.color: searchInput.activeFocus ? Theme.accent : Theme.borderSubtle
-                border.width: searchInput.activeFocus ? 1.5 : 1
+                border.color: searchInput.activeFocus ? Theme.borderAccent : Theme.borderSubtle
+                border.width: 1
 
                 Behavior on border.color { ColorAnimation { duration: 150 } }
 
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 18
-                    anchors.rightMargin: 18
+                    anchors.rightMargin: 14
                     spacing: 12
 
                     Text {
                         text: ""
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 16
-                        color: searchInput.activeFocus ? Theme.accent : "#707688"
+                        font.family: Theme.fontMono
+                        font.pixelSize: 15
+                        color: searchInput.activeFocus ? Theme.accent : Theme.textMuted
+                        Behavior on color { ColorAnimation { duration: 140 } }
                     }
 
                     TextInput {
@@ -272,7 +307,9 @@ PanelWindow {
                         Layout.fillWidth: true
                         font.family: Theme.fontSans
                         font.pixelSize: 13
-                        color: "#ffffff"
+                        color: Theme.textPrimary
+                        selectionColor: Theme.accentDim
+                        selectedTextColor: Theme.textPrimary
                         clip: true
                         selectByMouse: true
                         onTextChanged: launcherWindow.applyFilter()
@@ -282,11 +319,11 @@ PanelWindow {
                             text: "Buscar aplicaciones, juegos o herramientas..."
                             font.family: Theme.fontSans
                             font.pixelSize: 13
-                            color: "#6c7285"
+                            color: Theme.textMuted
                             visible: !searchInput.text
                         }
 
-                        Keys.onEscapePressed: launcherWindow.closeRequested()
+                        Keys.onEscapePressed: launcherWindow.closeAnimated()
                         Keys.onReturnPressed: launcherWindow.executeSelected()
 
                         Keys.onDownPressed: {
@@ -327,28 +364,46 @@ PanelWindow {
                         text: "󰅖"
                         font.family: Theme.fontMono
                         font.pixelSize: 14
-                        color: "#8c92a4"
+                        color: clearSearchArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
                         visible: searchInput.text.length > 0
+                        Behavior on color { ColorAnimation { duration: 130 } }
                         MouseArea {
+                            id: clearSearchArea
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: searchInput.text = ""
                         }
                     }
 
-                    // ESC Quick Badge
+                    // Interactive ESC Close Pill
                     Rectangle {
                         width: 44
-                        height: 22
-                        radius: 11
-                        color: "#20ffffff"
+                        height: 24
+                        radius: 12
+                        color: escBadgeArea.containsMouse ? Theme.bgHover : Theme.bgCard
+                        border.color: escBadgeArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
+                        border.width: 1
+                        scale: escBadgeArea.pressed ? 0.94 : 1.0
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on border.color { ColorAnimation { duration: 140 } }
+                        Behavior on scale { NumberAnimation { duration: 120 } }
+
                         Text {
                             anchors.centerIn: parent
                             text: "ESC"
-                            font.family: "JetBrainsMono Nerd Font"
+                            font.family: Theme.fontMono
                             font.pixelSize: 9
                             font.bold: true
-                            color: "#b0b5c5"
+                            color: escBadgeArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+                        }
+
+                        MouseArea {
+                            id: escBadgeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: launcherWindow.closeAnimated()
                         }
                     }
                 }
@@ -374,11 +429,13 @@ PanelWindow {
                         implicitWidth: pillText.implicitWidth + 22
                         radius: 14
                         color: isActive ? Theme.accent : (pillArea.containsMouse ? Theme.bgHover : Theme.bgCard)
-                        border.color: isActive ? Theme.accentHover : (pillArea.containsMouse ? "#303648" : Theme.borderSubtle)
+                        border.color: isActive ? Theme.accent : (pillArea.containsMouse ? Theme.borderGlass : Theme.borderSubtle)
                         border.width: 1
+                        scale: pillArea.pressed ? 0.95 : 1.0
 
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        Behavior on border.color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on border.color { ColorAnimation { duration: 140 } }
+                        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                         Text {
                             id: pillText
@@ -387,7 +444,8 @@ PanelWindow {
                             font.family: Theme.fontSans
                             font.pixelSize: 11
                             font.bold: pill.isActive
-                            color: pill.isActive ? "#ffffff" : "#8c92a4"
+                            color: pill.isActive ? Theme.accentFg : (pillArea.containsMouse ? Theme.textPrimary : Theme.textSecondary)
+                            Behavior on color { ColorAnimation { duration: 140 } }
                         }
 
                         MouseArea {
@@ -429,20 +487,22 @@ PanelWindow {
                         width: grid.cellWidth
                         height: grid.cellHeight
 
-                        property bool isSelected: (index === launcherWindow.selectedIndex) || itemArea.containsMouse
+                        property bool isSelected: index === launcherWindow.selectedIndex
 
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: 5
                             radius: 14
                             color: appItem.isSelected ? Theme.bgHover : Theme.bgCard
-                            border.color: appItem.isSelected ? Theme.accent : Theme.borderSubtle
-                            border.width: appItem.isSelected ? 1.5 : 1
+                            border.color: appItem.isSelected ? Theme.borderAccent : Theme.borderSubtle
+                            border.width: 1
+                            scale: itemArea.pressed ? 0.96 : 1.0
 
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            Behavior on border.color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-                            // Subtle Accent Halo on Hover / Focus
+                            // Subtle Accent Halo on Focus / Hover
                             Rectangle {
                                 visible: appItem.isSelected
                                 anchors.fill: parent
@@ -474,7 +534,7 @@ PanelWindow {
                                     font.family: Theme.fontSans
                                     font.pixelSize: 12
                                     font.bold: true
-                                    color: "#ffffff"
+                                    color: Theme.textPrimary
                                     elide: Text.ElideRight
                                 }
 
@@ -485,7 +545,8 @@ PanelWindow {
                                     text: appItem.modelData.category || "Sistema"
                                     font.family: Theme.fontSans
                                     font.pixelSize: 9
-                                    color: appItem.isSelected ? Theme.accentText : Theme.textMuted
+                                    color: appItem.isSelected ? Theme.accent : Theme.textMuted
+                                    Behavior on color { ColorAnimation { duration: 140 } }
                                     elide: Text.ElideRight
                                 }
                             }
@@ -495,6 +556,7 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
+                                onEntered: launcherWindow.selectedIndex = appItem.index
                                 onClicked: {
                                     launcherWindow.launchItem(appItem.modelData);
                                 }
@@ -527,7 +589,7 @@ PanelWindow {
 
                 Text {
                     text: "X64 LIOS • " + ThemeState.themeName
-                    font.family: "JetBrainsMono Nerd Font"
+                    font.family: Theme.fontMono
                     font.pixelSize: 10
                     color: Theme.textMuted
                 }
@@ -544,10 +606,18 @@ PanelWindow {
 
     onVisibleChanged: {
         if (visible) {
+            closing = false;
+            closeAnim.stop();
             searchInput.text = "";
             launcherWindow.activeCategory = "Todas";
             launcherWindow.updateAppList();
+            scrim.opacity = 0;
+            card.opacity = 0;
+            card.scale = 0.96;
+            openAnim.start();
             searchInput.forceActiveFocus();
+        } else {
+            closing = false;
         }
     }
 

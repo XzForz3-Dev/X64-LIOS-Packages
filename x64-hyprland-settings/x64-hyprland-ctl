@@ -131,7 +131,7 @@ cmd_caffeine() {
 }
 
 # -----------------------------------------------------------------------------
-# 2. NIGHTLIGHT (WARM 4200K FILTER)
+# 2. NIGHTLIGHT (WARM 4800K FILTER)
 # -----------------------------------------------------------------------------
 cmd_nightlight() {
     local action="${1:-toggle}"
@@ -555,6 +555,89 @@ cmd_record() {
     fi
 }
 
+_notify_screenshot() {
+    local out_file="$1"
+    local title="$2"
+    local subtitle="$3"
+    if ! quickshell ipc call screenshot notify "$out_file" "$title" "$subtitle" >/dev/null 2>&1; then
+        if [ "$IS_ES" -eq 1 ]; then
+            notify_user "$title" "$subtitle" "Captura X64"
+        else
+            notify_user "$title" "$subtitle" "X64 Capture"
+        fi
+    fi
+}
+
+cmd_screenshot_crop() {
+    local mon="${1:-}"
+    local nx="${2:-0}" ny="${3:-0}" nw="${4:-1}" nh="${5:-1}"
+    local freeze_file="${STATE_DIR}/freeze-${mon}.png"
+
+    quickshell ipc call popups unlock >/dev/null 2>&1 || true
+
+    local pic_base
+    pic_base="$(xdg-user-dir PICTURES 2>/dev/null)"
+    [ -z "$pic_base" ] && pic_base="${HOME}/Pictures"
+    local pic_dir="${pic_base}/Screenshots"
+    mkdir -p "${pic_dir}"
+    local out_file="${pic_dir}/X64-Shot-$(date +%Y%m%d-%H%M%S).png"
+
+    if [ ! -f "$freeze_file" ]; then
+        rm -f "${STATE_DIR}"/freeze-*.png 2>/dev/null || true
+        return 1
+    fi
+
+    local ok=0
+    if [ "$nx" = "0" ] && [ "$ny" = "0" ] && [ "$nw" = "1" ] && [ "$nh" = "1" ]; then
+        if python3 - "$freeze_file" "$out_file" <<'PYEOF'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1])
+im.save(sys.argv[2], "PNG", optimize=False, compress_level=4)
+PYEOF
+        then
+            ok=1
+        elif cp -f "$freeze_file" "$out_file"; then
+            ok=1
+        fi
+    else
+        if python3 - "$freeze_file" "$out_file" "$nx" "$ny" "$nw" "$nh" <<'PYEOF'
+import sys
+from PIL import Image
+src, dst = sys.argv[1], sys.argv[2]
+nx, ny, nw, nh = float(sys.argv[3]), float(sys.argv[4]), float(sys.argv[5]), float(sys.argv[6])
+im = Image.open(src)
+w, h = im.size
+x1 = max(0, min(w - 1, int(round(nx * w))))
+y1 = max(0, min(h - 1, int(round(ny * h))))
+x2 = max(x1 + 1, min(w, int(round((nx + nw) * w))))
+y2 = max(y1 + 1, min(h, int(round((ny + nh) * h))))
+im.crop((x1, y1, x2, y2)).save(dst, "PNG", optimize=False, compress_level=4)
+PYEOF
+        then
+            ok=1
+        fi
+    fi
+
+    rm -f "${STATE_DIR}"/freeze-*.png 2>/dev/null || true
+
+    if [ "$ok" -eq 1 ] && [ -s "$out_file" ]; then
+        setsid -f sh -c 'wl-copy < "$1"' _ "$out_file" >/dev/null 2>&1 < /dev/null
+        if [ "$IS_ES" -eq 1 ]; then
+            _notify_screenshot "$out_file" "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")"
+        else
+            _notify_screenshot "$out_file" "Snapshot Saved" "Copied to clipboard • $(basename "$out_file")"
+        fi
+        return 0
+    fi
+    return 1
+}
+
+cmd_screenshot_cancel() {
+    rm -f "${STATE_DIR}"/freeze-*.png 2>/dev/null || true
+    quickshell ipc call popups unlock >/dev/null 2>&1 || true
+}
+
 cmd_screenshot_worker() {
     local mode="${1:-full}"
     local pic_base
@@ -565,36 +648,67 @@ cmd_screenshot_worker() {
     local out_file="${pic_dir}/X64-Shot-$(date +%Y%m%d-%H%M%S).png"
 
     if [ "$mode" = "region" ]; then
-        sleep 0.15
+        # Native Freeze-Frame capture in tmpfs RAM across all active monitors (~30ms)
+        rm -f "${STATE_DIR}"/freeze-*.png 2>/dev/null || true
+        quickshell ipc call filter hide >/dev/null 2>&1 || true
+        sleep 0.04
+
+        local -a mons=()
+        mapfile -t mons < <(hyprctl monitors -j 2>/dev/null | jq -r '.[].name' 2>/dev/null || true)
+        local pids=()
+        local m
+        for m in "${mons[@]}"; do
+            [ -n "$m" ] || continue
+            grim -l 0 -o "$m" "${STATE_DIR}/freeze-${m}.png" >/dev/null 2>&1 &
+            pids+=($!)
+        done
+        for p in "${pids[@]}"; do
+            wait "$p" 2>/dev/null || true
+        done
+        quickshell ipc call filter show >/dev/null 2>&1 || true
+
+        local stamp
+        stamp=$(date +%s%N)
+        if [ "${#mons[@]}" -gt 0 ] && [ -s "${STATE_DIR}/freeze-${mons[0]}.png" ] \
+            && quickshell ipc call screenshot start "${STATE_DIR}" "${stamp}" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        # Graceful fallback to slurp if Quickshell overlay is unavailable
+        rm -f "${STATE_DIR}"/freeze-*.png 2>/dev/null || true
+        local acc="#ff2b2b"
+        if [ -r "${HOME}/.config/x64-theme/palette.json" ]; then
+            acc=$(jq -r '.accent // "#ff2b2b"' "${HOME}/.config/x64-theme/palette.json" 2>/dev/null || echo "#ff2b2b")
+        fi
         local geom
-        geom=$(slurp -b '#08080a88' -c '#ff2b2bff' -s '#ff2b2b18' -w 2 2>/dev/null || echo "")
+        geom=$(slurp -b '#08080a88' -c "${acc}ff" -s "${acc}18" -w 2 2>/dev/null || echo "")
         quickshell ipc call popups unlock >/dev/null 2>&1 || true
         [ -z "$geom" ] && return 0
         quickshell ipc call filter hide >/dev/null 2>&1 || true
-        sleep 0.05
+        sleep 0.04
         if grim -g "$geom" "$out_file"; then
             quickshell ipc call filter show >/dev/null 2>&1 || true
-            setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
+            setsid -f sh -c 'wl-copy < "$1"' _ "$out_file" >/dev/null 2>&1 < /dev/null
             if [ "$IS_ES" -eq 1 ]; then
-                notify_user "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")" "Captura X64"
+                _notify_screenshot "$out_file" "Recorte Guardado" "Copiado al portapapeles • $(basename "$out_file")"
             else
-                notify_user "Snapshot Saved" "Copied to clipboard • $(basename "$out_file")" "X64 Capture"
+                _notify_screenshot "$out_file" "Snapshot Saved" "Copied to clipboard • $(basename "$out_file")"
             fi
         else
             quickshell ipc call filter show >/dev/null 2>&1 || true
         fi
     else
-        sleep 0.25
+        sleep 0.15
         quickshell ipc call filter hide >/dev/null 2>&1 || true
-        sleep 0.05
+        sleep 0.04
         if grim "$out_file"; then
             quickshell ipc call popups unlock >/dev/null 2>&1 || true
             quickshell ipc call filter show >/dev/null 2>&1 || true
-            setsid -f sh -c "wl-copy < '${out_file}'" >/dev/null 2>&1 < /dev/null
+            setsid -f sh -c 'wl-copy < "$1"' _ "$out_file" >/dev/null 2>&1 < /dev/null
             if [ "$IS_ES" -eq 1 ]; then
-                notify_user "Captura de Pantalla" "Copiada al portapapeles • $(basename "$out_file")" "Captura X64"
+                _notify_screenshot "$out_file" "Captura de Pantalla" "Copiada al portapapeles • $(basename "$out_file")"
             else
-                notify_user "Screenshot Captured" "Copied to clipboard • $(basename "$out_file")" "X64 Capture"
+                _notify_screenshot "$out_file" "Screenshot Captured" "Copied to clipboard • $(basename "$out_file")"
             fi
         else
             quickshell ipc call popups unlock >/dev/null 2>&1 || true
@@ -2316,6 +2430,8 @@ case "${1:-status}" in
     record-worker)     cmd_record_worker "${2:-fullscreen}" "${3:-desktop}" ;;
     screenshot)        cmd_screenshot "${2:-full}" ;;
     screenshot-worker) cmd_screenshot_worker "${2:-full}" ;;
+    screenshot-crop)   shift; cmd_screenshot_crop "$@" ;;
+    screenshot-cancel) cmd_screenshot_cancel ;;
     scratchpad)        cmd_scratchpad ;;
     ai-engine)         cmd_ai_engine "${2:-get}" "${3:-opencode}" ;;
     zoom)              cmd_zoom "${2:-toggle}" ;;

@@ -232,6 +232,33 @@ hl.layer_rule({
     blur  = true,
 })
 
+-- Cinematic Frosted-Glass Blur for the App Launcher Overlay (SUPER + Space)
+hl.layer_rule({
+    name  = "quickshell-launcher-blur",
+    match = { namespace = "^quickshell-launcher$" },
+    blur  = true,
+})
+
+-- Keep transparent desktop hit-surface & context-menu click-catcher razor sharp (0 blur overhead)
+hl.layer_rule({
+    name  = "quickshell-desktop-hit-noblur",
+    match = { namespace = "^quickshell-desktop-hit$" },
+    blur  = false,
+})
+
+hl.layer_rule({
+    name  = "quickshell-context-menu-noblur",
+    match = { namespace = "^quickshell-context-menu$" },
+    blur  = false,
+})
+
+-- Keep freeze-frame screenshot overlay 100% razor-sharp with zero compositor blur
+hl.layer_rule({
+    name  = "quickshell-screenshot-freeze-noblur",
+    match = { namespace = "^quickshell-screenshot-freeze$" },
+    blur  = false,
+})
+
 -- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games
 hl.window_rule({
     name      = "x64-gaming-immediate",
@@ -288,14 +315,24 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
--- Scroll through workspaces 1..6 with mouse wheel (works on empty workspaces & wraps 1 <-> 6)
+-- Scroll through workspaces 1..max (base 1..7, expanding dynamically to 10 if occupied)
 local function cycle_workspace(delta)
     local ws = hl.get_active_workspace()
     local cur = (ws and ws.id) or 1
-    if cur < 1 or cur > 6 then cur = 1 end
+    local max_ws = 7
+    if cur > max_ws and cur <= 10 then max_ws = cur end
+    local ok, all_ws = pcall(hl.get_workspaces)
+    if ok and type(all_ws) == "table" then
+        for _, w in ipairs(all_ws) do
+            if w and type(w.id) == "number" and w.id > max_ws and w.id <= 10 then
+                max_ws = w.id
+            end
+        end
+    end
+    if cur < 1 or cur > max_ws then cur = 1 end
     local nxt = cur + delta
-    if nxt > 6 then nxt = 1 end
-    if nxt < 1 then nxt = 6 end
+    if nxt > max_ws then nxt = 1 end
+    if nxt < 1 then nxt = max_ws end
     hl.dispatch(hl.dsp.focus({ workspace = nxt }))
 end
 hl.bind(mainMod .. " + mouse_down", function() cycle_workspace(1) end)

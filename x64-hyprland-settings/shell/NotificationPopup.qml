@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Io
 import Quickshell.Services.Notifications
 
 PanelWindow {
@@ -14,6 +15,53 @@ PanelWindow {
     // Active toast queue (up to 3 recent notifications)
     ListModel {
         id: toastModel
+    }
+
+    Process {
+        id: actionProc
+    }
+
+    function openScreenshotFile(path) {
+        if (!path) return;
+        if (actionProc.running) actionProc.running = false;
+        actionProc.command = ["sh", "-c", "setsid -f loupe \"$1\" >/dev/null 2>&1 < /dev/null", "_", path];
+        actionProc.running = true;
+    }
+
+    function openScreenshotFolder(path) {
+        if (!path) return;
+        if (actionProc.running) actionProc.running = false;
+        actionProc.command = ["sh", "-c", "setsid -f dolphin --select \"$1\" >/dev/null 2>&1 < /dev/null", "_", path];
+        actionProc.running = true;
+    }
+
+    function pushScreenshot(filePath, title, subtitle) {
+        var cleanApp = I18n.isEs ? "Captura X64" : "X64 Capture";
+        var cleanSum = title || (I18n.isEs ? "Captura Guardada" : "Screenshot Saved");
+        var cleanBod = subtitle || "";
+
+        // Archive in persistent Notification Center history too
+        NotifState.recordNotification(cleanApp, cleanSum, cleanBod);
+
+        // Replace any previous screenshot toast in place
+        for (var i = toastModel.count - 1; i >= 0; i--) {
+            if (toastModel.get(i).imagePath !== "") {
+                toastModel.remove(i);
+            }
+        }
+        while (toastModel.count >= 3) {
+            toastModel.remove(toastModel.count - 1);
+        }
+
+        toastModel.insert(0, {
+            "appName": cleanApp,
+            "summary": cleanSum,
+            "body": cleanBod,
+            "ticks": 75,
+            "maxTicks": 75,
+            "imagePath": filePath || "",
+            "paused": false
+        });
     }
 
     function pushNotification(app, sum, bod) {
@@ -53,7 +101,10 @@ PanelWindow {
             "appName": cleanApp,
             "summary": cleanSum,
             "body": cleanBod,
-            "ticks": 45
+            "ticks": 45,
+            "maxTicks": 45,
+            "imagePath": "",
+            "paused": false
         });
     }
 
@@ -104,14 +155,16 @@ PanelWindow {
         }
     }
 
-    // Global 100ms countdown timer for smooth progress bar & auto-dismiss (4.5s)
+    // Global 100ms countdown timer for smooth progress bar & auto-dismiss (pauses on hover)
     Timer {
         interval: 100
         running: toastModel.count > 0
         repeat: true
         onTriggered: {
             for (var i = toastModel.count - 1; i >= 0; i--) {
-                var t = toastModel.get(i).ticks - 1;
+                var row = toastModel.get(i);
+                if (row.paused) continue;
+                var t = row.ticks - 1;
                 if (t <= 0) {
                     toastModel.remove(i);
                 } else {
@@ -133,12 +186,20 @@ PanelWindow {
             delegate: Rectangle {
                 id: toastCard
                 readonly property string toastIcon: NotifState.iconFor(model.appName, model.summary)
+                readonly property bool hasShot: (model.imagePath || "") !== ""
+                readonly property bool isCardHovered: toastArea.containsMouse || thumbArea.containsMouse || openBtnArea.containsMouse || folderBtnArea.containsMouse
+
+                onIsCardHoveredChanged: {
+                    if (index >= 0 && index < toastModel.count) {
+                        toastModel.setProperty(index, "paused", isCardHovered);
+                    }
+                }
 
                 Layout.fillWidth: true
                 implicitHeight: cardInner.implicitHeight + 24
                 radius: Theme.radiusLg
-                color: toastArea.containsMouse ? Theme.bgCard : Theme.bgGlass
-                border.color: toastArea.containsMouse ? "#28ffffff" : Theme.borderGlass
+                color: isCardHovered ? Theme.bgCard : Theme.bgGlass
+                border.color: isCardHovered ? Theme.borderAccent : Theme.borderGlass
                 border.width: 1
                 clip: true
 
@@ -159,90 +220,234 @@ PanelWindow {
                     NumberAnimation { target: slideTrans; property: "x"; from: 24; to: 0; duration: 220; easing.type: Easing.OutCubic }
                 }
 
-                RowLayout {
+                // Background dismiss catcher (sits underneath interactive preview & buttons)
+                MouseArea {
+                    id: toastArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: toastModel.remove(index)
+                }
+
+                ColumnLayout {
                     id: cardInner
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.margins: 12
-                    spacing: 11
+                    spacing: 10
 
-                    // Left Monochromatic Icon Badge with Subtle Crimson Dot
-                    Rectangle {
-                        Layout.alignment: Qt.AlignTop
-                        implicitWidth: 34
-                        implicitHeight: 34
-                        radius: 10
-                        color: Theme.bgElevated
-                        border.color: Theme.borderSubtle
-                        border.width: 1
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 11
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: toastCard.toastIcon
-                            font.family: Theme.fontMono
-                            font.pixelSize: 14
-                            color: Theme.textPrimary
+                        // Left Monochromatic Icon Badge with Subtle Accent Dot
+                        Rectangle {
+                            Layout.alignment: Qt.AlignTop
+                            implicitWidth: 34
+                            implicitHeight: 34
+                            radius: 10
+                            color: Theme.bgElevated
+                            border.color: Theme.borderSubtle
+                            border.width: 1
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: toastCard.toastIcon
+                                font.family: Theme.fontMono
+                                font.pixelSize: 14
+                                color: Theme.textPrimary
+                            }
+
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 5
+                                anchors.rightMargin: 5
+                                width: 5
+                                height: 5
+                                radius: 2.5
+                                color: Theme.accent
+                            }
                         }
 
-                        Rectangle {
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            anchors.topMargin: 5
-                            anchors.rightMargin: 5
-                            width: 5
-                            height: 5
-                            radius: 2.5
-                            color: Theme.accent
+                        // Right Text Column
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                Text {
+                                    text: model.appName.toUpperCase()
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    font.letterSpacing: 0.8
+                                    color: Theme.textMuted
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: "󰅖"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 11
+                                    color: toastCard.isCardHovered ? Theme.textSecondary : Theme.textMuted
+                                }
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: model.summary
+                                font.family: Theme.fontSans
+                                font.pixelSize: 11
+                                font.bold: true
+                                color: Theme.textPrimary
+                                wrapMode: Text.WordWrap
+                            }
+
+                            Text {
+                                visible: model.body !== ""
+                                Layout.fillWidth: true
+                                text: model.body
+                                font.family: Theme.fontSans
+                                font.pixelSize: 10
+                                color: Theme.textSecondary
+                                wrapMode: Text.WordWrap
+                            }
                         }
                     }
 
-                    // Right Text Column
-                    ColumnLayout {
+                    // Live Rounded Screenshot Thumbnail Preview (clickable to open in Loupe)
+                    Rectangle {
+                        visible: toastCard.hasShot
                         Layout.fillWidth: true
-                        spacing: 2
+                        implicitHeight: 112
+                        radius: 10
+                        color: Theme.bgElevated
+                        border.color: thumbArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
+                        border.width: 1
+                        clip: true
 
-                        RowLayout {
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            source: toastCard.hasShot ? ("file://" + model.imagePath) : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                            smooth: true
+                            sourceSize.width: 640
+                            sourceSize.height: 360
+                        }
+
+                        MouseArea {
+                            id: thumbArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                var p = model.imagePath;
+                                var idx = index;
+                                notifWindow.openScreenshotFile(p);
+                                toastModel.remove(idx);
+                            }
+                        }
+                    }
+
+                    // 1-Click Quick Actions Row: Abrir (Loupe) & Carpeta (Dolphin --select)
+                    RowLayout {
+                        visible: toastCard.hasShot
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 6
+                            implicitHeight: 28
+                            radius: 8
+                            color: openBtnArea.containsMouse ? Theme.accent : Theme.bgElevated
+                            border.color: openBtnArea.containsMouse ? Theme.accent : Theme.borderSubtle
+                            border.width: 1
+                            scale: openBtnArea.pressed ? 0.96 : 1.0
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on scale { NumberAnimation { duration: 100 } }
 
-                            Text {
-                                text: model.appName.toUpperCase()
-                                font.family: Theme.fontMono
-                                font.pixelSize: 9
-                                font.bold: true
-                                font.letterSpacing: 0.8
-                                color: Theme.textMuted
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text {
+                                    text: "󰋩"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 12
+                                    color: openBtnArea.containsMouse ? Theme.accentFg : Theme.accent
+                                }
+                                Text {
+                                    text: I18n.shotActionOpen
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: openBtnArea.containsMouse ? Theme.accentFg : Theme.textPrimary
+                                }
                             }
 
-                            Text {
-                                text: "󰅖"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
-                                color: toastArea.containsMouse ? Theme.textSecondary : Theme.textMuted
+                            MouseArea {
+                                id: openBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    var p = model.imagePath;
+                                    var idx = index;
+                                    notifWindow.openScreenshotFile(p);
+                                    toastModel.remove(idx);
+                                }
                             }
                         }
 
-                        Text {
+                        Rectangle {
                             Layout.fillWidth: true
-                            text: model.summary
-                            font.family: Theme.fontSans
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.textPrimary
-                            wrapMode: Text.WordWrap
-                        }
+                            implicitHeight: 28
+                            radius: 8
+                            color: folderBtnArea.containsMouse ? Theme.bgHover : Theme.bgElevated
+                            border.color: folderBtnArea.containsMouse ? Theme.borderAccent : Theme.borderSubtle
+                            border.width: 1
+                            scale: folderBtnArea.pressed ? 0.96 : 1.0
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on scale { NumberAnimation { duration: 100 } }
 
-                        Text {
-                            visible: model.body !== ""
-                            Layout.fillWidth: true
-                            text: model.body
-                            font.family: Theme.fontSans
-                            font.pixelSize: 10
-                            color: Theme.textSecondary
-                            wrapMode: Text.WordWrap
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text {
+                                    text: "󰉋"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 12
+                                    color: folderBtnArea.containsMouse ? Theme.accent : Theme.textSecondary
+                                }
+                                Text {
+                                    text: I18n.shotActionFolder
+                                    font.family: Theme.fontSans
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: Theme.textPrimary
+                                }
+                            }
+
+                            MouseArea {
+                                id: folderBtnArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    var p = model.imagePath;
+                                    var idx = index;
+                                    notifWindow.openScreenshotFolder(p);
+                                    toastModel.remove(idx);
+                                }
+                            }
                         }
                     }
                 }
@@ -260,20 +465,12 @@ PanelWindow {
                     color: "#0fffffff"
 
                     Rectangle {
-                        width: parent.width * Math.max(0.0, model.ticks / 45.0)
+                        width: parent.width * Math.max(0.0, model.ticks / Math.max(1, model.maxTicks || 45))
                         height: parent.height
                         radius: 1
-                        color: "#55ffffff"
+                        color: toastCard.hasShot ? Theme.accent : "#55ffffff"
                         Behavior on width { NumberAnimation { duration: 110; easing.type: Easing.Linear } }
                     }
-                }
-
-                MouseArea {
-                    id: toastArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: toastModel.remove(index)
                 }
             }
         }
