@@ -1252,75 +1252,62 @@ PanelWindow {
                 }
 
                 // [F] Unified Action Dock Capsule (Notifications | Control Center | Power)
-                // Concentric inner pills (r=12 inside r=15) with unified thin-stroke iconography
+                // Concentric inner pills (28x24, r=12 inside r=15), calm monochrome at rest
                 Rectangle {
                     id: actionDockCapsule
                     implicitWidth: actionDockRow.implicitWidth + 6
                     implicitHeight: 30
                     radius: 15
                     color: Theme.bgCapsule
-                    border.color: (barWindow.notifCenterOpen || barWindow.controlCenterOpen || barWindow.powerMenuOpen || barWindow.dndActive || NotifState.unreadCount > 0)
+                    border.color: (barWindow.notifCenterOpen || barWindow.controlCenterOpen || barWindow.powerMenuOpen)
                         ? Theme.borderAccent
                         : Theme.borderGlass
                     border.width: 1
-                    Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    Behavior on border.color { ColorAnimation { duration: 180 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
 
                     RowLayout {
                         id: actionDockRow
                         anchors.centerIn: parent
                         spacing: 2
 
-                        // 1. Notification Center Bell (Outline + Unread Counter + Right-Click DND)
+                        // 1. Notification Center Bell (Fixed width + crisp 6px unread micro-dot + Right-Click DND)
                         Rectangle {
                             id: notifBtn
                             readonly property int unread: NotifState.unreadCount
-                            readonly property bool isActive: barWindow.notifCenterOpen || barWindow.dndActive
-                            implicitWidth: unread > 0 ? Math.max(40, notifBtnRow.implicitWidth + 10) : 28
+                            implicitWidth: 28
                             implicitHeight: 24
                             radius: 12
                             color: barWindow.notifCenterOpen
                                 ? Theme.accentDim
-                                : (barWindow.dndActive
-                                    ? (notifArea.containsMouse ? Theme.accentDim : Theme.accentSubtle)
-                                    : (notifArea.containsMouse ? Theme.bgHover : "transparent"))
-                            scale: notifArea.pressed ? 0.92 : 1.0
-                            Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                : (notifArea.containsMouse ? Theme.bgHover : "transparent")
+                            scale: notifArea.pressed ? 0.94 : 1.0
                             Behavior on color { ColorAnimation { duration: 140 } }
                             Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-                            RowLayout {
-                                id: notifBtnRow
+                            Text {
                                 anchors.centerIn: parent
-                                spacing: 4
+                                text: barWindow.dndActive ? "󰪑" : "󰂜"
+                                font.family: Theme.fontMono
+                                font.pixelSize: 13
+                                color: (barWindow.notifCenterOpen || barWindow.dndActive || notifArea.containsMouse)
+                                    ? Theme.accent
+                                    : Theme.textPrimary
+                                Behavior on color { ColorAnimation { duration: 140 } }
+                            }
 
-                                Text {
-                                    text: barWindow.dndActive ? "󰪑" : "󰂜"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 13
-                                    color: (barWindow.notifCenterOpen || barWindow.dndActive || notifBtn.unread > 0 || notifArea.containsMouse)
-                                        ? Theme.accent
-                                        : Theme.textPrimary
-                                    Behavior on color { ColorAnimation { duration: 140 } }
-                                }
-
-                                Rectangle {
-                                    visible: notifBtn.unread > 0
-                                    implicitHeight: 15
-                                    implicitWidth: Math.max(15, unreadBadgeTxt.implicitWidth + 6)
-                                    radius: 7.5
-                                    color: Theme.accent
-
-                                    Text {
-                                        id: unreadBadgeTxt
-                                        anchors.centerIn: parent
-                                        text: notifBtn.unread > 9 ? "9+" : String(notifBtn.unread)
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: 9
-                                        font.bold: true
-                                        color: Theme.accentFg
-                                    }
-                                }
+                            // Subtle iOS/macOS corner unread indicator dot (zero capsule stretching)
+                            Rectangle {
+                                visible: notifBtn.unread > 0
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 3
+                                anchors.rightMargin: 4
+                                width: 7
+                                height: 7
+                                radius: 3.5
+                                color: Theme.accent
+                                border.color: Theme.bgCapsule
+                                border.width: 1.5
                             }
 
                             MouseArea {
@@ -1352,7 +1339,7 @@ PanelWindow {
                             color: barWindow.controlCenterOpen
                                 ? Theme.accentDim
                                 : (ctrlArea.containsMouse ? Theme.bgHover : "transparent")
-                            scale: ctrlArea.pressed ? 0.92 : 1.0
+                            scale: ctrlArea.pressed ? 0.94 : 1.0
                             Behavior on color { ColorAnimation { duration: 140 } }
                             Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
@@ -1420,20 +1407,22 @@ PanelWindow {
                             implicitWidth: 1
                             implicitHeight: 12
                             radius: 0.5
-                            color: "#1effffff"
+                            color: "#1cffffff"
                             Layout.leftMargin: 1
                             Layout.rightMargin: 1
                         }
 
-                        // 3. Power / Session Action Pill (Accent tinted -> Solid Accent on Hover/Open)
+                        // 3. Power / Session Action Pill (Clean transparent at rest; soft crimson on Hover/Open)
                         Rectangle {
                             id: pwrBtn
                             readonly property bool isLit: barWindow.powerMenuOpen || pwrArea.containsMouse
                             implicitWidth: 28
                             implicitHeight: 24
                             radius: 12
-                            color: pwrBtn.isLit ? Theme.accent : Theme.accentSubtle
-                            scale: pwrArea.pressed ? 0.92 : 1.0
+                            color: pwrBtn.isLit
+                                ? Qt.rgba(Theme.statusCrit.r, Theme.statusCrit.g, Theme.statusCrit.b, 0.20)
+                                : "transparent"
+                            scale: pwrArea.pressed ? 0.94 : 1.0
                             Behavior on color { ColorAnimation { duration: 140 } }
                             Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
@@ -1442,7 +1431,7 @@ PanelWindow {
                                 text: "󰐥"
                                 font.family: Theme.fontMono
                                 font.pixelSize: 13
-                                color: pwrBtn.isLit ? Theme.accentFg : Theme.accent
+                                color: pwrBtn.isLit ? Theme.statusCrit : Theme.textPrimary
                                 Behavior on color { ColorAnimation { duration: 140 } }
                             }
 
