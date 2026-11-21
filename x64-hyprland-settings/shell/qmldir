@@ -24,3 +24,4 @@ PowerMenuPopup 1.0 PowerMenuPopup.qml
 DesktopSurface 1.0 DesktopSurface.qml
 DesktopContextMenu 1.0 DesktopContextMenu.qml
 ScreenshotOverlay 1.0 ScreenshotOverlay.qml
+TrayMenuPopup 1.0 TrayMenuPopup.qml

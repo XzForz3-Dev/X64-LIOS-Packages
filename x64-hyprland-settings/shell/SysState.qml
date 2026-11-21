@@ -404,10 +404,21 @@ QtObject {
 
     readonly property Timer _kbGuardTimer: Timer {
         id: kbGuardTimer
-        interval: 800
+        interval: 350
         repeat: false
         onTriggered: {
-            if (!kbProcess.running) kbProcess.running = true;
+            if (!kbSwitchProc.running && !kbProcess.running) kbProcess.running = true;
+        }
+    }
+
+    readonly property Timer _kbRefreshDebounce: Timer {
+        id: kbRefreshDebounce
+        interval: 120
+        repeat: false
+        onTriggered: {
+            if (!kbSwitchProc.running && !kbGuardTimer.running && !kbProcess.running) {
+                kbProcess.running = true;
+            }
         }
     }
 
@@ -417,7 +428,7 @@ QtObject {
         stdout: StdioCollector {
             id: kbCollector
             onStreamFinished: {
-                if (!kbCollector.text || kbGuardTimer.running) return;
+                if (!kbCollector.text || kbSwitchProc.running || kbGuardTimer.running) return;
                 var val = kbCollector.text.trim();
                 if (val.length > 0) sys.kbLayout = val;
             }
@@ -436,8 +447,7 @@ QtObject {
             }
         }
         onExited: {
-            kbGuardTimer.stop();
-            if (!kbProcess.running) kbProcess.running = true;
+            kbGuardTimer.restart();
         }
     }
 
@@ -462,7 +472,7 @@ QtObject {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            if (!kbProcess.running) kbProcess.running = true;
+            if (!kbSwitchProc.running && !kbGuardTimer.running && !kbProcess.running) kbProcess.running = true;
             if (!netProcess.running) netProcess.running = true;
         }
     }
@@ -473,7 +483,9 @@ QtObject {
             if (!event || !event.name) return;
             var name = String(event.name);
             if (name.indexOf("activelayout") !== -1 || name === "configreloaded") {
-                if (!kbProcess.running) kbProcess.running = true;
+                if (!kbSwitchProc.running && !kbGuardTimer.running) {
+                    kbRefreshDebounce.restart();
+                }
             }
             if (name === "fullscreen") {
                 var data = String(event.data || "").trim();

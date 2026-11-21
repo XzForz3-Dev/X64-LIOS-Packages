@@ -31,6 +31,7 @@ PanelWindow {
     signal toggleNetwork()
     signal toggleAudio(string tab)
     signal toggleNotifications()
+    signal openTrayMenu(var trayItem, real anchorX)
     signal brightnessChangedOsd(int val)
 
     property bool trayExpanded: false
@@ -1234,12 +1235,26 @@ PanelWindow {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
-                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                                                 onClicked: (mouse) => {
-                                                    if (mouse.button === Qt.LeftButton) {
-                                                        trayIconBtn.modelData.activate();
-                                                    } else if (mouse.button === Qt.RightButton && trayIconBtn.modelData.hasMenu) {
-                                                        trayIconBtn.modelData.secondaryActivate();
+                                                    var item = trayIconBtn.modelData;
+                                                    if (!item) return;
+                                                    if (mouse.button === Qt.RightButton) {
+                                                        if (item.hasMenu && item.menu) {
+                                                            var pos = trayIconBtn.mapToItem(null, trayIconBtn.width / 2, trayIconBtn.height);
+                                                            barWindow.openTrayMenu(item, pos.x);
+                                                        } else {
+                                                            item.secondaryActivate();
+                                                        }
+                                                    } else if (mouse.button === Qt.MiddleButton) {
+                                                        item.secondaryActivate();
+                                                    } else {
+                                                        if (item.onlyMenu && item.hasMenu && item.menu) {
+                                                            var posL = trayIconBtn.mapToItem(null, trayIconBtn.width / 2, trayIconBtn.height);
+                                                            barWindow.openTrayMenu(item, posL.x);
+                                                        } else {
+                                                            item.activate();
+                                                        }
                                                     }
                                                 }
                                             }

@@ -259,6 +259,12 @@ hl.layer_rule({
     blur  = false,
 })
 
+hl.layer_rule({
+    name  = "quickshell-tray-menu-noblur",
+    match = { namespace = "^quickshell-tray-menu$" },
+    blur  = false,
+})
+
 -- Hybrid Pro-Gaming: Automatic Immediate Tearing & Direct Scanout Bypass for Games
 hl.window_rule({
     name      = "x64-gaming-immediate",

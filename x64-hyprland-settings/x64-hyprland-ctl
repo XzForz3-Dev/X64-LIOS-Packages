@@ -1977,16 +1977,41 @@ keymap_to_code() {
     km_l=$(echo "$km" | tr '[:upper:]' '[:lower:]')
     case "$km_l" in
         *latin*|*latam*) echo "LA" ;;
-        *span*|*español*|*es*) echo "ES" ;;
-        *russ*|*русск*) echo "RU" ;;
-        *"united kingdom"*|*"(uk)"*) echo "UK" ;;
-        *germ*|*deutsch*|*"(de)"*) echo "DE" ;;
-        *fren*|*français*|*francais*|*"(fr)"*) echo "FR" ;;
-        *ital*|*"(it)"*) echo "IT" ;;
-        *port*|*"(pt)"*) echo "PT" ;;
+        *span*|*español*|*"(es)"*|es) echo "ES" ;;
+        *russ*|*русск*|*"(ru)"*|ru) echo "RU" ;;
+        *"united kingdom"*|*"(uk)"*|uk|gb) echo "UK" ;;
+        *germ*|*deutsch*|*"(de)"*|de) echo "DE" ;;
+        *fren*|*français*|*francais*|*"(fr)"*|fr) echo "FR" ;;
+        *ital*|*"(it)"*|it) echo "IT" ;;
+        *port*|*"(pt)"*|pt) echo "PT" ;;
         *engl*|*"united states"*|*"(us)"*|us) echo "US" ;;
         *) echo "${km:0:2}" | tr '[:lower:]' '[:upper:]' ;;
     esac
+}
+
+_kb_primary_info() {
+    local sig="$1"
+    HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl devices -j 2>/dev/null | jq -r '
+        def is_pseudo:
+            (.name // "" | test("video-bus|power-button|sleep-button|lid-switch|hotkey|wmi|acpi|audio|dac|headset|headphone|microphone|speaker|consumer-control|system-control|wireless-radio|webcam|camera|mouse|touchpad|trackpoint|pointer|button$"; "i"));
+        def kb_rank:
+            [
+                (if .main then 0 else 1 end),
+                (if (.name // "" | test("keyboard|kbd"; "i")) then 0 else 1 end)
+            ];
+        (.keyboards // []) as $all
+        | ($all | map(select((.active_keymap // "") != ""))) as $valid
+        | ($valid | map(select(is_pseudo | not))) as $real
+        | (if ($real | length) > 0 then $real else $valid end)
+        | sort_by(kb_rank)
+        | .[0] // {active_keymap: "Spanish", active_layout_index: 0, layout: "es,us"}
+        | [
+            (.active_keymap // "Spanish"),
+            ((.active_layout_index // 0) | tostring),
+            (.layout // "es,us")
+          ]
+        | @tsv
+    ' 2>/dev/null || printf 'Spanish\t0\tes,us\n'
 }
 
 cmd_keyboard() {
@@ -2020,21 +2045,28 @@ cmd_keyboard() {
             echo "${layout:-es}"
             ;;
         get)
-            local keymap
-            keymap=$(HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl devices -j 2>/dev/null | jq -r '
-                [
-                  .keyboards[]
-                  | select(.name | test("video|power|sleep|hotkey|button"; "i") | not)
-                  | select(.active_keymap != null and .active_keymap != "")
-                  | {main: .main, active_keymap: .active_keymap}
-                ]
-                | sort_by(.main | not)
-                | .[0].active_keymap // "Spanish"
-            ' 2>/dev/null || echo "Spanish")
-            keymap_to_code "$keymap"
+            local kb_info keymap
+            kb_info=$(_kb_primary_info "$sig")
+            keymap=$(printf '%s\n' "$kb_info" | cut -f1)
+            keymap_to_code "${keymap:-Spanish}"
             ;;
         next|toggle)
-            HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl switchxkblayout all next >/dev/null 2>&1 || true
+            # Compute deterministic target index from the real physical keyboard so
+            # switchxkblayout re-synchronizes every keyboard device (fixing phase desync
+            # caused by Alt+Shift or virtual HID devices like USB audio DACs).
+            local kb_info cur_idx layout_str count next_idx
+            kb_info=$(_kb_primary_info "$sig")
+            cur_idx=$(printf '%s\n' "$kb_info" | cut -f2)
+            layout_str=$(printf '%s\n' "$kb_info" | cut -f3)
+            [[ "$cur_idx" =~ ^[0-9]+$ ]] || cur_idx=0
+            if [ -n "$layout_str" ]; then
+                count=$(printf '%s\n' "$layout_str" | awk -F',' '{print NF}')
+            else
+                count=2
+            fi
+            [ "${count:-0}" -lt 2 ] && count=2
+            next_idx=$(( (cur_idx + 1) % count ))
+            HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl switchxkblayout all "$next_idx" >/dev/null 2>&1 || true
             cmd_keyboard get
             ;;
         set)
@@ -2060,7 +2092,7 @@ cmd_keyboard() {
             local hypr_conf="${HOME}/.config/hypr/hyprland.conf"
             if [ -f "$hypr_conf" ]; then
                 local curr_conf
-                curr_conf=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_conf" | awk -F'=' '{print $2}' | tr -d ' ' 2>/dev/null || echo "")
+                curr_conf=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_conf" | head -n1 | awk -F'=' '{print $2}' | tr -d ' ' 2>/dev/null || echo "")
                 if [ "$curr_conf" != "$pair" ]; then
                     sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/    kb_layout = ${pair}/" "$hypr_conf" 2>/dev/null || true
                     changed=1
@@ -2070,7 +2102,7 @@ cmd_keyboard() {
             local hypr_lua="${HOME}/.config/hypr/hyprland.lua"
             if [ -f "$hypr_lua" ]; then
                 local curr_lua
-                curr_lua=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_lua" | awk -F'=' '{print $2}' | tr -d ' "', 2>/dev/null || echo "")
+                curr_lua=$(grep -E '^[[:space:]]*kb_layout[[:space:]]*=' "$hypr_lua" | head -n1 | awk -F'=' '{print $2}' | sed 's/,[[:space:]]*$//' | tr -d ' "' 2>/dev/null || echo "")
                 if [ "$curr_lua" != "$pair" ]; then
                     sed -i "s/^[[:space:]]*kb_layout[[:space:]]*=.*/        kb_layout  = \"${pair}\",/" "$hypr_lua" 2>/dev/null || true
                     changed=1

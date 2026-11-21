@@ -61,6 +61,7 @@ ShellRoot {
         if (targetName !== "notifications") notifCenter.visible = false;
         if (targetName !== "power") powerMenu.visible = false;
         if (targetName !== "desktopContext") desktopContextMenu.visible = false;
+        if (targetName !== "trayMenu") trayMenuPopup.visible = false;
     }
 
     function toggleAnimatedPopup(popup, keyName, targetScreen) {
@@ -590,6 +591,11 @@ ShellRoot {
             onToggleNetwork: root.toggleAnimatedPopup(networkPopup, "network", modelData)
             onToggleAudio: (tab) => root.toggleAudioOnScreen(modelData, tab)
             onToggleNotifications: root.toggleAnimatedPopup(notifCenter, "notifications", modelData)
+            onOpenTrayMenu: (trayItem, anchorX) => {
+                root.targetScreenName = root._screenName(modelData);
+                root.closeAllExcept("trayMenu");
+                trayMenuPopup.openForTrayItem(trayItem, anchorX);
+            }
             onBrightnessChangedOsd: (val) => volumeOsd.showBrightness(val)
         }
     }
@@ -814,6 +820,14 @@ ShellRoot {
                 shotActionProc.running = true;
             }
         }
+    }
+
+    // Native Obsidian System Tray DBusMenu Popup (Right-Click on Tray Icons)
+    TrayMenuPopup {
+        id: trayMenuPopup
+        screen: root.activePopupScreen
+        visible: false
+        onCloseRequested: trayMenuPopup.visible = false
     }
 
     // Native Wayland Security Lockscreen (ext-session-lock-v1 + PAM)
