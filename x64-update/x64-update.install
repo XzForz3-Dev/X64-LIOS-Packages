@@ -8,6 +8,22 @@ post_install() {
 
 post_upgrade() {
     post_install
+
+    # Reiniciar en caliente las instancias activas de x64-update-tray en sesiones gráficas de usuario
+    if [ -d /run/systemd/system ]; then
+        pkill -f '^python3 /usr/bin/x64-update-tray' 2>/dev/null || true
+        sleep 0.2
+        for udir in /home/*; do
+            if [ -d "$udir" ]; then
+                local uid uname
+                uid=$(stat -c "%u" "$udir" 2>/dev/null || true)
+                uname=$(id -nu "$uid" 2>/dev/null || true)
+                if [ -n "$uid" ] && [ -n "$uname" ] && [ -S "/run/user/${uid}/bus" ]; then
+                    runuser -u "$uname" -- env XDG_RUNTIME_DIR="/run/user/${uid}" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${uid}/bus" systemctl --user restart x64-update-tray.service 2>/dev/null || true
+                fi
+            fi
+        done
+    fi
 }
 
 post_remove() {
