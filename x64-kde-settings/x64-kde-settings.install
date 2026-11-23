@@ -121,6 +121,11 @@ sync_kde_user_configs() {
             rm -f "$udir/.cache/icon-cache.kcache" "$udir/.cache/ksycoca6"* 2>/dev/null || true
             rm -rf "$udir/.cache/plasmashell" 2>/dev/null || true
 
+            # Retirar Discover de los pines del panel inferior en usuarios existentes (unificando todo en Shelly)
+            if [ -f "$udir/.config/plasma-org.kde.plasma.desktop-appletsrc" ]; then
+                sed -i 's|applications:org.kde.discover.desktop,||g; s|,applications:org.kde.discover.desktop||g' "$udir/.config/plasma-org.kde.plasma.desktop-appletsrc" 2>/dev/null || true
+            fi
+
             # Rehabilitar autoarranque de KDE Connect eliminando el override Hidden=true heredado
             if [ -f "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" ] && grep -q "Hidden=true" "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" 2>/dev/null; then
                 rm -f "$udir/.config/autostart/org.kde.kdeconnect.daemon.desktop" 2>/dev/null || true
@@ -154,6 +159,11 @@ sync_kde_user_configs() {
         if systemctl is-active --quiet ufw.service 2>/dev/null; then
             ufw reload >/dev/null 2>&1 || true
         fi
+    fi
+
+    # Si Discover sigue instalado de una versión anterior, desinstalarlo limpiamente en segundo plano en cuanto termine la transacción de pacman
+    if [ -d /run/systemd/system ] && pacman -Qq discover >/dev/null 2>&1; then
+        systemd-run --no-block /bin/sh -c 'while [ -f /var/lib/pacman/db.lck ]; do sleep 1; done; pacman -Rns --noconfirm discover >/dev/null 2>&1 || pacman -R --noconfirm discover >/dev/null 2>&1 || true' >/dev/null 2>&1 || true
     fi
 }
 

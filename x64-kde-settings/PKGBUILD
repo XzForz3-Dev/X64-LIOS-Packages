@@ -1,11 +1,11 @@
 pkgname=x64-kde-settings
 pkgver=1.0.0
-pkgrel=20
+pkgrel=21
 pkgdesc="Official X64 LIOS KDE Plasma 6 Desktop Configuration, Wallpapers and SDDM Theme"
 arch=('any')
 license=('GPL')
 install='x64-kde-settings.install'
-depends=('plasma-desktop' 'breeze' 'breeze-icons' 'breeze-gtk' 'xdg-user-dirs' 'sddm')
+depends=('plasma-desktop' 'breeze' 'breeze-icons' 'breeze-gtk' 'xdg-user-dirs' 'sddm' 'shelly' 'shelly-flatpak-backend')
 source=('01-monolith.jpg'
         '02-v3-carbon.jpg'
         '03-v2-shield.jpg'
@@ -48,9 +48,9 @@ sha256sums=('5212eb679eafcc0bda672c2fa19e5fc337d0cb2736b14c0e216fc73d2a0a692d'
             'e722a7c2a3abaa4cddd70e6465f0118ebb6f7047455769eb8beedaa2f2d2d677'
             '2f8fe8b9161cf3171a30b16c712d5ea5b11a8194a8de35ccd08065105bba19df'
             '3b53fc2fdfda52678e5d91bd5bfcfdc34c441f6ef9d5fc22593701c27dff86c3'
-            'c679c314c4a3c9ac0c24779ecbe29af6ccf410297e0ba3c6028b5aa0e2ebea0c'
+            '31e3aede05237fb6b6f8dc64a72dee513cab8f4775ff52dc82753e986c024989'
             '7f7588dda01f6269a52909483b21b995cc8a6d2a2b150a624630750da9bd2f43'
-            '99658f030f43af94a9a9793f9e3eaf25d578a2fe6253a50379b0050687a78b04'
+            'cb6c8bac288fa4392a27303c3da17bbe8f1fa790ca4535d406460ccb3d38e693'
             '954d38bde84410f4e6e5115bf67b4ff4a8fd80a8c660d8ea2e97d4944eb85362'
             '65a79abb162b952c3eac27e7d299a24b8350c24d0b2a14e5800a83333cdc9b58'
             'a2ebc57909a27c4fea95f56b92a0dccbf6df551a0c44697151d983777e45cb2a'
