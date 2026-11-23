@@ -129,7 +129,14 @@ def get_battery_status():
             st = f.read().strip()
     except Exception:
         st = "Full"
-    charging = st in ("Charging", "Full", "Not charging")
+    charging = st in ("Charging", "Full", "Not charging", "Unknown")
+    if pct <= 0 and charging:
+        return {
+            "hasBattery": False,
+            "batteryPct": 100,
+            "batteryCharging": True,
+            "batteryText": "Conectado a CA (Alimentación directa)"
+        }
     st_es = "Cargando (CA)" if st == "Charging" else ("Carga completa (CA)" if charging else "En batería")
     return {
         "hasBattery": True,
