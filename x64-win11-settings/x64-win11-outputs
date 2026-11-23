@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# X64 LIOS - Laptop-First Multi-Monitor Auto-Calibrator for labwc (wlroots)
+# Ensures internal laptop panel (LVDS/eDP) is on the left (0,0) and external HDMI/DP is on the right.
+
+for _ in $(seq 1 20); do
+    if wlr-randr >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.2
+done
+
+outputs=$(wlr-randr 2>/dev/null | awk '/^[A-Za-z0-9-]+ / {print $1}')
+internal=""
+externals=()
+
+for out in $outputs; do
+    case "$out" in
+        eDP*|LVDS*|DSI*) internal="$out" ;;
+        *) externals+=("$out") ;;
+    esac
+done
+
+if [ -n "$internal" ] && [ "${#externals[@]}" -gt 0 ]; then
+    wlr-randr --output "$internal" --on --pos 0,0 2>/dev/null || true
+    cur_x=1920
+    int_w=$(wlr-randr 2>/dev/null | awk -v o="$internal" '$1==o {f=1; next} f && /^[A-Za-z0-9-]+ / {f=0} f && /current/ {split($1,a,"x"); print a[1]; exit}')
+    [ -n "$int_w" ] && cur_x="$int_w"
+    for ext in "${externals[@]}"; do
+        wlr-randr --output "$ext" --on --pos "${cur_x},0" 2>/dev/null || true
+        cur_x=$((cur_x + 1920))
+    done
+fi

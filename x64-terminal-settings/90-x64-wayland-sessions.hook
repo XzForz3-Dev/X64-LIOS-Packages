@@ -3,8 +3,10 @@ Operation = Install
 Operation = Upgrade
 Type = Package
 Target = hyprland
+Target = labwc
+Target = x64-win11-settings
 
 [Action]
 Description = Sincronizando y blindando sesiones Wayland en SDDM según el escritorio X64 activo...
 When = PostTransaction
-Exec = /usr/bin/sh -c "if [ -d /usr/share/omarchy ]; then rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null; if [ -f /usr/share/wayland-sessions/hyprland.desktop ] && ! grep -q 'NoDisplay=true' /usr/share/wayland-sessions/hyprland.desktop; then echo 'NoDisplay=true' >> /usr/share/wayland-sessions/hyprland.desktop; fi; if [ -f /usr/share/omarchy/default/wayland-sessions/omarchy.desktop ]; then cp -f /usr/share/omarchy/default/wayland-sessions/omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop; fi; else sed -i '/NoDisplay=true/d' /usr/share/wayland-sessions/hyprland.desktop 2>/dev/null; rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/omarchy.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null; fi"
+Exec = /usr/bin/sh -c "if [ -d /usr/share/omarchy ]; then rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null; if [ -f /usr/share/wayland-sessions/hyprland.desktop ] && ! grep -q 'NoDisplay=true' /usr/share/wayland-sessions/hyprland.desktop; then echo 'NoDisplay=true' >> /usr/share/wayland-sessions/hyprland.desktop; fi; if [ -f /usr/share/omarchy/default/wayland-sessions/omarchy.desktop ]; then cp -f /usr/share/omarchy/default/wayland-sessions/omarchy.desktop /usr/share/wayland-sessions/omarchy.desktop; fi; else sed -i '/NoDisplay=true/d' /usr/share/wayland-sessions/hyprland.desktop 2>/dev/null; rm -f /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/omarchy.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null; fi; if [ -f /usr/share/wayland-sessions/x64-win11.desktop ] && [ -f /usr/share/wayland-sessions/labwc.desktop ]; then grep -q '^NoDisplay=true' /usr/share/wayland-sessions/labwc.desktop || echo 'NoDisplay=true' >> /usr/share/wayland-sessions/labwc.desktop; fi"

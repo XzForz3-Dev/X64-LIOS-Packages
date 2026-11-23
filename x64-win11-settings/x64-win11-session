@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# X64 LIOS - Official Windows 11 26H2 Wayland Session Launcher (labwc + Quickshell)
+
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP="labwc:wlroots"
+export XDG_SESSION_DESKTOP="x64-win11"
+export QT_QPA_PLATFORM="wayland;xcb"
+export QT_AUTO_SCREEN_SCALE_FACTOR=1
+export MOZ_ENABLE_WAYLAND=1
+export ELECTRON_OZONE_PLATFORM_HINT=auto
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+
+mkdir -p "${HOME}/.local/state/x64-win11" "${HOME}/.config/labwc"
+cp -f /etc/xdg/x64-win11/labwc/* "${HOME}/.config/labwc/" 2>/dev/null || true
+chmod +x "${HOME}/.config/labwc/autostart" 2>/dev/null || true
+
+exec /usr/bin/labwc -C "${HOME}/.config/labwc"

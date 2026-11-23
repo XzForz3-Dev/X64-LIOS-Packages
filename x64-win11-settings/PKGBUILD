@@ -1,0 +1,65 @@
+# Maintainer: X64 Studios <dev@x64lios.com>
+pkgname=x64-win11-settings
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Official X64 LIOS Windows 11 26H2 Fluent Dark Wayland Desktop Environment (labwc + Quickshell)"
+arch=('any')
+url="https://x64lios.com"
+license=('GPL3')
+install='x64-win11-settings.install'
+depends=(
+    'labwc'
+    'quickshell'
+    'wlr-randr'
+    'sddm'
+    'x64-sddm-theme'
+    'polkit-gnome'
+    'python-pyqt6'
+    'qt6-svg'
+    'xdg-desktop-portal-wlr'
+    'xdg-desktop-portal-gtk'
+    'wl-clipboard'
+    'grim'
+    'slurp'
+    'adw-gtk-theme'
+    'kitty'
+)
+
+package() {
+    # 1. Core executables
+    install -d "${pkgdir}/usr/bin"
+    install -m755 "${startdir}/x64-win11-session" "${pkgdir}/usr/bin/x64-win11-session"
+    install -m755 "${startdir}/x64-win11-ctl" "${pkgdir}/usr/bin/x64-win11-ctl"
+    install -m755 "${startdir}/x64-win11-outputs" "${pkgdir}/usr/bin/x64-win11-outputs"
+    install -m755 "${startdir}/x64-win11-app" "${pkgdir}/usr/bin/x64-win11-app"
+
+    # 2. Wayland session entry for SDDM
+    install -d "${pkgdir}/usr/share/wayland-sessions"
+    install -m644 "${startdir}/x64-win11.desktop" "${pkgdir}/usr/share/wayland-sessions/x64-win11.desktop"
+
+    # 3. labwc compositor configuration & Windows 11 Dark Titlebar theme
+    install -d "${pkgdir}/etc/xdg/x64-win11/labwc"
+    install -m644 "${startdir}/labwc-rc.xml" "${pkgdir}/etc/xdg/x64-win11/labwc/rc.xml"
+    install -m644 "${startdir}/labwc-themerc" "${pkgdir}/etc/xdg/x64-win11/labwc/themerc"
+    install -m755 "${startdir}/labwc-autostart" "${pkgdir}/etc/xdg/x64-win11/labwc/autostart"
+
+    install -d "${pkgdir}/usr/share/themes/X64-Win11-Dark/openbox-3"
+    install -m644 "${startdir}/labwc-themerc" "${pkgdir}/usr/share/themes/X64-Win11-Dark/openbox-3/themerc"
+    install -d "${pkgdir}/usr/share/themes/X64-Win11-Dark/labwc"
+    install -m644 "${startdir}/labwc-themerc" "${pkgdir}/usr/share/themes/X64-Win11-Dark/labwc/themerc"
+
+    # 4. Quickshell Windows 11 26H2 Layer-Shell & Native App QMLs
+    install -d "${pkgdir}/usr/share/x64-win11/shell"
+    install -m644 "${startdir}/shell/shell.qml" "${pkgdir}/usr/share/x64-win11/shell/shell.qml"
+    install -m644 "${startdir}/shell/Win11Shell.qml" "${pkgdir}/usr/share/x64-win11/shell/Win11Shell.qml"
+    install -m644 "${startdir}/shell/Win11ExplorerWindow.qml" "${pkgdir}/usr/share/x64-win11/shell/Win11ExplorerWindow.qml"
+    install -m644 "${startdir}/shell/Win11SettingsWindow.qml" "${pkgdir}/usr/share/x64-win11/shell/Win11SettingsWindow.qml"
+    install -m644 "${startdir}/shell/Win11TaskMgrWindow.qml" "${pkgdir}/usr/share/x64-win11/shell/Win11TaskMgrWindow.qml"
+
+    # 5. Official Windows 11 SVG Icons & 4K Bloom Wallpapers
+    install -d "${pkgdir}/usr/share/x64-win11/assets/icons"
+    cp -a "${startdir}/assets/icons/"* "${pkgdir}/usr/share/x64-win11/assets/icons/"
+
+    install -d "${pkgdir}/usr/share/x64-win11/assets/wallpapers"
+    cp -a "${startdir}/assets/wallpapers/"* "${pkgdir}/usr/share/x64-win11/assets/wallpapers/"
+}

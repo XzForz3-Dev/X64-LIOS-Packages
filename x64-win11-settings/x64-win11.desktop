@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=X64 Windows 11 Edition (26H2)
+Comment=Windows 11 26H2 Fluent Dark Wayland Desktop for X64 LIOS
+Exec=/usr/bin/x64-win11-session
+Type=Application
+DesktopNames=labwc;wlroots;X64-Win11

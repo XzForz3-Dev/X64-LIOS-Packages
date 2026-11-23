@@ -1,0 +1,41 @@
+# X64 LIOS - Windows 11 26H2 Dark Mica Window Decoration Theme for labwc
+border.width: 1
+padding.height: 4
+window.titlebar.height: 32
+
+window.active.title.bg.color: #202020
+window.inactive.title.bg.color: #181818
+
+window.active.label.text.color: #ffffff
+window.inactive.label.text.color: #8a8a8a
+window.label.text.justify: left
+
+window.active.border.color: #38ffffff
+window.inactive.border.color: #22ffffff
+
+window.active.button.unpressed.image.color: #e5e5e5
+window.inactive.button.unpressed.image.color: #777777
+window.active.button.hover.bg.color: #28ffffff
+window.active.button.close.hover.bg.color: #c42b1c
+window.active.button.close.hover.image.color: #ffffff
+window.button.width: 42
+window.button.height: 32
+window.button.spacing: 0
+window.button.hover.bg.corner-radius: 0
+
+window.active.shadow.size: 26
+window.inactive.shadow.size: 16
+window.active.shadow.color: #70000000
+window.inactive.shadow.color: #45000000
+
+menu.items.bg.color: #242424
+menu.items.text.color: #ffffff
+menu.items.active.bg.color: #0078d4
+menu.items.active.text.color: #ffffff
+menu.border.width: 1
+menu.border.color: #38ffffff
+
+osd.bg.color: #202020
+osd.border.color: #60cdff
+osd.border.width: 1
+osd.label.text.color: #ffffff

@@ -1,0 +1,47 @@
+post_install() {
+    # Hide stock labwc.desktop so SDDM only displays "X64 Windows 11 Edition (26H2)"
+    if [ -f /usr/share/wayland-sessions/labwc.desktop ]; then
+        if ! grep -q "^NoDisplay=true" /usr/share/wayland-sessions/labwc.desktop 2>/dev/null; then
+            echo "NoDisplay=true" >> /usr/share/wayland-sessions/labwc.desktop
+        fi
+    fi
+
+    # Pre-select x64-win11.desktop in SDDM state.conf
+    primary_user=$(awk -F: '$3 >= 1000 && $3 < 60000 {print $1; exit}' /etc/passwd)
+    mkdir -p /var/lib/sddm
+    cat << EOF > /var/lib/sddm/state.conf
+[Last]
+User=${primary_user:-x64}
+Session=/usr/share/wayland-sessions/x64-win11.desktop
+EOF
+
+    # Propagate labwc configuration and dark GTK settings to existing users
+    for udir in /home/*; do
+        if [ -d "$udir" ]; then
+            ug=$(stat -c "%u:%g" "$udir" 2>/dev/null || echo "1000:1000")
+            mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
+            cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
+            chmod 755 "$udir/.config/labwc/autostart" 2>/dev/null || true
+
+            for gver in gtk-3.0 gtk-4.0; do
+                cat << 'GTKINI' > "$udir/.config/$gver/settings.ini"
+[Settings]
+gtk-application-prefer-dark-theme=1
+gtk-theme-name=adw-gtk3-dark
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Sans 10
+GTKINI
+            done
+
+            chown -R "$ug" "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0" 2>/dev/null || true
+        fi
+    done
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    rm -f /usr/share/wayland-sessions/x64-win11.desktop 2>/dev/null || true
+}

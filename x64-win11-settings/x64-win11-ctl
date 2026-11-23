@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# X64 LIOS - Windows 11 26H2 Desktop Controller (IPC & Hotkeys)
+STATE_DIR="${HOME}/.local/state/x64-win11"
+mkdir -p "$STATE_DIR"
+CMD_FILE="${STATE_DIR}/cmd"
+
+case "$1" in
+    toggle-start| toggle-qs| toggle-calendar| toggle-run| lock)
+        printf '%s:%s\n' "$1" "$(date +%s%N)" > "${CMD_FILE}.tmp"
+        mv -f "${CMD_FILE}.tmp" "$CMD_FILE"
+        ;;
+    explorer)
+        setsid -f /usr/bin/x64-win11-app explorer "${2:-Este equipo}" >/dev/null 2>&1 &
+        ;;
+    settings)
+        setsid -f /usr/bin/x64-win11-app settings "${2:-Personalización (26H2)}" >/dev/null 2>&1 &
+        ;;
+    taskmgr)
+        setsid -f /usr/bin/x64-win11-app taskmgr >/dev/null 2>&1 &
+        ;;
+    volume)
+        case "$2" in
+            up)   wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+            down) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+            mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+        esac
+        ;;
+    brightness)
+        if command -v brightnessctl >/dev/null 2>&1; then
+            case "$2" in
+                up)   brightnessctl set +5% >/dev/null 2>&1 || true ;;
+                down) brightnessctl set 5%- >/dev/null 2>&1 || true ;;
+            esac
+        fi
+        ;;
+    screenshot)
+        SHOT_DIR="${HOME}/Imágenes/Capturas"
+        mkdir -p "$SHOT_DIR"
+        OUT="${SHOT_DIR}/Captura_$(date +%Y%m%d_%H%M%S).png"
+        if command -v slurp >/dev/null 2>&1 && command -v grim >/dev/null 2>&1; then
+            GEOM=$(slurp 2>/dev/null || true)
+            if [ -n "$GEOM" ]; then
+                grim -g "$GEOM" "$OUT" && wl-copy < "$OUT" 2>/dev/null || true
+                notify-send -a "Recortes de Windows 11" "Captura guardada y copiada" "$OUT" 2>/dev/null || true
+            fi
+        fi
+        ;;
+esac

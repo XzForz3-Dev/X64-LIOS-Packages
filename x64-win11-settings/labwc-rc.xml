@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>0</gap>
+    <adaptiveSync>yes</adaptiveSync>
+    <xwaylandPersistence>yes</xwaylandPersistence>
+  </core>
+
+  <theme>
+    <name>X64-Win11-Dark</name>
+    <cornerRadius>8</cornerRadius>
+    <font place="ActiveWindow">
+      <name>Sans</name>
+      <size>10</size>
+      <weight>Normal</weight>
+    </font>
+    <font place="InactiveWindow">
+      <name>Sans</name>
+      <size>10</size>
+      <weight>Normal</weight>
+    </font>
+    <dropShadows>yes</dropShadows>
+  </theme>
+
+  <placement>
+    <policy>center</policy>
+  </placement>
+
+  <snapping>
+    <range>18</range>
+    <topMaximize>yes</topMaximize>
+    <notifyClient>always</notifyClient>
+  </snapping>
+
+  <keyboard>
+    <default />
+    <!-- Windows 11 Authentic Shortcuts -->
+    <keybind key="Super_L" onRelease="yes">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-start" />
+    </keybind>
+    <keybind key="W-space">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-start" />
+    </keybind>
+    <keybind key="W-e">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl explorer" />
+    </keybind>
+    <keybind key="W-i">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl settings" />
+    </keybind>
+    <keybind key="W-r">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-run" />
+    </keybind>
+    <keybind key="W-a">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-qs" />
+    </keybind>
+    <keybind key="W-n">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-calendar" />
+    </keybind>
+    <keybind key="W-l">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl lock" />
+    </keybind>
+    <keybind key="W-d">
+      <action name="ToggleShowDesktop" />
+    </keybind>
+    <keybind key="W-Return">
+      <action name="Execute" command="kitty" />
+    </keybind>
+    <keybind key="C-S-Escape">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl taskmgr" />
+    </keybind>
+    <keybind key="W-S-s">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl screenshot" />
+    </keybind>
+    <keybind key="Print">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl screenshot" />
+    </keybind>
+    <keybind key="A-F4">
+      <action name="Close" />
+    </keybind>
+    <keybind key="W-q">
+      <action name="Close" />
+    </keybind>
+    <keybind key="A-Tab">
+      <action name="NextWindow" />
+    </keybind>
+    <keybind key="W-Up">
+      <action name="ToggleMaximize" />
+    </keybind>
+    <keybind key="W-Down">
+      <action name="Iconify" />
+    </keybind>
+    <keybind key="W-Left">
+      <action name="SnapToEdge" direction="left" />
+    </keybind>
+    <keybind key="W-Right">
+      <action name="SnapToEdge" direction="right" />
+    </keybind>
+    <keybind key="XF86AudioRaiseVolume">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl volume up" />
+    </keybind>
+    <keybind key="XF86AudioLowerVolume">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl volume down" />
+    </keybind>
+    <keybind key="XF86AudioMute">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl volume mute" />
+    </keybind>
+    <keybind key="XF86MonBrightnessUp">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl brightness up" />
+    </keybind>
+    <keybind key="XF86MonBrightnessDown">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl brightness down" />
+    </keybind>
+  </keyboard>
+
+  <mouse>
+    <default />
+    <context name="TitleBar">
+      <mousebind button="Left" action="Drag">
+        <action name="Move" />
+      </mousebind>
+      <mousebind button="Left" action="DoubleClick">
+        <action name="ToggleMaximize" />
+      </mousebind>
+    </context>
+  </mouse>
+</labwc_config>

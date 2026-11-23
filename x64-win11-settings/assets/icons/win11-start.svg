@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="tl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#62e6ff"/>
+      <stop offset="100%" stop-color="#28b3f7"/>
+    </linearGradient>
+    <linearGradient id="tr" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3cc4fc"/>
+      <stop offset="100%" stop-color="#0d8ce8"/>
+    </linearGradient>
+    <linearGradient id="bl" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2bb2f7"/>
+      <stop offset="100%" stop-color="#0677d4"/>
+    </linearGradient>
+    <linearGradient id="br" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#138ee8"/>
+      <stop offset="100%" stop-color="#005fb8"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="16.5" height="16.5" rx="2.2" fill="url(#tl)"/>
+  <rect x="25.5" y="6" width="16.5" height="16.5" rx="2.2" fill="url(#tr)"/>
+  <rect x="6" y="25.5" width="16.5" height="16.5" rx="2.2" fill="url(#bl)"/>
+  <rect x="25.5" y="25.5" width="16.5" height="16.5" rx="2.2" fill="url(#br)"/>
+</svg>
