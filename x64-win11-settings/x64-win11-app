@@ -148,7 +148,7 @@ def get_battery_status():
 
 def detect_default_browser():
     candidates = [
-        ("chromium", "Navegador Web", "edge.svg"),
+        ("chromium", "Chromium", "chromium.png"),
         ("google-chrome-stable", "Google Chrome", "chrome.svg"),
         ("brave", "Brave Browser", "edge.svg"),
         ("firefox", "Firefox Web", "edge.svg"),
@@ -159,7 +159,7 @@ def detect_default_browser():
     for bin_name, label, icon in candidates:
         if shutil.which(bin_name):
             return bin_name, label, icon
-    return "xdg-open https://x64lios.com", "Navegador Web", "edge.svg"
+    return "xdg-open https://x64lios.com", "Chromium", "chromium.png"
 
 
 def resolve_app_icon_url(icon_name):
@@ -174,7 +174,7 @@ def resolve_app_icon_url(icon_name):
     builtin_map = {
         "antigravity-ide": "antigravity.png",
         "antigravity": "antigravity.png",
-        "chromium": "edge.svg",
+        "chromium": "chromium.png",
         "google-chrome": "chrome.svg",
         "firefox": "edge.svg",
         "brave": "edge.svg",

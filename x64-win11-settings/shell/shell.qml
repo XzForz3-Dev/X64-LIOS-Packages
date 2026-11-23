@@ -50,14 +50,14 @@ ShellRoot {
         { title: "Este equipo",            iconUrl: shellRoot.assetDir + "thispc.svg",      cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
         { title: "Papelera de\nreciclaje", iconUrl: shellRoot.assetDir + "trash.svg",       cmd: "/usr/bin/x64-win11-app explorer 'Papelera'" },
         { title: "Carpeta\npersonal",      iconUrl: shellRoot.assetDir + "folder-home.svg", cmd: "/usr/bin/x64-win11-app explorer 'Inicio'" },
-        { title: "Navegador\nWeb",         iconUrl: shellRoot.assetDir + "edge.svg",        cmd: "chromium" },
+        { title: "Chromium",               iconUrl: shellRoot.assetDir + "chromium.png",    cmd: "chromium" },
         { title: "Tienda\nShelly",         iconUrl: shellRoot.assetDir + "store.svg",       cmd: "shelly" },
         { title: "X64 Hello",              iconUrl: shellRoot.assetDir + "x64lios.png",     cmd: "x64-hello" },
         { title: "Configuración\n26H2",    iconUrl: shellRoot.assetDir + "settings.svg",    cmd: "/usr/bin/x64-win11-app settings" }
     ]
     property var taskbarPinned: [
         { id: "explorer", match: "explorer",  iconUrl: shellRoot.assetDir + "explorer.svg", cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-        { id: "browser",  match: "chromium",  iconUrl: shellRoot.assetDir + "edge.svg",     cmd: "chromium" },
+        { id: "browser",  match: "chromium",  iconUrl: shellRoot.assetDir + "chromium.png", cmd: "chromium" },
         { id: "shelly",   match: "shelly",    iconUrl: shellRoot.assetDir + "store.svg",    cmd: "shelly" },
         { id: "kitty",    match: "kitty",     iconUrl: shellRoot.assetDir + "terminal.svg", cmd: "kitty" },
         { id: "x64hello", match: "x64-hello", iconUrl: shellRoot.assetDir + "x64lios.png",  cmd: "x64-hello" },
