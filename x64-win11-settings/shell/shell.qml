@@ -39,6 +39,36 @@ ShellRoot {
     property string kbLayout: "ES"
     property string searchQuery: ""
 
+    // Universal Dynamic System & User State (Synchronized from ~/.local/state/x64-win11/sysinfo.json)
+    property string userName: "Usuario"
+    property string hostName: "x64-lios"
+    property bool hasBattery: false
+    property int batteryPct: 100
+    property string batteryText: "Conectado a CA"
+    property bool kdeConnectInstalled: true
+    property var desktopIcons: [
+        { title: "Este equipo",            iconUrl: shellRoot.assetDir + "thispc.svg",      cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
+        { title: "Papelera de\nreciclaje", iconUrl: shellRoot.assetDir + "trash.svg",       cmd: "/usr/bin/x64-win11-app explorer 'Papelera'" },
+        { title: "Carpeta\npersonal",      iconUrl: shellRoot.assetDir + "folder-home.svg", cmd: "/usr/bin/x64-win11-app explorer 'Inicio'" },
+        { title: "Navegador\nWeb",         iconUrl: shellRoot.assetDir + "edge.svg",        cmd: "chromium" },
+        { title: "Tienda\nShelly",         iconUrl: shellRoot.assetDir + "store.svg",       cmd: "shelly" },
+        { title: "X64 Hello",              iconUrl: shellRoot.assetDir + "x64lios.png",     cmd: "x64-hello" },
+        { title: "Configuración\n26H2",    iconUrl: shellRoot.assetDir + "settings.svg",    cmd: "/usr/bin/x64-win11-app settings" }
+    ]
+    property var taskbarPinned: [
+        { id: "explorer", match: "explorer",  iconUrl: shellRoot.assetDir + "explorer.svg", cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
+        { id: "browser",  match: "chromium",  iconUrl: shellRoot.assetDir + "edge.svg",     cmd: "chromium" },
+        { id: "shelly",   match: "shelly",    iconUrl: shellRoot.assetDir + "store.svg",    cmd: "shelly" },
+        { id: "kitty",    match: "kitty",     iconUrl: shellRoot.assetDir + "terminal.svg", cmd: "kitty" },
+        { id: "x64hello", match: "x64-hello", iconUrl: shellRoot.assetDir + "x64lios.png",  cmd: "x64-hello" },
+        { id: "settings", match: "settings",  iconUrl: shellRoot.assetDir + "settings.svg", cmd: "/usr/bin/x64-win11-app settings" }
+    ]
+    property var startPinned: []
+    property var allApps: []
+    property var startCategories: []
+    property string calendarHeader: Qt.formatDate(new Date(), "MMMM 'de' yyyy")
+    property var calendarCells: []
+
     // Quick Settings state
     property string qsSubView: "main"
     property bool qsWifi: true
@@ -75,10 +105,10 @@ ShellRoot {
         Quickshell.execDetached(["sh", "-c", cmd]);
     }
 
-    // Poll IPC Command File & Config JSON (Lightweight 180ms FileView / Process)
+    // Poll IPC Command File, Config JSON & Dynamic SysInfo JSON
     Process {
         id: statePoller
-        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'"]
+        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'; echo '---SYS---'; cat ~/.local/state/x64-win11/sysinfo.json 2>/dev/null || echo '{}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var raw = text || "";
@@ -112,8 +142,9 @@ ShellRoot {
                     shellRoot.lastCmdToken = cmdLine;
                 }
                 if (parts.length > 1) {
+                    var subParts = parts[1].split("---SYS---");
                     try {
-                        var cfg = JSON.parse(parts[1].trim());
+                        var cfg = JSON.parse((subParts[0] || "{}").trim());
                         if (cfg.taskbarCompact !== undefined) shellRoot.taskbarCompact = Boolean(cfg.taskbarCompact);
                         if (cfg.taskbarLeftAlign !== undefined) shellRoot.taskbarLeftAlign = Boolean(cfg.taskbarLeftAlign);
                         if (cfg.showRecommended !== undefined) shellRoot.showRecommended = Boolean(cfg.showRecommended);
@@ -121,6 +152,27 @@ ShellRoot {
                         if (cfg.showBatteryPct !== undefined) shellRoot.showBatteryPct = Boolean(cfg.showBatteryPct);
                         if (cfg.wallpaperMode !== undefined) shellRoot.wallpaperMode = Number(cfg.wallpaperMode);
                     } catch (e) {}
+
+                    if (subParts.length > 1) {
+                        try {
+                            var sys = JSON.parse((subParts[1] || "{}").trim());
+                            if (sys.user) shellRoot.userName = sys.user;
+                            if (sys.hostname) shellRoot.hostName = sys.hostname;
+                            if (sys.hasBattery !== undefined) shellRoot.hasBattery = Boolean(sys.hasBattery);
+                            if (sys.batteryPct !== undefined) shellRoot.batteryPct = Number(sys.batteryPct);
+                            if (sys.batteryText) shellRoot.batteryText = sys.batteryText;
+                            if (sys.kdeConnectInstalled !== undefined) shellRoot.kdeConnectInstalled = Boolean(sys.kdeConnectInstalled);
+                            if (sys.desktopIcons && sys.desktopIcons.length > 0) shellRoot.desktopIcons = sys.desktopIcons;
+                            if (sys.taskbarPinned && sys.taskbarPinned.length > 0) shellRoot.taskbarPinned = sys.taskbarPinned;
+                            if (sys.startPinned && sys.startPinned.length > 0) shellRoot.startPinned = sys.startPinned;
+                            if (sys.allApps && sys.allApps.length > 0) shellRoot.allApps = sys.allApps;
+                            if (sys.categories && sys.categories.length > 0) shellRoot.startCategories = sys.categories;
+                            if (sys.calendar) {
+                                if (sys.calendar.header) shellRoot.calendarHeader = sys.calendar.header;
+                                if (sys.calendar.cells) shellRoot.calendarCells = sys.calendar.cells;
+                            }
+                        } catch (e2) {}
+                    }
                 }
             }
         }
@@ -135,14 +187,27 @@ ShellRoot {
         }
     }
 
-    // Reusable SVG Loader
+    // Refresh dynamic hardware/battery/apps profile every 15s
+    Timer {
+        interval: 15000
+        running: true
+        repeat: true
+        onTriggered: Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "sysinfo"])
+    }
+
+    Component.onCompleted: {
+        Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "sysinfo"]);
+    }
+
+    // Reusable SVG/PNG Loader (supports both relative iconFile and full iconUrl)
     component WinSvg : Image {
         property string iconFile: "explorer.svg"
+        property string iconUrl: ""
         Layout.preferredWidth: width
         Layout.preferredHeight: height
         Layout.maximumWidth: width
         Layout.maximumHeight: height
-        source: shellRoot.assetDir + iconFile
+        source: iconUrl !== "" ? iconUrl : (iconFile.indexOf("file://") === 0 ? iconFile : (shellRoot.assetDir + iconFile))
         sourceSize.width: 96
         sourceSize.height: 96
         fillMode: Image.PreserveAspectFit
@@ -232,7 +297,7 @@ ShellRoot {
                 }
             }
 
-            // Desktop Icons Grid (Primary Monitor)
+            // Universal Desktop Icons Grid (Primary Monitor)
             Column {
                 visible: desktopWin.isPrimary
                 x: 12
@@ -240,16 +305,7 @@ ShellRoot {
                 spacing: 6
 
                 Repeater {
-                    model: [
-                        { title: "Este equipo",            icon: "thispc.svg",      cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                        { title: "Papelera de\nreciclaje", icon: "trash-full.svg",  cmd: "/usr/bin/x64-win11-app explorer 'Escritorio'" },
-                        { title: "Cristian",               icon: "folder-home.svg", cmd: "/usr/bin/x64-win11-app explorer 'Inicio'" },
-                        { title: "Antigravity\nIDE",       icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
-                        { title: "Microsoft Edge\n/ Web",  icon: "edge.svg",        cmd: "chromium" },
-                        { title: "Tienda\nShelly",         icon: "store.svg",       cmd: "shelly" },
-                        { title: "X64 Hello",              icon: "x64lios.png",     cmd: "x64-hello" },
-                        { title: "Configuración\n26H2",    icon: "settings.svg",    cmd: "/usr/bin/x64-win11-app settings" }
-                    ]
+                    model: shellRoot.desktopIcons
 
                     delegate: Rectangle {
                         width: 82
@@ -267,7 +323,7 @@ ShellRoot {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 width: 42
                                 height: 42
-                                iconFile: modelData.icon
+                                iconUrl: modelData.iconUrl || ""
                             }
 
                             Text {
@@ -423,17 +479,9 @@ ShellRoot {
                     }
                 }
 
-                // Pinned Applications
+                // Dynamic Pinned Applications (only apps installed on this machine)
                 Repeater {
-                    model: [
-                        { id: "explorer",    match: "explorer",    icon: "explorer.svg",    cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                        { id: "chromium",    match: "chromium",    icon: "edge.svg",        cmd: "chromium" },
-                        { id: "antigravity", match: "antigravity", icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
-                        { id: "shelly",      match: "shelly",      icon: "store.svg",       cmd: "shelly" },
-                        { id: "kitty",       match: "kitty",       icon: "terminal.svg",    cmd: "kitty" },
-                        { id: "x64hello",    match: "x64-hello",   icon: "x64lios.png",     cmd: "x64-hello" },
-                        { id: "settings",    match: "settings",    icon: "settings.svg",    cmd: "/usr/bin/x64-win11-app settings" }
-                    ]
+                    model: shellRoot.taskbarPinned
 
                     delegate: Rectangle {
                         id: tbAppBtn
@@ -461,7 +509,7 @@ ShellRoot {
                             anchors.centerIn: parent
                             width: shellRoot.taskbarCompact ? 21 : 25
                             height: shellRoot.taskbarCompact ? 21 : 25
-                            iconFile: modelData.icon
+                            iconUrl: modelData.iconUrl || ""
                             scale: tbHov.pressed ? 0.85 : 1.0
                             Behavior on scale { NumberAnimation { duration: 100 } }
                         }
@@ -501,14 +549,15 @@ ShellRoot {
                 Repeater {
                     model: {
                         var list = taskbarWin.toplevels;
-                        var pinnedKeys = ["explorer", "chromium", "antigravity", "shelly", "kitty", "x64-hello", "settings"];
+                        var pinnedList = shellRoot.taskbarPinned;
                         var extra = [];
                         for (var i = 0; i < list.length; i++) {
                             var app = (list[i].appId || "").toLowerCase();
                             var ttl = (list[i].title || "").toLowerCase();
                             var isPinned = false;
-                            for (var j = 0; j < pinnedKeys.length; j++) {
-                                if (app.indexOf(pinnedKeys[j]) !== -1 || ttl.indexOf(pinnedKeys[j]) !== -1) {
+                            for (var j = 0; j < pinnedList.length; j++) {
+                                var mk = (pinnedList[j].match || "").toLowerCase();
+                                if (mk !== "" && (app.indexOf(mk) !== -1 || ttl.indexOf(mk) !== -1)) {
                                     isPinned = true;
                                     break;
                                 }
@@ -531,6 +580,7 @@ ShellRoot {
                             var a = ((modelData ? modelData.appId : "") || "").toLowerCase();
                             var t = ((modelData ? modelData.title : "") || "").toLowerCase();
                             if (a.indexOf("taskmgr") !== -1 || t.indexOf("tareas") !== -1) return "thispc.svg";
+                            if (a.indexOf("antigravity") !== -1) return "antigravity.png";
                             if (a.indexOf("discord") !== -1) return "discord.svg";
                             if (a.indexOf("steam") !== -1) return "steam.svg";
                             if (a.indexOf("calc") !== -1) return "calculator.svg";
@@ -620,7 +670,7 @@ ShellRoot {
                     }
                 }
 
-                // Unified Wi-Fi + Volume + 26H2 Color Battery & % Button
+                // Unified Wi-Fi + Volume + Dynamic Battery (only shown on laptops with a real battery!)
                 Rectangle {
                     width: qsTrayRow.implicitWidth + 16
                     height: shellRoot.taskbarCompact ? 32 : 38
@@ -634,14 +684,15 @@ ShellRoot {
                         WinSvg { anchors.verticalCenter: parent.verticalCenter; width: 15; height: 15; iconFile: "am-wireless-symbolic.svg" }
                         WinSvg { anchors.verticalCenter: parent.verticalCenter; width: 15; height: 15; iconFile: "audio-volume-high-symbolic.svg" }
                         WinSvg {
+                            visible: shellRoot.hasBattery
                             anchors.verticalCenter: parent.verticalCenter
                             width: 19; height: 15
-                            iconFile: shellRoot.qsBatterySaver ? "win11-battery-yellow.svg" : "win11-battery-green.svg"
+                            iconFile: (shellRoot.qsBatterySaver || shellRoot.batteryPct <= 35) ? "win11-battery-yellow.svg" : "win11-battery-green.svg"
                         }
                         Text {
-                            visible: shellRoot.showBatteryPct
+                            visible: shellRoot.hasBattery && shellRoot.showBatteryPct
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "100%"
+                            text: shellRoot.batteryPct + "%"
                             color: "#ffffff"
                             font.pixelSize: 11
                         }
@@ -759,7 +810,7 @@ ShellRoot {
             x: shellRoot.ctxX
             y: shellRoot.ctxY
             width: 280
-            height: 344
+            height: 312
             radius: 8
             color: "#f4252525"
             border.color: "#38ffffff"
@@ -770,16 +821,15 @@ ShellRoot {
 
                 Repeater {
                     model: [
-                        { icon: "explorer.svg",            label: "Abrir Explorador (Win + E)", cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                        { icon: "view-refresh-symbolic.svg", label: "Actualizar escritorio",    cmd: "" },
-                        { icon: "thispc.svg",              label: "Administrador de tareas",    cmd: "/usr/bin/x64-win11-app taskmgr" },
-                        { icon: "settings.svg",            label: "Configuración (Win + I)",    cmd: "/usr/bin/x64-win11-app settings" },
-                        { icon: "windows.svg",             label: "Personalizar (26H2)",        cmd: "/usr/bin/x64-win11-app settings 'Personalización (26H2)'" },
-                        { icon: "folder-images.svg",       label: "Cambiar fondo 4K Bloom",     cmd: "__wp__" },
-                        { icon: "terminal.svg",            label: "Abrir en Terminal (Kitty)",  cmd: "kitty" },
-                        { icon: "antigravity.png",         label: "Abrir Antigravity IDE",      cmd: "/usr/bin/antigravity-ide" },
-                        { icon: "terminal.svg",            label: "Ejecutar (Win + R 26H2)",    cmd: "__run__" },
-                        { icon: "x64lios.png",             label: "Abrir X64 Hello",            cmd: "x64-hello" }
+                        { icon: "explorer.svg",              label: "Abrir Explorador (Win + E)", cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
+                        { icon: "view-refresh-symbolic.svg", label: "Actualizar escritorio",      cmd: "__refresh__" },
+                        { icon: "thispc.svg",                label: "Administrador de tareas",    cmd: "/usr/bin/x64-win11-app taskmgr" },
+                        { icon: "settings.svg",              label: "Configuración (Win + I)",    cmd: "/usr/bin/x64-win11-app settings" },
+                        { icon: "windows.svg",               label: "Personalizar (26H2)",        cmd: "/usr/bin/x64-win11-app settings 'Personalización (26H2)'" },
+                        { icon: "folder-images.svg",         label: "Cambiar fondo 4K Bloom",     cmd: "__wp__" },
+                        { icon: "terminal.svg",              label: "Abrir en Terminal (Kitty)",  cmd: "kitty" },
+                        { icon: "terminal.svg",              label: "Ejecutar (Win + R 26H2)",    cmd: "__run__" },
+                        { icon: "x64lios.png",               label: "Abrir X64 Hello",            cmd: "x64-hello" }
                     ]
 
                     delegate: Rectangle {
@@ -802,6 +852,8 @@ ShellRoot {
                                     shellRoot.saveConfigKey("wallpaperMode", String(nextWp));
                                 } else if (modelData.cmd === "__run__") {
                                     shellRoot.runDialogOpen = true;
+                                } else if (modelData.cmd === "__refresh__") {
+                                    Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "sysinfo"]);
                                 } else if (modelData.cmd !== "") {
                                     shellRoot.spawnCmd(modelData.cmd);
                                 }
@@ -906,9 +958,22 @@ ShellRoot {
                                         Layout.fillWidth: true; color: "#ffffff"; font.pixelSize: 13
                                         text: shellRoot.searchQuery
                                         onTextChanged: shellRoot.searchQuery = text
+                                        onAccepted: {
+                                            var q = text.trim().toLowerCase();
+                                            if (q !== "") {
+                                                var apps = shellRoot.allApps;
+                                                for (var i = 0; i < apps.length; i++) {
+                                                    if (apps[i].name.toLowerCase().indexOf(q) !== -1) {
+                                                        shellRoot.startOpen = false;
+                                                        shellRoot.spawnCmd(apps[i].cmd);
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        }
                                         Text {
                                             visible: startSearchInput.text === ""
-                                            text: "Buscar aplicaciones, configuración y documentos"
+                                            text: "Buscar aplicaciones instaladas, configuración y documentos"
                                             color: "#9e9e9e"; font.pixelSize: 13
                                         }
                                     }
@@ -947,29 +1012,11 @@ ShellRoot {
                                     }
                                 }
 
+                                // Dynamic Pinned Apps Grid
                                 Grid {
                                     width: 584; columns: 6; rowSpacing: 10; columnSpacing: 8
                                     Repeater {
-                                        model: [
-                                            { name: "Explorador",    icon: "explorer.svg",        cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                                            { name: "Antigravity",   icon: "antigravity.png",     cmd: "/usr/bin/antigravity-ide" },
-                                            { name: "Edge / Web",    icon: "edge.svg",            cmd: "chromium" },
-                                            { name: "Tienda Shelly", icon: "store.svg",           cmd: "shelly" },
-                                            { name: "Configuración", icon: "settings.svg",        cmd: "/usr/bin/x64-win11-app settings" },
-                                            { name: "X64 Hello",     icon: "x64lios.png",         cmd: "x64-hello" },
-                                            { name: "X64 Update",    icon: "update.svg",          cmd: "x64-update" },
-                                            { name: "Terminal",      icon: "terminal.svg",        cmd: "kitty" },
-                                            { name: "Admin. tareas", icon: "thispc.svg",          cmd: "/usr/bin/x64-win11-app taskmgr" },
-                                            { name: "Steam",         icon: "steam.svg",           cmd: "steam" },
-                                            { name: "Discord",       icon: "discord.svg",         cmd: "discord" },
-                                            { name: "Calculadora",   icon: "calculator.svg",      cmd: "gnome-calculator" },
-                                            { name: "Este equipo",   icon: "thispc.svg",          cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                                            { name: "Discos NVMe",   icon: "drive-c.svg",         cmd: "gnome-disks" },
-                                            { name: "Descargas",     icon: "folder-download.svg", cmd: "/usr/bin/x64-win11-app explorer 'Descargas'" },
-                                            { name: "Documentos",    icon: "folder-documents.svg",cmd: "/usr/bin/x64-win11-app explorer 'Documentos'" },
-                                            { name: "Imágenes",      icon: "folder-images.svg",   cmd: "/usr/bin/x64-win11-app explorer 'Imágenes'" },
-                                            { name: "Consola X64",   icon: "x64lios.png",         cmd: "kitty -e x64-dashboard" }
-                                        ]
+                                        model: shellRoot.startPinned
 
                                         delegate: Rectangle {
                                             visible: shellRoot.searchQuery.trim() === "" || modelData.name.toLowerCase().indexOf(shellRoot.searchQuery.trim().toLowerCase()) !== -1
@@ -977,7 +1024,7 @@ ShellRoot {
                                             color: appHov.containsMouse ? "#28ffffff" : "transparent"
                                             Column {
                                                 anchors.centerIn: parent; spacing: 6
-                                                WinSvg { anchors.horizontalCenter: parent.horizontalCenter; width: 34; height: 34; iconFile: modelData.icon }
+                                                WinSvg { anchors.horizontalCenter: parent.horizontalCenter; width: 34; height: 34; iconUrl: modelData.iconUrl || "" }
                                                 Text {
                                                     anchors.horizontalCenter: parent.horizontalCenter
                                                     width: 84; horizontalAlignment: Text.AlignHCenter
@@ -998,7 +1045,7 @@ ShellRoot {
                                 // Unified "Todas" Section with 26H2 3-View Switcher
                                 RowLayout {
                                     width: 584
-                                    Text { text: "Todas"; color: "#ffffff"; font.pixelSize: 14; font.bold: true }
+                                    Text { text: "Todas (" + shellRoot.allApps.length + " instaladas)"; color: "#ffffff"; font.pixelSize: 14; font.bold: true }
                                     Item { Layout.fillWidth: true }
                                     Row {
                                         spacing: 4
@@ -1019,24 +1066,12 @@ ShellRoot {
                                     }
                                 }
 
+                                // View 1: Categories
                                 Grid {
                                     width: 584; columns: 2; rowSpacing: 12; columnSpacing: 14
-                                    visible: shellRoot.startAllViewMode === "categories"
+                                    visible: shellRoot.startAllViewMode === "categories" && shellRoot.searchQuery.trim() === ""
                                     Repeater {
-                                        model: [
-                                            { cat: "Sistema y Motor X64", items: [
-                                                { name: "X64 Hello",     icon: "x64lios.png",  cmd: "x64-hello" },
-                                                { name: "Configuración", icon: "settings.svg", cmd: "/usr/bin/x64-win11-app settings" },
-                                                { name: "Terminal",      icon: "terminal.svg", cmd: "kitty" },
-                                                { name: "Tienda Shelly", icon: "store.svg",    cmd: "shelly" }
-                                            ]},
-                                            { cat: "Desarrollo y Juegos", items: [
-                                                { name: "Antigravity",   icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
-                                                { name: "Steam Gaming",  icon: "steam.svg",       cmd: "steam" },
-                                                { name: "Discord",       icon: "discord.svg",     cmd: "discord" },
-                                                { name: "X64 Dashboard", icon: "x64lios.png",     cmd: "kitty -e x64-dashboard" }
-                                            ]}
-                                        ]
+                                        model: shellRoot.startCategories
                                         delegate: Rectangle {
                                             width: 285; height: 112; radius: 8; color: "#272727"; border.color: "#22ffffff"
                                             Column {
@@ -1050,7 +1085,7 @@ ShellRoot {
                                                             width: 126; height: 26
                                                             Row {
                                                                 spacing: 6
-                                                                WinSvg { width: 22; height: 22; iconFile: modelData.icon }
+                                                                WinSvg { width: 22; height: 22; iconUrl: modelData.iconUrl || "" }
                                                                 Text { anchors.verticalCenter: parent.verticalCenter; text: modelData.name; color: "#e5e7eb"; font.pixelSize: 11; elide: Text.ElideRight; width: 96 }
                                                             }
                                                             MouseArea {
@@ -1064,10 +1099,65 @@ ShellRoot {
                                         }
                                     }
                                 }
+
+                                // View 2: Cuadrícula (All Installed Applications Grid)
+                                Grid {
+                                    width: 584; columns: 6; rowSpacing: 10; columnSpacing: 8
+                                    visible: shellRoot.startAllViewMode === "grid" || shellRoot.searchQuery.trim() !== ""
+                                    Repeater {
+                                        model: shellRoot.allApps
+                                        delegate: Rectangle {
+                                            visible: shellRoot.searchQuery.trim() === "" || modelData.name.toLowerCase().indexOf(shellRoot.searchQuery.trim().toLowerCase()) !== -1
+                                            width: 90; height: 74; radius: 6
+                                            color: allGridHov.containsMouse ? "#28ffffff" : "transparent"
+                                            Column {
+                                                anchors.centerIn: parent; spacing: 6
+                                                WinSvg { anchors.horizontalCenter: parent.horizontalCenter; width: 32; height: 32; iconUrl: modelData.iconUrl || "" }
+                                                Text {
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    width: 84; horizontalAlignment: Text.AlignHCenter
+                                                    text: modelData.name; color: "#f3f4f6"; font.pixelSize: 11; elide: Text.ElideRight
+                                                }
+                                            }
+                                            MouseArea {
+                                                id: allGridHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    shellRoot.startOpen = false;
+                                                    shellRoot.spawnCmd(modelData.cmd);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // View 3: Lista (A-Z Installed Applications List)
+                                Column {
+                                    width: 584; spacing: 4
+                                    visible: shellRoot.startAllViewMode === "list" && shellRoot.searchQuery.trim() === ""
+                                    Repeater {
+                                        model: shellRoot.allApps
+                                        delegate: Rectangle {
+                                            width: 584; height: 36; radius: 6
+                                            color: allListHov.containsMouse ? "#28ffffff" : "transparent"
+                                            RowLayout {
+                                                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 12
+                                                WinSvg { width: 24; height: 24; iconUrl: modelData.iconUrl || "" }
+                                                Text { text: modelData.name; color: "#ffffff"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                            }
+                                            MouseArea {
+                                                id: allListHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    shellRoot.startOpen = false;
+                                                    shellRoot.spawnCmd(modelData.cmd);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        // Bottom Profile & Power Footer
+                        // Bottom Profile & Power Footer (Dynamic Real User Name)
                         Rectangle {
                             Layout.fillWidth: true; Layout.preferredHeight: 58; radius: 8; color: "#171717"
                             RowLayout {
@@ -1076,8 +1166,8 @@ ShellRoot {
                                     spacing: 10
                                     WinSvg { width: 28; height: 28; iconFile: "x64lios.png" }
                                     Column {
-                                        Text { text: "Cristian"; color: "#ffffff"; font.pixelSize: 12; font.bold: true }
-                                        Text { text: "X64 LIOS • Windows 11 26H2"; color: "#888888"; font.pixelSize: 10 }
+                                        Text { text: shellRoot.userName; color: "#ffffff"; font.pixelSize: 12; font.bold: true }
+                                        Text { text: shellRoot.hostName + " • X64 Windows 11 26H2"; color: "#888888"; font.pixelSize: 10 }
                                     }
                                 }
                                 Item { Layout.fillWidth: true }
@@ -1143,18 +1233,18 @@ ShellRoot {
                             width: 193
                             WinSvg { width: 20; height: 20; iconFile: "phone.svg" }
                             Text { text: "Enlace Móvil (26H2)"; color: "#ffffff"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
-                            Rectangle { width: 8; height: 8; radius: 4; color: "#6ccb5f" }
+                            Rectangle { width: 8; height: 8; radius: 4; color: shellRoot.kdeConnectInstalled ? "#6ccb5f" : "#f5a524" }
                         }
                         Rectangle {
-                            width: 193; height: 78; radius: 8; color: "#282828"; border.color: "#22ffffff"
+                            width: 193; height: 84; radius: 8; color: "#282828"; border.color: "#22ffffff"
                             Column {
                                 anchors.fill: parent; anchors.margins: 10; spacing: 6
-                                Text { text: "KDE Connect Activo"; color: "#60cdff"; font.pixelSize: 12; font.bold: true }
+                                Text { text: shellRoot.kdeConnectInstalled ? "KDE Connect Listo" : "Servicio Enlace Móvil"; color: "#60cdff"; font.pixelSize: 12; font.bold: true }
                                 Text { text: "UFW 1714:1764 UDP/TCP Abierto"; color: "#aaaaaa"; font.pixelSize: 10 }
                                 RowLayout {
                                     width: 173
                                     WinSvg { width: 18; height: 14; iconFile: "win11-battery-green.svg" }
-                                    Text { text: "Conectado • Red Local"; color: "#d0d0d0"; font.pixelSize: 11 }
+                                    Text { text: "Sincronización Red Local"; color: "#d0d0d0"; font.pixelSize: 11 }
                                 }
                             }
                         }
@@ -1222,8 +1312,7 @@ ShellRoot {
                 RowLayout {
                     width: 320
                     WinSvg { width: 20; height: 16; iconFile: "win11-battery-green.svg" }
-                    Text { text: "100% • CA (scx_lavd + FalconD)"; color: "#cccccc"; font.pixelSize: 11 }
-                    Item { Layout.fillWidth: true }
+                    Text { text: shellRoot.batteryText + " • scx_lavd + FalconD"; color: "#cccccc"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
                     WinSvg {
                         width: 18; height: 18; iconFile: "settings.svg"
                         MouseArea {
@@ -1235,7 +1324,7 @@ ShellRoot {
             }
         }
 
-        // 5. WINDOWS 11 TWO-CARD NOTIFICATION CENTER + CALENDAR
+        // 5. WINDOWS 11 TWO-CARD NOTIFICATION CENTER + DYNAMIC REAL CALENDAR
         Column {
             visible: shellRoot.calendarOpen
             width: 340
@@ -1266,23 +1355,26 @@ ShellRoot {
             }
 
             Rectangle {
-                width: 340; height: 280; radius: 8; color: "#f4202020"; border.color: "#38ffffff"; border.width: 1
+                width: 340; height: 300; radius: 8; color: "#f4202020"; border.color: "#38ffffff"; border.width: 1
                 MouseArea { anchors.fill: parent }
                 Column {
-                    anchors.fill: parent; anchors.margins: 16; spacing: 12
+                    anchors.fill: parent; anchors.margins: 16; spacing: 10
                     Text { text: Qt.formatDate(new Date(), "dddd, d 'de' MMMM 'de' yyyy"); color: "#60cdff"; font.pixelSize: 13; font.bold: true }
+                    Text { text: shellRoot.calendarHeader; color: "#cccccc"; font.pixelSize: 11 }
                     Grid {
-                        columns: 7; spacing: 8
+                        columns: 7; spacing: 6
                         Repeater {
-                            model: ["L", "M", "X", "J", "V", "S", "D",
-                                    "2", "3", "4", "5", "6", "7", "8",
-                                    "9", "10","11","12","13","14","15",
-                                    "16","17","18","19","20","21","22",
-                                    "23","24","25","26","27","28","29"]
+                            model: shellRoot.calendarCells
                             delegate: Rectangle {
-                                width: 35; height: 30; radius: 15
-                                color: modelData === "22" ? "#60cdff" : "transparent"
-                                Text { anchors.centerIn: parent; text: modelData; color: modelData === "22" ? "#000000" : "#ffffff"; font.pixelSize: 11; font.bold: modelData === "22" }
+                                width: 37; height: 28; radius: 14
+                                color: modelData.isToday ? "#60cdff" : "transparent"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    color: modelData.isToday ? "#000000" : (modelData.isHeader ? "#9e9e9e" : "#ffffff")
+                                    font.pixelSize: 11
+                                    font.bold: modelData.isToday || modelData.isHeader
+                                }
                             }
                         }
                     }
@@ -1328,7 +1420,7 @@ ShellRoot {
                                 id: runInput
                                 anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
                                 verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12
-                                text: "antigravity-ide"
+                                text: "kitty"
                                 onAccepted: { shellRoot.spawnCmd(runInput.text); shellRoot.runDialogOpen = false; }
                             }
                         }
@@ -1351,7 +1443,7 @@ ShellRoot {
             }
         }
 
-        // 7. WINDOWS 11 26H2 LOCK SCREEN ("Win + L")
+        // 7. WINDOWS 11 26H2 LOCK SCREEN ("Win + L" — Dynamic Real User Name)
         Rectangle {
             visible: shellRoot.lockScreenOpen
             anchors.fill: parent
@@ -1386,7 +1478,7 @@ ShellRoot {
                     width: 116; height: 116; radius: 58; color: "#22ffffff"; border.color: "#60cdff"; border.width: 2
                     WinSvg { anchors.centerIn: parent; width: 72; height: 72; iconFile: "x64lios.png" }
                 }
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Cristian"; color: "#ffffff"; font.pixelSize: 24; font.bold: true }
+                Text { anchors.horizontalCenter: parent.horizontalCenter; text: shellRoot.userName; color: "#ffffff"; font.pixelSize: 24; font.bold: true }
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: 180; height: 36; radius: 5; color: "#0078d4"

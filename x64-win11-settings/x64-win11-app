@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-x64-win11-app: Native Windows 11 26H2 Applications for X64 LIOS
+x64-win11-app: Native Windows 11 26H2 Applications & Dynamic System Indexer for X64 LIOS
 Modes:
   - explorer [initial_section]  (Win + E — Windows 11 26H2 Tabbed File Explorer)
   - settings [initial_page]     (Win + I — Windows 11 26H2 6-Page Settings App)
   - taskmgr                     (Ctrl + Shift + Esc — Windows 11 26H2 Live Task Manager)
-Synchronizes live desktop preferences via ~/.local/state/x64-win11/config.json.
+  - --dump-sysinfo              (Generates ~/.local/state/x64-win11/sysinfo.json for shell.qml)
+100% Universal: Dynamically detects the active user, hardware (Desktop vs Laptop battery),
+mounted drives/filesystems, installed .desktop applications, and live calendar.
 """
 
 import sys
 import os
+import pwd
+import glob
 import json
 import shutil
+import socket
+import calendar
 import subprocess
 import urllib.parse
 from datetime import datetime
-from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QUrl
-from PyQt6.QtGui import QGuiApplication, QColor, QIcon
-from PyQt6.QtQuick import QQuickView
 
 HOME_DIR = os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME_DIR, ".local", "state", "x64-win11")
 CONFIG_FILE = os.path.join(STATE_DIR, "config.json")
+SYSINFO_FILE = os.path.join(STATE_DIR, "sysinfo.json")
 ASSET_DIR = "/usr/share/x64-win11/assets/icons/"
 WP_DIR = "/usr/share/x64-win11/assets/wallpapers/"
 if not os.path.isdir(ASSET_DIR):
@@ -38,6 +42,20 @@ DEFAULT_CFG = {
     "wallpaperMode": 0
 }
 
+
+def get_real_user_info():
+    try:
+        pw = pwd.getpwuid(os.getuid())
+        uname = pw.pw_name
+        gecos = (pw.pw_gecos or "").split(",")[0].strip()
+        display_name = gecos if gecos else uname.capitalize()
+    except Exception:
+        uname = os.environ.get("USER", "x64")
+        display_name = uname.capitalize()
+    hostname = socket.gethostname()
+    return display_name, uname, hostname
+
+
 def load_cfg():
     os.makedirs(STATE_DIR, exist_ok=True)
     if os.path.isfile(CONFIG_FILE):
@@ -51,6 +69,7 @@ def load_cfg():
             pass
     return dict(DEFAULT_CFG)
 
+
 def save_cfg(cfg):
     os.makedirs(STATE_DIR, exist_ok=True)
     tmp = CONFIG_FILE + ".tmp"
@@ -58,7 +77,15 @@ def save_cfg(cfg):
         json.dump(cfg, f)
     os.replace(tmp, CONFIG_FILE)
 
+
 def resolve_special_folder(name):
+    display_name, uname, _ = get_real_user_info()
+    if name in (display_name, uname, "Inicio", "Home"):
+        return HOME_DIR
+    if name in ("Papelera", "Papelera de reciclaje", "Trash"):
+        trash_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+        os.makedirs(trash_dir, exist_ok=True)
+        return trash_dir
     mapping = {
         "Escritorio": ["Escritorio", "Desktop"],
         "Descargas": ["Descargas", "Downloads"],
@@ -67,17 +94,12 @@ def resolve_special_folder(name):
         "Música": ["Música", "Musica", "Music"],
         "Vídeos": ["Vídeos", "Videos"],
         "Proyectos": ["Proyectos", "Projects"],
-        "Cristian": [""],
-        "Inicio": [""],
         "X64 LIOS (C:)": ["/"],
-        "X64 LIOS NVMe (C:)": ["/"],
     }
     if name in mapping:
         for cand in mapping[name]:
             if cand == "/":
                 return "/"
-            if cand == "":
-                return HOME_DIR
             p = os.path.join(HOME_DIR, cand)
             if os.path.isdir(p):
                 return p
@@ -87,296 +109,741 @@ def resolve_special_folder(name):
     return HOME_DIR
 
 
-class AppBridge(QObject):
-    def __init__(self, view):
-        super().__init__()
-        self.view = view
-        self._prev_cpu_total = 0
-        self._prev_cpu_idle = 0
+def get_battery_status():
+    bats = sorted(glob.glob("/sys/class/power_supply/BAT*"))
+    if not bats:
+        return {
+            "hasBattery": False,
+            "batteryPct": 100,
+            "batteryCharging": True,
+            "batteryText": "Conectado a CA (PC de Escritorio)"
+        }
+    bat = bats[0]
+    try:
+        with open(os.path.join(bat, "capacity"), "r", encoding="utf-8") as f:
+            pct = max(0, min(100, int(f.read().strip())))
+    except Exception:
+        pct = 100
+    try:
+        with open(os.path.join(bat, "status"), "r", encoding="utf-8") as f:
+            st = f.read().strip()
+    except Exception:
+        st = "Full"
+    charging = st in ("Charging", "Full", "Not charging")
+    st_es = "Cargando (CA)" if st == "Charging" else ("Carga completa (CA)" if charging else "En batería")
+    return {
+        "hasBattery": True,
+        "batteryPct": pct,
+        "batteryCharging": charging,
+        "batteryText": f"{pct}% • {st_es}"
+    }
 
-    @pyqtSlot(result=str)
-    def getConfigJson(self):
-        return json.dumps(load_cfg())
 
-    @pyqtSlot(str, str)
-    def setConfigValue(self, key, val_json):
-        cfg = load_cfg()
+def detect_default_browser():
+    candidates = [
+        ("chromium", "Navegador Web", "edge.svg"),
+        ("google-chrome-stable", "Google Chrome", "chrome.svg"),
+        ("brave", "Brave Browser", "edge.svg"),
+        ("firefox", "Firefox Web", "edge.svg"),
+        ("zen-browser", "Zen Browser", "edge.svg"),
+        ("librewolf", "LibreWolf", "edge.svg"),
+        ("vivaldi-stable", "Vivaldi", "edge.svg"),
+    ]
+    for bin_name, label, icon in candidates:
+        if shutil.which(bin_name):
+            return bin_name, label, icon
+    return "xdg-open https://x64lios.com", "Navegador Web", "edge.svg"
+
+
+def resolve_app_icon_url(icon_name):
+    if not icon_name:
+        return f"file://{ASSET_DIR}windows.svg"
+    if icon_name.startswith("/"):
+        if os.path.isfile(icon_name):
+            return f"file://{icon_name}"
+        return f"file://{ASSET_DIR}windows.svg"
+
+    low = icon_name.lower()
+    builtin_map = {
+        "antigravity-ide": "antigravity.png",
+        "antigravity": "antigravity.png",
+        "chromium": "edge.svg",
+        "google-chrome": "chrome.svg",
+        "firefox": "edge.svg",
+        "brave": "edge.svg",
+        "shelly": "store.svg",
+        "org.X64.shelly": "store.svg",
+        "kitty": "terminal.svg",
+        "utilities-terminal": "terminal.svg",
+        "x64-hello": "x64lios.png",
+        "x64-hello-icon": "x64lios.png",
+        "x64lios": "x64lios.png",
+        "x64-update": "update.svg",
+        "steam": "steam.svg",
+        "discord": "discord.svg",
+        "org.gnome.calculator": "calculator.svg",
+        "accessories-calculator": "calculator.svg",
+        "org.gnome.disks": "drive-c.svg",
+        "drive-harddisk": "drive-c.svg",
+        "org.gnome.loupe": "folder-images.svg",
+        "org.gnome.papers": "folder-documents.svg",
+        "org.gnome.fileroller": "folder.svg",
+        "blueman": "bluetooth.svg",
+        "preferences-system-bluetooth": "bluetooth.svg",
+        "nm-connection-editor": "network.svg",
+        "preferences-system-network": "network.svg",
+    }
+    for k, v in builtin_map.items():
+        if k == low or k in low:
+            p = os.path.join(ASSET_DIR, v)
+            if os.path.isfile(p):
+                return f"file://{p}"
+
+    search_Files = [
+        f"/usr/share/pixmaps/{icon_name}.png",
+        f"/usr/share/pixmaps/{icon_name}.svg",
+        f"/usr/share/icons/hicolor/scalable/apps/{icon_name}.svg",
+        f"/usr/share/icons/hicolor/256x256/apps/{icon_name}.png",
+        f"/usr/share/icons/hicolor/128x128/apps/{icon_name}.png",
+        f"/usr/share/icons/hicolor/48x48/apps/{icon_name}.png",
+        f"/usr/share/icons/Papirus-Dark/48x48/apps/{icon_name}.svg",
+        f"/usr/share/icons/breeze-dark/apps/48/{icon_name}.svg",
+    ]
+    for cand in search_Files:
+        if os.path.isfile(cand):
+            return f"file://{cand}"
+    return f"file://{ASSET_DIR}windows.svg"
+
+
+def scan_installed_desktop_apps():
+    dirs = [
+        "/usr/share/applications",
+        os.path.join(HOME_DIR, ".local", "share", "applications"),
+    ]
+    seen_names = set()
+    apps = []
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for fname in sorted(os.listdir(d)):
+            if not fname.endswith(".desktop"):
+                continue
+            fpath = os.path.join(d, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.read().splitlines()
+            except Exception:
+                continue
+
+            in_entry = False
+            name = ""
+            name_es = ""
+            exec_cmd = ""
+            icon = ""
+            cats = ""
+            no_display = False
+            hidden = False
+            terminal = False
+
+            for raw in lines:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("["):
+                    if line == "[Desktop Entry]":
+                        in_entry = True
+                        continue
+                    elif in_entry:
+                        break
+                if not in_entry or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip()
+                if k == "Name":
+                    name = v
+                elif k in ("Name[es]", "Name[es_ES]", "Name[es_PA]"):
+                    name_es = v
+                elif k == "Exec":
+                    exec_cmd = v
+                elif k == "Icon":
+                    icon = v
+                elif k == "Categories":
+                    cats = v
+                elif k == "NoDisplay" and v.lower() == "true":
+                    no_display = True
+                elif k == "Hidden" and v.lower() == "true":
+                    hidden = True
+                elif k == "Terminal" and v.lower() == "true":
+                    terminal = True
+
+            if no_display or hidden or not exec_cmd:
+                continue
+            # Skip raw terminal TUIs unless it's btop/nvim/opencode
+            clean_exec = " ".join(
+                tok for tok in exec_cmd.split()
+                if not tok.startswith("%")
+            ).strip()
+            if not clean_exec:
+                continue
+            if terminal:
+                base_bin = clean_exec.split()[0]
+                if os.path.basename(base_bin) not in ("btop", "opencode", "nvim"):
+                    continue
+                clean_exec = f"kitty -e {clean_exec}"
+
+            final_name = name_es or name
+            if not final_name:
+                continue
+            key = final_name.lower()
+            if key in seen_names:
+                continue
+            seen_names.add(key)
+
+            apps.append({
+                "id": fname[:-8],
+                "name": final_name,
+                "cmd": clean_exec,
+                "iconUrl": resolve_app_icon_url(icon),
+                "categories": cats.lower()
+            })
+
+    apps.sort(key=lambda x: x["name"].lower())
+    return apps
+
+
+def build_calendar_data():
+    now = datetime.now()
+    months_es = [
+        "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ]
+    cal = calendar.Calendar(firstweekday=0)  # Monday first
+    month_days = list(cal.itermonthdays(now.year, now.month))
+    cells = [{"label": h, "isToday": False, "isCurrentMonth": True, "isHeader": True}
+             for h in ("L", "M", "X", "J", "V", "S", "D")]
+    for d in month_days:
+        if d == 0:
+            cells.append({"label": "", "isToday": False, "isCurrentMonth": False, "isHeader": False})
+        else:
+            cells.append({
+                "label": str(d),
+                "isToday": (d == now.day),
+                "isCurrentMonth": True,
+                "isHeader": False
+            })
+    return {
+        "header": f"{months_es[now.month].capitalize()} de {now.year}",
+        "cells": cells
+    }
+
+
+def generate_sysinfo_dict():
+    display_name, uname, hostname = get_real_user_info()
+    bat = get_battery_status()
+    browser_cmd, browser_label, browser_icon = detect_default_browser()
+
+    trash_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+    trash_has_files = os.path.isdir(trash_dir) and len(os.listdir(trash_dir)) > 0
+    trash_icon = "trash-full.svg" if trash_has_files else "trash.svg"
+
+    # 1. Universal Desktop Icons
+    desktop_icons = [
+        {"title": "Este equipo",            "iconUrl": f"file://{ASSET_DIR}thispc.svg",      "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
+        {"title": "Papelera de\nreciclaje", "iconUrl": f"file://{ASSET_DIR}{trash_icon}",    "cmd": "/usr/bin/x64-win11-app explorer 'Papelera'"},
+        {"title": display_name,             "iconUrl": f"file://{ASSET_DIR}folder-home.svg", "cmd": "/usr/bin/x64-win11-app explorer 'Inicio'"},
+        {"title": browser_label,            "iconUrl": f"file://{ASSET_DIR}{browser_icon}",  "cmd": browser_cmd},
+    ]
+    if shutil.which("shelly"):
+        desktop_icons.append({"title": "Tienda\nShelly", "iconUrl": f"file://{ASSET_DIR}store.svg", "cmd": "shelly"})
+    if shutil.which("antigravity-ide"):
+        desktop_icons.append({"title": "Antigravity\nIDE", "iconUrl": resolve_app_icon_url("antigravity-ide"), "cmd": "/usr/bin/antigravity-ide"})
+    if shutil.which("x64-hello"):
+        desktop_icons.append({"title": "X64 Hello", "iconUrl": f"file://{ASSET_DIR}x64lios.png", "cmd": "x64-hello"})
+    desktop_icons.append({"title": "Configuración\n26H2", "iconUrl": f"file://{ASSET_DIR}settings.svg", "cmd": "/usr/bin/x64-win11-app settings"})
+
+    # 2. Universal Taskbar Pinned Apps (only apps installed on this machine)
+    taskbar_pinned = [
+        {"id": "explorer", "match": "explorer", "iconUrl": f"file://{ASSET_DIR}explorer.svg", "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
+        {"id": "browser",  "match": browser_cmd.split()[0], "iconUrl": f"file://{ASSET_DIR}{browser_icon}", "cmd": browser_cmd},
+    ]
+    if shutil.which("antigravity-ide"):
+        taskbar_pinned.append({"id": "antigravity", "match": "antigravity", "iconUrl": resolve_app_icon_url("antigravity-ide"), "cmd": "/usr/bin/antigravity-ide"})
+    if shutil.which("shelly"):
+        taskbar_pinned.append({"id": "shelly", "match": "shelly", "iconUrl": f"file://{ASSET_DIR}store.svg", "cmd": "shelly"})
+    if shutil.which("kitty"):
+        taskbar_pinned.append({"id": "kitty", "match": "kitty", "iconUrl": f"file://{ASSET_DIR}terminal.svg", "cmd": "kitty"})
+    if shutil.which("x64-hello"):
+        taskbar_pinned.append({"id": "x64hello", "match": "x64-hello", "iconUrl": f"file://{ASSET_DIR}x64lios.png", "cmd": "x64-hello"})
+    taskbar_pinned.append({"id": "settings", "match": "settings", "iconUrl": f"file://{ASSET_DIR}settings.svg", "cmd": "/usr/bin/x64-win11-app settings"})
+
+    # 3. Dynamically Scanned Installed Applications
+    all_apps = scan_installed_desktop_apps()
+
+    # Build Start Menu Pinned Apps (Core Windows 11 + Installed Apps on this system)
+    start_pinned = [
+        {"name": "Explorador",    "iconUrl": f"file://{ASSET_DIR}explorer.svg",         "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
+        {"name": browser_label,   "iconUrl": f"file://{ASSET_DIR}{browser_icon}",       "cmd": browser_cmd},
+        {"name": "Configuración", "iconUrl": f"file://{ASSET_DIR}settings.svg",         "cmd": "/usr/bin/x64-win11-app settings"},
+        {"name": "Admin. tareas", "iconUrl": f"file://{ASSET_DIR}thispc.svg",           "cmd": "/usr/bin/x64-win11-app taskmgr"},
+    ]
+    optional_pinned = [
+        ("shelly",           "Tienda Shelly", f"file://{ASSET_DIR}store.svg",            "shelly"),
+        ("x64-hello",        "X64 Hello",     f"file://{ASSET_DIR}x64lios.png",          "x64-hello"),
+        ("x64-update",       "X64 Update",    f"file://{ASSET_DIR}update.svg",           "x64-update"),
+        ("kitty",            "Terminal",      f"file://{ASSET_DIR}terminal.svg",         "kitty"),
+        ("antigravity-ide",  "Antigravity",   resolve_app_icon_url("antigravity-ide"),   "/usr/bin/antigravity-ide"),
+        ("steam",            "Steam",         f"file://{ASSET_DIR}steam.svg",            "steam"),
+        ("discord",          "Discord",       f"file://{ASSET_DIR}discord.svg",          "discord"),
+        ("gnome-calculator", "Calculadora",   f"file://{ASSET_DIR}calculator.svg",       "gnome-calculator"),
+        ("gnome-disks",      "Discos",        f"file://{ASSET_DIR}drive-c.svg",          "gnome-disks"),
+        ("opencode",         "OpenCode AI",   resolve_app_icon_url("opencode"),          "kitty -e opencode"),
+    ]
+    for bin_check, title, ic_url, cmd in optional_pinned:
+        if shutil.which(bin_check):
+            start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
+
+    # Fill up to 18 pinned items with standard user folders & X64 Dashboard
+    folder_Shortcuts = [
+        ("Este equipo", f"file://{ASSET_DIR}thispc.svg",           "/usr/bin/x64-win11-app explorer 'Este equipo'"),
+        ("Descargas",   f"file://{ASSET_DIR}folder-download.svg",  "/usr/bin/x64-win11-app explorer 'Descargas'"),
+        ("Documentos",  f"file://{ASSET_DIR}folder-documents.svg", "/usr/bin/x64-win11-app explorer 'Documentos'"),
+        ("Imágenes",    f"file://{ASSET_DIR}folder-images.svg",    "/usr/bin/x64-win11-app explorer 'Imágenes'"),
+        ("Consola X64", f"file://{ASSET_DIR}x64lios.png",          "kitty -e x64-dashboard"),
+    ]
+    for title, ic_url, cmd in folder_Shortcuts:
+        if len(start_pinned) < 18:
+            start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
+
+    # Build 26H2 Dynamic Categories from actually installed apps
+    cat_sys = []
+    cat_dev_game = []
+    for a in all_apps:
+        c = a["categories"]
+        if any(k in c for k in ("game", "development", "ide", "graphics", "audiovideo")):
+            if len(cat_dev_game) < 4:
+                cat_dev_game.append(a)
+        elif any(k in c for k in ("system", "settings", "utility", "network")):
+            if len(cat_sys) < 4:
+                cat_sys.append(a)
+
+    if len(cat_sys) < 4:
+        for p in start_pinned[:4]:
+            if len(cat_sys) < 4:
+                cat_sys.append(p)
+    if len(cat_dev_game) < 4:
+        for p in start_pinned[4:8]:
+            if len(cat_dev_game) < 4:
+                cat_dev_game.append(p)
+
+    kdeconnect_installed = os.path.isfile("/usr/lib/kdeconnectd") or shutil.which("kdeconnect-cli") is not None
+
+    return {
+        "user": display_name,
+        "username": uname,
+        "hostname": hostname,
+        "userEmail": f"{uname}@{hostname}",
+        "hasBattery": bat["hasBattery"],
+        "batteryPct": bat["batteryPct"],
+        "batteryCharging": bat["batteryCharging"],
+        "batteryText": bat["batteryText"],
+        "kdeConnectInstalled": kdeconnect_installed,
+        "desktopIcons": desktop_icons,
+        "taskbarPinned": taskbar_pinned,
+        "startPinned": start_pinned[:18],
+        "allApps": all_apps[:60],
+        "categories": [
+            {"cat": "Sistema y Utilidades", "items": cat_sys[:4]},
+            {"cat": "Aplicaciones Instaladas", "items": cat_dev_game[:4]},
+        ],
+        "calendar": build_calendar_data()
+    }
+
+
+def dump_sysinfo_file():
+    os.makedirs(STATE_DIR, exist_ok=True)
+    data = generate_sysinfo_dict()
+    tmp = SYSINFO_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, SYSINFO_FILE)
+
+
+def get_dynamic_drives():
+    drives = []
+    seen_devs = set()
+    letters = ["C", "D", "E", "F", "G", "H"]
+    letter_idx = 0
+
+    # 1. Root filesystem (C:)
+    try:
+        usage = shutil.disk_usage("/")
+        total_gb = usage.total / (1024 ** 3)
+        free_gb = usage.free / (1024 ** 3)
+        used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+        drives.append({
+            "name": "X64 LIOS Sistema (C:)",
+            "path": "/",
+            "icon": "drive-c.svg",
+            "usedRatio": round(used_ratio, 3),
+            "isCritical": used_ratio >= 0.90,
+            "info": f"{free_gb:.1f} GB disponibles de {total_gb:.1f} GB"
+        })
+        letter_idx = 1
+    except Exception:
+        pass
+
+    # 2. Scan real secondary mounted block devices (/mnt/*, /run/media/*, /home if separate disk)
+    valid_fs = {"btrfs", "ext4", "xfs", "f2fs", "ntfs", "ntfs3", "fuseblk", "vfat", "exfat"}
+    try:
+        root_dev_id = os.stat("/").st_dev
+    except Exception:
+        root_dev_id = -1
+
+    try:
+        with open("/proc/mounts", "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                dev, mnt, fstype = parts[0], parts[1].replace("\\040", " "), parts[2]
+                if not dev.startswith("/dev/") or fstype not in valid_fs:
+                    continue
+                if mnt in ("/", "/boot", "/boot/efi") or mnt.startswith("/var/") or mnt.startswith("/snap"):
+                    continue
+                try:
+                    st_dev = os.stat(mnt).st_dev
+                except Exception:
+                    continue
+                if st_dev == root_dev_id or st_dev in seen_devs:
+                    continue
+                seen_devs.add(st_dev)
+                try:
+                    usage = shutil.disk_usage(mnt)
+                    total_gb = usage.total / (1024 ** 3)
+                    free_gb = usage.free / (1024 ** 3)
+                    if total_gb < 1.0:
+                        continue
+                    used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+                    ltr = letters[min(letter_idx, len(letters) - 1)]
+                    letter_idx += 1
+                    label = os.path.basename(mnt.rstrip("/")) or "Volumen"
+                    drives.append({
+                        "name": f"{label.capitalize()} ({ltr}:)",
+                        "path": mnt,
+                        "icon": "drive.svg",
+                        "usedRatio": round(used_ratio, 3),
+                        "isCritical": used_ratio >= 0.90,
+                        "info": f"{fstype.upper()} • {free_gb:.1f} GB libres de {total_gb:.1f} GB"
+                    })
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    # 3. Also show Home folder volume shortcut if no external drive is mounted
+    if len(drives) == 1:
+        display_name, _, _ = get_real_user_info()
         try:
-            cfg[key] = json.loads(val_json)
-        except Exception:
-            cfg[key] = val_json
-        save_cfg(cfg)
-
-    @pyqtSlot(str)
-    def launchRealApp(self, cmd):
-        try:
-            subprocess.Popen(cmd, shell=True, start_new_session=True)
-        except Exception:
-            pass
-
-    @pyqtSlot(str)
-    def openFileOrUrl(self, path):
-        try:
-            subprocess.Popen(["xdg-open", path], start_new_session=True)
-        except Exception:
-            pass
-
-    @pyqtSlot()
-    def closeWindow(self):
-        QGuiApplication.quit()
-
-    @pyqtSlot(str, str, result=bool)
-    def createNewItem(self, folder_key, item_type):
-        base = resolve_special_folder(folder_key)
-        if not os.path.isdir(base) or not os.access(base, os.W_OK):
-            base = HOME_DIR
-        try:
-            if item_type == "folder":
-                name = "Nueva carpeta"
-                target = os.path.join(base, name)
-                idx = 2
-                while os.path.exists(target):
-                    target = os.path.join(base, f"{name} ({idx})")
-                    idx += 1
-                os.makedirs(target, exist_ok=True)
-            else:
-                name = "Nuevo documento de texto"
-                target = os.path.join(base, f"{name}.txt")
-                idx = 2
-                while os.path.exists(target):
-                    target = os.path.join(base, f"{name} ({idx}).txt")
-                    idx += 1
-                with open(target, "w", encoding="utf-8") as f:
-                    f.write("")
-            return True
-        except Exception:
-            return False
-
-    @pyqtSlot(result=str)
-    def getDrivesJson(self):
-        drives = []
-        try:
-            usage = shutil.disk_usage("/")
-            total_gb = usage.total / (1024 ** 3)
+            usage = shutil.disk_usage(HOME_DIR)
             free_gb = usage.free / (1024 ** 3)
             used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
             drives.append({
-                "name": "X64 LIOS NVMe (C:)",
-                "path": "/",
-                "icon": "drive-c.svg",
+                "name": f"Carpeta Personal — {display_name} (D:)",
+                "path": HOME_DIR,
+                "icon": "drive.svg",
                 "usedRatio": round(used_ratio, 3),
                 "isCritical": used_ratio >= 0.90,
-                "info": f"{free_gb:.1f} GB disponibles de {total_gb:.1f} GB"
+                "info": f"Espacio de usuario • {free_gb:.1f} GB libres"
             })
         except Exception:
             pass
 
-        proj_dir = os.path.join(HOME_DIR, "Proyectos")
-        if os.path.isdir(proj_dir):
-            try:
-                usage = shutil.disk_usage(proj_dir)
-                free_gb = usage.free / (1024 ** 3)
-                used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
-                drives.append({
-                    "name": "Proyectos X64 Studios (D:)",
-                    "path": proj_dir,
-                    "icon": "drive.svg",
-                    "usedRatio": round(used_ratio, 3),
-                    "isCritical": used_ratio >= 0.90,
-                    "info": f"Volumen Btrfs ZSTD • {free_gb:.1f} GB libres"
-                })
-            except Exception:
-                pass
-        return json.dumps(drives)
-
-    @pyqtSlot(str, str, result=str)
-    def listDirectoryJson(self, section_or_path, sort_by="name"):
-        if section_or_path in ("Este equipo", "This PC"):
-            return json.dumps({"mode": "thispc", "path": "Este equipo", "items": [], "count": 8})
-
-        real_path = resolve_special_folder(section_or_path)
-        items = []
-        try:
-            entries = list(os.scandir(real_path))
-        except Exception:
-            entries = []
-
-        for e in entries:
-            if e.name.startswith("."):
-                continue
-            try:
-                st = e.stat(follow_symlinks=True)
-                is_dir = e.is_dir(follow_symlinks=True)
-                mtime = datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M")
-                if is_dir:
-                    low = e.name.lower()
-                    if "descarg" in low or "download" in low:
-                        icon = "folder-download.svg"
-                    elif "doc" in low:
-                        icon = "folder-documents.svg"
-                    elif "imág" in low or "imag" in low or "pict" in low or "foto" in low:
-                        icon = "folder-images.svg"
-                    elif "músic" in low or "music" in low:
-                        icon = "folder-music.svg"
-                    elif "vídeo" in low or "video" in low:
-                        icon = "folder-videos.svg"
-                    elif "escritorio" in low or "desktop" in low:
-                        icon = "folder-desktop.svg"
-                    elif "juego" in low or "game" in low or "steam" in low:
-                        icon = "folder-games.svg"
-                    else:
-                        icon = "folder.svg"
-                    size_str = "Carpeta de archivos"
-                    size_bytes = -1
-                else:
-                    ext = os.path.splitext(e.name)[1].lower()
-                    if ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"):
-                        icon = "folder-images.svg"
-                        size_str = "Imagen"
-                    elif ext in (".mp4", ".mkv", ".webm", ".avi"):
-                        icon = "folder-videos.svg"
-                        size_str = "Vídeo"
-                    elif ext in (".mp3", ".flac", ".ogg", ".wav"):
-                        icon = "folder-music.svg"
-                        size_str = "Audio"
-                    elif ext in (".sh", ".py", ".qml", ".js", ".ts", ".rs", ".c", ".cpp", ".md"):
-                        icon = "terminal.svg"
-                        size_str = f"Código ({ext})"
-                    else:
-                        icon = "folder-documents.svg"
-                        size_str = "Archivo"
-                    sb = st.st_size
-                    size_bytes = sb
-                    if sb < 1024:
-                        size_val = f"{sb} B"
-                    elif sb < 1024 ** 2:
-                        size_val = f"{sb / 1024:.1f} KB"
-                    elif sb < 1024 ** 3:
-                        size_val = f"{sb / (1024 ** 2):.1f} MB"
-                    else:
-                        size_val = f"{sb / (1024 ** 3):.2f} GB"
-                    size_str = f"{size_val} • {size_str}"
-
-                items.append({
-                    "name": e.name,
-                    "path": e.path,
-                    "isDir": is_dir,
-                    "icon": icon,
-                    "sub": size_str,
-                    "mtime": mtime,
-                    "mtimeTs": st.st_mtime,
-                    "sizeBytes": size_bytes
-                })
-            except Exception:
-                continue
-
-        items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
-        return json.dumps({
-            "mode": "dir",
-            "path": real_path,
-            "items": items[:150],
-            "count": len(items)
-        })
-
-    @pyqtSlot(str, result=str)
-    def getParentDir(self, current_path):
-        if current_path in ("Este equipo", "/", ""):
-            return "Este equipo"
-        real = resolve_special_folder(current_path)
-        if real == "/" or real == HOME_DIR:
-            return "Este equipo"
-        return os.path.dirname(real)
-
-    @pyqtSlot(result=str)
-    def getSystemTelemetryJson(self):
-        cpu_model = "AMD Ryzen / Intel Core"
-        try:
-            with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
-                for line in f:
-                    if "model name" in line:
-                        cpu_model = line.split(":", 1)[1].strip()
-                        break
-        except Exception:
-            pass
-
-        mem_total_gb = 64.0
-        mem_used_gb = 11.0
-        mem_pct = 17
-        try:
-            mem = {}
-            with open("/proc/meminfo", "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.split(":")
-                    if len(parts) == 2:
-                        mem[parts[0].strip()] = int(parts[1].strip().split()[0])
-            mem_total_gb = mem.get("MemTotal", 65536000) / (1024 ** 2)
-            mem_avail_gb = mem.get("MemAvailable", 54000000) / (1024 ** 2)
-            mem_used_gb = mem_total_gb - mem_avail_gb
-            mem_pct = int(round((mem_used_gb / max(1.0, mem_total_gb)) * 100))
-        except Exception:
-            pass
-
-        cpu_pct = 6
-        try:
-            with open("/proc/stat", "r", encoding="utf-8") as f:
-                fields = [int(x) for x in f.readline().split()[1:8]]
-            idle = fields[3] + fields[4]
-            total = sum(fields)
-            if self._prev_cpu_total > 0 and total > self._prev_cpu_total:
-                cpu_pct = int(round((1.0 - (idle - self._prev_cpu_idle) / (total - self._prev_cpu_total)) * 100))
-            self._prev_cpu_total = total
-            self._prev_cpu_idle = idle
-        except Exception:
-            pass
-
-        kernel = os.uname().release
-        sched = "BORE (Nativo)"
-        try:
-            if os.path.exists("/sys/kernel/sched_ext/state"):
-                with open("/sys/kernel/sched_ext/state") as f:
-                    if f.read().strip() == "enabled":
-                        with open("/sys/kernel/sched_ext/root/ops") as f2:
-                            sched = "scx_" + f2.read().strip().split("_")[0]
-        except Exception:
-            pass
-
-        procs = []
-        try:
-            out = subprocess.check_output(
-                ["ps", "-eo", "pid,comm,%cpu,rss", "--sort=-%cpu"],
-                text=True, timeout=1.5
-            ).splitlines()[1:16]
-            for line in out:
-                parts = line.split()
-                if len(parts) >= 4:
-                    pid, comm, pcpu, rss_kb = parts[0], parts[1], parts[2], int(parts[3])
-                    procs.append({
-                        "pid": pid,
-                        "name": comm,
-                        "cpu": f"{float(pcpu):.1f}%",
-                        "mem": f"{rss_kb / 1024:.1f} MB"
-                    })
-        except Exception:
-            pass
-
-        return json.dumps({
-            "user": "Cristian",
-            "hostname": os.uname().nodename,
-            "cpu": cpu_model,
-            "cpuPct": max(1, min(100, cpu_pct)),
-            "ram": f"{mem_used_gb:.1f} / {mem_total_gb:.1f} GB ({mem_pct}%)",
-            "ramPct": mem_pct,
-            "kernel": kernel,
-            "sched": sched,
-            "procs": procs
-        })
+    return drives
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--dump-sysinfo":
+        dump_sysinfo_file()
+        sys.exit(0)
+
+    from PyQt6.QtCore import QObject, pyqtSlot, QUrl
+    from PyQt6.QtGui import QGuiApplication, QColor
+    from PyQt6.QtQuick import QQuickView
+
+    class AppBridge(QObject):
+        def __init__(self, view):
+            super().__init__()
+            self.view = view
+            self._prev_cpu_total = 0
+            self._prev_cpu_idle = 0
+
+        @pyqtSlot(result=str)
+        def getConfigJson(self):
+            return json.dumps(load_cfg())
+
+        @pyqtSlot(str, str)
+        def setConfigValue(self, key, val_json):
+            cfg = load_cfg()
+            try:
+                cfg[key] = json.loads(val_json)
+            except Exception:
+                cfg[key] = val_json
+            save_cfg(cfg)
+
+        @pyqtSlot(str)
+        def launchRealApp(self, cmd):
+            try:
+                subprocess.Popen(cmd, shell=True, start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(str)
+        def openFileOrUrl(self, path):
+            try:
+                subprocess.Popen(["xdg-open", path], start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot()
+        def closeWindow(self):
+            QGuiApplication.quit()
+
+        @pyqtSlot(str, str, result=bool)
+        def createNewItem(self, folder_key, item_type):
+            base = resolve_special_folder(folder_key)
+            if not os.path.isdir(base) or not os.access(base, os.W_OK):
+                base = HOME_DIR
+            try:
+                if item_type == "folder":
+                    name = "Nueva carpeta"
+                    target = os.path.join(base, name)
+                    idx = 2
+                    while os.path.exists(target):
+                        target = os.path.join(base, f"{name} ({idx})")
+                        idx += 1
+                    os.makedirs(target, exist_ok=True)
+                else:
+                    name = "Nuevo documento de texto"
+                    target = os.path.join(base, f"{name}.txt")
+                    idx = 2
+                    while os.path.exists(target):
+                        target = os.path.join(base, f"{name} ({idx}).txt")
+                        idx += 1
+                    with open(target, "w", encoding="utf-8") as f:
+                        f.write("")
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(result=str)
+        def getDrivesJson(self):
+            return json.dumps(get_dynamic_drives())
+
+        @pyqtSlot(str, str, result=str)
+        def listDirectoryJson(self, section_or_path, sort_by="name"):
+            if section_or_path in ("Este equipo", "This PC"):
+                return json.dumps({"mode": "thispc", "path": "Este equipo", "items": [], "count": 8})
+
+            real_path = resolve_special_folder(section_or_path)
+            items = []
+            try:
+                entries = list(os.scandir(real_path))
+            except Exception:
+                entries = []
+
+            for e in entries:
+                if e.name.startswith("."):
+                    continue
+                try:
+                    st = e.stat(follow_symlinks=True)
+                    is_dir = e.is_dir(follow_symlinks=True)
+                    mtime = datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M")
+                    if is_dir:
+                        low = e.name.lower()
+                        if "descarg" in low or "download" in low:
+                            icon = "folder-download.svg"
+                        elif "doc" in low:
+                            icon = "folder-documents.svg"
+                        elif "imág" in low or "imag" in low or "pict" in low or "foto" in low:
+                            icon = "folder-images.svg"
+                        elif "músic" in low or "music" in low:
+                            icon = "folder-music.svg"
+                        elif "vídeo" in low or "video" in low:
+                            icon = "folder-videos.svg"
+                        elif "escritorio" in low or "desktop" in low:
+                            icon = "folder-desktop.svg"
+                        elif "juego" in low or "game" in low or "steam" in low:
+                            icon = "folder-games.svg"
+                        else:
+                            icon = "folder.svg"
+                        size_str = "Carpeta de archivos"
+                        size_bytes = -1
+                    else:
+                        ext = os.path.splitext(e.name)[1].lower()
+                        if ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"):
+                            icon = "folder-images.svg"
+                            size_str = "Imagen"
+                        elif ext in (".mp4", ".mkv", ".webm", ".avi"):
+                            icon = "folder-videos.svg"
+                            size_str = "Vídeo"
+                        elif ext in (".mp3", ".flac", ".ogg", ".wav"):
+                            icon = "folder-music.svg"
+                            size_str = "Audio"
+                        elif ext in (".sh", ".py", ".qml", ".js", ".ts", ".rs", ".c", ".cpp", ".md"):
+                            icon = "terminal.svg"
+                            size_str = f"Código ({ext})"
+                        else:
+                            icon = "folder-documents.svg"
+                            size_str = "Archivo"
+                        sb = st.st_size
+                        size_bytes = sb
+                        if sb < 1024:
+                            size_val = f"{sb} B"
+                        elif sb < 1024 ** 2:
+                            size_val = f"{sb / 1024:.1f} KB"
+                        elif sb < 1024 ** 3:
+                            size_val = f"{sb / (1024 ** 2):.1f} MB"
+                        else:
+                            size_val = f"{sb / (1024 ** 3):.2f} GB"
+                        size_str = f"{size_val} • {size_str}"
+
+                    items.append({
+                        "name": e.name,
+                        "path": e.path,
+                        "isDir": is_dir,
+                        "icon": icon,
+                        "sub": size_str,
+                        "mtime": mtime,
+                        "mtimeTs": st.st_mtime,
+                        "sizeBytes": size_bytes
+                    })
+                except Exception:
+                    continue
+
+            items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
+            return json.dumps({
+                "mode": "dir",
+                "path": real_path,
+                "items": items[:150],
+                "count": len(items)
+            })
+
+        @pyqtSlot(str, result=str)
+        def getParentDir(self, current_path):
+            if current_path in ("Este equipo", "/", ""):
+                return "Este equipo"
+            real = resolve_special_folder(current_path)
+            if real == "/" or real == HOME_DIR:
+                return "Este equipo"
+            return os.path.dirname(real)
+
+        @pyqtSlot(result=str)
+        def getSystemTelemetryJson(self):
+            display_name, uname, hostname = get_real_user_info()
+            cpu_model = "Procesador x86_64"
+            try:
+                with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if "model name" in line:
+                            cpu_model = line.split(":", 1)[1].strip()
+                            break
+            except Exception:
+                pass
+
+            mem_total_gb = 16.0
+            mem_used_gb = 2.0
+            mem_pct = 12
+            try:
+                mem = {}
+                with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                    for line in f:
+                        parts = line.split(":")
+                        if len(parts) == 2:
+                            mem[parts[0].strip()] = int(parts[1].strip().split()[0])
+                mem_total_gb = mem.get("MemTotal", 16384000) / (1024 ** 2)
+                mem_avail_gb = mem.get("MemAvailable", 14000000) / (1024 ** 2)
+                mem_used_gb = mem_total_gb - mem_avail_gb
+                mem_pct = int(round((mem_used_gb / max(1.0, mem_total_gb)) * 100))
+            except Exception:
+                pass
+
+            cpu_pct = 4
+            try:
+                with open("/proc/stat", "r", encoding="utf-8") as f:
+                    fields = [int(x) for x in f.readline().split()[1:8]]
+                idle = fields[3] + fields[4]
+                total = sum(fields)
+                if self._prev_cpu_total > 0 and total > self._prev_cpu_total:
+                    cpu_pct = int(round((1.0 - (idle - self._prev_cpu_idle) / (total - self._prev_cpu_total)) * 100))
+                self._prev_cpu_total = total
+                self._prev_cpu_idle = idle
+            except Exception:
+                pass
+
+            kernel = os.uname().release
+            sched = "BORE (Nativo)"
+            try:
+                if os.path.exists("/sys/kernel/sched_ext/state"):
+                    with open("/sys/kernel/sched_ext/state") as f:
+                        if f.read().strip() == "enabled":
+                            with open("/sys/kernel/sched_ext/root/ops") as f2:
+                                sched = "scx_" + f2.read().strip().split("_")[0]
+            except Exception:
+                pass
+
+            root_fstype = "Btrfs"
+            try:
+                with open("/proc/mounts", "r", encoding="utf-8") as f:
+                    for line in f:
+                        parts = line.split()
+                        if len(parts) >= 3 and parts[1] == "/":
+                            root_fstype = parts[2].upper()
+                            break
+            except Exception:
+                pass
+
+            procs = []
+            try:
+                out = subprocess.check_output(
+                    ["ps", "-eo", "pid,comm,%cpu,rss", "--sort=-%cpu"],
+                    text=True, timeout=1.5
+                ).splitlines()[1:16]
+                for line in out:
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        pid, comm, pcpu, rss_kb = parts[0], parts[1], parts[2], int(parts[3])
+                        procs.append({
+                            "pid": pid,
+                            "name": comm,
+                            "cpu": f"{float(pcpu):.1f}%",
+                            "mem": f"{rss_kb / 1024:.1f} MB"
+                        })
+            except Exception:
+                pass
+
+            return json.dumps({
+                "user": display_name,
+                "username": uname,
+                "hostname": hostname,
+                "userEmail": f"{uname}@{hostname}",
+                "cpu": cpu_model,
+                "cpuPct": max(1, min(100, cpu_pct)),
+                "ram": f"{mem_used_gb:.1f} / {mem_total_gb:.1f} GB ({mem_pct}%)",
+                "ramPct": mem_pct,
+                "kernel": kernel,
+                "sched": sched,
+                "diskLabel": f"Disco del Sistema ({root_fstype})",
+                "diskInfo": f"Activo • {root_fstype}",
+                "procs": procs
+            })
+
     mode = sys.argv[1] if len(sys.argv) > 1 else "explorer"
     arg2 = sys.argv[2] if len(sys.argv) > 2 else ""
     if arg2.startswith("file://"):
         arg2 = urllib.parse.unquote(arg2[7:])
+
+    dump_sysinfo_file()
 
     app = QGuiApplication(sys.argv)
     if mode == "settings":
@@ -417,6 +884,7 @@ def main():
     view.show()
 
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

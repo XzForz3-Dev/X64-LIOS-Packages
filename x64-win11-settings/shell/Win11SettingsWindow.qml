@@ -17,7 +17,7 @@ Rectangle {
         "showBatteryPct": true,
         "wallpaperMode": 0
     })
-    property var sysInfo: ({ "hostname": "x64-pc", "cpu": "AMD Ryzen / Intel", "ram": "64 GB", "kernel": "7.3.5-cachyos", "sched": "scx_lavd" })
+    property var sysInfo: ({ "user": "Usuario", "username": "x64", "hostname": "x64-pc", "userEmail": "x64@x64-pc", "cpu": "Procesador x86_64", "ram": "16 GB", "kernel": "Linux", "sched": "scx_lavd", "diskLabel": "Disco del Sistema (BTRFS)" })
     property var drives: []
 
     component WinSvg : Image {
@@ -64,8 +64,8 @@ Rectangle {
                     WinSvg { width: 42; height: 42; iconFile: "x64lios.png" }
                     Column {
                         anchors.verticalCenter: parent.verticalCenter
-                        Text { text: "Cristian"; color: "#ffffff"; font.bold: true; font.pixelSize: 13 }
-                        Text { text: "x64studios@x64lios.com"; color: "#999999"; font.pixelSize: 11 }
+                        Text { text: root.sysInfo.user || "Usuario"; color: "#ffffff"; font.bold: true; font.pixelSize: 13 }
+                        Text { text: root.sysInfo.userEmail || "x64@x64lios"; color: "#999999"; font.pixelSize: 11 }
                     }
                 }
 

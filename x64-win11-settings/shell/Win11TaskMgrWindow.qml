@@ -63,8 +63,8 @@ Rectangle {
                     Layout.fillWidth: true; height: 54; radius: 6; color: "#1d1d1d"; border.color: "#10b981"
                     Column {
                         anchors.centerIn: parent
-                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Disco NVMe (ADIOS)"; color: "#6ee7b7"; font.pixelSize: 14; font.bold: true }
-                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Activo • Btrfs ZSTD"; color: "#aaaaaa"; font.pixelSize: 11 }
+                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.sysInfo.diskLabel || "Disco del Sistema"; color: "#6ee7b7"; font.pixelSize: 14; font.bold: true }
+                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.sysInfo.diskInfo || "Activo"; color: "#aaaaaa"; font.pixelSize: 11 }
                     }
                 }
             }

@@ -13,7 +13,8 @@ if command -v gsettings >/dev/null 2>&1; then
     gsettings set org.gnome.desktop.interface cursor-theme 'breeze_cursors' 2>/dev/null || true
 fi
 
-# 1. Calibrate multi-monitor layout (Laptop internal left 0,0 -> External right 1920,0)
+# 1. Generate dynamic user & hardware profile + calibrate multi-monitor layout
+/usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
 /usr/bin/x64-win11-outputs &
 
 # 2. Polkit authentication agent
