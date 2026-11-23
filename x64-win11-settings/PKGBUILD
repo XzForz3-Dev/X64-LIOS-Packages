@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-win11-settings
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Official X64 LIOS Windows 11 26H2 Fluent Dark Wayland Desktop Environment (labwc + Quickshell)"
 arch=('any')
 url="https://x64lios.com"
@@ -22,6 +22,8 @@ depends=(
     'grim'
     'slurp'
     'brightnessctl'
+    'breeze-cursors'
+    'breeze-icons'
     'adw-gtk-theme'
     'papirus-icon-theme'
     'kitty'
@@ -35,9 +37,13 @@ package() {
     install -m755 "${startdir}/x64-win11-outputs" "${pkgdir}/usr/bin/x64-win11-outputs"
     install -m755 "${startdir}/x64-win11-app" "${pkgdir}/usr/bin/x64-win11-app"
 
-    # 2. Wayland session entry for SDDM & Desktop Application entries
+    # 2. Wayland session entry for SDDM, XDG Desktop Portal mapping & Desktop Application entries
     install -d "${pkgdir}/usr/share/wayland-sessions"
     install -m644 "${startdir}/x64-win11.desktop" "${pkgdir}/usr/share/wayland-sessions/x64-win11.desktop"
+
+    install -d "${pkgdir}/usr/share/xdg-desktop-portal"
+    install -m644 "${startdir}/labwc-portals.conf" "${pkgdir}/usr/share/xdg-desktop-portal/labwc-portals.conf"
+    install -m644 "${startdir}/labwc-portals.conf" "${pkgdir}/usr/share/xdg-desktop-portal/wlroots-portals.conf"
 
     install -d "${pkgdir}/usr/share/applications"
     install -m644 "${startdir}/x64-win11-explorer.desktop" "${pkgdir}/usr/share/applications/x64-win11-explorer.desktop"

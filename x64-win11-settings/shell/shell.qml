@@ -54,6 +54,11 @@ ShellRoot {
     PwObjectTracker { objects: [shellRoot.defaultSink] }
 
     property string lastCmdToken: ""
+    property bool firstPollDone: false
+
+    function saveConfigKey(k, valJson) {
+        Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "set-config", k, valJson]);
+    }
 
     function closeAllPopups() {
         startOpen = false;
@@ -79,29 +84,30 @@ ShellRoot {
                 var raw = text || "";
                 var parts = raw.split("---CFG---");
                 var cmdLine = (parts[0] || "").trim();
-                if (cmdLine !== "" && cmdLine !== shellRoot.lastCmdToken) {
-                    if (shellRoot.lastCmdToken !== "") {
-                        var act = cmdLine.split(":")[0];
-                        if (act === "toggle-start") {
-                            var ns = !shellRoot.startOpen;
-                            shellRoot.closeAllPopups();
-                            shellRoot.startOpen = ns;
-                        } else if (act === "toggle-qs") {
-                            var nq = !shellRoot.quickSettingsOpen;
-                            shellRoot.closeAllPopups();
-                            shellRoot.quickSettingsOpen = nq;
-                        } else if (act === "toggle-calendar") {
-                            var nc = !shellRoot.calendarOpen;
-                            shellRoot.closeAllPopups();
-                            shellRoot.calendarOpen = nc;
-                        } else if (act === "toggle-run") {
-                            shellRoot.closeAllPopups();
-                            shellRoot.runDialogOpen = !shellRoot.runDialogOpen;
-                        } else if (act === "lock") {
-                            shellRoot.closeAllPopups();
-                            shellRoot.lockPromptOpen = false;
-                            shellRoot.lockScreenOpen = true;
-                        }
+                if (!shellRoot.firstPollDone) {
+                    shellRoot.lastCmdToken = cmdLine;
+                    shellRoot.firstPollDone = true;
+                } else if (cmdLine !== "" && cmdLine !== shellRoot.lastCmdToken) {
+                    var act = cmdLine.split(":")[0];
+                    if (act === "toggle-start") {
+                        var ns = !shellRoot.startOpen;
+                        shellRoot.closeAllPopups();
+                        shellRoot.startOpen = ns;
+                    } else if (act === "toggle-qs") {
+                        var nq = !shellRoot.quickSettingsOpen;
+                        shellRoot.closeAllPopups();
+                        shellRoot.quickSettingsOpen = nq;
+                    } else if (act === "toggle-calendar") {
+                        var nc = !shellRoot.calendarOpen;
+                        shellRoot.closeAllPopups();
+                        shellRoot.calendarOpen = nc;
+                    } else if (act === "toggle-run") {
+                        shellRoot.closeAllPopups();
+                        shellRoot.runDialogOpen = !shellRoot.runDialogOpen;
+                    } else if (act === "lock") {
+                        shellRoot.closeAllPopups();
+                        shellRoot.lockPromptOpen = false;
+                        shellRoot.lockScreenOpen = true;
                     }
                     shellRoot.lastCmdToken = cmdLine;
                 }
@@ -175,7 +181,7 @@ ShellRoot {
                         ? (shellRoot.wpDir + "win11-bloom-dark.jpg")
                         : (shellRoot.wallpaperMode === 1
                            ? (shellRoot.wpDir + "win11-bloom-light.jpg")
-                           : "file:///usr/share/backgrounds/x64-lios/01-monolith.jpg")
+                           : (shellRoot.wpDir + "x64-monolith.jpg"))
                 fillMode: Image.PreserveAspectCrop
                 smooth: true
             }
@@ -490,6 +496,81 @@ ShellRoot {
                         }
                     }
                 }
+
+                // Dynamic Unpinned Running Wayland Windows
+                Repeater {
+                    model: {
+                        var list = taskbarWin.toplevels;
+                        var pinnedKeys = ["explorer", "chromium", "antigravity", "shelly", "kitty", "x64-hello", "settings"];
+                        var extra = [];
+                        for (var i = 0; i < list.length; i++) {
+                            var app = (list[i].appId || "").toLowerCase();
+                            var ttl = (list[i].title || "").toLowerCase();
+                            var isPinned = false;
+                            for (var j = 0; j < pinnedKeys.length; j++) {
+                                if (app.indexOf(pinnedKeys[j]) !== -1 || ttl.indexOf(pinnedKeys[j]) !== -1) {
+                                    isPinned = true;
+                                    break;
+                                }
+                            }
+                            if (!isPinned) {
+                                extra.push(list[i]);
+                            }
+                        }
+                        return extra;
+                    }
+
+                    delegate: Rectangle {
+                        id: dynBtn
+                        required property var modelData
+                        width: shellRoot.taskbarCompact ? 34 : 40
+                        height: shellRoot.taskbarCompact ? 34 : 40
+                        radius: 4
+                        readonly property bool isFocused: Boolean(modelData && modelData.activated)
+                        readonly property string dynIcon: {
+                            var a = ((modelData ? modelData.appId : "") || "").toLowerCase();
+                            var t = ((modelData ? modelData.title : "") || "").toLowerCase();
+                            if (a.indexOf("taskmgr") !== -1 || t.indexOf("tareas") !== -1) return "thispc.svg";
+                            if (a.indexOf("discord") !== -1) return "discord.svg";
+                            if (a.indexOf("steam") !== -1) return "steam.svg";
+                            if (a.indexOf("calc") !== -1) return "calculator.svg";
+                            if (a.indexOf("disk") !== -1) return "drive-c.svg";
+                            if (a.indexOf("update") !== -1) return "update.svg";
+                            if (a.indexOf("loupe") !== -1 || a.indexOf("image") !== -1) return "folder-images.svg";
+                            return "windows.svg";
+                        }
+                        color: (isFocused || dynHov.containsMouse) ? "#24ffffff" : "transparent"
+
+                        WinSvg {
+                            anchors.centerIn: parent
+                            width: shellRoot.taskbarCompact ? 21 : 25
+                            height: shellRoot.taskbarCompact ? 21 : 25
+                            iconFile: dynBtn.dynIcon
+                        }
+
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 2
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: dynBtn.isFocused ? 16 : 6
+                            height: 3
+                            radius: 1.5
+                            color: dynBtn.isFocused ? "#60cdff" : "#8a8a8a"
+                        }
+
+                        MouseArea {
+                            id: dynHov
+                            anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: (mouse) => {
+                                shellRoot.closeAllPopups();
+                                if (!dynBtn.modelData) return;
+                                if (mouse.button === Qt.MiddleButton) dynBtn.modelData.close();
+                                else dynBtn.modelData.activate();
+                            }
+                        }
+                    }
+                }
             }
 
             // [3] Right System Tray
@@ -716,7 +797,9 @@ ShellRoot {
                             onClicked: {
                                 shellRoot.ctxMenuOpen = false;
                                 if (modelData.cmd === "__wp__") {
-                                    shellRoot.wallpaperMode = (shellRoot.wallpaperMode + 1) % 3;
+                                    var nextWp = (shellRoot.wallpaperMode + 1) % 3;
+                                    shellRoot.wallpaperMode = nextWp;
+                                    shellRoot.saveConfigKey("wallpaperMode", String(nextWp));
                                 } else if (modelData.cmd === "__run__") {
                                     shellRoot.runDialogOpen = true;
                                 } else if (modelData.cmd !== "") {
@@ -855,7 +938,11 @@ ShellRoot {
                                         }
                                         MouseArea {
                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                            onClicked: shellRoot.showRecommended = !shellRoot.showRecommended
+                                            onClicked: {
+                                                var nextRec = !shellRoot.showRecommended;
+                                                shellRoot.showRecommended = nextRec;
+                                                shellRoot.saveConfigKey("showRecommended", nextRec ? "true" : "false");
+                                            }
                                         }
                                     }
                                 }

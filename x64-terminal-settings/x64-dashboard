@@ -907,7 +907,7 @@ except Exception:
         if test (count $win11_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $win11_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $win11_pkgs 2>/dev/null
         end
-        sudo rm -rf /usr/share/x64-win11 /etc/xdg/x64-win11 /usr/share/themes/X64-Win11-Dark /etc/skel/.config/labwc /usr/share/wayland-sessions/x64-win11.desktop /usr/share/applications/x64-win11-*.desktop 2>/dev/null
+        sudo rm -rf /usr/share/x64-win11 /etc/xdg/x64-win11 /usr/share/themes/X64-Win11-Dark /etc/skel/.config/labwc /usr/share/wayland-sessions/x64-win11.desktop /usr/share/applications/x64-win11-*.desktop /usr/share/xdg-desktop-portal/labwc-portals.conf /usr/share/xdg-desktop-portal/wlroots-portals.conf 2>/dev/null
         if test -f /usr/share/wayland-sessions/labwc.desktop
             sudo sed -i '/^NoDisplay=true$/d' /usr/share/wayland-sessions/labwc.desktop 2>/dev/null
         end
@@ -1494,7 +1494,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Windows 11 26H2 (Fluent Wayland Suite)...\e[0m"
             end
-            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr sddm x64-sddm-theme polkit-gnome python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp brightnessctl file-roller loupe papers gnome-calculator gnome-disk-utility blueman adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
+            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr sddm x64-sddm-theme polkit-gnome python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp brightnessctl breeze-cursors breeze-icons file-roller loupe papers gnome-calculator gnome-disk-utility blueman adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Windows 11 26H2 (X64 Fluent Edition)"

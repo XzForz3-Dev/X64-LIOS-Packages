@@ -3,3 +3,4 @@ XKB_DEFAULT_OPTIONS=grp:alt_shift_toggle
 XCURSOR_THEME=breeze_cursors
 XCURSOR_SIZE=24
 GTK_THEME=adw-gtk3-dark
+QT_QPA_PLATFORMTHEME=gtk3

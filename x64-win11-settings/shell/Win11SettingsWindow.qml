@@ -124,7 +124,7 @@ Rectangle {
                                 width: 100; height: 58; radius: 4; color: "#000000"; border.color: "#555555"; border.width: 2
                                 Image {
                                     anchors.fill: parent; anchors.margins: 2; cache: false
-                                    source: root.cfg.wallpaperMode === 0 ? (wpDirUrl + "win11-bloom-dark.jpg") : (root.cfg.wallpaperMode === 1 ? (wpDirUrl + "win11-bloom-light.jpg") : "file:///usr/share/backgrounds/x64-lios/01-monolith.jpg")
+                                    source: root.cfg.wallpaperMode === 0 ? (wpDirUrl + "win11-bloom-dark.jpg") : (root.cfg.wallpaperMode === 1 ? (wpDirUrl + "win11-bloom-light.jpg") : (wpDirUrl + "x64-monolith.jpg"))
                                     fillMode: Image.PreserveAspectCrop
                                 }
                             }
@@ -163,7 +163,7 @@ Rectangle {
                                     model: [
                                         { mode: 0, src: wpDirUrl + "win11-bloom-dark.jpg" },
                                         { mode: 1, src: wpDirUrl + "win11-bloom-light.jpg" },
-                                        { mode: 2, src: "file:///usr/share/backgrounds/x64-lios/01-monolith.jpg" }
+                                        { mode: 2, src: wpDirUrl + "x64-monolith.jpg" }
                                     ]
                                     delegate: Rectangle {
                                         width: 96; height: 60; radius: 5

@@ -20,8 +20,28 @@ case "$1" in
         ;;
     reload)
         pkill -f 'quickshell.*x64-win11' 2>/dev/null || true
-        sleep 0.15
-        setsid -f quickshell -p /usr/share/x64-win11/shell/shell.qml >/tmp/x64-win11-shell.log 2>&1 &
+        ;;
+    set-config)
+        python3 - "$2" "$3" <<'PYEOF'
+import json, os, sys
+p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+cfg = {}
+if os.path.isfile(p):
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:
+        cfg = {}
+try:
+    cfg[sys.argv[1]] = json.loads(sys.argv[2])
+except Exception:
+    cfg[sys.argv[1]] = sys.argv[2]
+tmp = p + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(cfg, f)
+os.replace(tmp, p)
+PYEOF
         ;;
     volume)
         case "$2" in
