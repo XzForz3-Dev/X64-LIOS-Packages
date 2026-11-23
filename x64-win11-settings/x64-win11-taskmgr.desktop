@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Task Manager
+Name[es]=Administrador de tareas
+Comment=Windows 11 26H2 Live Task & Performance Manager
+Comment[es]=Administrador de tareas y rendimiento en tiempo real de Windows 11 26H2
+Exec=/usr/bin/x64-win11-app taskmgr
+Icon=/usr/share/x64-win11/assets/icons/gaming.svg
+Terminal=false
+Type=Application
+Categories=System;Monitor;
+StartupNotify=false

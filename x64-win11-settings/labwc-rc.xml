@@ -66,6 +66,9 @@
     <keybind key="W-Return">
       <action name="Execute" command="kitty" />
     </keybind>
+    <keybind key="W-h">
+      <action name="Execute" command="/usr/bin/x64-hello" />
+    </keybind>
     <keybind key="C-S-Escape">
       <action name="Execute" command="/usr/bin/x64-win11-ctl taskmgr" />
     </keybind>

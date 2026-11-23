@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Windows 11 Settings
+Name[es]=Configuración de Windows 11
+Comment=Windows 11 26H2 System & Personalization Settings
+Comment[es]=Configuración del sistema y personalización de Windows 11 26H2
+Exec=/usr/bin/x64-win11-app settings
+Icon=/usr/share/x64-win11/assets/icons/settings.svg
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;System;
+StartupNotify=false

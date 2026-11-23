@@ -524,6 +524,10 @@ function configure_desktop_boot_mode -a dm_service desktop_name
 end
 
 function clean_previous_desktops -a target_id
+    if test -z "$DBUS_SESSION_BUS_ADDRESS"; and test -S "/run/user/"(id -u)"/bus"
+        set -gx DBUS_SESSION_BUS_ADDRESS "unix:path=/run/user/"(id -u)"/bus"
+    end
+
     if test $is_es -eq 1
         echo -e "\n  \e[1;33m[*] Retirando entorno anterior para mantener la pureza del sistema...\e[0m"
     else
@@ -535,14 +539,16 @@ function clean_previous_desktops -a target_id
     sudo systemctl disable sddm gdm lightdm cosmic-greeter 2>/dev/null
 
     # Remove packages from previous desktop with safe recursive cascade (-Rcs)
-    if test "$target_id" != "1"; and test (count (pacman -Qq x64-hyprland-settings hyprland 2>/dev/null)) -gt 0
+    if test "$target_id" != "1"; and test (count (pacman -Qq x64-hyprland-settings hyprland x64-themes 2>/dev/null)) -gt 0
         if test $is_es -eq 1
             echo -e "  \e[0;37m-> Desinstalando Hyprland Nativo y componentes...\e[0m"
         else
             echo -e "  \e[0;37m-> Uninstalling Native Hyprland and components...\e[0m"
         end
+        pkill -x mpvpaper 2>/dev/null
+        pkill -x swaybg 2>/dev/null
         if test "$target_id" = "8"
-            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings papirus-icon-theme dolphin ark hyprpwcenter swaybg loupe gnome-text-editor kdegraphics-thumbnailers ffmpegthumbs 2>/dev/null | sort -u)
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings x64-themes mpvpaper papirus-icon-theme dolphin ark hyprpwcenter swaybg loupe gnome-text-editor kdegraphics-thumbnailers ffmpegthumbs breeze 2>/dev/null | sort -u)
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
@@ -553,25 +559,54 @@ function clean_previous_desktops -a target_id
                 end
             end
         else if test "$target_id" = "9"
-            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder cliphist xdg-desktop-portal-hyprland qalculate-gtk gnome-text-editor xdg-terminal-exec hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings x64-themes hyprland uwsm swaybg mpvpaper socat hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder cliphist xdg-desktop-portal-hyprland qalculate-gtk gnome-text-editor xdg-terminal-exec hyprland-preview-share-picker qtengine dolphin ark ffmpegthumbs kdegraphics-thumbnailers breeze 2>/dev/null | sort -u)
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
             sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null
         else
-            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings hyprland uwsm quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk loupe papers gnome-text-editor gnome-disk-utility adw-gtk-theme xdg-terminal-exec hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
+            set -l hypr_pkgs (pacman -Qq x64-hyprland-settings x64-themes hyprland uwsm quickshell swaybg mpvpaper socat hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder wf-recorder grim slurp cliphist xdg-desktop-portal-hyprland papirus-icon-theme blueman qalculate-gtk loupe papers gnome-text-editor gnome-disk-utility adw-gtk-theme xdg-terminal-exec hyprland-preview-share-picker qtengine 2>/dev/null | sort -u)
+            if test "$target_id" != "3"
+                set -a hypr_pkgs (pacman -Qq dolphin ark ffmpegthumbs kdegraphics-thumbnailers breeze 2>/dev/null)
+            end
             if test (count $hypr_pkgs) -gt 0
                 sudo pacman -Rcs --noconfirm $hypr_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $hypr_pkgs 2>/dev/null
             end
             sudo rm -f /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop /usr/share/wayland-sessions/x64-lios-omarchy.desktop 2>/dev/null
         end
-        sudo rm -rf /etc/skel/.config/hypr /etc/skel/.config/quickshell /etc/xdg/hypr 2>/dev/null
-        sudo rm -f /etc/environment.d/10-qt.conf /usr/lib/environment.d/10-qt.conf /usr/bin/papirus-folders 2>/dev/null
+        sudo rm -rf /etc/skel/.config/hypr /etc/skel/.config/quickshell /etc/skel/.config/gtk-3.0 /etc/skel/.config/gtk-4.0 /etc/skel/.config/kdeglobals /etc/skel/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service /etc/xdg/hypr /usr/share/x64-themes /etc/tmpfiles.d/x64-cpufreq.conf 2>/dev/null
+        sudo rm -f /etc/environment.d/10-qt.conf /usr/lib/environment.d/10-qt.conf /usr/bin/papirus-folders /usr/bin/x64-theme /usr/bin/x64-hyprland-ctl /usr/bin/x64-hyprland-scale 2>/dev/null
+        sudo sed -i '/^QT_QPA_PLATFORMTHEME=gtk3$/d' /etc/environment 2>/dev/null
         for udir in /home/*
             if test -d $udir
-                rm -rf $udir/.config/hypr $udir/.config/hypr.x64-native.bak $udir/.config/quickshell $udir/.config/quickshell.x64-native.bak 2>/dev/null
-                rm -f $udir/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service 2>/dev/null
+                bash -c 'shopt -s nullglob
+                    u="$1"
+                    tid="$2"
+                    rm -rf "$u"/.config/{hypr,hypr.x64-native.bak,quickshell,quickshell.x64-native.bak,x64-theme,x64-themes}
+                    rm -rf "$u"/.local/state/x64-hyprland "$u"/.cache/x64-theme "$u"/.local/share/themes/X64-GTK-* "$u"/.local/share/icons/Papirus-Dark-X64-* "$u"/.local/share/color-schemes/{BreezeDark.colors,BreezeLight.colors,X64LiveTheme.colors}
+                    rm -f "$u"/.config/systemd/user/graphical-session.target.wants/hyprpolkitagent.service "$u"/.config/kitty/x64-theme.conf "$u"/.config/btop/themes/x64-theme.theme "$u"/.config/gtk-3.0/gtk.css "$u"/.config/gtk-4.0/gtk.css
+                    if [ "$tid" != "3" ]; then
+                        rm -rf "$u"/.config/{kdeglobals,dolphinrc,kiorc,trashrc,session} "$u"/.local/share/{dolphin,baloo} "$u"/.local/state/dolphinstaterc "$u"/.local/state/UserFeedback.org.kde.*
+                    fi
+                    if [ -f /etc/xdg/kitty/kitty.conf ] && grep -q "x64-theme.conf" "$u"/.config/kitty/kitty.conf 2>/dev/null; then
+                        cp -f /etc/xdg/kitty/kitty.conf "$u"/.config/kitty/kitty.conf
+                    fi
+                    if [ -f "$u"/.config/btop/btop.conf ] && grep -q "x64-theme" "$u"/.config/btop/btop.conf 2>/dev/null; then
+                        sed -i "/color_theme.*x64-theme/d" "$u"/.config/btop/btop.conf 2>/dev/null || true
+                    fi
+                    if [ -f /etc/skel/.config/starship.toml ] && grep -q "x64-theme" "$u"/.config/starship.toml 2>/dev/null; then
+                        cp -f /etc/skel/.config/starship.toml "$u"/.config/starship.toml
+                    fi
+                    if [ -f /etc/fastfetch/config.jsonc ] && grep -q "38;5;196" "$u"/.config/fastfetch/config.jsonc 2>/dev/null; then
+                        cp -f /etc/fastfetch/config.jsonc "$u"/.config/fastfetch/config.jsonc
+                    fi
+                ' _ "$udir" "$target_id" 2>/dev/null
             end
+        end
+        if type -q gsettings
+            gsettings reset org.gnome.desktop.interface gtk-theme 2>/dev/null
+            gsettings reset org.gnome.desktop.interface icon-theme 2>/dev/null
+            gsettings reset org.gnome.desktop.interface accent-color 2>/dev/null
         end
     end
 
@@ -841,17 +876,41 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Windows 11 26H2 Edition suite...\e[0m"
         end
-        set -l win11_pkgs (pacman -Qq x64-win11-settings wlr-randr xdg-desktop-portal-wlr 2>/dev/null | sort -u)
+        set -l win11_pkgs (pacman -Qq x64-win11-settings wlr-randr xdg-desktop-portal-wlr polkit-gnome 2>/dev/null | sort -u)
         if test "$target_id" != "7"
             set -a win11_pkgs (pacman -Qq labwc 2>/dev/null)
         end
         if not contains "$target_id" "1" "8"
             set -a win11_pkgs (pacman -Qq quickshell 2>/dev/null)
         end
+        if not contains "$target_id" "2" "4" "5" "6" "7"
+            set -a win11_pkgs (pacman -Qq file-roller gnome-calculator 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "2" "5" "8"
+            set -a win11_pkgs (pacman -Qq loupe 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "2" "4" "5" "8"
+            set -a win11_pkgs (pacman -Qq papers 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "2" "4" "5" "6" "7" "8"
+            set -a win11_pkgs (pacman -Qq gnome-disk-utility 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "6" "7" "8"
+            set -a win11_pkgs (pacman -Qq blueman 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "2" "8"
+            set -a win11_pkgs (pacman -Qq adw-gtk-theme 2>/dev/null)
+        end
+        if not contains "$target_id" "1"
+            set -a win11_pkgs (pacman -Qq papirus-icon-theme 2>/dev/null)
+        end
         if test (count $win11_pkgs) -gt 0
             sudo pacman -Rcs --noconfirm $win11_pkgs 2>/dev/null; or sudo pacman -Rc --noconfirm $win11_pkgs 2>/dev/null
         end
-        sudo rm -rf /usr/share/x64-win11 /etc/xdg/x64-win11 /usr/share/wayland-sessions/x64-win11.desktop 2>/dev/null
+        sudo rm -rf /usr/share/x64-win11 /etc/xdg/x64-win11 /usr/share/themes/X64-Win11-Dark /etc/skel/.config/labwc /usr/share/wayland-sessions/x64-win11.desktop /usr/share/applications/x64-win11-*.desktop 2>/dev/null
+        if test -f /usr/share/wayland-sessions/labwc.desktop
+            sudo sed -i '/^NoDisplay=true$/d' /usr/share/wayland-sessions/labwc.desktop 2>/dev/null
+        end
         for udir in /home/*
             if test -d $udir
                 rm -rf $udir/.local/state/x64-win11 2>/dev/null
@@ -973,18 +1032,27 @@ except Exception:
                     for sdir in "$u/.agents/skills" "$u/.claude/skills" "$u/.codex/skills" "$u/.pi/agent/skills" "$u/.hermes/skills" "$u/.gemini/config/skills" "$u/.local/share/icons/hicolor/scalable/apps" "$u/.config/systemd/user"; do
                         [ -d "$sdir" ] && find "$sdir" -xtype l -delete 2>/dev/null || true
                     done
+                    rm -rf "$u"/.local/state/herdr
+                    for mf in "$u/.config/mimeapps.list" "$u/.local/share/applications/mimeapps.list"; do
+                        if [ -f "$mf" ]; then
+                            sed -i "/HEY\.desktop/d; /superwhisper-url\.desktop/d" "$mf" 2>/dev/null || true
+                            if [ ! -f /usr/share/applications/google-chrome.desktop ]; then
+                                sed -i "/google-chrome\.desktop/d" "$mf" 2>/dev/null || true
+                            fi
+                        fi
+                    done
                 ' _ "$udir" 2>/dev/null
             end
         end
     end
     if not contains "$target_id" "1" "8"
-        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils 2>/dev/null | sort -u)
+        set -l unused_hypr (pacman -Qq hyprpicker hyprland-guiutils hyprtoolkit hyprgraphics hyprlang hyprutils x64-themes mpvpaper 2>/dev/null | sort -u)
         if test (count $unused_hypr) -gt 0
             sudo pacman -Rcs --noconfirm $unused_hypr 2>/dev/null; or sudo pacman -Rc --noconfirm $unused_hypr 2>/dev/null
         end
         for udir in /home/*
             if test -d $udir
-                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/hyprland "$u"/.cache/{cliphist,quickshell,xdg-terminal-exec}' _ "$udir" 2>/dev/null
+                bash -c 'shopt -s nullglob; u="$1"; rm -rf "$u"/.local/share/hyprland "$u"/.local/share/qalculate "$u"/.cache/{cliphist,quickshell,xdg-terminal-exec,x64-theme}' _ "$udir" 2>/dev/null
             end
         end
     end
@@ -1280,7 +1348,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Native Hyprland (Cyberpunk Suite)...\e[0m"
             end
-            sudo pacman -Syu --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell swaybg hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme xdg-terminal-exec xdg-desktop-portal-hyprland x64-hyprland-settings chromium
+            sudo pacman -Syu --needed --noconfirm --overwrite "*" hyprland sddm x64-sddm-theme dolphin ark ffmpegthumbs kdegraphics-thumbnailers loupe papers gnome-text-editor qalculate-gtk blueman gnome-disk-utility kitty opencode quickshell qt6-multimedia swaybg mpvpaper socat brightnessctl hyprlock hypridle hyprpolkitagent hyprpwcenter hyprpicker hyprsunset gpu-screen-recorder cliphist adw-gtk-theme papirus-icon-theme xdg-terminal-exec xdg-desktop-portal-hyprland x64-themes x64-hyprland-settings chromium
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 if test -d $HOME/.config/hypr.x64-native.bak
@@ -1426,7 +1494,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Windows 11 26H2 (Fluent Wayland Suite)...\e[0m"
             end
-            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr sddm x64-sddm-theme polkit-gnome python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp file-roller loupe papers gnome-calculator gnome-disk-utility blueman adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
+            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr sddm x64-sddm-theme polkit-gnome python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp brightnessctl file-roller loupe papers gnome-calculator gnome-disk-utility blueman adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Windows 11 26H2 (X64 Fluent Edition)"

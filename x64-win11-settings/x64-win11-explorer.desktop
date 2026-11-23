@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=File Explorer
+Name[es]=Explorador de archivos
+Comment=Windows 11 26H2 Tabbed File Explorer
+Comment[es]=Explorador de archivos con pestañas de Windows 11 26H2
+Exec=/usr/bin/x64-win11-app explorer %u
+Icon=/usr/share/x64-win11/assets/icons/explorer.svg
+Terminal=false
+Type=Application
+Categories=System;FileTools;FileManager;
+MimeType=inode/directory;
+StartupNotify=false

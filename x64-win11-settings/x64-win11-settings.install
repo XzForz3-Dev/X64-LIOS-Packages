@@ -1,12 +1,40 @@
 post_install() {
-    # Hide stock labwc.desktop so SDDM only displays "X64 Windows 11 Edition (26H2)"
+    # 1. Detect system keyboard layout from localectl / vconsole
+    local sys_layout="es"
+    if command -v localectl >/dev/null 2>&1; then
+        sys_layout=$(localectl status 2>/dev/null | awk -F': ' '/X11 Layout/{print $2}' | tr -d ' ')
+        if [ -z "$sys_layout" ] || [ "$sys_layout" = "n/a" ]; then
+            sys_layout=$(localectl status 2>/dev/null | awk -F': ' '/VC Keymap/{print $2}' | tr -d ' ')
+        fi
+    fi
+    if [ -z "$sys_layout" ] || [ "$sys_layout" = "n/a" ]; then
+        [ -f /etc/vconsole.conf ] && sys_layout=$(grep '^KEYMAP=' /etc/vconsole.conf | cut -d= -f2 | tr -d '"'\'' ')
+    fi
+    [ -z "$sys_layout" ] && sys_layout="es"
+
+    local pair="es,us"
+    if [ "$sys_layout" = "us" ]; then
+        pair="us,es"
+    elif [ "$sys_layout" = "latam" ]; then
+        pair="latam,us"
+    else
+        pair="${sys_layout},us"
+    fi
+
+    for envf in /etc/xdg/x64-win11/labwc/environment /etc/skel/.config/labwc/environment; do
+        if [ -f "$envf" ]; then
+            sed -i "s/^XKB_DEFAULT_LAYOUT=.*/XKB_DEFAULT_LAYOUT=${pair}/" "$envf" 2>/dev/null || true
+        fi
+    done
+
+    # 2. Hide stock labwc.desktop so SDDM only displays "X64 Windows 11 Edition (26H2)"
     if [ -f /usr/share/wayland-sessions/labwc.desktop ]; then
         if ! grep -q "^NoDisplay=true" /usr/share/wayland-sessions/labwc.desktop 2>/dev/null; then
             echo "NoDisplay=true" >> /usr/share/wayland-sessions/labwc.desktop
         fi
     fi
 
-    # Pre-select x64-win11.desktop in SDDM state.conf
+    # 3. Pre-select x64-win11.desktop in SDDM state.conf
     primary_user=$(awk -F: '$3 >= 1000 && $3 < 60000 {print $1; exit}' /etc/passwd)
     mkdir -p /var/lib/sddm
     cat << EOF > /var/lib/sddm/state.conf
@@ -15,13 +43,25 @@ User=${primary_user:-x64}
 Session=/usr/share/wayland-sessions/x64-win11.desktop
 EOF
 
-    # Propagate labwc configuration and dark GTK settings to existing users
+    # 4. Propagate labwc configuration and clean dark GTK settings to existing users
     for udir in /home/*; do
         if [ -d "$udir" ]; then
             ug=$(stat -c "%u:%g" "$udir" 2>/dev/null || echo "1000:1000")
+            uid_num=$(stat -c "%u" "$udir" 2>/dev/null || echo "1000")
+            uname=$(basename "$udir")
+
             mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
             cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
             chmod 755 "$udir/.config/labwc/autostart" 2>/dev/null || true
+
+            # Remove any residual X64 Theme Studio / Cyberpunk overrides from previous desktop
+            rm -f "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css" "$udir/.config/kitty/x64-theme.conf" "$udir/.config/btop/themes/x64-theme.theme" 2>/dev/null || true
+            rm -rf "$udir/.local/share/themes/X64-GTK-A" "$udir/.local/share/themes/X64-GTK-B" "$udir/.local/share/icons/Papirus-Dark-X64-A" "$udir/.local/share/icons/Papirus-Dark-X64-B" "$udir/.local/share/color-schemes/BreezeDark.colors" "$udir/.local/share/color-schemes/BreezeLight.colors" "$udir/.local/share/color-schemes/X64LiveTheme.colors" 2>/dev/null || true
+
+            if [ -f /etc/xdg/kitty/kitty.conf ] && grep -q "x64-theme.conf" "$udir/.config/kitty/kitty.conf" 2>/dev/null; then
+                cp -f /etc/xdg/kitty/kitty.conf "$udir/.config/kitty/kitty.conf" 2>/dev/null || true
+                chown "$ug" "$udir/.config/kitty/kitty.conf" 2>/dev/null || true
+            fi
 
             for gver in gtk-3.0 gtk-4.0; do
                 cat << 'GTKINI' > "$udir/.config/$gver/settings.ini"
@@ -29,13 +69,21 @@ EOF
 gtk-application-prefer-dark-theme=1
 gtk-theme-name=adw-gtk3-dark
 gtk-icon-theme-name=Papirus-Dark
+gtk-cursor-theme-name=breeze_cursors
+gtk-cursor-theme-size=24
 gtk-font-name=Sans 10
 GTKINI
             done
 
+            if [ -S "/run/user/${uid_num}/bus" ] && command -v gsettings >/dev/null 2>&1; then
+                su - "$uname" -c "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid_num}/bus gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null; DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid_num}/bus gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null; DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid_num}/bus gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null; DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid_num}/bus gsettings set org.gnome.desktop.interface accent-color 'blue' 2>/dev/null" >/dev/null 2>&1 || true
+            fi
+
             chown -R "$ug" "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0" 2>/dev/null || true
         fi
     done
+
+    update-desktop-database /usr/share/applications 2>/dev/null || true
 }
 
 post_upgrade() {
@@ -44,4 +92,8 @@ post_upgrade() {
 
 post_remove() {
     rm -f /usr/share/wayland-sessions/x64-win11.desktop 2>/dev/null || true
+    if [ -f /usr/share/wayland-sessions/labwc.desktop ]; then
+        sed -i '/^NoDisplay=true$/d' /usr/share/wayland-sessions/labwc.desktop 2>/dev/null || true
+    fi
+    update-desktop-database /usr/share/applications 2>/dev/null || true
 }

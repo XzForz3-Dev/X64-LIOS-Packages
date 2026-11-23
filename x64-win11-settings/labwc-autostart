@@ -4,6 +4,15 @@
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP >/dev/null 2>&1 &
 systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP >/dev/null 2>&1 &
 
+# 0. Synchronize GTK/Libadwaita portal theme to clean Windows 11 Fluent Blue Dark
+if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface accent-color 'blue' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface cursor-theme 'breeze_cursors' 2>/dev/null || true
+fi
+
 # 1. Calibrate multi-monitor layout (Laptop internal left 0,0 -> External right 1920,0)
 /usr/bin/x64-win11-outputs &
 
@@ -22,10 +31,14 @@ if [ -x /usr/lib/kdeconnectd ]; then
     /usr/lib/kdeconnectd &
 fi
 
-# 5. Launch Quickshell Windows 11 26H2 Multi-Monitor Shell (with auto-respawn & live hot-reload)
+# 5. Launch Quickshell Windows 11 26H2 Multi-Monitor Shell
 pkill -f 'quickshell.*x64-win11' 2>/dev/null || true
 quickshell -p /usr/share/x64-win11/shell/shell.qml >/tmp/x64-win11-shell.log 2>&1 &
 
-# 6. Open Windows 11 26H2 File Explorer ("Este equipo") on first login welcome
-sleep 1.0
-/usr/bin/x64-win11-app explorer "Este equipo" &
+# 6. Respect X64 Hello autostart if enabled by user
+if [ -f "${HOME}/.config/autostart/x64-hello.desktop" ] && ! grep -qi "^Hidden=true" "${HOME}/.config/autostart/x64-hello.desktop" 2>/dev/null; then
+    if [ -x /usr/bin/x64-hello ]; then
+        sleep 1.0
+        /usr/bin/x64-hello &
+    fi
+fi
