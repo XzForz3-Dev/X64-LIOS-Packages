@@ -1,5 +1,11 @@
 post_install() {
-    # 1. Detect system keyboard layout from localectl / vconsole
+    # 1. Ensure /usr/local/bin/antigravity convenience symlink exists if antigravity-ide is installed
+    if [ -x /usr/bin/antigravity-ide ] && [ ! -e /usr/local/bin/antigravity ]; then
+        mkdir -p /usr/local/bin
+        ln -sf /usr/bin/antigravity-ide /usr/local/bin/antigravity 2>/dev/null || true
+    fi
+
+    # 2. Detect system keyboard layout from localectl / vconsole
     local sys_layout="es"
     if command -v localectl >/dev/null 2>&1; then
         sys_layout=$(localectl status 2>/dev/null | awk -F': ' '/X11 Layout/{print $2}' | tr -d ' ')

@@ -244,7 +244,7 @@ ShellRoot {
                         { title: "Este equipo",            icon: "thispc.svg",      cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
                         { title: "Papelera de\nreciclaje", icon: "trash-full.svg",  cmd: "/usr/bin/x64-win11-app explorer 'Escritorio'" },
                         { title: "Cristian",               icon: "folder-home.svg", cmd: "/usr/bin/x64-win11-app explorer 'Inicio'" },
-                        { title: "Antigravity\nIDE",       icon: "terminal.svg",    cmd: "antigravity" },
+                        { title: "Antigravity\nIDE",       icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
                         { title: "Microsoft Edge\n/ Web",  icon: "edge.svg",        cmd: "chromium" },
                         { title: "Tienda\nShelly",         icon: "store.svg",       cmd: "shelly" },
                         { title: "X64 Hello",              icon: "x64lios.png",     cmd: "x64-hello" },
@@ -426,13 +426,13 @@ ShellRoot {
                 // Pinned Applications
                 Repeater {
                     model: [
-                        { id: "explorer",    match: "explorer",    icon: "explorer.svg", cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                        { id: "chromium",    match: "chromium",    icon: "edge.svg",     cmd: "chromium" },
-                        { id: "antigravity", match: "antigravity", icon: "terminal.svg", cmd: "antigravity" },
-                        { id: "shelly",      match: "shelly",      icon: "store.svg",    cmd: "shelly" },
-                        { id: "kitty",       match: "kitty",       icon: "terminal.svg", cmd: "kitty" },
-                        { id: "x64hello",    match: "x64-hello",   icon: "x64lios.png",  cmd: "x64-hello" },
-                        { id: "settings",    match: "settings",    icon: "settings.svg", cmd: "/usr/bin/x64-win11-app settings" }
+                        { id: "explorer",    match: "explorer",    icon: "explorer.svg",    cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
+                        { id: "chromium",    match: "chromium",    icon: "edge.svg",        cmd: "chromium" },
+                        { id: "antigravity", match: "antigravity", icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
+                        { id: "shelly",      match: "shelly",      icon: "store.svg",       cmd: "shelly" },
+                        { id: "kitty",       match: "kitty",       icon: "terminal.svg",    cmd: "kitty" },
+                        { id: "x64hello",    match: "x64-hello",   icon: "x64lios.png",     cmd: "x64-hello" },
+                        { id: "settings",    match: "settings",    icon: "settings.svg",    cmd: "/usr/bin/x64-win11-app settings" }
                     ]
 
                     delegate: Rectangle {
@@ -777,7 +777,7 @@ ShellRoot {
                         { icon: "windows.svg",             label: "Personalizar (26H2)",        cmd: "/usr/bin/x64-win11-app settings 'Personalización (26H2)'" },
                         { icon: "folder-images.svg",       label: "Cambiar fondo 4K Bloom",     cmd: "__wp__" },
                         { icon: "terminal.svg",            label: "Abrir en Terminal (Kitty)",  cmd: "kitty" },
-                        { icon: "terminal.svg",            label: "Abrir Antigravity IDE",      cmd: "antigravity" },
+                        { icon: "antigravity.png",         label: "Abrir Antigravity IDE",      cmd: "/usr/bin/antigravity-ide" },
                         { icon: "terminal.svg",            label: "Ejecutar (Win + R 26H2)",    cmd: "__run__" },
                         { icon: "x64lios.png",             label: "Abrir X64 Hello",            cmd: "x64-hello" }
                     ]
@@ -952,7 +952,7 @@ ShellRoot {
                                     Repeater {
                                         model: [
                                             { name: "Explorador",    icon: "explorer.svg",        cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
-                                            { name: "Antigravity",   icon: "terminal.svg",        cmd: "antigravity" },
+                                            { name: "Antigravity",   icon: "antigravity.png",     cmd: "/usr/bin/antigravity-ide" },
                                             { name: "Edge / Web",    icon: "edge.svg",            cmd: "chromium" },
                                             { name: "Tienda Shelly", icon: "store.svg",           cmd: "shelly" },
                                             { name: "Configuración", icon: "settings.svg",        cmd: "/usr/bin/x64-win11-app settings" },
@@ -972,6 +972,7 @@ ShellRoot {
                                         ]
 
                                         delegate: Rectangle {
+                                            visible: shellRoot.searchQuery.trim() === "" || modelData.name.toLowerCase().indexOf(shellRoot.searchQuery.trim().toLowerCase()) !== -1
                                             width: 90; height: 76; radius: 6
                                             color: appHov.containsMouse ? "#28ffffff" : "transparent"
                                             Column {
@@ -1030,10 +1031,10 @@ ShellRoot {
                                                 { name: "Tienda Shelly", icon: "store.svg",    cmd: "shelly" }
                                             ]},
                                             { cat: "Desarrollo y Juegos", items: [
-                                                { name: "Antigravity",   icon: "terminal.svg", cmd: "antigravity" },
-                                                { name: "Steam Gaming",  icon: "steam.svg",    cmd: "steam" },
-                                                { name: "Discord",       icon: "discord.svg",  cmd: "discord" },
-                                                { name: "X64 Dashboard", icon: "x64lios.png",  cmd: "kitty -e x64-dashboard" }
+                                                { name: "Antigravity",   icon: "antigravity.png", cmd: "/usr/bin/antigravity-ide" },
+                                                { name: "Steam Gaming",  icon: "steam.svg",       cmd: "steam" },
+                                                { name: "Discord",       icon: "discord.svg",     cmd: "discord" },
+                                                { name: "X64 Dashboard", icon: "x64lios.png",     cmd: "kitty -e x64-dashboard" }
                                             ]}
                                         ]
                                         delegate: Rectangle {
@@ -1327,7 +1328,7 @@ ShellRoot {
                                 id: runInput
                                 anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
                                 verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12
-                                text: "antigravity"
+                                text: "antigravity-ide"
                                 onAccepted: { shellRoot.spawnCmd(runInput.text); shellRoot.runDialogOpen = false; }
                             }
                         }
