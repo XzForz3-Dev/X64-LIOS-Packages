@@ -68,7 +68,10 @@ Rectangle {
         "threadCount": 720,
         "sched": "scx_lavd",
         "kernel": "Linux",
-        "diskLabel": "Disco (C:) SSD",
+        "disks": [
+            { "id": "disk_0", "blk": "nvme0n1", "label": "Disco 0 (C:)", "titleLabel": "Disco 0 (C:) — SSD", "model": "Unidad del sistema", "type": "SSD", "fs": "BTRFS", "ioSched": "adios", "totalGb": 256.0, "freeGb": 100.0, "freeStr": "100.0 GB", "usedPct": 18, "activePct": 0, "readStr": "0.0 MB/s", "writeStr": "0.0 MB/s", "mounted": true, "subUsage": "18% ocupado" }
+        ],
+        "diskLabel": "Disco 0 (C:) — SSD",
         "diskModel": "Unidad del sistema",
         "diskType": "SSD",
         "diskFs": "BTRFS",
@@ -106,10 +109,19 @@ Rectangle {
 
     property var cpuHistory: [2, 3, 4, 3, 4, 3, 2, 3, 4, 3, 3, 4, 3, 2, 3, 4, 3, 3, 4, 3]
     property var ramHistory: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
-    property var diskHistory: [0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+    property var diskHistories: ({ "disk_0": [0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] })
     property var netRecvHistory: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     property var netSendHistory: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     property var gpuHistories: ({ "gpu_0": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })
+
+    readonly property bool isDiskPerfTab: root.perfSubTab === "disk" || root.perfSubTab.indexOf("disk_") === 0
+    readonly property var activeDiskObj: {
+        var list = root.sysInfo.disks || [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === root.perfSubTab) return list[i];
+        }
+        return list.length > 0 ? list[0] : ({ id: "disk_0", label: "Disco 0 (C:)", titleLabel: "Disco 0 (C:) — SSD", model: "Unidad del sistema", type: "SSD", fs: "BTRFS", ioSched: "adios", totalGb: 0, freeStr: "—", usedPct: 0, activePct: 0, readStr: "0.0 MB/s", writeStr: "0.0 MB/s", mounted: true, subUsage: "—" });
+    }
 
     readonly property bool isGpuPerfTab: root.perfSubTab.indexOf("gpu_") === 0
     readonly property var activeGpuObj: {
@@ -356,9 +368,15 @@ Rectangle {
             rh.push(Number(data.ramPct || 10));
             ramHistory = rh;
 
-            var dh = diskHistory.slice(Math.max(0, diskHistory.length - 59));
-            dh.push(Number(data.diskActivePct || 0));
-            diskHistory = dh;
+            var nextDiskHist = Object.assign({}, diskHistories);
+            var dList = data.disks || [];
+            for (var di = 0; di < dList.length; di++) {
+                var did = dList[di].id || ("disk_" + di);
+                var prevD = nextDiskHist[did] ? nextDiskHist[did].slice(Math.max(0, nextDiskHist[did].length - 59)) : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                prevD.push(Number(dList[di].activePct || 0));
+                nextDiskHist[did] = prevD;
+            }
+            diskHistories = nextDiskHist;
 
             var nrh = netRecvHistory.slice(Math.max(0, netRecvHistory.length - 59));
             nrh.push(Math.min(100, Math.round((Number(data.netRecvKbs || 0) / 1024.0) * 100.0)));
@@ -389,7 +407,6 @@ Rectangle {
             perfCanvas.requestPaint();
             miniCpuCanvas.requestPaint();
             miniRamCanvas.requestPaint();
-            miniDiskCanvas.requestPaint();
             miniNetCanvas.requestPaint();
         } catch (e) {}
     }
@@ -1003,22 +1020,35 @@ Rectangle {
                                 MouseArea { id: rCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.perfSubTab = "ram"; perfCanvas.requestPaint(); } }
                             }
 
-                            // 3. Disco Card
-                            Rectangle {
-                                width: parent.width; height: 62; radius: 6
-                                color: root.perfSubTab === "disk" ? "#2b2b2b" : (dCardH.containsMouse ? "#232323" : "transparent")
-                                border.color: root.perfSubTab === "disk" ? "#4ade80" : "#18ffffff"; border.width: 1
-                                RowLayout {
-                                    anchors.fill: parent; anchors.margins: 8; spacing: 10
-                                    MiniSpark { id: miniDiskCanvas; series: root.diskHistory; strokeColor: "#4ade80"; fillColor: "rgba(74, 222, 128, 0.24)" }
-                                    Column {
-                                        Layout.fillWidth: true; spacing: 2
-                                        Text { text: "Disco (C:)"; color: "#f5f5f5"; font.pixelSize: 12; font.weight: Font.DemiBold }
-                                        Text { text: root.sysInfo.diskType + " • " + root.sysInfo.diskActivePct + "%"; color: "#4ade80"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
-                                        Text { text: root.sysInfo.diskPct + "% ocupado"; color: "#8e8e8e"; font.pixelSize: 10 }
+                            // 3+. Dynamic Multi-Disk Cards (Disco 0 (C:), Disco 1 (D:), Disco 2... — ALL NVMe/SATA/HDD/SSD/USB!)
+                            Repeater {
+                                model: root.sysInfo.disks || []
+                                delegate: Rectangle {
+                                    id: diskCardDel
+                                    readonly property string dId: modelData.id || ("disk_" + index)
+                                    width: perfRailCol.width; height: 62; radius: 6
+                                    color: (root.perfSubTab === dId || (root.perfSubTab === "disk" && index === 0)) ? "#2b2b2b" : (dCardH.containsMouse ? "#232323" : "transparent")
+                                    border.color: (root.perfSubTab === dId || (root.perfSubTab === "disk" && index === 0)) ? "#4ade80" : "#18ffffff"; border.width: 1
+                                    RowLayout {
+                                        anchors.fill: parent; anchors.margins: 8; spacing: 10
+                                        MiniSpark {
+                                            series: root.diskHistories[diskCardDel.dId] || []
+                                            repaintTick: root.historyTick
+                                            strokeColor: "#4ade80"
+                                            fillColor: "rgba(74, 222, 128, 0.24)"
+                                        }
+                                        Column {
+                                            Layout.fillWidth: true; spacing: 2
+                                            Text { text: modelData.label || ("Disco " + index); color: "#f5f5f5"; font.pixelSize: 12; font.weight: Font.DemiBold; elide: Text.ElideRight; width: parent.width }
+                                            Text { text: (modelData.type || "Disco") + " • " + Number(modelData.activePct || 0) + "%"; color: "#4ade80"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
+                                            Text { text: modelData.subUsage || ""; color: "#8e8e8e"; font.pixelSize: 10; elide: Text.ElideRight; width: parent.width }
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: dCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: { root.perfSubTab = diskCardDel.dId; perfCanvas.requestPaint(); }
                                     }
                                 }
-                                MouseArea { id: dCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.perfSubTab = "disk"; perfCanvas.requestPaint(); } }
                             }
 
                             // 4. Red Card
@@ -1096,7 +1126,7 @@ Rectangle {
                             Text {
                                 text: root.perfSubTab === "cpu" ? "CPU"
                                       : (root.perfSubTab === "ram" ? "Memoria"
-                                         : (root.perfSubTab === "disk" ? root.sysInfo.diskLabel
+                                         : (root.isDiskPerfTab ? (root.activeDiskObj.titleLabel || "Disco 0")
                                             : (root.perfSubTab === "net" ? (root.sysInfo.netType + " (" + root.sysInfo.netIface + ")")
                                                : (root.activeGpuObj.label || "GPU 0"))))
                                 color: "#f5f5f5"; font.pixelSize: 22; font.weight: Font.DemiBold
@@ -1121,7 +1151,7 @@ Rectangle {
                             Text {
                                 text: root.perfSubTab === "cpu" ? root.sysInfo.cpu
                                       : (root.perfSubTab === "ram" ? (root.sysInfo.ramTotalGb + " GB RAM")
-                                         : (root.perfSubTab === "disk" ? root.sysInfo.diskModel
+                                         : (root.isDiskPerfTab ? (root.activeDiskObj.model || "Unidad")
                                             : (root.perfSubTab === "net" ? root.sysInfo.netIp
                                                : (root.activeGpuObj.name || "Adaptador gráfico"))))
                                 color: "#c4c4c4"; font.pixelSize: 12; elide: Text.ElideRight; Layout.maximumWidth: 340
@@ -1134,7 +1164,7 @@ Rectangle {
                             Text {
                                 text: root.perfSubTab === "cpu" ? (root.cpuShowPerCore ? "Uso por procesador lógico" : "% de uso")
                                       : (root.perfSubTab === "ram" ? "Uso de memoria física"
-                                         : (root.perfSubTab === "disk" ? "Tiempo de actividad de disco (%)"
+                                         : (root.isDiskPerfTab ? "Tiempo de actividad de disco (%)"
                                             : (root.perfSubTab === "net" ? "Rendimiento de red (↓ Recibir / ↑ Enviar)"
                                                : "Uso de GPU 3D (%)")))
                                 color: "#9a9a9a"; font.pixelSize: 11
@@ -1195,7 +1225,7 @@ Rectangle {
                             color: "#141414"
                             border.color: root.perfSubTab === "cpu" ? "#4cc2ff"
                                           : (root.perfSubTab === "ram" ? "#c084fc"
-                                             : (root.perfSubTab === "disk" ? "#4ade80"
+                                             : (root.isDiskPerfTab ? "#4ade80"
                                                 : (root.perfSubTab === "net" ? "#f59e0b" : "#38bdf8")))
                             border.width: 1
                             clip: true
@@ -1250,7 +1280,7 @@ Rectangle {
 
                                     if (root.perfSubTab === "cpu") drawSeries(root.cpuHistory, "#4cc2ff", "rgba(76, 194, 255, 0.22)", false);
                                     else if (root.perfSubTab === "ram") drawSeries(root.ramHistory, "#c084fc", "rgba(192, 132, 252, 0.22)", false);
-                                    else if (root.perfSubTab === "disk") drawSeries(root.diskHistory, "#4ade80", "rgba(74, 222, 128, 0.22)", false);
+                                    else if (root.isDiskPerfTab) drawSeries(root.diskHistories[root.activeDiskObj.id || "disk_0"] || [], "#4ade80", "rgba(74, 222, 128, 0.22)", false);
                                     else if (root.perfSubTab === "net") {
                                         drawSeries(root.netRecvHistory, "#f59e0b", "rgba(245, 158, 11, 0.20)", false);
                                         drawSeries(root.netSendHistory, "#4cc2ff", "", true);
@@ -1339,15 +1369,16 @@ Rectangle {
                                     { k: "En caché / Búfer",     v: root.sysInfo.ramCachedGb + " GB" },
                                     { k: "Swap / ZRAM usada",    v: root.sysInfo.swapUsedGb + " / " + root.sysInfo.swapTotalGb + " GB" },
                                     { k: "Uso Swap / ZRAM",      v: root.sysInfo.swapPct + "%" }
-                                ] : (root.perfSubTab === "disk" ? [
-                                    { k: "Tiempo activo I/O",    v: root.sysInfo.diskActivePct + "%", accent: "#4ade80" },
-                                    { k: "Velocidad lectura",    v: root.sysInfo.diskReadStr },
-                                    { k: "Velocidad escritura",  v: root.sysInfo.diskWriteStr },
-                                    { k: "Capacidad total",      v: root.sysInfo.diskTotalGb + " GB" },
-                                    { k: "Espacio libre",        v: root.sysInfo.diskFreeGb + " GB (" + (100 - root.sysInfo.diskPct) + "%)" },
-                                    { k: "Sistema de archivos",  v: root.sysInfo.diskFs },
-                                    { k: "Tipo de unidad",       v: root.sysInfo.diskType },
-                                    { k: "Planificador I/O",     v: root.sysInfo.diskIoSched, accent: "#4ade80" }
+                                ] : (root.isDiskPerfTab ? [
+                                    { k: "Tiempo activo I/O",    v: Number(root.activeDiskObj.activePct || 0) + "%", accent: "#4ade80" },
+                                    { k: "Velocidad lectura",    v: root.activeDiskObj.readStr || "0.0 MB/s" },
+                                    { k: "Velocidad escritura",  v: root.activeDiskObj.writeStr || "0.0 MB/s" },
+                                    { k: "Capacidad total",      v: (root.activeDiskObj.totalGb || 0) + " GB" },
+                                    { k: "Espacio libre",        v: root.activeDiskObj.freeStr || "—" },
+                                    { k: "Sistema de archivos",  v: root.activeDiskObj.fs || "—" },
+                                    { k: "Tipo de unidad",       v: root.activeDiskObj.type || "Disco" },
+                                    { k: "Dispositivo / Bloque", v: "/dev/" + (root.activeDiskObj.blk || "—") },
+                                    { k: "Planificador I/O",     v: root.activeDiskObj.ioSched || "none", accent: "#4ade80" }
                                 ] : (root.perfSubTab === "net" ? [
                                     { k: "Recibir (descarga)",   v: root.sysInfo.netRecvStr, accent: "#f59e0b" },
                                     { k: "Enviar (subida)",      v: root.sysInfo.netSendStr, accent: "#4cc2ff" },

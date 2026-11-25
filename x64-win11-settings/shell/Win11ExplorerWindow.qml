@@ -277,6 +277,12 @@ Rectangle {
         else if (a === "nav_tab" && tgt) openNewTab(tgt.path || tgt.name);
         else if (a === "nav_term" && tgt) bridge.openTerminalIn(tgt.path || tgt.name);
         else if (a === "nav_props" && tgt) openPropertiesForPath(bridge.getSpecialFolderPath(tgt.path || tgt.name), tgt.icon || "folder.svg");
+        else if (a === "drv_open" && tgt) openDriveItem(tgt, false);
+        else if (a === "drv_tab" && tgt) openDriveItem(tgt, true);
+        else if (a === "drv_mount" && tgt) mountDriveOnly(tgt);
+        else if (a === "drv_unmount" && tgt) unmountDriveItem(tgt);
+        else if (a === "drv_term" && tgt && tgt.path) bridge.openTerminalIn(tgt.path);
+        else if (a === "drv_props" && tgt && tgt.path) openPropertiesForPath(tgt.path, tgt.icon || "drive.svg");
         else if (a === "toggle_view") explorerViewMode = (explorerViewMode === "details" ? "tiles" : (explorerViewMode === "tiles" ? "large" : "details"));
         else if (a === "toggle_hidden") execExpDropdown("v_hidden");
         else if (a === "refresh") refreshExplorer();
@@ -357,8 +363,8 @@ Rectangle {
                 var nc = nKids[ni];
                 if (nc.navName && nc.navName !== "" && nc.navName !== "Este equipo" &&
                     navP.x >= nc.x && navP.x <= nc.x + nc.width && navP.y >= nc.y && navP.y <= nc.y + nc.height) {
-                    var destPath = (nc.navName === "Papelera") ? "Papelera" : bridge.getSpecialFolderPath(nc.navName);
-                    if (destPath !== explorerRealPath) {
+                    var destPath = nc.navPath ? String(nc.navPath) : ((nc.navName === "Papelera") ? "Papelera" : bridge.getSpecialFolderPath(nc.navName));
+                    if (destPath !== "" && destPath !== explorerRealPath) {
                         dropTargetNavName = nc.navName;
                         dropTargetPath = destPath;
                         dropTargetLabel = (nc.navName === "Papelera") ? "Mover a Papelera de reciclaje" : ("Mover a " + nc.navName);
@@ -592,6 +598,57 @@ Rectangle {
             return last !== "" ? last : "X64 LIOS (C:)";
         }
         return sec;
+    }
+
+    function openDriveItem(drv, inNewTab) {
+        if (!drv) return;
+        if (drv.mounted && drv.path && drv.path !== "") {
+            if (inNewTab) openNewTab(drv.path);
+            else navigateExplorer(drv.path, true);
+            return;
+        }
+        if (!drv.device) {
+            showExpToast("Unidad no disponible");
+            return;
+        }
+        try {
+            var res = JSON.parse(bridge.mountDrive(drv.device));
+            if (res && res.ok && res.path) {
+                refreshExplorer();
+                showExpToast("Unidad montada: " + drv.name);
+                if (inNewTab) openNewTab(res.path);
+                else navigateExplorer(res.path, true);
+            } else {
+                showExpToast((res && res.error) ? res.error : "No se pudo montar la unidad");
+            }
+        } catch (e) {
+            showExpToast("Error al montar la unidad");
+        }
+    }
+
+    function mountDriveOnly(drv) {
+        if (!drv || !drv.device) return;
+        try {
+            var res = JSON.parse(bridge.mountDrive(drv.device));
+            refreshExplorer();
+            if (res && res.ok) showExpToast("Unidad montada: " + drv.name);
+            else showExpToast((res && res.error) ? res.error : "No se pudo montar");
+        } catch (e) {}
+    }
+
+    function unmountDriveItem(drv) {
+        if (!drv || !drv.device || drv.isSystem) return;
+        var wasInside = (drv.path && explorerRealPath && explorerRealPath.indexOf(drv.path) === 0);
+        try {
+            var res = JSON.parse(bridge.unmountDrive(drv.device));
+            if (res && res.ok) {
+                if (wasInside) navigateExplorer("Este equipo", true);
+                else refreshExplorer();
+                showExpToast("Unidad desmontada de forma segura");
+            } else {
+                showExpToast((res && res.error) ? res.error : "No se pudo desmontar (en uso)");
+            }
+        } catch (e) {}
     }
 
     function refreshExplorer() {
@@ -1222,11 +1279,11 @@ Rectangle {
                                 { icon: "folder.svg",           name: "Proyectos" },
                                 { sep: true },
                                 { icon: "thispc.svg",           name: "Este equipo" },
-                                { icon: "drive-c.svg",          name: "X64 LIOS (C:)" },
                                 { icon: "trash.svg",            name: "Papelera" }
                             ]
                             delegate: Item {
                                 readonly property string navName: modelData.sep ? "" : modelData.name
+                                readonly property string navPath: ""
                                 readonly property bool isDrop: root.draggingItems && !modelData.sep && root.dropTargetNavName === modelData.name
                                 width: navCol.width
                                 height: modelData.sep ? 11 : 33
@@ -1271,6 +1328,60 @@ Rectangle {
                                             } else {
                                                 root.expCtxOpen = false;
                                                 root.navigateExplorer(modelData.name, true);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Dynamic Drives Separator + All Physical/USB Drives (Mounted & Unmounted!)
+                        Item {
+                            width: navCol.width; height: 11
+                            visible: root.explorerDrives.length > 0
+                            Rectangle { anchors.centerIn: parent; width: navCol.width - 16; height: 1; color: "#1cffffff" }
+                        }
+
+                        Repeater {
+                            model: root.explorerDrives
+                            delegate: Item {
+                                readonly property string navName: modelData.name || ""
+                                readonly property string navPath: (modelData.mounted && modelData.path) ? modelData.path : ""
+                                readonly property bool isCurDrv: Boolean(modelData.mounted && modelData.path && (root.explorerSection === modelData.path || root.explorerRealPath === modelData.path))
+                                readonly property bool isDrop: root.draggingItems && navPath !== "" && root.dropTargetNavName === navName
+                                width: navCol.width; height: 33
+
+                                Rectangle {
+                                    anchors.fill: parent; radius: 5
+                                    color: parent.isDrop ? "#550078d4" : (parent.isCurDrv ? "#2c2c2c" : (drvNavH.containsMouse ? "#222222" : "transparent"))
+                                    border.color: parent.isDrop ? "#4cc2ff" : "transparent"
+                                    border.width: parent.isDrop ? 1.5 : 0
+                                    Rectangle {
+                                        visible: parent.parent.isCurDrv
+                                        x: 2; anchors.verticalCenter: parent.verticalCenter
+                                        width: 3; height: 16; radius: 1.5; color: "#4cc2ff"
+                                    }
+                                    RowLayout {
+                                        anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
+                                        WinSvg { width: 18; height: 18; iconFile: modelData.icon || "drive.svg"; opacity: modelData.mounted ? 1.0 : 0.7 }
+                                        Text { text: modelData.name || "Disco"; color: modelData.mounted ? "#f2f2f2" : "#b8b8b8"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                        Rectangle {
+                                            visible: !modelData.mounted
+                                            width: 6; height: 6; radius: 3; color: "#787878"
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: drvNavH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                                        onClicked: (mouse) => {
+                                            if (mouse.button === Qt.MiddleButton) {
+                                                root.openDriveItem(modelData, true);
+                                            } else if (mouse.button === Qt.RightButton) {
+                                                var gp = drvNavH.mapToItem(root, mouse.x, mouse.y);
+                                                root.showExpCtx(gp.x, gp.y, "drive_item", modelData);
+                                            } else {
+                                                root.expCtxOpen = false;
+                                                root.openDriveItem(modelData, false);
                                             }
                                         }
                                     }
@@ -1376,29 +1487,38 @@ Rectangle {
                                     border.color: driveHover.containsMouse ? "#26ffffff" : "transparent"
                                     RowLayout {
                                         anchors.fill: parent; anchors.margins: 10; spacing: 12
-                                        WinSvg { width: 44; height: 44; iconFile: modelData.icon }
+                                        WinSvg { width: 44; height: 44; iconFile: modelData.icon || "drive.svg"; opacity: modelData.mounted ? 1.0 : 0.75 }
                                         Column {
                                             Layout.fillWidth: true; spacing: 5
-                                            Text { text: modelData.name; color: "#f5f5f5"; font.pixelSize: 13; elide: Text.ElideRight; width: 235 }
+                                            RowLayout {
+                                                width: 235; spacing: 6
+                                                Text { text: modelData.name; color: "#f5f5f5"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
+                                                Rectangle {
+                                                    visible: !modelData.mounted
+                                                    width: 66; height: 17; radius: 4; color: "#264cc2ff"; border.color: "#444cc2ff"; border.width: 1
+                                                    Text { anchors.centerIn: parent; text: "Sin montar"; color: "#4cc2ff"; font.pixelSize: 9; font.weight: Font.DemiBold }
+                                                }
+                                            }
                                             Rectangle {
                                                 width: 230; height: 10; radius: 3; color: "#323232"; border.color: "#4a4a4a"
                                                 Rectangle {
-                                                    x: 1; y: 1; width: (parent.width - 2) * modelData.usedRatio; height: parent.height - 2; radius: 2
+                                                    visible: Boolean(modelData.mounted)
+                                                    x: 1; y: 1; width: (parent.width - 2) * Number(modelData.usedRatio || 0); height: parent.height - 2; radius: 2
                                                     color: modelData.isCritical ? "#d13438" : "#4cc2ff"
                                                 }
                                             }
-                                            Text { text: modelData.info; color: "#9e9e9e"; font.pixelSize: 11 }
+                                            Text { text: modelData.info; color: "#9e9e9e"; font.pixelSize: 11; width: 235; elide: Text.ElideRight }
                                         }
                                     }
                                     MouseArea {
                                         id: driveHover; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
                                         onClicked: (mouse) => {
-                                            if (mouse.button === Qt.MiddleButton) root.openNewTab(modelData.path);
+                                            if (mouse.button === Qt.MiddleButton) root.openDriveItem(modelData, true);
                                             else if (mouse.button === Qt.RightButton) {
                                                 var gp = driveHover.mapToItem(root, mouse.x, mouse.y);
-                                                root.showExpCtx(gp.x, gp.y, "nav_folder", modelData);
-                                            } else root.navigateExplorer(modelData.path, true);
+                                                root.showExpCtx(gp.x, gp.y, "drive_item", modelData);
+                                            } else root.openDriveItem(modelData, false);
                                         }
                                     }
                                 }
@@ -2131,6 +2251,27 @@ Rectangle {
                     { sep: true },
                     { act: "empty_trash", label: "Vaciar Papelera de reciclaje", icon: "fluent-delete.svg" }
                 ];
+            }
+            if (root.expCtxKind === "drive_item" && root.expCtxTargetObj) {
+                var d = root.expCtxTargetObj;
+                if (!d.mounted) {
+                    return [
+                        { act: "drv_open",  label: "Montar y abrir", icon: d.icon || "drive.svg", bold: true },
+                        { act: "drv_mount", label: "Montar unidad",  icon: "fluent-add.svg" }
+                    ];
+                }
+                var dm = [
+                    { act: "drv_open", label: "Abrir",                      icon: d.icon || "drive.svg", bold: true },
+                    { act: "drv_tab",  label: "Abrir en una pestaña nueva", icon: "fluent-add.svg" },
+                    { act: "drv_term", label: "Abrir en Terminal",          icon: "fluent-window-console.svg" }
+                ];
+                if (!d.isSystem) {
+                    dm.push({ sep: true });
+                    dm.push({ act: "drv_unmount", label: d.removable ? "Expulsar unidad" : "Desmontar unidad", icon: "fluent-dismiss.svg" });
+                }
+                dm.push({ sep: true });
+                dm.push({ act: "drv_props", label: "Propiedades", icon: "fluent-info.svg" });
+                return dm;
             }
             if (root.expCtxKind === "nav_folder") {
                 return [

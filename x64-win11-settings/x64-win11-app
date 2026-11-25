@@ -13,6 +13,7 @@ mounted drives/filesystems, installed .desktop applications, and live calendar.
 
 import sys
 import os
+import re
 import pwd
 import glob
 import json
@@ -977,11 +978,53 @@ def dump_sysinfo_file():
     os.replace(tmp, SYSINFO_FILE)
 
 
+def _base_blk_from_dev(dev_path):
+    try:
+        real_dev = os.path.realpath(dev_path) if dev_path else ""
+        bname = os.path.basename(real_dev)
+        if (bname.startswith("nvme") or bname.startswith("mmcblk")) and "p" in bname:
+            return bname.rsplit("p", 1)[0]
+        return bname.rstrip("0123456789")
+    except Exception:
+        return ""
+
+
 def get_dynamic_drives():
+    """
+    Universal Multi-Disk & Multi-Partition discovery for ANY PC:
+    Combines `lsblk --json` + `/proc/mounts` so ALL real internal disks (NVMe/SATA/HDD/SSD,
+    NTFS/ext4/Btrfs/XFS/exFAT/FAT32) and USB drives appear in Este equipo, Sidebar & Settings —
+    both mounted and unmounted (with 1-click udisks2 mounting).
+    """
     drives = []
-    seen_devs = set()
-    letters = ["C", "D", "E", "F", "G", "H"]
+    letters = [chr(c) for c in range(ord("C"), ord("Z") + 1)]
     letter_idx = 0
+
+    # Read /proc/mounts once to map real device -> mountpoint and detect root device
+    mounts_by_dev = {}
+    root_dev_real = ""
+    root_fstype = "BTRFS"
+    try:
+        with open("/proc/mounts", "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                dev, mnt, fstype = parts[0], parts[1].replace("\\040", " "), parts[2]
+                if mnt == "/":
+                    root_dev_real = os.path.realpath(dev) if dev.startswith("/dev/") else dev
+                    root_fstype = fstype.upper()
+                if dev.startswith("/dev/"):
+                    rdev = os.path.realpath(dev)
+                    # Prefer user/media mountpoints over /var/* or /boot/*
+                    prev = mounts_by_dev.get(rdev)
+                    if prev is None or prev[0].startswith("/var/") or prev[0] in ("/home",):
+                        if not mnt.startswith("/var/") and not mnt.startswith("/snap"):
+                            mounts_by_dev[rdev] = (mnt, fstype)
+    except Exception:
+        pass
+
+    root_base_blk = _base_blk_from_dev(root_dev_real)
 
     # 1. Root filesystem (C:)
     try:
@@ -991,7 +1034,15 @@ def get_dynamic_drives():
         used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
         drives.append({
             "name": "X64 LIOS Sistema (C:)",
+            "letter": "C:",
             "path": "/",
+            "device": root_dev_real,
+            "baseBlk": root_base_blk,
+            "mounted": True,
+            "isSystem": True,
+            "removable": False,
+            "fstype": root_fstype,
+            "sizeGb": round(total_gb, 1),
             "icon": "drive-c.svg",
             "usedRatio": round(used_ratio, 3),
             "isCritical": used_ratio >= 0.90,
@@ -1001,71 +1052,186 @@ def get_dynamic_drives():
     except Exception:
         pass
 
-    # 2. Scan real secondary mounted block devices (/mnt/*, /run/media/*, /home if separate disk)
-    valid_fs = {"btrfs", "ext4", "xfs", "f2fs", "ntfs", "ntfs3", "fuseblk", "vfat", "exfat"}
+    # 2. Discover ALL real secondary partitions & removable volumes (mounted AND unmounted) via lsblk
+    valid_fs = {"btrfs", "ext4", "ext3", "ext2", "xfs", "f2fs", "ntfs", "ntfs3", "fuseblk", "vfat", "exfat", "hfsplus", "iso9660", "udf"}
+    skip_parttypes = {
+        "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",  # EFI System Partition
+        "e3c9e316-0b5c-4db8-817d-f92df00215ae",  # Microsoft Reserved (MSR)
+        "de94bba4-06d1-4d40-a16a-bfd50179d6ac",  # Windows Recovery Environment
+        "21686148-6449-6e6f-744e-656564454649",  # BIOS Boot
+        "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f",  # Linux Swap
+    }
+    seen_devs = {root_dev_real} if root_dev_real else set()
+    seen_st_devs = set()
     try:
-        root_dev_id = os.stat("/").st_dev
-    except Exception:
-        root_dev_id = -1
-
-    try:
-        with open("/proc/mounts", "r", encoding="utf-8") as f:
-            for line in f:
-                parts = line.split()
-                if len(parts) < 3:
-                    continue
-                dev, mnt, fstype = parts[0], parts[1].replace("\\040", " "), parts[2]
-                if not dev.startswith("/dev/") or fstype not in valid_fs:
-                    continue
-                if mnt in ("/", "/boot", "/boot/efi") or mnt.startswith("/var/") or mnt.startswith("/snap"):
-                    continue
-                try:
-                    st_dev = os.stat(mnt).st_dev
-                except Exception:
-                    continue
-                if st_dev == root_dev_id or st_dev in seen_devs:
-                    continue
-                seen_devs.add(st_dev)
-                try:
-                    usage = shutil.disk_usage(mnt)
-                    total_gb = usage.total / (1024 ** 3)
-                    free_gb = usage.free / (1024 ** 3)
-                    if total_gb < 1.0:
-                        continue
-                    used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
-                    ltr = letters[min(letter_idx, len(letters) - 1)]
-                    letter_idx += 1
-                    label = os.path.basename(mnt.rstrip("/")) or "Volumen"
-                    drives.append({
-                        "name": f"{label.capitalize()} ({ltr}:)",
-                        "path": mnt,
-                        "icon": "drive.svg",
-                        "usedRatio": round(used_ratio, 3),
-                        "isCritical": used_ratio >= 0.90,
-                        "info": f"{fstype.upper()} • {free_gb:.1f} GB libres de {total_gb:.1f} GB"
-                    })
-                except Exception:
-                    continue
+        seen_st_devs.add(os.stat("/").st_dev)
     except Exception:
         pass
 
-    # 3. Also show Home folder volume shortcut if no external drive is mounted
-    if len(drives) == 1:
-        display_name, _, _ = get_real_user_info()
-        try:
-            usage = shutil.disk_usage(HOME_DIR)
-            free_gb = usage.free / (1024 ** 3)
-            used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+    lsblk_ok = False
+    try:
+        out = subprocess.check_output(
+            ["lsblk", "-J", "-b", "-o", "NAME,KNAME,PATH,SIZE,FSTYPE,LABEL,MOUNTPOINT,TYPE,RM,HOTPLUG,TRAN,MODEL,PARTTYPE,PARTLABEL,PKNAME"],
+            text=True, timeout=1.8, stderr=subprocess.DEVNULL
+        )
+        data = json.loads(out)
+        lsblk_ok = True
+
+        def walk_blk(node, parent_model="", parent_tran="", parent_rm=False, parent_hotplug=False, parent_blk=""):
+            nonlocal letter_idx
+            name = str(node.get("name") or "")
+            kname = str(node.get("kname") or name)
+            dev_path = str(node.get("path") or (f"/dev/{kname}" if kname else ""))
+            btype = str(node.get("type") or "")
+            fstype = str(node.get("fstype") or "").lower()
+            label = str(node.get("label") or "").strip()
+            partlabel = str(node.get("partlabel") or "").strip()
+            parttype = str(node.get("parttype") or "").lower().strip()
+            model = str(node.get("model") or "").strip() or parent_model
+            tran = str(node.get("tran") or "").lower().strip() or parent_tran
+            rm = bool(node.get("rm")) or parent_rm
+            hotplug = bool(node.get("hotplug")) or parent_hotplug
+            cur_blk = kname if btype == "disk" else (parent_blk or str(node.get("pkname") or _base_blk_from_dev(dev_path)))
+
+            if kname.startswith(("zram", "loop", "ram")):
+                return
+
+            children = node.get("children") or []
+            if children:
+                for ch in children:
+                    walk_blk(ch, model, tran, rm, hotplug, cur_blk)
+                return
+
+            if not dev_path or fstype not in valid_fs:
+                return
+            if parttype in skip_parttypes:
+                return
+            if btype == "rom" and not fstype:
+                return
+
+            rdev = os.path.realpath(dev_path) if os.path.exists(dev_path) else dev_path
+            if rdev in seen_devs:
+                return
+
+            mnt = str(node.get("mountpoint") or "").strip()
+            if rdev in mounts_by_dev:
+                mnt = mounts_by_dev[rdev][0]
+            if mnt in ("/", "/boot", "/boot/efi", "/efi", "[SWAP]") or mnt.startswith(("/var/", "/snap/")):
+                return
+
+            size_b = int(node.get("size") or 0)
+            size_gb = size_b / (1024 ** 3)
+            # Skip tiny hidden system partitions (< 128 MB) unless explicitly user-mounted
+            if size_b < 128 * 1024 * 1024 and not mnt.startswith(("/run/media/", "/mnt/", "/media/")):
+                return
+            if partlabel.lower() in ("efi", "efi system partition", "microsoft reserved partition", "recovery"):
+                return
+
+            mounted = bool(mnt and os.path.isdir(mnt))
+            if mounted:
+                try:
+                    st_dev = os.stat(mnt).st_dev
+                    if st_dev in seen_st_devs:
+                        return
+                    seen_st_devs.add(st_dev)
+                except Exception:
+                    pass
+
+            seen_devs.add(rdev)
+            ltr = letters[min(letter_idx, len(letters) - 1)]
+            letter_idx += 1
+
+            is_removable = bool(rm or hotplug or tran == "usb")
+            fs_disp = "NTFS" if fstype in ("ntfs", "ntfs3", "fuseblk") else fstype.upper()
+            brand = model.split()[0] if model else ""
+            if brand.upper() in ("ATA", "ST", "GENERIC"):
+                brand = model[:18].strip()
+
+            mnt_base = os.path.basename(mnt.rstrip("/")) if mounted else ""
+            is_hex_uuid = bool(mnt_base and re.fullmatch(r"[0-9A-Fa-f\-]{8,}", mnt_base))
+
+            if label:
+                disp_name = f"{label} ({ltr}:)"
+            elif mounted and mnt_base and not is_hex_uuid and mnt_base.lower() not in ("mnt", "media", "run"):
+                disp_name = f"{mnt_base} ({ltr}:)"
+            elif is_removable:
+                disp_name = f"Unidad USB {brand} ({ltr}:)".replace("  ", " ")
+            elif brand:
+                disp_name = f"Disco local {brand} ({ltr}:)"
+            else:
+                disp_name = f"Disco local ({ltr}:)"
+
+            if mounted:
+                try:
+                    usage = shutil.disk_usage(mnt)
+                    t_gb = usage.total / (1024 ** 3)
+                    f_gb = usage.free / (1024 ** 3)
+                    used_ratio = max(0.02, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+                    info_str = f"{fs_disp} • {f_gb:.1f} GB libres de {t_gb:.1f} GB"
+                    size_gb = t_gb
+                except Exception:
+                    used_ratio = 0.0
+                    info_str = f"{fs_disp} • {size_gb:.1f} GB"
+            else:
+                used_ratio = 0.0
+                info_str = f"{fs_disp} • {size_gb:.1f} GB — Clic para montar"
+
             drives.append({
-                "name": f"Carpeta Personal — {display_name} (D:)",
-                "path": HOME_DIR,
+                "name": disp_name,
+                "letter": f"{ltr}:",
+                "path": mnt if mounted else "",
+                "device": dev_path,
+                "baseBlk": cur_blk,
+                "mounted": mounted,
+                "isSystem": False,
+                "removable": is_removable,
+                "fstype": fs_disp,
+                "model": model,
+                "sizeGb": round(size_gb, 1),
                 "icon": "drive.svg",
                 "usedRatio": round(used_ratio, 3),
-                "isCritical": used_ratio >= 0.90,
-                "info": f"Espacio de usuario • {free_gb:.1f} GB libres"
+                "isCritical": mounted and used_ratio >= 0.90,
+                "info": info_str
             })
-        except Exception:
-            pass
+
+        for top in (data.get("blockdevices") or []):
+            walk_blk(top)
+    except Exception:
+        pass
+
+    # Fallback to /proc/mounts only if lsblk failed completely
+    if not lsblk_ok:
+        for rdev, (mnt, fstype) in mounts_by_dev.items():
+            if rdev in seen_devs or fstype not in valid_fs or mnt in ("/", "/boot", "/boot/efi"):
+                continue
+            try:
+                usage = shutil.disk_usage(mnt)
+                t_gb = usage.total / (1024 ** 3)
+                f_gb = usage.free / (1024 ** 3)
+                if t_gb < 0.2:
+                    continue
+                used_ratio = max(0.02, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+                ltr = letters[min(letter_idx, len(letters) - 1)]
+                letter_idx += 1
+                lbl = os.path.basename(mnt.rstrip("/")) or "Volumen"
+                drives.append({
+                    "name": f"{lbl.capitalize()} ({ltr}:)",
+                    "letter": f"{ltr}:",
+                    "path": mnt,
+                    "device": rdev,
+                    "baseBlk": _base_blk_from_dev(rdev),
+                    "mounted": True,
+                    "isSystem": False,
+                    "removable": False,
+                    "fstype": fstype.upper(),
+                    "sizeGb": round(t_gb, 1),
+                    "icon": "drive.svg",
+                    "usedRatio": round(used_ratio, 3),
+                    "isCritical": used_ratio >= 0.90,
+                    "info": f"{fstype.upper()} • {f_gb:.1f} GB libres de {t_gb:.1f} GB"
+                })
+            except Exception:
+                continue
 
     return drives
 
@@ -1122,9 +1288,9 @@ def main():
             self._prev_cpu_idle = 0
             self._prev_core_stats = {}
             self._prev_disk_ts = 0.0
-            self._prev_disk_r = 0
-            self._prev_disk_w = 0
-            self._prev_disk_io_ms = 0
+            self._prev_disks = {}
+            self._disk_meta_ts = 0.0
+            self._disk_meta_cache = []
             self._prev_net_ts = 0.0
             self._prev_net_rx = 0
             self._prev_net_tx = 0
@@ -2814,6 +2980,58 @@ def main():
         def getDrivesJson(self):
             return json.dumps(get_dynamic_drives())
 
+        @pyqtSlot(str, result=str)
+        def mountDrive(self, device_path):
+            dev = (device_path or "").strip()
+            if not dev.startswith("/dev/") or not os.path.exists(dev):
+                return json.dumps({"ok": False, "path": "", "error": "Dispositivo no encontrado"})
+            try:
+                # Check if already mounted
+                cur_mnt = subprocess.check_output(["lsblk", "-no", "MOUNTPOINT", dev], text=True, timeout=1.5, stderr=subprocess.DEVNULL).strip().splitlines()
+                cur_mnt = [m.strip() for m in cur_mnt if m.strip() and os.path.isdir(m.strip())]
+                if cur_mnt:
+                    return json.dumps({"ok": True, "path": cur_mnt[0], "error": ""})
+
+                r = subprocess.run(["udisksctl", "mount", "-b", dev, "--no-user-interaction"], capture_output=True, text=True, timeout=10.0)
+                if r.returncode != 0 and ("NotAuthorized" in (r.stderr or "") or "authentication" in (r.stderr or "").lower()):
+                    r = subprocess.run(["udisksctl", "mount", "-b", dev], capture_output=True, text=True, timeout=25.0)
+                if r.returncode != 0:
+                    err = (r.stderr or r.stdout or "Error al montar la unidad").strip()
+                    if "hibernated" in err.lower() or "unsafe state" in err.lower():
+                        err = "Disco NTFS hibernado por Windows (apaga Inicio rápido en Windows)"
+                    return json.dumps({"ok": False, "path": "", "error": err[:140]})
+
+                mnt = ""
+                if " at " in (r.stdout or ""):
+                    mnt = r.stdout.split(" at ", 1)[1].strip().rstrip(".")
+                if not mnt or not os.path.isdir(mnt):
+                    out2 = subprocess.check_output(["lsblk", "-no", "MOUNTPOINT", dev], text=True, timeout=1.5, stderr=subprocess.DEVNULL).strip().splitlines()
+                    for m in out2:
+                        if m.strip() and os.path.isdir(m.strip()):
+                            mnt = m.strip()
+                            break
+                dump_sysinfo_file()
+                return json.dumps({"ok": bool(mnt), "path": mnt, "error": "" if mnt else "No se obtuvo ruta de montaje"})
+            except Exception as e:
+                return json.dumps({"ok": False, "path": "", "error": str(e)[:120]})
+
+        @pyqtSlot(str, result=str)
+        def unmountDrive(self, device_path):
+            dev = (device_path or "").strip()
+            if not dev.startswith("/dev/"):
+                return json.dumps({"ok": False, "error": "Dispositivo inválido"})
+            try:
+                r = subprocess.run(["udisksctl", "unmount", "-b", dev, "--no-user-interaction"], capture_output=True, text=True, timeout=10.0)
+                if r.returncode != 0 and ("NotAuthorized" in (r.stderr or "") or "authentication" in (r.stderr or "").lower()):
+                    r = subprocess.run(["udisksctl", "unmount", "-b", dev], capture_output=True, text=True, timeout=20.0)
+                if r.returncode != 0:
+                    err = (r.stderr or r.stdout or "Unidad ocupada o en uso").strip()
+                    return json.dumps({"ok": False, "error": err[:140]})
+                dump_sysinfo_file()
+                return json.dumps({"ok": True, "error": ""})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)[:120]})
+
         @pyqtSlot(str, str, bool, bool, result=str)
         def listDirectoryExJson(self, section_or_path, sort_by="name", sort_asc=True, show_hidden=False):
             if section_or_path in ("Este equipo", "This PC"):
@@ -3106,8 +3324,8 @@ def main():
             except Exception:
                 pass
 
-            # Root Disk info + Live Read/Write MB/s & Active % from /proc/diskstats
-            root_fstype = "Btrfs"
+            # Universal Multi-Disk Discovery + Per-Disk Live Read/Write MB/s & Active % from /proc/diskstats
+            root_fstype = "BTRFS"
             root_dev = ""
             try:
                 with open("/proc/mounts", "r", encoding="utf-8") as f:
@@ -3119,76 +3337,196 @@ def main():
                             break
             except Exception:
                 pass
-            base_blk = ""
-            try:
-                real_dev = os.path.realpath(root_dev) if root_dev else ""
-                bname = os.path.basename(real_dev)
-                if bname.startswith("nvme") and "p" in bname:
-                    base_blk = bname.rsplit("p", 1)[0]
-                else:
-                    base_blk = bname.rstrip("0123456789")
-            except Exception:
-                pass
-            disk_model = "Unidad del sistema"
-            disk_type = "SSD"
-            disk_io_sched = "adios"
-            if base_blk:
+            base_blk = _base_blk_from_dev(root_dev)
+
+            # Refresh physical disk metadata every 4 seconds (letters, capacity, model, type, I/O scheduler)
+            if not self._disk_meta_cache or (now_ts - self._disk_meta_ts) >= 4.0:
+                drives_map = {}
                 try:
-                    mp = f"/sys/block/{base_blk}/device/model"
-                    if os.path.isfile(mp):
-                        disk_model = open(mp).read().strip() or disk_model
-                    rp = f"/sys/block/{base_blk}/queue/rotational"
-                    if os.path.isfile(rp):
-                        rot = open(rp).read().strip()
-                        if base_blk.startswith("nvme"):
-                            disk_type = "NVMe SSD"
-                        else:
-                            disk_type = "HDD" if rot == "1" else "SSD"
-                    sp = f"/sys/block/{base_blk}/queue/scheduler"
-                    if os.path.isfile(sp):
-                        stxt = open(sp).read().strip()
-                        if "[" in stxt and "]" in stxt:
-                            disk_io_sched = stxt.split("[", 1)[1].split("]", 1)[0]
+                    for drv in get_dynamic_drives():
+                        b = drv.get("baseBlk") or _base_blk_from_dev(drv.get("device", ""))
+                        if b:
+                            drives_map.setdefault(b, []).append(drv)
                 except Exception:
                     pass
 
-            disk_read_mbs = 0.0
-            disk_write_mbs = 0.0
-            disk_active_pct = 0
+                blk_names = []
+                try:
+                    for b in sorted(os.listdir("/sys/block")):
+                        if b.startswith(("zram", "loop", "dm-", "ram", "sr", "fd")):
+                            continue
+                        sz_p = f"/sys/block/{b}/size"
+                        if not os.path.isfile(sz_p):
+                            continue
+                        try:
+                            sectors = int(open(sz_p).read().strip())
+                        except Exception:
+                            sectors = 0
+                        if sectors <= 0:
+                            continue
+                        blk_names.append((b, sectors))
+                except Exception:
+                    pass
+
+                # Put root system disk first (Disco 0 (C:)), then remaining physical disks sorted naturally
+                blk_names.sort(key=lambda pair: (0 if pair[0] == base_blk else 1, pair[0]))
+
+                meta_list = []
+                for idx_d, (b, sectors) in enumerate(blk_names):
+                    cap_gb = (sectors * 512.0) / (1024 ** 3)
+                    d_model = f"Disco {b}"
+                    try:
+                        mp = f"/sys/block/{b}/device/model"
+                        if os.path.isfile(mp):
+                            d_model = open(mp).read().strip() or d_model
+                    except Exception:
+                        pass
+                    d_type = "SSD"
+                    try:
+                        rp = f"/sys/block/{b}/queue/rotational"
+                        rot = open(rp).read().strip() if os.path.isfile(rp) else "0"
+                        rem_p = f"/sys/block/{b}/removable"
+                        is_rem = (open(rem_p).read().strip() == "1") if os.path.isfile(rem_p) else False
+                        if b.startswith("nvme"):
+                            d_type = "NVMe SSD"
+                        elif is_rem:
+                            d_type = "USB / Extraíble"
+                        elif b.startswith("mmcblk"):
+                            d_type = "eMMC / SD"
+                        else:
+                            d_type = "SATA HDD" if rot == "1" else "SATA SSD"
+                    except Exception:
+                        pass
+                    d_sched = "none"
+                    try:
+                        sp = f"/sys/block/{b}/queue/scheduler"
+                        if os.path.isfile(sp):
+                            stxt = open(sp).read().strip()
+                            if "[" in stxt and "]" in stxt:
+                                d_sched = stxt.split("[", 1)[1].split("]", 1)[0]
+                    except Exception:
+                        pass
+
+                    part_drvs = drives_map.get(b, [])
+                    ltrs = [d.get("letter", "") for d in part_drvs if d.get("letter")]
+                    ltr_str = " ".join(ltrs)
+                    lbl = f"Disco {idx_d} ({ltr_str})" if ltr_str else f"Disco {idx_d} ({b})"
+                    fs_names = sorted({d.get("fstype", "") for d in part_drvs if d.get("fstype")})
+                    d_fs = " / ".join(fs_names) if fs_names else (root_fstype if b == base_blk else "Sin formato")
+
+                    used_pct = -1
+                    free_gb = 0.0
+                    tot_mounted_gb = 0.0
+                    any_mounted = False
+                    if b == base_blk:
+                        try:
+                            du = shutil.disk_usage("/")
+                            tot_mounted_gb = du.total / (1024 ** 3)
+                            free_gb = du.free / (1024 ** 3)
+                            used_pct = int(round(((du.total - du.free) / max(1, du.total)) * 100))
+                            any_mounted = True
+                        except Exception:
+                            pass
+                    else:
+                        t_sum = 0
+                        f_sum = 0
+                        for pd in part_drvs:
+                            if pd.get("mounted") and pd.get("path"):
+                                try:
+                                    du = shutil.disk_usage(pd["path"])
+                                    t_sum += du.total
+                                    f_sum += du.free
+                                    any_mounted = True
+                                except Exception:
+                                    pass
+                        if any_mounted and t_sum > 0:
+                            tot_mounted_gb = t_sum / (1024 ** 3)
+                            free_gb = f_sum / (1024 ** 3)
+                            used_pct = int(round(((t_sum - f_sum) / t_sum) * 100))
+
+                    free_str = (
+                        f"{free_gb:.1f} GB ({100 - used_pct}%)"
+                        if any_mounted and used_pct >= 0
+                        else "Desmontado (clic en Explorador)"
+                    )
+                    sub_usage = (
+                        f"{used_pct}% ocupado"
+                        if any_mounted and used_pct >= 0
+                        else f"{cap_gb:.0f} GB • Desmontado"
+                    )
+
+                    meta_list.append({
+                        "id": f"disk_{idx_d}",
+                        "blk": b,
+                        "label": lbl,
+                        "titleLabel": f"{lbl} — {d_type}",
+                        "model": d_model,
+                        "type": d_type,
+                        "fs": d_fs,
+                        "ioSched": d_sched,
+                        "totalGb": round(tot_mounted_gb if (any_mounted and tot_mounted_gb > 0) else cap_gb, 1),
+                        "freeGb": round(free_gb, 1),
+                        "freeStr": free_str,
+                        "usedPct": used_pct if used_pct >= 0 else 0,
+                        "mounted": any_mounted,
+                        "subUsage": sub_usage,
+                    })
+
+                if not meta_list:
+                    meta_list.append({
+                        "id": "disk_0", "blk": base_blk or "sda", "label": "Disco 0 (C:)",
+                        "titleLabel": "Disco 0 (C:) — SSD", "model": "Unidad del sistema",
+                        "type": "SSD", "fs": root_fstype, "ioSched": "adios",
+                        "totalGb": 256.0, "freeGb": 100.0, "freeStr": "100.0 GB",
+                        "usedPct": 15, "mounted": True, "subUsage": "15% ocupado",
+                    })
+                self._disk_meta_cache = meta_list
+                self._disk_meta_ts = now_ts
+
+            # Read live /proc/diskstats for ALL detected physical disks simultaneously
+            cur_diskstats = {}
             try:
-                r_sec = 0
-                w_sec = 0
-                io_ms = 0
+                wanted_blks = {m["blk"] for m in self._disk_meta_cache}
                 with open("/proc/diskstats", "r", encoding="utf-8") as f:
                     for ln in f:
                         p = ln.split()
-                        if len(p) >= 14 and ((base_blk and p[2] == base_blk) or (not base_blk and p[2] in ("sda", "nvme0n1", "vda"))):
-                            r_sec = int(p[5])
-                            w_sec = int(p[9])
-                            io_ms = int(p[12])
-                            break
-                if self._prev_disk_ts > 0 and now_ts > self._prev_disk_ts:
-                    dt = now_ts - self._prev_disk_ts
-                    disk_read_mbs = max(0.0, ((r_sec - self._prev_disk_r) * 512.0) / (1024 ** 2) / dt)
-                    disk_write_mbs = max(0.0, ((w_sec - self._prev_disk_w) * 512.0) / (1024 ** 2) / dt)
-                    disk_active_pct = max(0, min(100, int(round(((io_ms - self._prev_disk_io_ms) / (dt * 1000.0)) * 100))))
-                self._prev_disk_ts = now_ts
-                self._prev_disk_r = r_sec
-                self._prev_disk_w = w_sec
-                self._prev_disk_io_ms = io_ms
+                        if len(p) >= 14 and p[2] in wanted_blks:
+                            cur_diskstats[p[2]] = (int(p[5]), int(p[9]), int(p[12]))
             except Exception:
                 pass
 
-            disk_used_pct = 15
-            disk_total_gb = 0.0
-            disk_free_gb = 0.0
-            try:
-                du = shutil.disk_usage("/")
-                disk_total_gb = du.total / (1024 ** 3)
-                disk_free_gb = du.free / (1024 ** 3)
-                disk_used_pct = int(round(((du.total - du.free) / max(1, du.total)) * 100))
-            except Exception:
-                pass
+            dt_disk = (now_ts - self._prev_disk_ts) if (self._prev_disk_ts > 0 and now_ts > self._prev_disk_ts) else 0.0
+            disks_list = []
+            for m in self._disk_meta_cache:
+                b = m["blk"]
+                r_mbs = 0.0
+                w_mbs = 0.0
+                act_pct = 0
+                if b in cur_diskstats:
+                    r_sec, w_sec, io_ms = cur_diskstats[b]
+                    if dt_disk > 0 and b in self._prev_disks:
+                        pr, pw, pio = self._prev_disks[b]
+                        r_mbs = max(0.0, ((r_sec - pr) * 512.0) / (1024 ** 2) / dt_disk)
+                        w_mbs = max(0.0, ((w_sec - pw) * 512.0) / (1024 ** 2) / dt_disk)
+                        act_pct = max(0, min(100, int(round(((io_ms - pio) / (dt_disk * 1000.0)) * 100))))
+                    self._prev_disks[b] = (r_sec, w_sec, io_ms)
+                d_entry = dict(m)
+                d_entry["activePct"] = act_pct
+                d_entry["readStr"] = f"{r_mbs:.1f} MB/s"
+                d_entry["writeStr"] = f"{w_mbs:.1f} MB/s"
+                disks_list.append(d_entry)
+            self._prev_disk_ts = now_ts
+
+            d0 = disks_list[0]
+            disk_model = d0["model"]
+            disk_type = d0["type"]
+            disk_io_sched = d0["ioSched"]
+            disk_active_pct = d0["activePct"]
+            disk_read_mbs = float(d0["readStr"].split()[0])
+            disk_write_mbs = float(d0["writeStr"].split()[0])
+            disk_used_pct = d0["usedPct"]
+            disk_total_gb = d0["totalGb"]
+            disk_free_gb = d0["freeGb"]
 
             # Live Network Throughput from /proc/net/dev
             net_iface = "Sin red"
@@ -3507,7 +3845,8 @@ def main():
                 "threadCount": thread_total,
                 "kernel": kernel,
                 "sched": sched,
-                "diskLabel": f"Disco (C:) {disk_type}",
+                "disks": disks_list,
+                "diskLabel": d0["titleLabel"],
                 "diskModel": disk_model,
                 "diskType": disk_type,
                 "diskFs": root_fstype,

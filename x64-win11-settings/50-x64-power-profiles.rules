@@ -2,4 +2,11 @@ polkit.addRule(function(action, subject) {
     if (action.id.indexOf("org.freedesktop.UPower.PowerProfiles.") === 0 && subject.isInGroup("wheel")) {
         return polkit.Result.YES;
     }
+    if ((action.id === "org.freedesktop.udisks2.filesystem-mount" ||
+         action.id === "org.freedesktop.udisks2.filesystem-mount-system" ||
+         action.id === "org.freedesktop.udisks2.filesystem-unmount-others" ||
+         action.id === "org.freedesktop.udisks2.eject-media") &&
+        subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
 });

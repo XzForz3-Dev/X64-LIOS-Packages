@@ -790,7 +790,7 @@ Rectangle {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         WinSvg { width: 18; height: 18; iconFile: "drive-c.svg" }
-                                        Text { text: "Almacenamiento"; color: "#f5f5f5"; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                                        Text { text: "Almacenamiento" + (root.drives.length > 1 ? (" (" + root.drives.length + ")") : ""); color: "#f5f5f5"; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true }
                                         WinSvg { width: 12; height: 12; iconFile: "fluent-chevron-right.svg"; opacity: 0.7 }
                                     }
                                     Text { text: root.drives.length > 0 ? root.drives[0].name : "Disco principal"; color: "#d4d4d4"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
@@ -1151,13 +1151,34 @@ Rectangle {
                                         Layout.fillWidth: true; spacing: 5
                                         RowLayout {
                                             Layout.fillWidth: true; spacing: 10
-                                            WinSvg { width: 20; height: 20; iconFile: modelData.icon || "drive-c.svg" }
+                                            WinSvg { width: 20; height: 20; iconFile: modelData.icon || "drive-c.svg"; opacity: modelData.mounted ? 1.0 : 0.7 }
                                             Text { text: modelData.name; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true; elide: Text.ElideRight }
-                                            Text { text: Math.round(Number(modelData.usedRatio || 0) * 100) + "%"; color: modelData.isCritical ? "#f87171" : "#4cc2ff"; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                            Text {
+                                                text: modelData.mounted ? (Math.round(Number(modelData.usedRatio || 0) * 100) + "%") : "Sin montar"
+                                                color: !modelData.mounted ? "#9e9e9e" : (modelData.isCritical ? "#f87171" : "#4cc2ff")
+                                                font.pixelSize: 12; font.weight: Font.DemiBold
+                                            }
+                                            FluentBtn {
+                                                visible: !modelData.isSystem
+                                                label: modelData.mounted ? "Desmontar" : "Montar"
+                                                accent: !modelData.mounted
+                                                onClicked: {
+                                                    try {
+                                                        var r = JSON.parse(modelData.mounted ? bridge.unmountDrive(modelData.device) : bridge.mountDrive(modelData.device));
+                                                        root.refreshLiveState();
+                                                        if (r && r.ok) root.showToast(modelData.mounted ? "Unidad desmontada" : ("Unidad montada: " + modelData.name));
+                                                        else root.showToast((r && r.error) ? r.error : "No se pudo completar la operación");
+                                                    } catch (e) {}
+                                                }
+                                            }
                                         }
                                         Rectangle {
                                             Layout.fillWidth: true; height: 8; radius: 4; color: "#383838"
-                                            Rectangle { width: parent.width * Number(modelData.usedRatio || 0.1); height: 8; radius: 4; color: modelData.isCritical ? "#d13438" : "#4cc2ff" }
+                                            Rectangle {
+                                                visible: Boolean(modelData.mounted)
+                                                width: parent.width * Number(modelData.usedRatio || 0.04); height: 8; radius: 4
+                                                color: modelData.isCritical ? "#d13438" : "#4cc2ff"
+                                            }
                                         }
                                         Text { text: modelData.info; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                                     }
