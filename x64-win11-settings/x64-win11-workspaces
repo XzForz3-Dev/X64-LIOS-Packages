@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+"""
+X64 LIOS - Native Wayland Virtual Desktop Controller for labwc (ext_workspace_manager_v1)
+Zero external dependencies: speaks raw ext-workspace-v1 directly over the Wayland UNIX socket
+and updates ~/.config/labwc/rc.xml + SIGHUP dynamically for adding/removing/renaming desktops.
+"""
+import json
+import os
+import re
+import socket
+import struct
+import subprocess
+import sys
+import time
+from xml.sax.saxutils import escape as xml_escape
+
+HOME_DIR = os.path.expanduser("~")
+STATE_DIR = os.path.join(HOME_DIR, ".local", "state", "x64-win11")
+WS_STATE_FILE = os.path.join(STATE_DIR, "workspaces.json")
+LABWC_RC = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+MAX_DESKTOPS = 8
+
+
+def find_wayland_socket():
+    xdg = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    disp = os.environ.get("WAYLAND_DISPLAY", "")
+    if disp:
+        p = disp if disp.startswith("/") else os.path.join(xdg, disp)
+        if os.path.exists(p):
+            return p
+    try:
+        for fn in sorted(os.listdir(xdg)):
+            if fn.startswith("wayland-") and not fn.endswith(".lock"):
+                p = os.path.join(xdg, fn)
+                if os.path.exists(p):
+                    return p
+    except Exception:
+        pass
+    return os.path.join(xdg, "wayland-0")
+
+
+def pack_wl_str(s):
+    b = s.encode("utf-8") + b"\x00"
+    pad = (-len(b)) & 3
+    return struct.pack("<I", len(b)) + b + (b"\x00" * pad)
+
+
+def wl_ext_workspaces(activate_target=None):
+    """
+    Connect to labwc's ext_workspace_manager_v1.
+    activate_target: None, 1-based int index, 'left', or 'right'.
+    Returns list of dicts: [{"index": 1, "name": "...", "active": True, "urgent": False}, ...]
+    """
+    sock_path = find_wayland_socket()
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    s.connect(sock_path)
+
+    def send_msg(obj_id, opcode, payload=b""):
+        size = 8 + len(payload)
+        s.sendall(struct.pack("<II", obj_id, (size << 16) | opcode) + payload)
+
+    # wl_display(1).get_registry(1) -> id 2; sync(0) -> id 3
+    send_msg(1, 1, struct.pack("<I", 2))
+    send_msg(1, 0, struct.pack("<I", 3))
+
+    buf = b""
+    mgr = None
+    workspaces = {}
+    order = []
+
+    def pump(stop_cb):
+        nonlocal buf, mgr
+        while True:
+            try:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+            except socket.timeout:
+                break
+            while len(buf) >= 8:
+                obj_id, size_op = struct.unpack("<II", buf[:8])
+                size = size_op >> 16
+                op = size_op & 0xFFFF
+                if size < 8 or len(buf) < size:
+                    break
+                payload = buf[8:size]
+                buf = buf[size:]
+                if obj_id == 2 and op == 0:  # wl_registry.global
+                    name, slen = struct.unpack("<II", payload[:8])
+                    iface = payload[8:8 + slen - 1].decode("utf-8", errors="replace")
+                    pad = (slen + 3) & ~3
+                    ver = struct.unpack("<I", payload[8 + pad:12 + pad])[0]
+                    if iface == "ext_workspace_manager_v1":
+                        mgr = (name, iface, ver)
+                elif obj_id == 4 and op == 1:  # ext_workspace_manager_v1.workspace
+                    wid = struct.unpack("<I", payload[:4])[0]
+                    workspaces[wid] = {"wid": wid, "name": "", "state": 0}
+                    order.append(wid)
+                elif obj_id in workspaces:
+                    if op == 1 and len(payload) >= 4:  # name
+                        slen = struct.unpack("<I", payload[:4])[0]
+                        workspaces[obj_id]["name"] = payload[4:4 + slen - 1].decode("utf-8", errors="replace")
+                    elif op == 3 and len(payload) >= 4:  # state
+                        workspaces[obj_id]["state"] = struct.unpack("<I", payload[:4])[0]
+                elif obj_id == stop_cb and op == 0:  # wl_callback.done
+                    return
+
+    try:
+        pump(3)
+        if not mgr:
+            return []
+        # wl_registry(2).bind(0): name, interface, version, new_id=4
+        send_msg(2, 0, struct.pack("<I", mgr[0]) + pack_wl_str(mgr[1]) + struct.pack("<II", min(mgr[2], 1), 4))
+        send_msg(1, 0, struct.pack("<I", 5))
+        pump(5)
+
+        ordered = [workspaces[w] for w in order]
+        if activate_target is not None and ordered:
+            cur_idx = 0
+            for i, w in enumerate(ordered):
+                if w["state"] & 1:
+                    cur_idx = i
+                    break
+            target_idx = None
+            if activate_target == "left":
+                target_idx = max(0, cur_idx - 1)
+            elif activate_target == "right":
+                target_idx = min(len(ordered) - 1, cur_idx + 1)
+            else:
+                try:
+                    n = int(activate_target)
+                    target_idx = max(0, min(len(ordered) - 1, n - 1))
+                except Exception:
+                    target_idx = None
+
+            if target_idx is not None and target_idx != cur_idx:
+                wid = ordered[target_idx]["wid"]
+                # ext_workspace_handle_v1.activate = opcode 1
+                send_msg(wid, 1, b"")
+                # ext_workspace_manager_v1.commit = opcode 0
+                send_msg(4, 0, b"")
+                send_msg(1, 0, struct.pack("<I", 6))
+                pump(6)
+                ordered = [workspaces[w] for w in order]
+    finally:
+        try:
+            s.close()
+        except Exception:
+            pass
+
+    result = []
+    for i, w in enumerate(ordered):
+        result.append({
+            "index": i + 1,
+            "name": w["name"] or f"Escritorio {i + 1}",
+            "active": bool(w["state"] & 1),
+            "urgent": bool(w["state"] & 2),
+        })
+    return result
+
+
+def build_state_payload(ws_list):
+    if not ws_list:
+        ws_list = [{"index": 1, "name": "Escritorio 1", "active": True, "urgent": False}]
+    active_idx = 1
+    active_name = ws_list[0]["name"]
+    for w in ws_list:
+        if w.get("active"):
+            active_idx = w["index"]
+            active_name = w["name"]
+            break
+    return {
+        "count": len(ws_list),
+        "active": active_idx,
+        "activeName": active_name,
+        "desktops": ws_list,
+    }
+
+
+def write_state_file(payload):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    tmp = WS_STATE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
+    os.replace(tmp, WS_STATE_FILE)
+
+
+def update_rc_desktops(names):
+    if not os.path.isfile(LABWC_RC):
+        return False
+    with open(LABWC_RC, "r", encoding="utf-8") as f:
+        txt = f.read()
+
+    names_xml = "\n".join(f"      <name>{xml_escape(n)}</name>" for n in names)
+    block = (
+        "  <desktops>\n"
+        "    <popupTime>0</popupTime>\n"
+        "    <prefix>Escritorio</prefix>\n"
+        "    <names>\n"
+        f"{names_xml}\n"
+        "    </names>\n"
+        "  </desktops>"
+    )
+
+    if re.search(r"<desktops\b[^>]*>.*?</desktops>", txt, flags=re.DOTALL):
+        new_txt = re.sub(r"[ \t]*<desktops\b[^>]*>.*?</desktops>", block, txt, count=1, flags=re.DOTALL)
+    elif "<core>" in txt:
+        new_txt = txt.replace("  <core>", block + "\n\n  <core>", 1)
+    elif "<labwc_config>" in txt:
+        new_txt = txt.replace("<labwc_config>", "<labwc_config>\n" + block, 1)
+    else:
+        return False
+
+    tmp = LABWC_RC + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(new_txt)
+    os.replace(tmp, LABWC_RC)
+
+    subprocess.run(["pkill", "-HUP", "-x", "labwc"], stderr=subprocess.DEVNULL)
+    return True
+
+
+def wait_for_count(expected_count, timeout=0.8):
+    deadline = time.monotonic() + timeout
+    last = []
+    while time.monotonic() < deadline:
+        try:
+            last = wl_ext_workspaces()
+            if len(last) == expected_count:
+                return last
+        except Exception:
+            pass
+        time.sleep(0.03)
+    return last
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    try:
+        if cmd in ("status", "sync"):
+            ws = wl_ext_workspaces()
+            payload = build_state_payload(ws)
+            write_state_file(payload)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
+        if cmd == "switch":
+            target = sys.argv[2] if len(sys.argv) > 2 else "1"
+            ws = wl_ext_workspaces(activate_target=target)
+            payload = build_state_payload(ws)
+            write_state_file(payload)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
+        if cmd == "add":
+            cur = wl_ext_workspaces()
+            names = [w["name"] for w in cur] if cur else ["Escritorio 1"]
+            if len(names) < MAX_DESKTOPS:
+                existing = set(names)
+                next_num = len(names) + 1
+                cand = f"Escritorio {next_num}"
+                k = 1
+                while cand in existing:
+                    k += 1
+                    cand = f"Escritorio {k}"
+                names.append(cand)
+                if update_rc_desktops(names):
+                    wait_for_count(len(names))
+                    ws = wl_ext_workspaces(activate_target=len(names))
+                else:
+                    ws = wl_ext_workspaces()
+            else:
+                ws = cur
+            payload = build_state_payload(ws)
+            write_state_file(payload)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
+        if cmd == "remove":
+            cur = wl_ext_workspaces()
+            if len(cur) <= 1:
+                payload = build_state_payload(cur)
+                write_state_file(payload)
+                print(json.dumps(payload, ensure_ascii=False))
+                return 0
+
+            active_idx = next((w["index"] for w in cur if w["active"]), 1)
+            if len(sys.argv) > 2:
+                try:
+                    rem_idx = max(1, min(len(cur), int(sys.argv[2])))
+                except Exception:
+                    rem_idx = active_idx
+            else:
+                rem_idx = active_idx
+
+            # If removing the active desktop, switch smoothly to adjacent desktop first
+            if rem_idx == active_idx:
+                fallback_idx = rem_idx - 1 if rem_idx > 1 else 2
+                wl_ext_workspaces(activate_target=fallback_idx)
+                time.sleep(0.03)
+
+            names = [w["name"] for w in cur if w["index"] != rem_idx]
+            if not names:
+                names = ["Escritorio 1"]
+            if update_rc_desktops(names):
+                ws = wait_for_count(len(names))
+            else:
+                ws = wl_ext_workspaces()
+            payload = build_state_payload(ws)
+            write_state_file(payload)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
+        if cmd == "rename" and len(sys.argv) >= 4:
+            cur = wl_ext_workspaces()
+            try:
+                idx = int(sys.argv[2])
+            except Exception:
+                idx = 1
+            new_name = " ".join(sys.argv[3:]).strip()[:28]
+            if new_name and 1 <= idx <= len(cur):
+                names = [w["name"] for w in cur]
+                names[idx - 1] = new_name
+                if update_rc_desktops(names):
+                    time.sleep(0.15)
+            ws = wl_ext_workspaces()
+            payload = build_state_payload(ws)
+            write_state_file(payload)
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+
+    except Exception as e:
+        sys.stderr.write(f"x64-win11-workspaces error: {e}\n")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

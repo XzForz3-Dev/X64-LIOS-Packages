@@ -1,5 +1,14 @@
 <?xml version="1.0"?>
 <labwc_config>
+  <desktops>
+    <popupTime>0</popupTime>
+    <prefix>Escritorio</prefix>
+    <names>
+      <name>Escritorio 1</name>
+      <name>Escritorio 2</name>
+    </names>
+  </desktops>
+
   <core>
     <decoration>server</decoration>
     <gap>0</gap>
@@ -59,6 +68,29 @@
     </keybind>
     <keybind key="W-Tab">
       <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-taskview" />
+    </keybind>
+    <!-- Windows 11 Authentic Virtual Desktops Shortcuts -->
+    <keybind key="C-W-Left">
+      <action name="GoToDesktop" to="left" wrap="no" />
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces sync" />
+    </keybind>
+    <keybind key="C-W-Right">
+      <action name="GoToDesktop" to="right" wrap="no" />
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces sync" />
+    </keybind>
+    <keybind key="C-W-S-Left">
+      <action name="SendToDesktop" to="left" follow="yes" wrap="no" />
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces sync" />
+    </keybind>
+    <keybind key="C-W-S-Right">
+      <action name="SendToDesktop" to="right" follow="yes" wrap="no" />
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces sync" />
+    </keybind>
+    <keybind key="C-W-d">
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces add" />
+    </keybind>
+    <keybind key="C-W-F4">
+      <action name="Execute" command="/usr/bin/x64-win11-workspaces remove" />
     </keybind>
     <keybind key="W-x">
       <action name="Execute" command="/usr/bin/x64-win11-ctl toggle-winx" />

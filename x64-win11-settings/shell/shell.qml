@@ -76,13 +76,19 @@ ShellRoot {
     property string _lastCfgRaw: ""
     property string _lastSysRaw: ""
     property string _lastClipRaw: ""
+    property string _lastWsRaw: ""
     property bool trashHasFiles: false
     property int trashCount: 0
     property string trashSize: "0 B"
     property bool hasHiddenDesktopIcons: false
     property string customWallpaperUrl: ""
     property int activeVirtualDesktop: 1
+    property string activeVirtualDesktopName: "Escritorio 1"
     property int virtualDesktopCount: 2
+    property var virtualDesktops: [
+        { index: 1, name: "Escritorio 1", active: true, urgent: false },
+        { index: 2, name: "Escritorio 2", active: false, urgent: false }
+    ]
 
     // 26H2 Preferences (Synchronized live from ~/.local/state/x64-win11/config.json)
     property string startAllViewMode: "categories"
@@ -965,10 +971,18 @@ ShellRoot {
         }
     }
 
-    // Poll IPC Command File, Config JSON, Shared Clipboard & Dynamic SysInfo JSON (Diff-guarded for zero flicker!)
+    Process {
+        id: wsSyncProc
+        command: ["/usr/bin/x64-win11-workspaces", "sync"]
+        onExited: {
+            if (!statePoller.running) statePoller.running = true;
+        }
+    }
+
+    // Poll IPC Command File, Config JSON, Shared Clipboard, Workspaces & Dynamic SysInfo JSON (Diff-guarded for zero flicker!)
     Process {
         id: statePoller
-        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'; echo '---SYS---'; cat ~/.local/state/x64-win11/sysinfo.json 2>/dev/null || echo '{}'; echo '---CLIP---'; cat ~/.local/state/x64-win11/clipboard.json 2>/dev/null || echo '{}'"]
+        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'; echo '---SYS---'; cat ~/.local/state/x64-win11/sysinfo.json 2>/dev/null || echo '{}'; echo '---CLIP---'; cat ~/.local/state/x64-win11/clipboard.json 2>/dev/null || echo '{}'; echo '---WS---'; cat ~/.local/state/x64-win11/workspaces.json 2>/dev/null || echo '{}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var raw = text || "";
@@ -1092,7 +1106,8 @@ ShellRoot {
                             } catch (e2) {}
                         }
                         if (sysClipParts.length > 1) {
-                            var clipRaw = (sysClipParts[1] || "{}").trim();
+                            var clipWsParts = (sysClipParts[1] || "{}").split("---WS---");
+                            var clipRaw = (clipWsParts[0] || "{}").trim();
                             if (clipRaw !== shellRoot._lastClipRaw) {
                                 shellRoot._lastClipRaw = clipRaw;
                                 try {
@@ -1103,6 +1118,21 @@ ShellRoot {
                                         shellRoot.desktopClipboardCut = (cl.mode === "cut");
                                     }
                                 } catch (e3) {}
+                            }
+                            if (clipWsParts.length > 1) {
+                                var wsRaw = (clipWsParts[1] || "{}").trim();
+                                if (wsRaw !== shellRoot._lastWsRaw && wsRaw !== "{}") {
+                                    shellRoot._lastWsRaw = wsRaw;
+                                    try {
+                                        var ws = JSON.parse(wsRaw);
+                                        if (ws && Array.isArray(ws.desktops) && ws.desktops.length > 0) {
+                                            shellRoot.virtualDesktops = ws.desktops;
+                                            shellRoot.virtualDesktopCount = ws.desktops.length;
+                                            if (ws.active !== undefined) shellRoot.activeVirtualDesktop = Number(ws.active);
+                                            if (ws.activeName) shellRoot.activeVirtualDesktopName = String(ws.activeName);
+                                        }
+                                    } catch (e4) {}
+                                }
                             }
                         }
                     }
@@ -1132,6 +1162,7 @@ ShellRoot {
         try { Qt.application.font = Qt.font({ family: "Inter", pointSize: 9 }); } catch (e) {}
         shellRoot.rebuildInteractiveCalendar();
         Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "sysinfo"]);
+        if (!wsSyncProc.running) wsSyncProc.running = true;
     }
 
     // Reusable SVG/PNG Loader (2x Exact Supersampling + Trilinear Mipmapping for Razor-Sharp Curves)
@@ -2243,7 +2274,7 @@ ShellRoot {
                     MouseArea {
                         id: tvBtnHov
                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
-                        onEntered: shellRoot.showTbTooltip(taskbarWin.modelData, mainIconsRow.x + tvBtnRect.x + tvBtnRect.width / 2, "Vista de tareas")
+                        onEntered: shellRoot.showTbTooltip(taskbarWin.modelData, mainIconsRow.x + tvBtnRect.x + tvBtnRect.width / 2, "Vista de tareas — " + shellRoot.activeVirtualDesktopName)
                         onExited: shellRoot.hideTbTooltip()
                         onClicked: {
                             shellRoot.hideTbTooltip();
@@ -4030,7 +4061,12 @@ ShellRoot {
             color: "#d414161d"
             focus: shellRoot.taskViewOpen
             Keys.onEscapePressed: shellRoot.closeAllPopups()
-            onVisibleChanged: if (visible) taskViewSurface.forceActiveFocus()
+            onVisibleChanged: {
+                if (visible) {
+                    taskViewSurface.forceActiveFocus();
+                    if (!wsSyncProc.running) wsSyncProc.running = true;
+                }
+            }
 
             // Click empty background in Task View to dismiss
             MouseArea {
@@ -4054,7 +4090,7 @@ ShellRoot {
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No hay ventanas abiertas en Escritorio " + shellRoot.activeVirtualDesktop
+                    text: "No hay ventanas abiertas en " + shellRoot.activeVirtualDesktopName
                     color: "#cfcfcf"
                     font.pixelSize: 15
                 }
@@ -4201,29 +4237,57 @@ ShellRoot {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 16
-                width: desktopsRow.implicitWidth + 24
+                width: Math.min(parent.width - 48, desktopsRow.implicitWidth + 24)
                 height: 112
                 radius: 10
                 color: "#f0222222"
                 border.color: "#2effffff"
                 border.width: 1
+                clip: true
                 MouseArea { anchors.fill: parent }
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    contentWidth: desktopsRow.implicitWidth
+                    contentHeight: height
+                    flickableDirection: Flickable.HorizontalFlick
+                    interactive: contentWidth > width
+                    clip: true
 
                 Row {
                     id: desktopsRow
-                    anchors.centerIn: parent
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: 12
 
                     Repeater {
-                        model: shellRoot.virtualDesktopCount
+                        model: shellRoot.virtualDesktops
 
                         delegate: Rectangle {
-                            readonly property int deskNum: index + 1
+                            required property var modelData
+                            required property int index
+                            readonly property int deskNum: Number(modelData.index || (index + 1))
+                            readonly property string deskName: String(modelData.name || ("Escritorio " + deskNum))
                             readonly property bool isCur: shellRoot.activeVirtualDesktop === deskNum
                             width: 148
                             height: 92
                             radius: 7
-                            color: deskCardHov.containsMouse ? "#2cffffff" : (isCur ? "#1effffff" : "transparent")
+                            color: (deskCardHov.containsMouse || deskCloseHov.containsMouse) ? "#2cffffff" : (isCur ? "#1effffff" : "transparent")
+                            Behavior on color { ColorAnimation { duration: 110 } }
+
+                            MouseArea {
+                                id: deskCardHov
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    shellRoot.activeVirtualDesktop = deskNum;
+                                    shellRoot.activeVirtualDesktopName = deskName;
+                                    Quickshell.execDetached(["/usr/bin/x64-win11-workspaces", "switch", String(deskNum)]);
+                                    shellRoot.closeAllPopups();
+                                }
+                            }
 
                             Column {
                                 anchors.centerIn: parent
@@ -4231,7 +4295,10 @@ ShellRoot {
 
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "Escritorio " + deskNum
+                                    width: 118
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                    text: deskName
                                     color: isCur ? "#ffffff" : "#cfcfcf"
                                     font.pixelSize: 11
                                     font.weight: isCur ? Font.DemiBold : Font.Normal
@@ -4248,29 +4315,58 @@ ShellRoot {
                                     Image {
                                         anchors.fill: parent
                                         anchors.margins: isCur ? 2 : 1
-                                        source: shellRoot.wallpaperMode === 0
-                                                ? (shellRoot.wpDir + "win11-bloom-dark.jpg")
-                                                : (shellRoot.wallpaperMode === 1
-                                                   ? (shellRoot.wpDir + "win11-bloom-light.jpg")
-                                                   : (shellRoot.wpDir + "x64-monolith.jpg"))
+                                        source: (shellRoot.wallpaperMode === 3 && shellRoot.customWallpaperUrl !== "")
+                                                ? shellRoot.customWallpaperUrl
+                                                : (shellRoot.wallpaperMode === 0
+                                                   ? (shellRoot.wpDir + "win11-bloom-dark.jpg")
+                                                   : (shellRoot.wallpaperMode === 1
+                                                      ? (shellRoot.wpDir + "win11-bloom-light.jpg")
+                                                      : (shellRoot.wpDir + "x64-monolith.jpg")))
                                         fillMode: Image.PreserveAspectCrop
                                     }
                                 }
                             }
 
-                            MouseArea {
-                                id: deskCardHov
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: shellRoot.activeVirtualDesktop = deskNum
+                            // Authentic Windows 11 Close Desktop button ("✕") when > 1 desktop exists
+                            Rectangle {
+                                visible: shellRoot.virtualDesktopCount > 1
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 3
+                                anchors.rightMargin: 3
+                                width: 20
+                                height: 20
+                                radius: 4
+                                z: 5
+                                color: deskCloseHov.containsMouse ? "#c42b1c" : "#b8242424"
+                                border.color: "#2cffffff"
+                                border.width: 1
+                                opacity: (deskCardHov.containsMouse || deskCloseHov.containsMouse) ? 1.0 : 0.0
+                                Behavior on opacity { NumberAnimation { duration: 100 } }
+
+                                WinSvg {
+                                    anchors.centerIn: parent
+                                    width: 9; height: 9
+                                    iconFile: "fluent-dismiss.svg"
+                                }
+
+                                MouseArea {
+                                    id: deskCloseHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: (mouse) => {
+                                        mouse.accepted = true;
+                                        Quickshell.execDetached(["/usr/bin/x64-win11-workspaces", "remove", String(deskNum)]);
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // "+ Nuevo escritorio" Card
+                    // "+ Nuevo escritorio" Card (up to 8 real labwc virtual desktops!)
                     Rectangle {
-                        visible: shellRoot.virtualDesktopCount < 5
+                        visible: shellRoot.virtualDesktopCount < 8
                         width: 138
                         height: 92
                         radius: 7
@@ -4306,13 +4402,13 @@ ShellRoot {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                if (shellRoot.virtualDesktopCount < 5) {
-                                    shellRoot.virtualDesktopCount += 1;
-                                    shellRoot.activeVirtualDesktop = shellRoot.virtualDesktopCount;
+                                if (shellRoot.virtualDesktopCount < 8) {
+                                    Quickshell.execDetached(["/usr/bin/x64-win11-workspaces", "add"]);
                                 }
                             }
                         }
                     }
+                }
                 }
             }
         }

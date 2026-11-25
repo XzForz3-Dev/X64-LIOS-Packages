@@ -368,6 +368,10 @@ PYEOF
     taskmgr)
         setsid -f /usr/bin/x64-win11-app taskmgr >/dev/null 2>&1 &
         ;;
+    desktop)
+        shift
+        /usr/bin/x64-win11-workspaces "$@" >/dev/null 2>&1 || true
+        ;;
     reload)
         /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
         pkill -f 'quickshell.*x64-win11' 2>/dev/null || true

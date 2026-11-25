@@ -57,7 +57,21 @@ EOF
             uname=$(basename "$udir")
 
             mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
+            # Preserve existing user <desktops> configuration when upgrading labwc rc.xml
+            local saved_desktops=""
+            if [ -f "$udir/.config/labwc/rc.xml" ] && grep -q "<desktops" "$udir/.config/labwc/rc.xml" 2>/dev/null; then
+                saved_desktops=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); m=re.search(r"[ \t]*<desktops\b[^>]*>.*?</desktops>",t,re.S); print(m.group(0) if m else "")' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
+            fi
             cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
+            if [ -n "$saved_desktops" ] && [ -f "$udir/.config/labwc/rc.xml" ]; then
+                python3 - "$udir/.config/labwc/rc.xml" "$saved_desktops" <<'PYEOF' 2>/dev/null || true
+import re, sys
+p, blk = sys.argv[1], sys.argv[2]
+txt = open(p, "r", encoding="utf-8").read()
+new_txt = re.sub(r"[ \t]*<desktops\b[^>]*>.*?</desktops>", blk, txt, count=1, flags=re.S)
+open(p, "w", encoding="utf-8").write(new_txt)
+PYEOF
+            fi
             chmod 755 "$udir/.config/labwc/autostart" 2>/dev/null || true
             if [ -f /etc/xdg/x64-win11/mimeapps.list ]; then
                 cp -f /etc/xdg/x64-win11/mimeapps.list "$udir/.config/mimeapps.list" 2>/dev/null || true
