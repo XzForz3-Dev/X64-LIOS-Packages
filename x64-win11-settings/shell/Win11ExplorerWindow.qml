@@ -59,9 +59,19 @@ Rectangle {
     property string dropTargetNavName: ""
     property string dropTargetCrumbPath: ""
 
-    // Per-Tab State: each tab stores { section, history: [...], histIdx: 0 }
-    property var explorerTabs: [({ section: root.explorerSection, history: [root.explorerSection], histIdx: 0 })]
+    // Per-Tab State: static initial value (NEVER bound to root.explorerSection so history is preserved!)
+    property var explorerTabs: [({
+        section: (typeof initialArg !== "undefined" && initialArg !== "") ? initialArg : "Este equipo",
+        history: [(typeof initialArg !== "undefined" && initialArg !== "") ? initialArg : "Este equipo"],
+        histIdx: 0
+    })]
     property int activeTabIndex: 0
+
+    Connections {
+        target: bridge
+        function onMouseBackPressed() { root.goBack(); }
+        function onMouseForwardPressed() { root.goForward(); }
+    }
 
     readonly property var currentTabObj: (activeTabIndex >= 0 && activeTabIndex < explorerTabs.length) ? explorerTabs[activeTabIndex] : ({ section: "Este equipo", history: ["Este equipo"], histIdx: 0 })
     readonly property bool canGoBack: currentTabObj.histIdx > 0
@@ -474,7 +484,7 @@ Rectangle {
             root.goForward();
             event.accepted = true;
         } else if (((event.modifiers & Qt.AltModifier) && event.key === Qt.Key_Up) || event.key === Qt.Key_Backspace) {
-            if (root.explorerMode !== "thispc") root.navigateExplorer(bridge.getParentDir(root.explorerRealPath), true);
+            if (root.explorerMode !== "thispc") root.goUpDirectory();
             event.accepted = true;
         } else if ((event.modifiers & Qt.AltModifier) && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
             if (root.selectedObj) root.openPropertiesForPath(root.selectedObj.path, root.selectedObj.icon);
@@ -538,6 +548,36 @@ Rectangle {
         antialiasing: true
     }
 
+    function findMountedDriveForPath(p) {
+        if (!p || p === "/") return null;
+        var drvs = root.explorerDrives || [];
+        var best = null;
+        for (var i = 0; i < drvs.length; i++) {
+            var d = drvs[i];
+            if (!d || !d.mounted || !d.path || d.path === "/" || d.isHomeVolume) continue;
+            var dp = String(d.path).replace(/\/+$/, "");
+            if (p === dp || p.indexOf(dp + "/") === 0) {
+                if (!best || dp.length > String(best.path).length) best = d;
+            }
+        }
+        return best;
+    }
+
+    function goUpDirectory() {
+        if (root.explorerMode === "thispc") return;
+        var p = String(root.explorerRealPath || "").replace(/\/+$/, "") || "/";
+        if (p === "/" || root.isTrashFolder) {
+            root.navigateExplorer("Este equipo", true);
+            return;
+        }
+        var drv = findMountedDriveForPath(p);
+        if (drv && p === String(drv.path).replace(/\/+$/, "")) {
+            root.navigateExplorer("Este equipo", true);
+            return;
+        }
+        root.navigateExplorer(bridge.getParentDir(root.explorerRealPath), true);
+    }
+
     readonly property var breadcrumbSegments: {
         if (root.explorerMode === "thispc" || root.explorerRealPath === "Este equipo") {
             return [{ label: "Este equipo", path: "Este equipo" }];
@@ -545,8 +585,24 @@ Rectangle {
         if (root.isTrashFolder) {
             return [{ label: "Este equipo", path: "Este equipo" }, { label: "Papelera de reciclaje", path: "Papelera" }];
         }
-        var segs = [{ label: "Este equipo", path: "Este equipo" }, { label: "X64 LIOS (C:)", path: "/" }];
         var p = String(root.explorerRealPath || "");
+        var drv = root.findMountedDriveForPath(p);
+        if (drv) {
+            var baseP = String(drv.path).replace(/\/+$/, "");
+            var segsD = [{ label: "Este equipo", path: "Este equipo" }, { label: drv.name, path: baseP }];
+            var rel = p.slice(baseP.length);
+            if (rel.length > 0) {
+                var rParts = rel.split("/");
+                var accD = baseP;
+                for (var ri = 0; ri < rParts.length; ri++) {
+                    if (rParts[ri] === "") continue;
+                    accD += "/" + rParts[ri];
+                    segsD.push({ label: rParts[ri], path: accD });
+                }
+            }
+            return segsD;
+        }
+        var segs = [{ label: "Este equipo", path: "Este equipo" }, { label: "X64 LIOS (C:)", path: "/" }];
         if (p !== "/" && p.indexOf("/") === 0) {
             var parts = p.split("/");
             var acc = "";
@@ -592,6 +648,10 @@ Rectangle {
     function tabDisplayName(sec) {
         if (!sec || sec === "") return "Este equipo";
         if (sec === "/") return "X64 LIOS (C:)";
+        var drv = findMountedDriveForPath(sec);
+        if (drv && String(sec).replace(/\/+$/, "") === String(drv.path).replace(/\/+$/, "")) {
+            return drv.name;
+        }
         if (sec.indexOf("/") !== -1) {
             var parts = sec.split("/");
             var last = parts[parts.length - 1];
@@ -826,7 +886,7 @@ Rectangle {
                     WinSvg { anchors.centerIn: parent; width: 16; height: 16; iconFile: "fluent-arrow-up.svg"; opacity: root.explorerMode !== "thispc" ? 1.0 : 0.35 }
                     MouseArea {
                         id: upHov; anchors.fill: parent; hoverEnabled: true
-                        onClicked: if (root.explorerMode !== "thispc") root.navigateExplorer(bridge.getParentDir(root.explorerRealPath), true)
+                        onClicked: root.goUpDirectory()
                     }
                 }
 
@@ -1345,11 +1405,12 @@ Rectangle {
                         Repeater {
                             model: root.explorerDrives
                             delegate: Item {
+                                visible: !Boolean(modelData.isHomeVolume)
                                 readonly property string navName: modelData.name || ""
                                 readonly property string navPath: (modelData.mounted && modelData.path) ? modelData.path : ""
                                 readonly property bool isCurDrv: Boolean(modelData.mounted && modelData.path && (root.explorerSection === modelData.path || root.explorerRealPath === modelData.path))
                                 readonly property bool isDrop: root.draggingItems && navPath !== "" && root.dropTargetNavName === navName
-                                width: navCol.width; height: 33
+                                width: navCol.width; height: visible ? 33 : 0
 
                                 Rectangle {
                                     anchors.fill: parent; radius: 5

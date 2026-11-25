@@ -1233,6 +1233,33 @@ def get_dynamic_drives():
             except Exception:
                 continue
 
+    # 3. Always include user's Home volume card in "Dispositivos y unidades" (without stealing D:/E: from real disks)
+    try:
+        display_name, _, _ = get_real_user_info()
+        usage = shutil.disk_usage(HOME_DIR)
+        t_gb = usage.total / (1024 ** 3)
+        f_gb = usage.free / (1024 ** 3)
+        used_ratio = max(0.04, min(1.0, (usage.total - usage.free) / max(1, usage.total)))
+        drives.append({
+            "name": f"Carpeta Personal — {display_name} (HOME)",
+            "letter": "HOME",
+            "path": HOME_DIR,
+            "device": "",
+            "baseBlk": "",
+            "mounted": True,
+            "isSystem": True,
+            "isHomeVolume": True,
+            "removable": False,
+            "fstype": root_fstype,
+            "sizeGb": round(t_gb, 1),
+            "icon": "drive.svg",
+            "usedRatio": round(used_ratio, 3),
+            "isCritical": used_ratio >= 0.90,
+            "info": f"Espacio de usuario • {f_gb:.1f} GB libres"
+        })
+    except Exception:
+        pass
+
     return drives
 
 
@@ -1245,7 +1272,7 @@ def main():
         dump_sysinfo_file()
         sys.exit(0)
 
-    from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QThread, QUrl, Qt, QRectF
+    from PyQt6.QtCore import QObject, QEvent, pyqtSlot, pyqtSignal, QThread, QUrl, Qt, QRectF
     from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QLinearGradient
     from PyQt6.QtQuick import QQuickView
     try:
@@ -1280,6 +1307,8 @@ def main():
 
     class AppBridge(QObject):
         updatesChecked = pyqtSignal(str)
+        mouseBackPressed = pyqtSignal()
+        mouseForwardPressed = pyqtSignal()
         def __init__(self, view):
             super().__init__()
             self.view = view
@@ -3921,7 +3950,21 @@ def main():
     view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
     view.resize(w, h)
 
+    class _MouseNavFilter(QObject):
+        def eventFilter(self, obj, ev):
+            if ev.type() == QEvent.Type.MouseButtonPress:
+                btn = ev.button()
+                if btn == Qt.MouseButton.BackButton:
+                    bridge.mouseBackPressed.emit()
+                    return True
+                elif btn == Qt.MouseButton.ForwardButton:
+                    bridge.mouseForwardPressed.emit()
+                    return True
+            return False
+
     bridge = AppBridge(view)
+    mouse_nav_filter = _MouseNavFilter(view)
+    view.installEventFilter(mouse_nav_filter)
     view.rootContext().setContextProperty("bridge", bridge)
     view.rootContext().setContextProperty("initialArg", arg2)
     view.rootContext().setContextProperty("assetDirUrl", f"file://{ASSET_DIR}")
