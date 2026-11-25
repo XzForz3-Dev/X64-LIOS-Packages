@@ -3064,10 +3064,13 @@ def main():
         @pyqtSlot(str, str, bool, bool, result=str)
         def listDirectoryExJson(self, section_or_path, sort_by="name", sort_asc=True, show_hidden=False):
             if section_or_path in ("Este equipo", "This PC"):
-                return json.dumps({"mode": "thispc", "path": "Este equipo", "items": [], "count": 8})
+                return json.dumps({"mode": "thispc", "path": "Este equipo", "isReadOnly": False, "items": [], "count": 8})
 
             real_path = resolve_special_folder(section_or_path)
             is_trash = real_path.endswith("/Trash/files")
+            is_read_only = (not is_trash) and (not os.access(real_path, os.W_OK))
+            is_root_dir = (os.path.normpath(real_path) == "/")
+            virtual_root_dirs = {"proc", "sys", "dev", "run", "lost+found"}
             trash_info_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "info")
             items = []
             try:
@@ -3076,7 +3079,7 @@ def main():
                 entries = []
 
             for e in entries:
-                if not show_hidden and e.name.startswith("."):
+                if not show_hidden and (e.name.startswith(".") or (is_root_dir and e.name in virtual_root_dirs)):
                     continue
                 try:
                     st = e.stat(follow_symlinks=True)
@@ -3193,6 +3196,7 @@ def main():
                 "mode": "dir",
                 "path": real_path,
                 "isTrash": is_trash,
+                "isReadOnly": is_read_only,
                 "items": combined[:500],
                 "count": len(combined)
             })

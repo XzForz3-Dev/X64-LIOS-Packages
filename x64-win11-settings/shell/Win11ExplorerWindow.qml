@@ -13,6 +13,7 @@ Rectangle {
     property string explorerRealPath: "Este equipo"
     property string explorerMode: "thispc"
     property bool isTrashFolder: false
+    property bool isReadOnlyDir: false
     property var explorerItems: []
     property var explorerDrives: []
     property int explorerItemCount: 0
@@ -433,12 +434,18 @@ Rectangle {
 
     function finishItemDrag() {
         if (draggingItems && dropTargetPath !== "" && dragSourcePaths.length > 0) {
-            var cnt = bridge.moveItemsToDirJson(JSON.stringify(dragSourcePaths), dropTargetPath);
-            if (cnt > 0) {
-                var lbl = dropTargetLabel;
-                clearSelection();
-                refreshExplorer();
-                showExpToast(cnt + " elemento(s): " + lbl);
+            if (isReadOnlyDir) {
+                showExpToast("Carpeta del sistema (solo lectura): usa Copiar");
+            } else {
+                var cnt = bridge.moveItemsToDirJson(JSON.stringify(dragSourcePaths), dropTargetPath);
+                if (cnt > 0) {
+                    var lbl = dropTargetLabel;
+                    clearSelection();
+                    refreshExplorer();
+                    showExpToast(cnt + " elemento(s): " + lbl);
+                } else {
+                    showExpToast("No se pudo mover (destino protegido / solo lectura)");
+                }
             }
         }
         draggingItems = false;
@@ -494,12 +501,14 @@ Rectangle {
             root.execExpDropdown("m_selall");
             event.accepted = true;
         } else if (event.key === Qt.Key_F2 && root.selectedPaths.length === 1 && root.selectedObj && !root.isTrashFolder) {
+            if (root.isReadOnlyDir) { root.showExpToast("Carpeta del sistema (solo lectura)"); event.accepted = true; return; }
             renameField.text = root.selectedObj.name;
             root.renamingActive = true;
             renameField.forceActiveFocus();
             renameField.selectAll();
             event.accepted = true;
         } else if (event.key === Qt.Key_Delete && root.selectedPaths.length > 0) {
+            if (root.isReadOnlyDir) { root.showExpToast("Carpeta del sistema (solo lectura)"); event.accepted = true; return; }
             var okDel = root.isTrashFolder
                         ? bridge.deletePermanentlyJson(JSON.stringify(root.selectedPaths))
                         : bridge.trashItemsJson(JSON.stringify(root.selectedPaths));
@@ -514,10 +523,12 @@ Rectangle {
             root.showExpToast(root.selectedPaths.length + " elemento(s) copiado(s)");
             event.accepted = true;
         } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_X && root.selectedPaths.length > 0 && !root.isTrashFolder) {
+            if (root.isReadOnlyDir) { root.showExpToast("Carpeta del sistema (solo lectura): usa Copiar"); event.accepted = true; return; }
             root.writeClipboard(root.selectedPaths, true);
             root.showExpToast(root.selectedPaths.length + " elemento(s) cortado(s)");
             event.accepted = true;
         } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V && root.explorerMode === "dir" && !root.isTrashFolder) {
+            if (root.isReadOnlyDir) { root.showExpToast("Carpeta del sistema (solo lectura)"); event.accepted = true; return; }
             root.execExpCtxAction("paste");
             event.accepted = true;
         } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && root.selectedObj) {
@@ -719,6 +730,7 @@ Rectangle {
             explorerMode = res.mode;
             explorerRealPath = res.path;
             isTrashFolder = Boolean(res.isTrash);
+            isReadOnlyDir = Boolean(res.isReadOnly);
             explorerItems = res.items || [];
             explorerItemCount = res.count || 0;
         } catch (e) {}
@@ -1064,7 +1076,7 @@ Rectangle {
                 // "Nuevo ∨" Button
                 Rectangle {
                     id: newCmdBtn
-                    readonly property bool canNew: !root.isTrashFolder
+                    readonly property bool canNew: !root.isTrashFolder && !root.isReadOnlyDir
                     width: 94; height: 32; radius: 5
                     opacity: canNew ? 1.0 : 0.38
                     color: canNew && (root.openDropdown === "new" || newBtnHov.containsMouse) ? "#28ffffff" : "transparent"
@@ -1084,7 +1096,7 @@ Rectangle {
 
                 // Cut
                 Rectangle {
-                    readonly property bool canAct: root.selectedPaths.length > 0 && !root.isTrashFolder
+                    readonly property bool canAct: root.selectedPaths.length > 0 && !root.isTrashFolder && !root.isReadOnlyDir
                     width: 34; height: 32; radius: 5
                     color: cutHov.containsMouse && canAct ? "#24ffffff" : "transparent"
                     opacity: canAct ? 1.0 : 0.38
@@ -1110,7 +1122,7 @@ Rectangle {
 
                 // Paste
                 Rectangle {
-                    readonly property bool canAct: root.clipboardPaths.length > 0 && root.explorerMode === "dir" && !root.isTrashFolder
+                    readonly property bool canAct: root.clipboardPaths.length > 0 && root.explorerMode === "dir" && !root.isTrashFolder && !root.isReadOnlyDir
                     width: 34; height: 32; radius: 5
                     color: pasteHov.containsMouse && canAct ? "#24ffffff" : "transparent"
                     opacity: canAct ? 1.0 : 0.38
@@ -1123,7 +1135,7 @@ Rectangle {
 
                 // Rename (F2)
                 Rectangle {
-                    readonly property bool canAct: root.selectedPaths.length === 1 && root.selectedObj !== null && !root.isTrashFolder
+                    readonly property bool canAct: root.selectedPaths.length === 1 && root.selectedObj !== null && !root.isTrashFolder && !root.isReadOnlyDir
                     width: 34; height: 32; radius: 5
                     color: renHov.containsMouse && canAct ? "#24ffffff" : "transparent"
                     opacity: canAct ? 1.0 : 0.38
@@ -1134,9 +1146,9 @@ Rectangle {
                     }
                 }
 
-                // Compress to ZIP (only active when 1+ items selected!)
+                // Compress to ZIP (only active when 1+ items selected in writable dir!)
                 Rectangle {
-                    readonly property bool canAct: root.selectedPaths.length > 0 && !root.isTrashFolder
+                    readonly property bool canAct: root.selectedPaths.length > 0 && !root.isTrashFolder && !root.isReadOnlyDir
                     width: 34; height: 32; radius: 5
                     color: zipHov.containsMouse && canAct ? "#24ffffff" : "transparent"
                     opacity: canAct ? 1.0 : 0.38
@@ -1149,7 +1161,7 @@ Rectangle {
 
                 // Delete (Supr)
                 Rectangle {
-                    readonly property bool canAct: root.selectedPaths.length > 0
+                    readonly property bool canAct: root.selectedPaths.length > 0 && !root.isReadOnlyDir
                     width: 34; height: 32; radius: 5
                     color: delHov.containsMouse && canAct ? "#24ffffff" : "transparent"
                     opacity: canAct ? 1.0 : 0.38
@@ -2148,6 +2160,16 @@ Rectangle {
                            : (root.selectedObj ? ("   |   1 elemento seleccionado  " + (root.selectedObj.sizeLabel || "")) : ""))
                     color: "#a8a8a8"; font.pixelSize: 11
                 }
+                Rectangle {
+                    visible: root.isReadOnlyDir && root.explorerMode === "dir"
+                    width: roRow.implicitWidth + 14; height: 19; radius: 4
+                    color: "#22f59e0b"; border.color: "#44f59e0b"; border.width: 1
+                    RowLayout {
+                        id: roRow; anchors.centerIn: parent; spacing: 5
+                        WinSvg { width: 11; height: 11; iconFile: "fluent-lock.svg" }
+                        Text { text: "Solo lectura"; color: "#fbbf24"; font.pixelSize: 10; font.weight: Font.DemiBold }
+                    }
+                }
                 Item { Layout.fillWidth: true }
                 Text {
                     visible: root.statusToast !== ""
@@ -2349,7 +2371,7 @@ Rectangle {
                     { act: "toggle_hidden", label: root.showHiddenFiles ? "Ocultar archivos ocultos" : "Mostrar archivos ocultos", icon: "fluent-eye.svg" },
                     { act: "refresh",       label: "Actualizar",                   icon: "fluent-refresh.svg" }
                 ];
-                if (root.clipboardPath !== "" && !root.isTrashFolder) {
+                if (root.clipboardPath !== "" && !root.isTrashFolder && !root.isReadOnlyDir) {
                     b.push({ sep: true });
                     b.push({ act: "paste", label: "Pegar", icon: "fluent-paste.svg" });
                 }
@@ -2358,10 +2380,12 @@ Rectangle {
                     b.push({ act: "restore_all", label: "Restaurar todos los elementos", icon: "fluent-arrow-undo.svg" });
                     b.push({ act: "empty_trash", label: "Vaciar Papelera de reciclaje",  icon: "fluent-delete.svg" });
                 } else {
-                    b.push({ sep: true });
-                    b.push({ act: "new_folder", label: "Nueva carpeta",            icon: "folder.svg" });
-                    b.push({ act: "new_doc",    label: "Nuevo documento de texto", icon: "fluent-document.svg" });
-                    b.push({ act: "new_md",     label: "Nuevas notas (.md)",       icon: "fluent-document.svg" });
+                    if (!root.isReadOnlyDir) {
+                        b.push({ sep: true });
+                        b.push({ act: "new_folder", label: "Nueva carpeta",            icon: "folder.svg" });
+                        b.push({ act: "new_doc",    label: "Nuevo documento de texto", icon: "fluent-document.svg" });
+                        b.push({ act: "new_md",     label: "Nuevas notas (.md)",       icon: "fluent-document.svg" });
+                    }
                     b.push({ sep: true });
                     b.push({ act: "term_here",  label: "Abrir en Terminal",        icon: "fluent-window-console.svg" });
                 }
@@ -2385,14 +2409,16 @@ Rectangle {
             } else {
                 r.push({ act: "term_item", label: "Abrir carpeta en Terminal",  icon: "fluent-window-console.svg" });
             }
-            if (it.isArchive) {
+            if (it.isArchive && !root.isReadOnlyDir) {
                 r.push({ act: "extract_item", label: "Extraer todo aquí", icon: "fluent-folder-zip.svg" });
             }
             if (it.isImage) {
                 r.push({ act: "set_wp", label: "Establecer como fondo de escritorio", icon: "fluent-image.svg" });
             }
             r.push({ sep: true });
-            r.push({ act: "zip_item",  label: "Comprimir en archivo ZIP",   icon: "fluent-folder-zip.svg" });
+            if (!root.isReadOnlyDir) {
+                r.push({ act: "zip_item",  label: "Comprimir en archivo ZIP",   icon: "fluent-folder-zip.svg" });
+            }
             r.push({ act: "copy_path", label: "Copiar como ruta de acceso", icon: "fluent-link.svg" });
             r.push({ sep: true });
             r.push({ act: "props",     label: "Propiedades",                icon: "fluent-info.svg" });
@@ -2417,7 +2443,7 @@ Rectangle {
                             { id: "delete", icon: "fluent-delete.svg", label: "Eliminar" }
                         ]
                         delegate: Rectangle {
-                            readonly property bool dis: (modelData.id === "rename" && root.selectedPaths.length > 1)
+                            readonly property bool dis: (modelData.id === "rename" && root.selectedPaths.length > 1) || (root.isReadOnlyDir && modelData.id !== "copy")
                             width: 62; height: 46; radius: 5
                             opacity: dis ? 0.4 : 1.0
                             color: (!dis && eqHov.containsMouse) ? "#24ffffff" : "transparent"
