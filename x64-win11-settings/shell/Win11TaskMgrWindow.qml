@@ -10,8 +10,9 @@ Rectangle {
     focus: true
 
     property string activeTab: "processes" // "processes" | "performance" | "startup"
-    property string perfSubTab: "cpu"      // "cpu" | "ram" | "disk" | "net" | "gpu"
+    property string perfSubTab: "cpu"      // "cpu" | "ram" | "disk" | "net" | "gpu_0" | "gpu_1" ...
     property bool cpuShowPerCore: false
+    property int historyTick: 0
     property bool telemetryPaused: false
     property string procFilter: ""
     property string procSortKey: "cpu"     // "cpu" | "mem" | "name" | "pid" | "threads"
@@ -90,6 +91,9 @@ Rectangle {
         "netPct": 0,
         "netTotalRecvStr": "0.00 GB",
         "netTotalSentStr": "0.00 GB",
+        "gpus": [
+            { "id": "gpu_0", "label": "GPU 0", "name": "Adaptador gráfico", "pct": 0, "temp": "—", "vramUsedMb": 0, "vramTotalMb": 0, "vramPct": 0, "vramStr": "Compartida", "driver": "DRM/KMS", "busId": "—" }
+        ],
         "gpuName": "Adaptador gráfico",
         "gpuPct": 0,
         "gpuTemp": "—",
@@ -105,7 +109,16 @@ Rectangle {
     property var diskHistory: [0, 0, 1, 0, 0, 2, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
     property var netRecvHistory: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     property var netSendHistory: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    property var gpuHistory: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    property var gpuHistories: ({ "gpu_0": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] })
+
+    readonly property bool isGpuPerfTab: root.perfSubTab.indexOf("gpu_") === 0
+    readonly property var activeGpuObj: {
+        var list = root.sysInfo.gpus || [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === root.perfSubTab) return list[i];
+        }
+        return list.length > 0 ? list[0] : ({ id: "gpu_0", label: "GPU 0", name: "Adaptador gráfico", pct: 0, temp: "—", vramUsedMb: 0, vramTotalMb: 0, vramPct: 0, vramStr: "Compartida", driver: "DRM/KMS", busId: "—" });
+    }
 
     readonly property bool compactRail: root.width < 760
 
@@ -355,9 +368,16 @@ Rectangle {
             nsh.push(Math.min(100, Math.round((Number(data.netSendKbs || 0) / 1024.0) * 100.0)));
             netSendHistory = nsh;
 
-            var gh = gpuHistory.slice(Math.max(0, gpuHistory.length - 59));
-            gh.push(Number(data.gpuPct || 0));
-            gpuHistory = gh;
+            var nextGpuHist = Object.assign({}, gpuHistories);
+            var gList = data.gpus || [];
+            for (var gi = 0; gi < gList.length; gi++) {
+                var gid = gList[gi].id || ("gpu_" + gi);
+                var prevArr = nextGpuHist[gid] ? nextGpuHist[gid].slice(Math.max(0, nextGpuHist[gid].length - 59)) : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                prevArr.push(Number(gList[gi].pct || 0));
+                nextGpuHist[gid] = prevArr;
+            }
+            gpuHistories = nextGpuHist;
+            historyTick += 1;
 
             if (selectedPid !== "") {
                 var arr = data.procs || [];
@@ -371,7 +391,6 @@ Rectangle {
             miniRamCanvas.requestPaint();
             miniDiskCanvas.requestPaint();
             miniNetCanvas.requestPaint();
-            miniGpuCanvas.requestPaint();
         } catch (e) {}
     }
 
@@ -391,9 +410,11 @@ Rectangle {
     // Reusable Mini Sparkline Canvas component for Performance Sidebar Cards
     component MiniSpark : Canvas {
         property var series: []
+        property int repaintTick: 0
         property string strokeColor: "#4cc2ff"
         property string fillColor: "rgba(76, 194, 255, 0.22)"
         width: 56; height: 34
+        onRepaintTickChanged: requestPaint()
         onPaint: {
             var ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
@@ -1018,22 +1039,35 @@ Rectangle {
                                 MouseArea { id: nCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.perfSubTab = "net"; perfCanvas.requestPaint(); } }
                             }
 
-                            // 5. GPU Card
-                            Rectangle {
-                                width: parent.width; height: 62; radius: 6
-                                color: root.perfSubTab === "gpu" ? "#2b2b2b" : (gCardH.containsMouse ? "#232323" : "transparent")
-                                border.color: root.perfSubTab === "gpu" ? "#38bdf8" : "#18ffffff"; border.width: 1
-                                RowLayout {
-                                    anchors.fill: parent; anchors.margins: 8; spacing: 10
-                                    MiniSpark { id: miniGpuCanvas; series: root.gpuHistory; strokeColor: "#38bdf8"; fillColor: "rgba(56, 189, 248, 0.24)" }
-                                    Column {
-                                        Layout.fillWidth: true; spacing: 2
-                                        Text { text: "GPU 0"; color: "#f5f5f5"; font.pixelSize: 12; font.weight: Font.DemiBold }
-                                        Text { text: root.sysInfo.gpuPct + "%  " + (root.sysInfo.gpuTemp !== "—" ? root.sysInfo.gpuTemp : ""); color: "#38bdf8"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
-                                        Text { text: root.sysInfo.gpuVramStr; color: "#8e8e8e"; font.pixelSize: 10; elide: Text.ElideRight; width: parent.width }
+                            // 5+. Dynamic Multi-GPU Cards (GPU 0, GPU 1, GPU 2... — SLI, Hybrid Optimus & Multi-Vendor!)
+                            Repeater {
+                                model: root.sysInfo.gpus || []
+                                delegate: Rectangle {
+                                    id: gpuCardDel
+                                    readonly property string gId: modelData.id || ("gpu_" + index)
+                                    width: perfRailCol.width; height: 62; radius: 6
+                                    color: root.perfSubTab === gId ? "#2b2b2b" : (gCardH.containsMouse ? "#232323" : "transparent")
+                                    border.color: root.perfSubTab === gId ? "#38bdf8" : "#18ffffff"; border.width: 1
+                                    RowLayout {
+                                        anchors.fill: parent; anchors.margins: 8; spacing: 10
+                                        MiniSpark {
+                                            series: root.gpuHistories[gpuCardDel.gId] || []
+                                            repaintTick: root.historyTick
+                                            strokeColor: "#38bdf8"
+                                            fillColor: "rgba(56, 189, 248, 0.24)"
+                                        }
+                                        Column {
+                                            Layout.fillWidth: true; spacing: 2
+                                            Text { text: modelData.label || ("GPU " + index); color: "#f5f5f5"; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                            Text { text: Number(modelData.pct || 0) + "%  " + (modelData.temp && modelData.temp !== "—" ? modelData.temp : ""); color: "#38bdf8"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
+                                            Text { text: modelData.vramStr || "Compartida"; color: "#8e8e8e"; font.pixelSize: 10; elide: Text.ElideRight; width: parent.width }
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: gCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: { root.perfSubTab = gpuCardDel.gId; perfCanvas.requestPaint(); }
                                     }
                                 }
-                                MouseArea { id: gCardH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.perfSubTab = "gpu"; perfCanvas.requestPaint(); } }
                             }
                         }
                     }
@@ -1064,7 +1098,7 @@ Rectangle {
                                       : (root.perfSubTab === "ram" ? "Memoria"
                                          : (root.perfSubTab === "disk" ? root.sysInfo.diskLabel
                                             : (root.perfSubTab === "net" ? (root.sysInfo.netType + " (" + root.sysInfo.netIface + ")")
-                                               : "GPU 0")))
+                                               : (root.activeGpuObj.label || "GPU 0"))))
                                 color: "#f5f5f5"; font.pixelSize: 22; font.weight: Font.DemiBold
                             }
                             Item { Layout.fillWidth: true }
@@ -1089,8 +1123,8 @@ Rectangle {
                                       : (root.perfSubTab === "ram" ? (root.sysInfo.ramTotalGb + " GB RAM")
                                          : (root.perfSubTab === "disk" ? root.sysInfo.diskModel
                                             : (root.perfSubTab === "net" ? root.sysInfo.netIp
-                                               : root.sysInfo.gpuName)))
-                                color: "#b0b0b0"; font.pixelSize: 12; elide: Text.ElideRight; Layout.maximumWidth: 280
+                                               : (root.activeGpuObj.name || "Adaptador gráfico"))))
+                                color: "#c4c4c4"; font.pixelSize: 12; elide: Text.ElideRight; Layout.maximumWidth: 340
                             }
                         }
 
@@ -1221,8 +1255,29 @@ Rectangle {
                                         drawSeries(root.netRecvHistory, "#f59e0b", "rgba(245, 158, 11, 0.20)", false);
                                         drawSeries(root.netSendHistory, "#4cc2ff", "", true);
                                     } else {
-                                        drawSeries(root.gpuHistory, "#38bdf8", "rgba(56, 189, 248, 0.22)", false);
+                                        drawSeries(root.gpuHistories[root.perfSubTab] || [], "#38bdf8", "rgba(56, 189, 248, 0.22)", false);
                                     }
+                                }
+                            }
+                        }
+
+                        // Dedicated GPU VRAM Utilization Bar (Windows 11 Authentic VRAM Bar)
+                        ColumnLayout {
+                            visible: root.isGpuPerfTab && Number(root.activeGpuObj.vramTotalMb || 0) > 0
+                            Layout.fillWidth: true; spacing: 5
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Text { text: "Uso de memoria dedicada de GPU (VRAM)"; color: "#9a9a9a"; font.pixelSize: 11 }
+                                Item { Layout.fillWidth: true }
+                                Text { text: (root.activeGpuObj.vramStr || "") + "  (" + Number(root.activeGpuObj.vramPct || 0) + "%)"; color: "#38bdf8"; font.pixelSize: 11; font.weight: Font.DemiBold }
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true; height: 18; radius: 4; color: "#141414"; border.color: "#3338bdf8"; border.width: 1; clip: true
+                                Rectangle {
+                                    x: 1; y: 1; height: parent.height - 2; radius: 3
+                                    width: Math.max(2, (parent.width - 2) * (Math.min(100, Number(root.activeGpuObj.vramPct || 0)) / 100.0))
+                                    color: "#38bdf8"
+                                    Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
                                 }
                             }
                         }
@@ -1302,11 +1357,12 @@ Rectangle {
                                     { k: "Total recibido",       v: root.sysInfo.netTotalRecvStr },
                                     { k: "Total enviado",        v: root.sysInfo.netTotalSentStr }
                                 ] : [
-                                    { k: "Uso GPU 3D",           v: root.sysInfo.gpuPct + "%", accent: "#38bdf8" },
-                                    { k: "Temperatura GPU",      v: root.sysInfo.gpuTemp },
-                                    { k: "Memoria VRAM",         v: root.sysInfo.gpuVramStr },
-                                    { k: "Controlador activo",   v: root.sysInfo.gpuDriver },
-                                    { k: "Modelo",               v: root.sysInfo.gpuName }
+                                    { k: "Uso GPU 3D",           v: Number(root.activeGpuObj.pct || 0) + "%", accent: "#38bdf8" },
+                                    { k: "Temperatura GPU",      v: root.activeGpuObj.temp || "—" },
+                                    { k: "Memoria VRAM",         v: root.activeGpuObj.vramStr || "Compartida" },
+                                    { k: "Controlador activo",   v: root.activeGpuObj.driver || "DRM/KMS" },
+                                    { k: "Bus PCI",              v: root.activeGpuObj.busId || "—" },
+                                    { k: "GPUs detectadas",      v: String((root.sysInfo.gpus || []).length) + " GPU" + ((root.sysInfo.gpus || []).length === 1 ? "" : "s") }
                                 ])))
                                 delegate: Column {
                                     width: Math.max(120, (perfDetailCol.width - 44) / 3)

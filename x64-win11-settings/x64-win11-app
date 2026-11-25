@@ -2497,64 +2497,170 @@ def main():
                     return f"{kbs / 1024.0:.2f} MB/s"
                 return f"{kbs:.0f} KB/s"
 
-            # GPU Telemetry (cached 2s — universal NVIDIA nvidia-smi + AMD/Intel DRM sysfs)
+            # Universal Multi-GPU Telemetry (cached 2s — NVIDIA SLI/Multi-GPU + AMD/Intel DRM/Hybrid Laptops!)
             if self._gpu_cache is None or (now_ts - self._gpu_cache_ts) >= 2.0:
-                g_name = "Adaptador gráfico"
-                g_pct = 0
-                g_temp = "—"
-                g_vram_used = 0
-                g_vram_tot = 0
-                g_driver = "DRM/KMS"
+                gpus_list = []
+                seen_bus = set()
+                lspci_map = {}
+                try:
+                    lout = subprocess.check_output(["lspci", "-D"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
+                    for ln in lout.splitlines():
+                        if "VGA compatible controller:" in ln or "3D controller:" in ln or "Display controller:" in ln:
+                            toks = ln.split(None, 1)
+                            if len(toks) == 2:
+                                bus_id = toks[0].strip().lower()
+                                desc = toks[1].split(":", 1)[-1].strip()
+                                lspci_map[bus_id] = desc
+                except Exception:
+                    pass
+
+                # 1. All NVIDIA GPUs via nvidia-smi (supports 1, 2, 3, 4+ GPUs / SLI / Optimus!)
                 if shutil.which("nvidia-smi"):
                     try:
                         nout = subprocess.check_output(
-                            ["nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total,driver_version",
+                            ["nvidia-smi",
+                             "--query-gpu=index,pci.bus_id,name,utilization.gpu,temperature.gpu,memory.used,memory.total,driver_version",
                              "--format=csv,noheader,nounits"],
-                            text=True, timeout=1.2, stderr=subprocess.DEVNULL
+                            text=True, timeout=1.4, stderr=subprocess.DEVNULL
                         ).splitlines()
-                        if nout:
-                            gp = [x.strip() for x in nout[0].split(",")]
-                            if len(gp) >= 6:
-                                g_name = gp[0]
-                                g_pct = int(float(gp[1])) if gp[1].replace(".", "", 1).isdigit() else 0
-                                g_temp = f"{gp[2]} °C" if gp[2].isdigit() else "—"
-                                g_vram_used = int(float(gp[3])) if gp[3].replace(".", "", 1).isdigit() else 0
-                                g_vram_tot = int(float(gp[4])) if gp[4].replace(".", "", 1).isdigit() else 0
-                                g_driver = f"NVIDIA {gp[5]}"
+                        for raw_ln in nout:
+                            gp = [x.strip() for x in raw_ln.split(",")]
+                            if len(gp) < 8:
+                                continue
+                            raw_bus = gp[1].lower()
+                            # Normalize 00000000:01:00.0 -> 0000:01:00.0
+                            if len(raw_bus) > 12 and raw_bus.startswith("0000"):
+                                norm_bus = raw_bus[-12:]
+                            else:
+                                norm_bus = raw_bus
+                            seen_bus.add(norm_bus)
+                            g_idx = len(gpus_list)
+                            g_name = gp[2] or "NVIDIA GPU"
+                            g_pct = int(float(gp[3])) if gp[3].replace(".", "", 1).isdigit() else 0
+                            g_temp = f"{gp[4]} °C" if gp[4].isdigit() else "—"
+                            v_used = int(float(gp[5])) if gp[5].replace(".", "", 1).isdigit() else 0
+                            v_tot = int(float(gp[6])) if gp[6].replace(".", "", 1).isdigit() else 0
+                            v_pct = int(round((v_used / max(1, v_tot)) * 100)) if v_tot > 0 else 0
+                            gpus_list.append({
+                                "id": f"gpu_{g_idx}",
+                                "label": f"GPU {g_idx}",
+                                "name": g_name,
+                                "pct": max(0, min(100, g_pct)),
+                                "temp": g_temp,
+                                "vramUsedMb": v_used,
+                                "vramTotalMb": v_tot,
+                                "vramPct": v_pct,
+                                "vramStr": f"{v_used / 1024:.1f} / {v_tot / 1024:.1f} GB" if v_tot > 0 else "Compartida",
+                                "driver": f"NVIDIA {gp[7]}",
+                                "busId": norm_bus.upper()
+                            })
                     except Exception:
                         pass
-                if g_name == "Adaptador gráfico":
-                    try:
-                        lout = subprocess.check_output(["lspci"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
-                        for ln in lout.splitlines():
-                            if "VGA compatible controller:" in ln or "3D controller:" in ln:
-                                g_name = ln.split(":", 2)[-1].strip()
+
+                # 2. All additional AMD / Intel / DRM GPUs via /sys/class/drm/card*
+                for card in sorted(glob.glob("/sys/class/drm/card[0-9]*")):
+                    bname = os.path.basename(card)
+                    if "-" in bname:
+                        continue
+                    dev_dir = os.path.join(card, "device")
+                    if not os.path.isdir(dev_dir):
+                        continue
+                    pci_slot = ""
+                    drv = "DRM/KMS"
+                    uev = os.path.join(dev_dir, "uevent")
+                    if os.path.isfile(uev):
+                        try:
+                            for ln in open(uev, "r", encoding="utf-8", errors="ignore"):
+                                if ln.startswith("PCI_SLOT_NAME="):
+                                    pci_slot = ln.split("=", 1)[1].strip().lower()
+                                elif ln.startswith("DRIVER="):
+                                    drv = ln.split("=", 1)[1].strip()
+                        except Exception:
+                            pass
+                    if pci_slot and pci_slot in seen_bus:
+                        continue
+                    if drv.lower() == "nvidia" and len(gpus_list) > 0:
+                        continue
+                    if pci_slot:
+                        seen_bus.add(pci_slot)
+
+                    g_name = lspci_map.get(pci_slot, f"GPU {drv.upper()}")
+                    g_pct = 0
+                    g_temp = "—"
+                    v_used = 0
+                    v_tot = 0
+                    bp = os.path.join(dev_dir, "gpu_busy_percent")
+                    if os.path.isfile(bp):
+                        try:
+                            g_pct = int(open(bp).read().strip())
+                        except Exception:
+                            pass
+                    vu = os.path.join(dev_dir, "mem_info_vram_used")
+                    vt = os.path.join(dev_dir, "mem_info_vram_total")
+                    if os.path.isfile(vu) and os.path.isfile(vt):
+                        try:
+                            v_used = int(open(vu).read().strip()) // (1024 ** 2)
+                            v_tot = int(open(vt).read().strip()) // (1024 ** 2)
+                        except Exception:
+                            pass
+                    for hw in sorted(glob.glob(os.path.join(dev_dir, "hwmon", "hwmon*", "temp1_input"))):
+                        try:
+                            tc = int(open(hw).read().strip()) / 1000.0
+                            if 5 < tc < 125:
+                                g_temp = f"{tc:.0f} °C"
                                 break
-                    except Exception:
-                        pass
-                    for card in sorted(glob.glob("/sys/class/drm/card*/device")):
-                        bp = os.path.join(card, "gpu_busy_percent")
-                        if os.path.isfile(bp):
-                            try:
-                                g_pct = int(open(bp).read().strip())
-                            except Exception:
-                                pass
-                        vu = os.path.join(card, "mem_info_vram_used")
-                        vt = os.path.join(card, "mem_info_vram_total")
-                        if os.path.isfile(vu) and os.path.isfile(vt):
-                            try:
-                                g_vram_used = int(open(vu).read().strip()) // (1024 ** 2)
-                                g_vram_tot = int(open(vt).read().strip()) // (1024 ** 2)
-                            except Exception:
-                                pass
+                        except Exception:
+                            pass
+                    drv_lbl = {"amdgpu": "AMD AMDGPU", "i915": "Intel i915", "xe": "Intel Xe", "nouveau": "Nouveau"}.get(drv.lower(), drv.upper())
+                    g_idx = len(gpus_list)
+                    v_pct = int(round((v_used / max(1, v_tot)) * 100)) if v_tot > 0 else 0
+                    gpus_list.append({
+                        "id": f"gpu_{g_idx}",
+                        "label": f"GPU {g_idx}",
+                        "name": g_name,
+                        "pct": max(0, min(100, g_pct)),
+                        "temp": g_temp,
+                        "vramUsedMb": v_used,
+                        "vramTotalMb": v_tot,
+                        "vramPct": v_pct,
+                        "vramStr": f"{v_used / 1024:.1f} / {v_tot / 1024:.1f} GB" if v_tot > 0 else "Compartida",
+                        "driver": drv_lbl,
+                        "busId": pci_slot.upper() if pci_slot else "Integrada"
+                    })
+
+                # 3. Fallback via lspci if no DRM/nvidia-smi device was enumerated
+                if not gpus_list:
+                    for bus_id, desc in sorted(lspci_map.items()):
+                        g_idx = len(gpus_list)
+                        gpus_list.append({
+                            "id": f"gpu_{g_idx}",
+                            "label": f"GPU {g_idx}",
+                            "name": desc,
+                            "pct": 0,
+                            "temp": "—",
+                            "vramUsedMb": 0,
+                            "vramTotalMb": 0,
+                            "vramPct": 0,
+                            "vramStr": "Compartida",
+                            "driver": "DRM/KMS",
+                            "busId": bus_id.upper()
+                        })
+                if not gpus_list:
+                    gpus_list.append({
+                        "id": "gpu_0", "label": "GPU 0", "name": "Adaptador gráfico",
+                        "pct": 0, "temp": "—", "vramUsedMb": 0, "vramTotalMb": 0, "vramPct": 0,
+                        "vramStr": "Compartida", "driver": "DRM/KMS", "busId": "—"
+                    })
+
                 self._gpu_cache = {
-                    "gpuName": g_name,
-                    "gpuPct": max(0, min(100, g_pct)),
-                    "gpuTemp": g_temp,
-                    "gpuVramUsedMb": g_vram_used,
-                    "gpuVramTotalMb": g_vram_tot,
-                    "gpuVramStr": f"{g_vram_used / 1024:.1f} / {g_vram_tot / 1024:.1f} GB" if g_vram_tot > 0 else "Compartida",
-                    "gpuDriver": g_driver
+                    "gpus": gpus_list,
+                    "gpuName": gpus_list[0]["name"],
+                    "gpuPct": gpus_list[0]["pct"],
+                    "gpuTemp": gpus_list[0]["temp"],
+                    "gpuVramUsedMb": gpus_list[0]["vramUsedMb"],
+                    "gpuVramTotalMb": gpus_list[0]["vramTotalMb"],
+                    "gpuVramStr": gpus_list[0]["vramStr"],
+                    "gpuDriver": gpus_list[0]["driver"]
                 }
                 self._gpu_cache_ts = now_ts
 
@@ -2672,6 +2778,7 @@ def main():
                 "netPct": net_pct,
                 "netTotalRecvStr": f"{net_tot_rx_gb:.2f} GB",
                 "netTotalSentStr": f"{net_tot_tx_gb:.2f} GB",
+                "gpus": self._gpu_cache["gpus"],
                 "gpuName": self._gpu_cache["gpuName"],
                 "gpuPct": self._gpu_cache["gpuPct"],
                 "gpuTemp": self._gpu_cache["gpuTemp"],

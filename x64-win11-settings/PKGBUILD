@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-win11-settings
 pkgver=1.0.0
-pkgrel=9
+pkgrel=10
 pkgdesc="Official X64 LIOS Windows 11 26H2 Fluent Dark Wayland Desktop Environment (labwc + Quickshell)"
 arch=('any')
 url="https://x64lios.com"
@@ -102,6 +102,12 @@ package() {
     # 5. Official Windows 11 SVG Icons & 4K Bloom Wallpapers
     install -d "${pkgdir}/usr/share/x64-win11/assets/icons"
     cp -a "${startdir}/assets/icons/"* "${pkgdir}/usr/share/x64-win11/assets/icons/"
+
+    # Register native app icons in hicolor theme so labwc SSD titlebars & all launchers resolve immediately
+    install -d "${pkgdir}/usr/share/icons/hicolor/scalable/apps"
+    install -m644 "${startdir}/assets/icons/taskmgr.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-win11-taskmgr.svg"
+    install -m644 "${startdir}/assets/icons/explorer.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-win11-explorer.svg"
+    install -m644 "${startdir}/assets/icons/settings.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/x64-win11-settings-app.svg"
 
     install -d "${pkgdir}/usr/share/x64-win11/assets/wallpapers"
     cp -a "${startdir}/assets/wallpapers/"* "${pkgdir}/usr/share/x64-win11/assets/wallpapers/"

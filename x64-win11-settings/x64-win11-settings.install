@@ -95,6 +95,9 @@ GTKINI
 
     systemd-tmpfiles --create /usr/lib/tmpfiles.d/x64-win11-power.conf 2>/dev/null || true
     update-desktop-database /usr/share/applications 2>/dev/null || true
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    # Reload active labwc compositor icon cache so updated .desktop window titlebar icons appear immediately
+    pkill -HUP -x labwc 2>/dev/null || true
 }
 
 post_upgrade() {
