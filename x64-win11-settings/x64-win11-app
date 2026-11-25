@@ -1079,7 +1079,7 @@ def main():
         dump_sysinfo_file()
         sys.exit(0)
 
-    from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QRectF
+    from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QThread, QUrl, Qt, QRectF
     from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QLinearGradient
     from PyQt6.QtQuick import QQuickView
     try:
@@ -1090,10 +1090,34 @@ def main():
         QFileDialog = None
         _HAS_QTWIDGETS = False
 
+    class _UpdateCheckWorker(QThread):
+        done = pyqtSignal(str)
+        def run(self):
+            pkgs = []
+            try:
+                cmd = ["checkupdates"] if shutil.which("checkupdates") else ["pacman", "-Qu"]
+                out = subprocess.check_output(cmd, text=True, timeout=12.0, stderr=subprocess.DEVNULL)
+                for ln in out.splitlines():
+                    ln = ln.strip()
+                    if ln:
+                        pkgs.append(ln)
+            except subprocess.CalledProcessError as e:
+                if e.returncode == 2:
+                    pkgs = []
+            except Exception:
+                pass
+            self.done.emit(json.dumps({
+                "count": len(pkgs),
+                "packages": pkgs[:40],
+                "checkedAt": datetime.now().strftime("%H:%M:%S")
+            }))
+
     class AppBridge(QObject):
+        updatesChecked = pyqtSignal(str)
         def __init__(self, view):
             super().__init__()
             self.view = view
+            self._upd_worker = None
             self._prev_cpu_total = 0
             self._prev_cpu_idle = 0
             self._prev_core_stats = {}
@@ -1817,12 +1841,13 @@ def main():
             except Exception:
                 pass
 
-        @pyqtSlot()
+        @pyqtSlot(result=bool)
         def toggleAudioMute(self):
             try:
-                subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], start_new_session=True)
+                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], timeout=1.2, stderr=subprocess.DEVNULL)
+                return True
             except Exception:
-                pass
+                return False
 
         @pyqtSlot(int)
         def setMicVolume(self, pct):
@@ -1832,12 +1857,13 @@ def main():
             except Exception:
                 pass
 
-        @pyqtSlot()
+        @pyqtSlot(result=bool)
         def toggleMicMute(self):
             try:
-                subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"], start_new_session=True)
+                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"], timeout=1.2, stderr=subprocess.DEVNULL)
+                return True
             except Exception:
-                pass
+                return False
 
         @pyqtSlot(str, result=bool)
         def setDefaultAudioSink(self, sink_id):
@@ -1846,6 +1872,61 @@ def main():
             try:
                 subprocess.run(["wpctl", "set-default", str(sink_id)], timeout=1.5, stderr=subprocess.DEVNULL)
                 return True
+            except Exception:
+                return False
+
+        @pyqtSlot(bool, result=bool)
+        def setBluetoothEnabled(self, enabled):
+            try:
+                if enabled:
+                    subprocess.run(["rfkill", "unblock", "bluetooth"], timeout=1.5, stderr=subprocess.DEVNULL)
+                    subprocess.run(["bluetoothctl", "power", "on"], timeout=2.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    subprocess.run(["bluetoothctl", "power", "off"], timeout=2.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["rfkill", "block", "bluetooth"], timeout=1.5, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(bool, result=bool)
+        def setWifiEnabled(self, enabled):
+            try:
+                subprocess.run(["nmcli", "radio", "wifi", "on" if enabled else "off"], timeout=2.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=str)
+        def connectWifi(self, ssid, password=""):
+            s = (ssid or "").strip()
+            if not s:
+                return "error:Red vacía"
+            cmd = ["nmcli", "dev", "wifi", "connect", s]
+            if password:
+                cmd += ["password", password]
+            try:
+                res = subprocess.run(cmd, text=True, capture_output=True, timeout=12.0, env=dict(os.environ, LC_ALL="C"))
+                if res.returncode == 0:
+                    dump_sysinfo_file()
+                    return "ok"
+                err = (res.stderr or res.stdout or "").lower()
+                if not password and ("secrets were required" in err or "password" in err or "802-11-wireless-security" in err or "key-mgmt" in err or "not provided" in err):
+                    return "need_password"
+                return "error:" + ((res.stderr or res.stdout or "Error de conexión").strip().splitlines()[-1][:90])
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(str, result=bool)
+        def disconnectWifi(self, ssid):
+            s = (ssid or "").strip()
+            if not s:
+                return False
+            try:
+                r = subprocess.run(["nmcli", "con", "down", "id", s], timeout=4.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return r.returncode == 0
             except Exception:
                 return False
 
@@ -1861,10 +1942,108 @@ def main():
             if len(cmd) <= 3:
                 return False
             try:
-                subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+                r = subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+                if r.returncode == 0:
+                    mon_p = os.path.join(STATE_DIR, "monitors.json")
+                    os.makedirs(STATE_DIR, exist_ok=True)
+                    mdata = {}
+                    if os.path.isfile(mon_p):
+                        try:
+                            mdata = json.load(open(mon_p, "r", encoding="utf-8"))
+                        except Exception:
+                            mdata = {}
+                    entry = dict(mdata.get(str(output_name), {}))
+                    if scale_str:
+                        entry["scale"] = str(scale_str)
+                    if mode_str:
+                        entry["mode"] = str(mode_str)
+                    mdata[str(output_name)] = entry
+                    with open(mon_p + ".tmp", "w", encoding="utf-8") as f:
+                        json.dump(mdata, f)
+                    os.replace(mon_p + ".tmp", mon_p)
+                    return True
+                return False
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def setKeyboardLayout(self, code):
+            c = (code or "es").strip().lower()
+            pairs = {"es": ("es,us", "ES"), "us": ("us,es", "US"), "latam": ("latam,us", "LATAM")}
+            pair, label = pairs.get(c, ("es,us", "ES"))
+            env_p = os.path.join(HOME_DIR, ".config", "labwc", "environment")
+            try:
+                os.makedirs(os.path.dirname(env_p), exist_ok=True)
+                lines = open(env_p, "r", encoding="utf-8", errors="ignore").read().splitlines() if os.path.isfile(env_p) else []
+                out = []
+                replaced = False
+                for ln in lines:
+                    if ln.startswith("XKB_DEFAULT_LAYOUT="):
+                        out.append(f"XKB_DEFAULT_LAYOUT={pair}")
+                        replaced = True
+                    else:
+                        out.append(ln)
+                if not replaced:
+                    out.append(f"XKB_DEFAULT_LAYOUT={pair}")
+                with open(env_p, "w", encoding="utf-8") as f:
+                    f.write("\n".join(out) + "\n")
+                cfg = load_cfg()
+                cfg["kbLayout"] = label
+                save_cfg(cfg)
+                subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.0, stderr=subprocess.DEVNULL)
                 return True
             except Exception:
                 return False
+
+        @pyqtSlot(str, result=bool)
+        def setSystemTimezone(self, tz_name):
+            tz = (tz_name or "").strip()
+            if not tz or "/" not in tz and tz != "UTC":
+                return False
+            try:
+                r = subprocess.run(["pkexec", "timedatectl", "set-timezone", tz], timeout=15.0, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(bool, result=bool)
+        def setNtpEnabled(self, enabled):
+            try:
+                r = subprocess.run(["pkexec", "timedatectl", "set-ntp", "true" if enabled else "false"], timeout=15.0, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def setDefaultAppForRole(self, role_id, desktop_file):
+            if not desktop_file or not desktop_file.endswith(".desktop"):
+                return False
+            role_mimes = {
+                "web":     ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"],
+                "text":    ["text/plain", "text/markdown", "inode/x-empty", "application/x-zerosize", "text/x-empty"],
+                "image":   ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"],
+                "pdf":     ["application/pdf"],
+                "video":   ["video/mp4", "video/x-matroska", "video/webm", "video/x-msvideo"],
+                "archive": ["application/zip", "application/x-tar", "application/gzip", "application/x-7z-compressed"],
+                "files":   ["inode/directory"],
+            }
+            mimes = role_mimes.get(role_id, [])
+            if not mimes:
+                return False
+            try:
+                subprocess.run(["xdg-mime", "default", desktop_file] + mimes, timeout=2.0, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot()
+        def startAsyncUpdateCheck(self):
+            if self._upd_worker is not None and self._upd_worker.isRunning():
+                return
+            w = _UpdateCheckWorker(self)
+            w.done.connect(self.updatesChecked.emit)
+            self._upd_worker = w
+            w.start()
 
         @pyqtSlot(str, bool, result=bool)
         def toggleBluetoothDevice(self, mac, do_connect):
@@ -2041,53 +2220,55 @@ def main():
             import grp
             display_name, uname, hostname = get_real_user_info()
             cfg = load_cfg()
-            # 1. Monitors via wlr-randr
+            # 1. Monitors via wlr-randr --json (exact current mode + Hz precision)
             monitors_list = []
             try:
-                wout = subprocess.check_output(["wlr-randr"], text=True, timeout=1.5, stderr=subprocess.DEVNULL)
-                cur = None
-                in_modes = False
-                for raw in wout.splitlines():
-                    if raw and not raw.startswith(" "):
-                        if cur:
-                            monitors_list.append(cur)
-                        toks = raw.split(" ", 1)
-                        mname = toks[0].strip()
-                        desc = toks[1].strip().strip('"') if len(toks) > 1 else mname
-                        cur = {"name": mname, "desc": desc, "enabled": True, "currentMode": "", "modes": [], "scale": "1.0", "position": "0,0"}
-                        in_modes = False
-                    elif cur is not None:
-                        s = raw.strip()
-                        if s.startswith("Enabled:"):
-                            cur["enabled"] = ("yes" in s.lower())
-                        elif s.startswith("Scale:"):
-                            try:
-                                cur["scale"] = f"{float(s.split(':', 1)[1].strip()):.2f}".rstrip("0").rstrip(".")
-                            except Exception:
-                                cur["scale"] = "1"
-                        elif s.startswith("Position:"):
-                            cur["position"] = s.split(":", 1)[1].strip()
-                        elif s.startswith("Modes:"):
-                            in_modes = True
-                        elif in_modes and "px," in s:
-                            parts = s.split("px,")
-                            res = parts[0].strip()
-                            hz_part = parts[1].strip().split()[0]
-                            try:
-                                hz = f"{round(float(hz_part))} Hz"
-                                mode_arg = f"{res}@{float(hz_part):.3f}Hz"
-                            except Exception:
-                                hz = hz_part
-                                mode_arg = res
-                            lbl = f"{res} ({hz})"
-                            if "(current)" in s:
-                                cur["currentMode"] = lbl
-                            if len(cur["modes"]) < 8 and not any(m["label"] == lbl for m in cur["modes"]):
-                                cur["modes"].append({"label": lbl, "arg": mode_arg, "current": "(current)" in s})
-                        else:
-                            in_modes = False
-                if cur:
-                    monitors_list.append(cur)
+                wraw = subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.5, stderr=subprocess.DEVNULL)
+                wdata = json.loads(wraw)
+                for mon in (wdata if isinstance(wdata, list) else []):
+                    mname = str(mon.get("name", "")).strip()
+                    if not mname:
+                        continue
+                    desc = str(mon.get("description") or mname).strip()
+                    enabled = bool(mon.get("enabled", True))
+                    sc_val = mon.get("scale", 1.0)
+                    try:
+                        scale_s = f"{float(sc_val):.2f}".rstrip("0").rstrip(".") or "1"
+                    except Exception:
+                        scale_s = "1"
+                    pos = mon.get("position") or {}
+                    pos_s = f"{pos.get('x', 0)},{pos.get('y', 0)}" if isinstance(pos, dict) else "0,0"
+                    cur_mode_lbl = ""
+                    modes_by_lbl = {}
+                    modes_order = []
+                    for m in (mon.get("modes") or []):
+                        w = int(m.get("width", 0))
+                        h = int(m.get("height", 0))
+                        if w <= 0 or h <= 0:
+                            continue
+                        ref = float(m.get("refresh", 60.0))
+                        is_cur = bool(m.get("current", False))
+                        lbl = f"{w}x{h} ({round(ref)} Hz)"
+                        arg = f"{w}x{h}@{ref:.6f}Hz"
+                        if is_cur:
+                            cur_mode_lbl = lbl
+                        if lbl not in modes_by_lbl:
+                            modes_by_lbl[lbl] = {"label": lbl, "arg": arg, "current": is_cur}
+                            modes_order.append(lbl)
+                        elif is_cur:
+                            modes_by_lbl[lbl] = {"label": lbl, "arg": arg, "current": True}
+                    final_modes = [modes_by_lbl[k] for k in modes_order[:8]]
+                    if cur_mode_lbl and not any(x["current"] for x in final_modes) and cur_mode_lbl in modes_by_lbl:
+                        final_modes = [modes_by_lbl[cur_mode_lbl]] + final_modes[:7]
+                    monitors_list.append({
+                        "name": mname,
+                        "desc": desc,
+                        "enabled": enabled,
+                        "currentMode": cur_mode_lbl,
+                        "modes": final_modes,
+                        "scale": scale_s,
+                        "position": pos_s,
+                    })
             except Exception:
                 pass
 
@@ -2206,34 +2387,94 @@ def main():
                 pass
             locale_str = os.environ.get("LANG", "es_ES.UTF-8")
 
-            # 7. Default Apps via xdg-mime
-            def qmime(m):
+            # 7. Default Apps via xdg-mime + Real Installed Candidates per Role!
+            friendly_map = {
+                "chromium.desktop": "Chromium",
+                "firefox.desktop": "Firefox",
+                "brave-browser.desktop": "Brave",
+                "org.gnome.TextEditor.desktop": "Editor de texto",
+                "antigravity-ide.desktop": "Antigravity IDE",
+                "org.gnome.Loupe.desktop": "Visor de imágenes (Loupe)",
+                "org.gnome.Papers.desktop": "Documentos PDF (Papers)",
+                "org.gnome.FileRoller.desktop": "Gestor de archivadores",
+                "mpv.desktop": "Reproductor multimedia mpv",
+                "vlc.desktop": "VLC Media Player",
+                "x64-win11-explorer.desktop": "Explorador de archivos",
+                "org.gnome.Nautilus.desktop": "Nautilus",
+                "thunar.desktop": "Thunar",
+                "org.kde.dolphin.desktop": "Dolphin",
+            }
+            def qmime_raw(m):
                 try:
-                    d = subprocess.check_output(["xdg-mime", "query", "default", m], text=True, timeout=0.8, stderr=subprocess.DEVNULL).strip()
-                    friendly = {
-                        "chromium.desktop": "Chromium",
-                        "org.gnome.TextEditor.desktop": "Editor de texto",
-                        "org.gnome.Loupe.desktop": "Visor de imágenes (Loupe)",
-                        "org.gnome.Papers.desktop": "Documentos PDF (Papers)",
-                        "org.gnome.FileRoller.desktop": "Gestor de archivadores",
-                        "mpv.desktop": "Reproductor multimedia mpv",
-                        "x64-win11-explorer.desktop": "Explorador de archivos",
-                    }
-                    return friendly.get(d, d.replace(".desktop", "") or "Predeterminada")
+                    return subprocess.check_output(["xdg-mime", "query", "default", m], text=True, timeout=0.8, stderr=subprocess.DEVNULL).strip()
                 except Exception:
-                    return "Predeterminada"
+                    return ""
+            def scan_role_candidates(mime_key, cur_df):
+                cands = []
+                seen_df = set()
+                for df in sorted(os.listdir("/usr/share/applications")) if os.path.isdir("/usr/share/applications") else []:
+                    if not df.endswith(".desktop"):
+                        continue
+                    fp = os.path.join("/usr/share/applications", df)
+                    try:
+                        txt = open(fp, "r", encoding="utf-8", errors="ignore").read()
+                        if "NoDisplay=true" in txt or "Terminal=true" in txt:
+                            continue
+                        if mime_key in txt or df == cur_df:
+                            nm = friendly_map.get(df, "")
+                            if not nm:
+                                for ln in txt.splitlines():
+                                    if ln.startswith("Name[es]="):
+                                        nm = ln.split("=", 1)[1].strip(); break
+                                    elif ln.startswith("Name=") and not nm:
+                                        nm = ln.split("=", 1)[1].strip()
+                            if df not in seen_df:
+                                seen_df.add(df)
+                                cands.append({"desktop": df, "label": nm or df[:-8], "active": df == cur_df})
+                    except Exception:
+                        continue
+                return cands[:8]
 
-            defaults_list = [
-                {"role": "Navegador web",          "app": qmime("x-scheme-handler/https"), "icon": "chromium.png"},
-                {"role": "Editor de texto (.txt)", "app": qmime("text/plain"),             "icon": "fluent-document.svg"},
-                {"role": "Visor de fotos",         "app": qmime("image/png"),              "icon": "folder-images.svg"},
-                {"role": "Documentos PDF",         "app": qmime("application/pdf"),        "icon": "folder-documents.svg"},
-                {"role": "Reproductor de vídeo",   "app": qmime("video/mp4"),              "icon": "folder-videos.svg"},
-                {"role": "Archivos comprimidos",   "app": qmime("application/zip"),        "icon": "fluent-folder-zip.svg"},
-                {"role": "Explorador de archivos", "app": qmime("inode/directory"),        "icon": "explorer.svg"},
+            role_defs = [
+                ("web",     "Navegador web",          "x-scheme-handler/https", "chromium.png"),
+                ("text",    "Editor de texto (.txt)", "text/plain",             "fluent-document.svg"),
+                ("image",   "Visor de fotos",         "image/png",              "folder-images.svg"),
+                ("pdf",     "Documentos PDF",         "application/pdf",        "folder-documents.svg"),
+                ("video",   "Reproductor de vídeo",   "video/mp4",              "folder-videos.svg"),
+                ("archive", "Archivos comprimidos",   "application/zip",        "fluent-folder-zip.svg"),
+                ("files",   "Explorador de archivos", "inode/directory",        "explorer.svg"),
             ]
+            defaults_list = []
+            for rid, rtitle, rmime, ricon in role_defs:
+                cur_d = qmime_raw(rmime)
+                cands = scan_role_candidates(rmime, cur_d)
+                defaults_list.append({
+                    "id": rid,
+                    "role": rtitle,
+                    "desktop": cur_d,
+                    "app": friendly_map.get(cur_d, cur_d.replace(".desktop", "") or "Predeterminada"),
+                    "icon": ricon,
+                    "candidates": cands
+                })
 
-            # 8. Gaming Stack Telemetry
+            # Detect active keyboard layout from ~/.config/labwc/environment
+            cur_kb = str(cfg.get("kbLayout", "") or "").upper()
+            if not cur_kb:
+                try:
+                    env_p = os.path.join(HOME_DIR, ".config", "labwc", "environment")
+                    if os.path.isfile(env_p):
+                        for ln in open(env_p, "r", encoding="utf-8", errors="ignore"):
+                            if ln.startswith("XKB_DEFAULT_LAYOUT="):
+                                first_l = ln.split("=", 1)[1].strip().split(",")[0].split("(")[0].upper()
+                                if first_l:
+                                    cur_kb = first_l
+                                break
+                except Exception:
+                    pass
+            if not cur_kb:
+                cur_kb = "ES"
+
+            # 8. Gaming Stack Telemetry + Tool Availability Flags (zero dead buttons!)
             def svc_active(svc, user=False):
                 try:
                     cmd = ["systemctl"] + (["--user"] if user else []) + ["is-active", "--quiet", svc]
@@ -2249,6 +2490,13 @@ def main():
                 "hasSteam": shutil.which("steam") is not None,
                 "hasHeroic": shutil.which("heroic") is not None,
                 "hasLutris": shutil.which("lutris") is not None,
+            }
+            tool_flags = {
+                "hasKdeConnect": (shutil.which("kdeconnect-app") is not None) or (shutil.which("kdeconnect-settings") is not None),
+                "hasBlueman": shutil.which("blueman-manager") is not None,
+                "hasPrinterGui": shutil.which("system-config-printer") is not None,
+                "hasNmEditor": shutil.which("nm-connection-editor") is not None,
+                "hasGnomeDisks": shutil.which("gnome-disks") is not None,
             }
 
             # 9. Recent System Updates from /var/log/pacman.log & installed pkg count
@@ -2294,10 +2542,12 @@ def main():
                     "timezone": tz_str,
                     "ntpActive": ntp_on,
                     "synced": synced,
-                    "locale": locale_str
+                    "locale": locale_str,
+                    "kbLayout": cur_kb
                 },
                 "defaultApps": defaults_list,
                 "gamingStack": gaming_stack,
+                "tools": tool_flags,
                 "recentUpgrades": recent_upg,
                 "pkgCount": max(0, pkg_count)
             })

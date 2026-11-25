@@ -298,6 +298,7 @@ p = os.path.expanduser("~/.local/state/x64-win11/config.json")
 if os.path.isfile(p):
     cfg = json.load(open(p))
     cfg["hiddenDesktopIds"] = []
+    cfg["showDesktopIcons"] = True
     with open(p + ".tmp", "w") as f: json.dump(cfg, f)
     os.replace(p + ".tmp", p)
 PYEOF
@@ -416,7 +417,8 @@ PYEOF
                 nmcli dev wifi rescan >/dev/null 2>&1 || true
                 ;;
             connect)
-                ssid="$3"
+                shift 2
+                ssid="$*"
                 if [ -n "$ssid" ]; then
                     if ! nmcli dev wifi connect "$ssid" >/dev/null 2>&1; then
                         setsid -f nm-connection-editor >/dev/null 2>&1 &

@@ -30,9 +30,35 @@ Rectangle {
     property string clockTimeStr: Qt.formatTime(new Date(), "hh:mm:ss")
     property string clockDateStr: Qt.formatDate(new Date(), "dddd, d 'de' MMMM 'de' yyyy")
 
-    // System Update Check State
+    // Live Optimistic Slider & Toggle States (prevents 4s poller jitter & instant 144Hz feedback!)
+    property int localBrightPct: 100
+    property int localVolPct: 80
+    property int localMicPct: 50
+    property bool brightDragging: false
+    property bool volDragging: false
+    property bool micDragging: false
+    property string expandedMimeRole: ""
+
+    // Wi-Fi Password Modal State (handles SSIDs with spaces & new secured networks!)
+    property bool wifiPassModalOpen: false
+    property string wifiPassSsid: ""
+    property string wifiPassErr: ""
+
+    // System Update Check State (100% Async QThread via bridge.updatesChecked signal!)
     property bool checkingUpdates: false
     property var updateResult: ({ "count": -1, "packages": [], "checkedAt": "" })
+
+    Connections {
+        target: bridge
+        function onUpdatesChecked(jsonStr) {
+            root.checkingUpdates = false;
+            try {
+                var res = JSON.parse(jsonStr);
+                root.updateResult = res;
+                root.showToast(res.count > 0 ? (res.count + " actualizaciones disponibles") : "Sistema al día");
+            } catch (e) {}
+        }
+    }
 
     // Responsive Breakpoints (ZERO deformation on small or narrow windows!)
     readonly property bool compactNav: root.width < 820 && !root.navExpandedManual
@@ -95,9 +121,10 @@ Rectangle {
         "netDns": "—",
         "netIface": "—",
         "account": { "displayName": "Usuario", "username": "x64", "hostname": "x64-pc", "homeDir": "/home", "shell": "/usr/bin/fish", "groups": "wheel", "isAdmin": true, "avatarUrl": "" },
-        "timeLang": { "timezone": "Local", "ntpActive": true, "synced": true, "locale": "es_ES.UTF-8" },
+        "timeLang": { "timezone": "Local", "ntpActive": true, "synced": true, "locale": "es_ES.UTF-8", "kbLayout": "ES" },
         "defaultApps": [],
         "gamingStack": { "falcond": false, "dmemcg": false, "ananicy": false, "ntsync": false, "hasSteam": false, "hasHeroic": false, "hasLutris": false },
+        "tools": { "hasKdeConnect": false, "hasBlueman": true, "hasPrinterGui": true, "hasNmEditor": true, "hasGnomeDisks": true },
         "recentUpgrades": [],
         "pkgCount": 0
     })
@@ -131,6 +158,15 @@ Rectangle {
         onTriggered: { root.toastMsg = ""; root.copiedNotice = false; }
     }
 
+    Timer {
+        id: wifiRescanT
+        interval: 2400; repeat: false
+        onTriggered: {
+            root.refreshLiveState();
+            root.showToast("Redes Wi-Fi actualizadas");
+        }
+    }
+
     function showToast(msg) {
         toastMsg = msg;
         toastClearTimer.restart();
@@ -140,7 +176,7 @@ Rectangle {
         interval: 1000; running: root.settingsPage === "Hora e idioma"; repeat: true
         onTriggered: {
             var now = new Date();
-            root.clockTimeStr = Qt.formatTime(now, "hh:mm:ss");
+            root.clockTimeStr = Boolean(root.cfg.clock12h) ? Qt.formatTime(now, "h:mm:ss AP") : Qt.formatTime(now, "hh:mm:ss");
             root.clockDateStr = Qt.formatDate(now, "dddd, d 'de' MMMM 'de' yyyy");
         }
     }
@@ -184,26 +220,33 @@ Rectangle {
         }
     }
 
-    component Win11Switch : Switch {
+    // Controlled WinUI 3 Switch: clicking emits toggled(!checked) without breaking QML bindings
+    component Win11Switch : Item {
         id: wSwitch
+        property bool checked: false
+        signal toggled(bool isChecked)
         implicitWidth: 40; implicitHeight: 20
-        padding: 0; hoverEnabled: true
-        contentItem: Item {}
-        indicator: Rectangle {
-            implicitWidth: 40; implicitHeight: 20; radius: 10
-            color: wSwitch.checked ? "#4cc2ff" : (wSwitch.hovered ? "#24ffffff" : "#14000000")
+        Layout.preferredWidth: 40; Layout.preferredHeight: 20
+
+        Rectangle {
+            anchors.fill: parent; radius: 10
+            color: wSwitch.checked ? "#4cc2ff" : (swMouse.containsMouse ? "#24ffffff" : "#14000000")
             border.color: wSwitch.checked ? "#4cc2ff" : "#99ffffff"; border.width: 1
             antialiasing: true
             Behavior on color { ColorAnimation { duration: 130 } }
             Rectangle {
-                x: wSwitch.checked ? (wSwitch.pressed ? 21 : 23) : 4
+                x: wSwitch.checked ? (swMouse.pressed ? 21 : 23) : 4
                 anchors.verticalCenter: parent.verticalCenter
-                width: wSwitch.pressed ? 14 : 12; height: 12; radius: 6
+                width: swMouse.pressed ? 14 : 12; height: 12; radius: 6
                 color: wSwitch.checked ? "#000000" : "#d8d8d8"
                 antialiasing: true
                 Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                 Behavior on width { NumberAnimation { duration: 90 } }
             }
+        }
+        MouseArea {
+            id: swMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+            onClicked: wSwitch.toggled(!wSwitch.checked)
         }
     }
 
@@ -212,7 +255,9 @@ Rectangle {
         property real from: 0.0
         property real to: 100.0
         property real value: 80.0
+        property bool dragging: sMouse.pressed
         signal movedValue(real v)
+        signal releasedValue(real v)
         implicitWidth: 170; implicitHeight: 28
         readonly property real ratio: Math.max(0.0, Math.min(1.0, (value - from) / Math.max(0.001, to - from)))
 
@@ -244,6 +289,7 @@ Rectangle {
             }
             onPressed: (mouse) => syncX(mouse.x)
             onPositionChanged: (mouse) => { if (pressed) syncX(mouse.x); }
+            onReleased: sSlider.releasedValue(sSlider.value)
         }
     }
 
@@ -297,7 +343,7 @@ Rectangle {
                 Text { text: tCard.title; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                 Text { visible: tCard.subtitle !== ""; text: tCard.subtitle; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
             }
-            Win11Switch { checked: tCard.checked; onToggled: tCard.toggled(checked) }
+            Win11Switch { checked: tCard.checked; onToggled: (v) => tCard.toggled(v) }
         }
     }
 
@@ -313,14 +359,36 @@ Rectangle {
         try { hwState = JSON.parse(bridge.getLiveHardwareJson()); } catch (e) {}
         try { drives = JSON.parse(bridge.getDrivesJson()); } catch (e) {}
         try { extData = JSON.parse(bridge.getSettingsExtendedJson()); } catch (e) {}
+        if (!brightDragging) localBrightPct = Math.round(Number(hwState.brightnessPct !== undefined ? hwState.brightnessPct : 100));
+        if (!volDragging) localVolPct = Math.round(Number(hwState.volumePct !== undefined ? hwState.volumePct : 80));
+        if (!micDragging) localMicPct = Math.round(Number(extData.micVol !== undefined ? extData.micVol : 50));
+        if (typeof dispNameIn !== "undefined" && !dispNameIn.activeFocus) {
+            dispNameIn.text = activeDisplayName;
+        }
+        var now = new Date();
+        clockTimeStr = Boolean(cfg.clock12h) ? Qt.formatTime(now, "h:mm:ss AP") : Qt.formatTime(now, "hh:mm:ss");
     }
 
     function runUpdateCheck() {
+        if (checkingUpdates) return;
         checkingUpdates = true;
-        try {
-            updateResult = JSON.parse(bridge.checkPendingUpdatesJson());
-        } catch (e) {}
-        checkingUpdates = false;
+        bridge.startAsyncUpdateCheck();
+    }
+
+    function tryConnectWifi(ssid) {
+        var res = bridge.connectWifi(ssid, "");
+        if (res === "ok") {
+            refreshLiveState();
+            showToast("Conectado a " + ssid);
+        } else if (res === "need_password") {
+            wifiPassSsid = ssid;
+            wifiPassErr = "";
+            wifiPassField.text = "";
+            wifiPassModalOpen = true;
+            wifiPassField.forceActiveFocus();
+        } else {
+            showToast(res.replace(/^error:/, "") || "No se pudo conectar");
+        }
     }
 
     Component.onCompleted: {
@@ -335,17 +403,23 @@ Rectangle {
     }
 
     readonly property var navCategories: [
-        { icon: "fluent-grid.svg",        name: "Inicio" },
-        { icon: "fluent-display.svg",     name: "Sistema" },
-        { icon: "fluent-bluetooth.svg",   name: "Bluetooth y dispositivos" },
-        { icon: "fluent-wifi.svg",        name: "Red e Internet" },
-        { icon: "fluent-paint-brush.svg", name: "Personalización" },
-        { icon: "fluent-apps-list.svg",   name: "Aplicaciones" },
-        { icon: "fluent-person.svg",      name: "Cuentas" },
-        { icon: "fluent-keyboard.svg",    name: "Hora e idioma" },
-        { icon: "fluent-games.svg",       name: "Juegos" },
-        { icon: "update.svg",             name: "Actualización del sistema" }
+        { icon: "fluent-grid.svg",        name: "Inicio",                    kw: "inicio resumen casa home" },
+        { icon: "fluent-display.svg",     name: "Sistema",                   kw: "sistema pantalla monitor escala resolucion hz brillo luz nocturna sonido audio volumen microfono energia bateria rendimiento almacenamiento disco acerca especificaciones cpu ram gpu no molestar notificaciones" },
+        { icon: "fluent-bluetooth.svg",   name: "Bluetooth y dispositivos",  kw: "bluetooth dispositivos emparejar auriculares mando telefono enlace movil kde connect impresoras escaneres" },
+        { icon: "fluent-wifi.svg",        name: "Red e Internet",            kw: "red internet wifi ethernet ip dns puerta enlace conectar desconectar" },
+        { icon: "fluent-paint-brush.svg", name: "Personalización",           kw: "personalizacion fondo wallpaper tema foto barra tareas compacta izquierda menu inicio iconos escritorio tamano bloqueo" },
+        { icon: "fluent-apps-list.svg",   name: "Aplicaciones",              kw: "aplicaciones programas instaladas predeterminadas navegador editor fotos pdf video tienda shelly inicio" },
+        { icon: "fluent-person.svg",      name: "Cuentas",                   kw: "cuentas usuario perfil avatar foto imagen nombre contrasena bloquear administrador sddm" },
+        { icon: "fluent-keyboard.svg",    name: "Hora e idioma",             kw: "hora fecha reloj 12h 24h idioma teclado distribucion es us latam zona horaria ntp" },
+        { icon: "fluent-games.svg",       name: "Juegos",                    kw: "juegos gaming modo juego scx lavd falcond dmemcg ananicy ntsync steam heroic lutris fps gpu" },
+        { icon: "update.svg",             name: "Actualización del sistema", kw: "actualizacion sistema update paquetes pacman kernel historial comprobar" }
     ]
+
+    function matchesNavFilter(cat) {
+        var q = root.navFilter.trim().toLowerCase();
+        if (q === "") return true;
+        return cat.name.toLowerCase().indexOf(q) !== -1 || String(cat.kw || "").indexOf(q) !== -1;
+    }
 
     RowLayout {
         anchors.fill: parent
@@ -443,6 +517,14 @@ Rectangle {
                                 anchors.fill: parent; verticalAlignment: TextInput.AlignVCenter
                                 color: "#ffffff"; font.pixelSize: 12; selectByMouse: true; clip: true
                                 onTextChanged: root.navFilter = text
+                                onAccepted: {
+                                    for (var i = 0; i < root.navCategories.length; i++) {
+                                        if (root.matchesNavFilter(root.navCategories[i])) {
+                                            root.settingsPage = root.navCategories[i].name;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                         WinSvg {
@@ -471,7 +553,7 @@ Rectangle {
                         Repeater {
                             model: root.navCategories
                             delegate: Rectangle {
-                                visible: root.compactNav || root.navFilter.trim() === "" || modelData.name.toLowerCase().indexOf(root.navFilter.trim().toLowerCase()) !== -1
+                                visible: root.compactNav || root.matchesNavFilter(modelData)
                                 width: navListCol.width; height: 36; radius: 5
                                 color: root.settingsPage === modelData.name ? "#2d2d2d" : (catHov.containsMouse ? "#262626" : "transparent")
                                 Rectangle {
@@ -687,27 +769,29 @@ Rectangle {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text: "Luz nocturna"; color: "#e6e6e6"; font.pixelSize: 12; Layout.fillWidth: true }
-                                        Win11Switch { checked: Boolean(root.cfg.nightLight); onToggled: root.updateCfg("nightLight", checked) }
+                                        Win11Switch { checked: Boolean(root.cfg.nightLight); onToggled: (v) => root.updateCfg("nightLight", v) }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text: "Barra de tareas compacta"; color: "#e6e6e6"; font.pixelSize: 12; Layout.fillWidth: true }
-                                        Win11Switch { checked: Boolean(root.cfg.taskbarCompact); onToggled: root.updateCfg("taskbarCompact", checked) }
+                                        Win11Switch { checked: Boolean(root.cfg.taskbarCompact); onToggled: (v) => root.updateCfg("taskbarCompact", v) }
                                     }
                                 }
                             }
 
-                            // Card 3: Almacenamiento
+                            // Card 3: Almacenamiento (clickable -> Sistema)
                             Rectangle {
                                 Layout.fillWidth: true; Layout.alignment: Qt.AlignTop
                                 implicitHeight: stoHomeCol.implicitHeight + 28
-                                radius: 8; color: "#262626"; border.color: "#1cffffff"; border.width: 1
+                                radius: 8; color: stoHomeH.containsMouse ? "#2c2c2c" : "#262626"; border.color: "#1cffffff"; border.width: 1
+                                MouseArea { id: stoHomeH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.settingsPage = "Sistema" }
                                 ColumnLayout {
                                     id: stoHomeCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14; spacing: 8
                                     RowLayout {
                                         Layout.fillWidth: true
                                         WinSvg { width: 18; height: 18; iconFile: "drive-c.svg" }
                                         Text { text: "Almacenamiento"; color: "#f5f5f5"; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                                        WinSvg { width: 12; height: 12; iconFile: "fluent-chevron-right.svg"; opacity: 0.7 }
                                     }
                                     Text { text: root.drives.length > 0 ? root.drives[0].name : "Disco principal"; color: "#d4d4d4"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
                                     Rectangle {
@@ -733,12 +817,24 @@ Rectangle {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text { text: "Bluetooth (" + (root.extData.btDevices ? root.extData.btDevices.length : 0) + " vinculados)"; color: "#d8d8d8"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-                                        Win11Switch { checked: Boolean(root.hwState.btEnabled); onToggled: bridge.runCtlAction("bluetooth toggle") }
+                                        Win11Switch {
+                                            checked: Boolean(root.hwState.btEnabled)
+                                            onToggled: (v) => {
+                                                var cp = Object.assign({}, root.hwState); cp.btEnabled = v; root.hwState = cp;
+                                                bridge.setBluetoothEnabled(v);
+                                                root.refreshLiveState();
+                                            }
+                                        }
                                     }
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text { text: "Modo de energía activo"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true }
-                                        Text { text: root.hwState.cpuGovernor || "Equilibrado"; color: "#4cc2ff"; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                    Rectangle {
+                                        Layout.fillWidth: true; height: 30; radius: 5
+                                        color: pwrLinkH.containsMouse ? "#323232" : "#202020"
+                                        RowLayout {
+                                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                                            Text { text: "Modo de energía activo"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true }
+                                            Text { text: root.hwState.cpuGovernor || "Equilibrado"; color: "#4cc2ff"; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                        }
+                                        MouseArea { id: pwrLinkH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.settingsPage = "Sistema" }
                                     }
                                 }
                             }
@@ -781,22 +877,28 @@ Rectangle {
                                         SettingsSlider {
                                             Layout.fillWidth: root.narrowBody; Layout.preferredWidth: 180
                                             from: 10; to: 100
-                                            value: Number(root.hwState.brightnessPct || 100)
-                                            onMovedValue: (v) => bridge.runCtlAction("brightness set " + Math.round(v))
+                                            value: root.localBrightPct
+                                            onDraggingChanged: root.brightDragging = dragging
+                                            onMovedValue: (v) => {
+                                                var iv = Math.round(v);
+                                                root.localBrightPct = iv;
+                                                bridge.runCtlAction("brightness set " + iv);
+                                            }
                                         }
-                                        Text { text: Math.round(root.hwState.brightnessPct || 100) + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+                                        Text { text: root.localBrightPct + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                                     }
                                 }
 
                                 Rectangle { Layout.fillWidth: true; height: 1; color: "#18ffffff" }
 
-                                // Real Connected Monitors Scale Control
+                                // Real Connected Monitors Scale & Resolution/Hz Control (Persisted across reboots!)
                                 Repeater {
                                     model: root.extData.monitors || []
                                     delegate: Rectangle {
                                         id: monCard
                                         readonly property string mName: modelData.name || ""
                                         readonly property real mScale: Number(modelData.scale || 1)
+                                        readonly property string mCurMode: modelData.currentMode || ""
                                         Layout.fillWidth: true
                                         implicitHeight: monInner.implicitHeight + 20
                                         radius: 6; color: "#202020"; border.color: "#18ffffff"
@@ -807,7 +909,7 @@ Rectangle {
                                                 WinSvg { width: 18; height: 18; iconFile: "fluent-display.svg" }
                                                 ColumnLayout {
                                                     Layout.fillWidth: true; spacing: 1
-                                                    Text { text: monCard.mName + "  •  " + (modelData.currentMode || "Activa"); color: "#f2f2f2"; font.pixelSize: 12; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
+                                                    Text { text: monCard.mName + "  •  " + (monCard.mCurMode || "Activa"); color: "#f2f2f2"; font.pixelSize: 12; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
                                                     Text { text: (modelData.desc || "") + " • Escala actual: " + Math.round(monCard.mScale * 100) + "%"; color: "#9a9a9a"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
                                                 }
                                             }
@@ -826,7 +928,30 @@ Rectangle {
                                                             onClicked: {
                                                                 if (bridge.applyMonitorSetting(monCard.mName, modelData, "")) {
                                                                     root.refreshLiveState();
-                                                                    root.showToast("Escala aplicada en " + monCard.mName);
+                                                                    root.showToast("Escala aplicada y guardada en " + monCard.mName);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Flow {
+                                                visible: (modelData.modes || []).length > 1
+                                                Layout.fillWidth: true; spacing: 6
+                                                Text { text: "Modo:"; color: "#b0b0b0"; font.pixelSize: 11; height: 26; verticalAlignment: Text.AlignVCenter }
+                                                Repeater {
+                                                    model: (modelData.modes || []).slice(0, 6)
+                                                    delegate: Rectangle {
+                                                        readonly property bool isCurM: Boolean(modelData.current)
+                                                        width: mTxt.implicitWidth + 16; height: 26; radius: 4
+                                                        color: isCurM ? "#4cc2ff" : (mHov.containsMouse ? "#383838" : "#2c2c2c")
+                                                        Text { id: mTxt; anchors.centerIn: parent; text: modelData.label; color: parent.isCurM ? "#000000" : "#e8e8e8"; font.pixelSize: 11; font.weight: parent.isCurM ? Font.DemiBold : Font.Normal }
+                                                        MouseArea {
+                                                            id: mHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                if (bridge.applyMonitorSetting(monCard.mName, "", modelData.arg)) {
+                                                                    root.refreshLiveState();
+                                                                    root.showToast("Resolución aplicada: " + modelData.label);
                                                                 }
                                                             }
                                                         }
@@ -878,10 +1003,15 @@ Rectangle {
                                         SettingsSlider {
                                             Layout.fillWidth: root.narrowBody; Layout.preferredWidth: 180
                                             from: 0; to: 100
-                                            value: Number(root.hwState.volumePct || 80)
-                                            onMovedValue: (v) => bridge.setPipewireVolume(Math.round(v))
+                                            value: root.localVolPct
+                                            onDraggingChanged: root.volDragging = dragging
+                                            onMovedValue: (v) => {
+                                                var iv = Math.round(v);
+                                                root.localVolPct = iv;
+                                                bridge.setPipewireVolume(iv);
+                                            }
                                         }
-                                        Text { text: Math.round(root.hwState.volumePct || 80) + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+                                        Text { text: root.localVolPct + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                                     }
                                 }
 
@@ -938,10 +1068,15 @@ Rectangle {
                                         SettingsSlider {
                                             Layout.fillWidth: root.narrowBody; Layout.preferredWidth: 180
                                             from: 0; to: 100
-                                            value: Number(root.extData.micVol || 50)
-                                            onMovedValue: (v) => bridge.setMicVolume(Math.round(v))
+                                            value: root.localMicPct
+                                            onDraggingChanged: root.micDragging = dragging
+                                            onMovedValue: (v) => {
+                                                var iv = Math.round(v);
+                                                root.localMicPct = iv;
+                                                bridge.setMicVolume(iv);
+                                            }
                                         }
-                                        Text { text: Math.round(root.extData.micVol || 50) + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+                                        Text { text: root.localMicPct + "%"; color: "#d4d4d4"; font.pixelSize: 12; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
                                     }
                                 }
                             }
@@ -1029,7 +1164,17 @@ Rectangle {
                                 }
                                 Flow {
                                     Layout.fillWidth: true; spacing: 8
-                                    FluentBtn { label: "Abrir Discos"; onClicked: bridge.launchRealApp("gnome-disks") }
+                                    FluentBtn {
+                                        label: (root.extData.tools && root.extData.tools.hasGnomeDisks) ? "Abrir Discos" : "Instalar gestor de discos"
+                                        onClicked: {
+                                            if (root.extData.tools && root.extData.tools.hasGnomeDisks) {
+                                                bridge.launchRealApp("gnome-disks");
+                                            } else {
+                                                bridge.launchRealApp("/usr/bin/shelly-ui");
+                                                root.showToast("Busca 'gnome-disk-utility' en Tienda Shelly");
+                                            }
+                                        }
+                                    }
                                     FluentBtn { label: "Abrir Explorador"; onClicked: bridge.launchRealApp("/usr/bin/x64-win11-app explorer 'Este equipo'") }
                                 }
                             }
@@ -1093,12 +1238,24 @@ Rectangle {
                                         Text { text: "Bluetooth"; color: "#f2f2f2"; font.pixelSize: 14; font.weight: Font.DemiBold }
                                         Text { text: root.hwState.btEnabled ? "Detectable y listo para emparejar accesorios" : "Bluetooth desactivado"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                                     }
-                                    Win11Switch { checked: Boolean(root.hwState.btEnabled); onToggled: { bridge.runCtlAction("bluetooth toggle"); root.refreshLiveState(); } }
+                                    Win11Switch {
+                                        checked: Boolean(root.hwState.btEnabled)
+                                        onToggled: (v) => {
+                                            var cp = Object.assign({}, root.hwState); cp.btEnabled = v; root.hwState = cp;
+                                            bridge.setBluetoothEnabled(v);
+                                            root.refreshLiveState();
+                                            root.showToast(v ? "Bluetooth activado" : "Bluetooth desactivado");
+                                        }
+                                    }
                                 }
                                 Flow {
                                     Layout.fillWidth: true; spacing: 8
-                                    FluentBtn { label: "+ Agregar dispositivo"; accent: true; onClicked: bridge.launchRealApp("blueman-manager") }
-                                    FluentBtn { label: "Actualizar lista"; onClicked: root.refreshLiveState() }
+                                    FluentBtn {
+                                        label: (root.extData.tools && root.extData.tools.hasBlueman) ? "+ Agregar dispositivo" : "Instalar gestor Bluetooth"
+                                        accent: true
+                                        onClicked: bridge.launchRealApp((root.extData.tools && root.extData.tools.hasBlueman) ? "blueman-manager" : "/usr/bin/shelly-ui")
+                                    }
+                                    FluentBtn { label: "Actualizar lista"; onClicked: { root.refreshLiveState(); root.showToast("Lista Bluetooth actualizada"); } }
                                 }
                             }
                         }
@@ -1146,10 +1303,25 @@ Rectangle {
                                     ColumnLayout {
                                         Layout.fillWidth: true; spacing: 2
                                         Text { text: "Dispositivos móviles y Enlace Móvil"; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium }
-                                        Text { text: "Sincroniza mensajes, notificaciones y archivos con tu teléfono mediante KDE Connect"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                        Text {
+                                            text: (root.extData.tools && root.extData.tools.hasKdeConnect)
+                                                  ? "Sincroniza mensajes, notificaciones y archivos con tu teléfono mediante KDE Connect"
+                                                  : "Instala KDE Connect desde Tienda Shelly para sincronizar tu móvil Android o iPhone"
+                                            color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap
+                                        }
                                     }
                                 }
-                                FluentBtn { label: "Abrir Enlace Móvil"; onClicked: bridge.launchRealApp("kdeconnect-app") }
+                                FluentBtn {
+                                    label: (root.extData.tools && root.extData.tools.hasKdeConnect) ? "Abrir Enlace Móvil" : "Instalar (Tienda Shelly)"
+                                    onClicked: {
+                                        if (root.extData.tools && root.extData.tools.hasKdeConnect) {
+                                            bridge.launchRealApp("kdeconnect-app || kdeconnect-settings");
+                                        } else {
+                                            bridge.launchRealApp("/usr/bin/shelly-ui");
+                                            root.showToast("Busca 'kdeconnect' en Tienda Shelly");
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -1168,7 +1340,17 @@ Rectangle {
                                         Text { text: "Administra impresoras locales y de red mediante CUPS"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                                     }
                                 }
-                                FluentBtn { label: "Configurar"; onClicked: bridge.launchRealApp("system-config-printer") }
+                                FluentBtn {
+                                    label: (root.extData.tools && root.extData.tools.hasPrinterGui) ? "Configurar" : "Instalar (Tienda Shelly)"
+                                    onClicked: {
+                                        if (root.extData.tools && root.extData.tools.hasPrinterGui) {
+                                            bridge.launchRealApp("system-config-printer");
+                                        } else {
+                                            bridge.launchRealApp("/usr/bin/shelly-ui");
+                                            root.showToast("Busca 'system-config-printer' en Tienda Shelly");
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1196,8 +1378,18 @@ Rectangle {
                                 }
                                 Flow {
                                     Layout.fillWidth: true; spacing: 8
-                                    FluentBtn { label: "Explorar redes"; accent: true; onClicked: { bridge.runCtlAction("wifi rescan"); root.showToast("Buscando redes Wi-Fi..."); } }
-                                    FluentBtn { label: "Conexiones avanzadas"; onClicked: bridge.launchRealApp("nm-connection-editor") }
+                                    FluentBtn { label: "Explorar redes"; accent: true; onClicked: { bridge.runCtlAction("wifi rescan"); wifiRescanT.restart(); root.showToast("Buscando redes Wi-Fi..."); } }
+                                    FluentBtn {
+                                        label: (root.extData.tools && root.extData.tools.hasNmEditor) ? "Conexiones avanzadas" : "Instalar editor de red"
+                                        onClicked: {
+                                            if (root.extData.tools && root.extData.tools.hasNmEditor) {
+                                                bridge.launchRealApp("nm-connection-editor");
+                                            } else {
+                                                bridge.launchRealApp("/usr/bin/shelly-ui");
+                                                root.showToast("Busca 'nm-connection-editor' en Tienda Shelly");
+                                            }
+                                        }
+                                    }
                                     FluentBtn { label: "Optimizador DNS"; onClicked: bridge.launchRealApp("x64-hello") }
                                 }
                             }
@@ -1208,7 +1400,12 @@ Rectangle {
                             title: "Wi-Fi"
                             subtitle: "Activa o desactiva la tarjeta inalámbrica del equipo (" + (root.extData.netIface || "wlan") + ")"
                             checked: Boolean(root.hwState.wifiEnabled)
-                            onToggled: (v) => { bridge.runCtlAction("wifi " + (v ? "on" : "off")); root.refreshLiveState(); }
+                            onToggled: (v) => {
+                                var cp = Object.assign({}, root.hwState); cp.wifiEnabled = v; root.hwState = cp;
+                                bridge.setWifiEnabled(v);
+                                root.refreshLiveState();
+                                root.showToast(v ? "Wi-Fi activado" : "Wi-Fi desactivado");
+                            }
                         }
 
                         Repeater {
@@ -1227,9 +1424,19 @@ Rectangle {
                                         Text { text: (modelData.active ? "Conectado, seguro • " : "") + "Señal " + (modelData.signal || 0) + "% • " + (modelData.security || "WPA2"); color: modelData.active ? "#4cc2ff" : "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
                                     }
                                     FluentBtn {
+                                        visible: Boolean(modelData.active)
+                                        label: "Desconectar"
+                                        onClicked: {
+                                            if (bridge.disconnectWifi(modelData.ssid)) {
+                                                root.refreshLiveState();
+                                                root.showToast("Desconectado de " + modelData.ssid);
+                                            }
+                                        }
+                                    }
+                                    FluentBtn {
                                         visible: !modelData.active
                                         label: "Conectar"; accent: true
-                                        onClicked: { bridge.runCtlAction("wifi connect " + modelData.ssid); root.showToast("Conectando a " + modelData.ssid + "..."); }
+                                        onClicked: root.tryConnectWifi(modelData.ssid)
                                     }
                                 }
                             }
@@ -1387,7 +1594,14 @@ Rectangle {
                                             MouseArea { id: iszH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.updateCfg("desktopIconSizeMode", modelData.id) }
                                         }
                                     }
-                                    FluentBtn { label: "Restaurar iconos predeterminados"; onClicked: { bridge.runCtlAction("restore-desktop-icons"); root.showToast("Iconos predeterminados restaurados"); } }
+                                    FluentBtn {
+                                        label: "Restaurar iconos predeterminados"
+                                        onClicked: {
+                                            root.updateCfg("showDesktopIcons", true);
+                                            bridge.runCtlAction("restore-desktop-icons");
+                                            root.showToast("Iconos predeterminados restaurados");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1407,12 +1621,12 @@ Rectangle {
                             Flow {
                                 id: appActFlow; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14; spacing: 8
                                 FluentBtn { label: "Instalar o quitar apps (Tienda Shelly)"; accent: true; onClicked: bridge.launchRealApp("/usr/bin/shelly-ui") }
-                                FluentBtn { label: "Aplicaciones de inicio"; onClicked: bridge.launchRealApp("/usr/bin/x64-win11-app taskmgr") }
+                                FluentBtn { label: "Aplicaciones de inicio"; onClicked: bridge.launchRealApp("/usr/bin/x64-win11-app taskmgr startup") }
                             }
                         }
 
-                        // Aplicaciones predeterminadas (REAL xdg-mime!)
-                        Text { text: "Aplicaciones predeterminadas"; color: "#b8b8b8"; font.pixelSize: 12; font.weight: Font.DemiBold; topPadding: 2 }
+                        // Aplicaciones predeterminadas (REAL xdg-mime + Selector interactivo!)
+                        Text { text: "Aplicaciones predeterminadas (haz clic para cambiar)"; color: "#b8b8b8"; font.pixelSize: 12; font.weight: Font.DemiBold; topPadding: 2 }
 
                         Rectangle {
                             width: parent.width; implicitHeight: defCol.implicitHeight + 20
@@ -1421,13 +1635,60 @@ Rectangle {
                                 id: defCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 12; spacing: 4
                                 Repeater {
                                     model: root.extData.defaultApps || []
-                                    delegate: Rectangle {
-                                        Layout.fillWidth: true; height: 38; radius: 5; color: "#202020"
-                                        RowLayout {
-                                            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 10
-                                            WinSvg { width: 18; height: 18; iconFile: modelData.icon || "fluent-apps-list.svg" }
-                                            Text { text: modelData.role; color: "#e8e8e8"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
-                                            Text { text: modelData.app; color: "#4cc2ff"; font.pixelSize: 12; font.weight: Font.Medium; elide: Text.ElideRight }
+                                    delegate: ColumnLayout {
+                                        id: roleBlock
+                                        readonly property string rId: modelData.id || ""
+                                        readonly property bool isExp: root.expandedMimeRole === rId && (modelData.candidates || []).length > 1
+                                        Layout.fillWidth: true; spacing: 4
+
+                                        Rectangle {
+                                            Layout.fillWidth: true; height: 40; radius: 5
+                                            color: defRowH.containsMouse ? "#2c2c2c" : "#202020"
+                                            RowLayout {
+                                                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 10
+                                                WinSvg { width: 18; height: 18; iconFile: modelData.icon || "fluent-apps-list.svg" }
+                                                Text { text: modelData.role; color: "#e8e8e8"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+                                                Text { text: modelData.app; color: "#4cc2ff"; font.pixelSize: 12; font.weight: Font.Medium; elide: Text.ElideRight }
+                                                WinSvg {
+                                                    visible: (modelData.candidates || []).length > 1
+                                                    width: 12; height: 12
+                                                    iconFile: roleBlock.isExp ? "fluent-chevron-up.svg" : "fluent-chevron-down.svg"
+                                                    opacity: 0.75
+                                                }
+                                            }
+                                            MouseArea {
+                                                id: defRowH; anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: (modelData.candidates || []).length > 1 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                onClicked: {
+                                                    if ((modelData.candidates || []).length > 1) {
+                                                        root.expandedMimeRole = (root.expandedMimeRole === roleBlock.rId) ? "" : roleBlock.rId;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Flow {
+                                            visible: roleBlock.isExp
+                                            Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 4; spacing: 6
+                                            Repeater {
+                                                model: modelData.candidates || []
+                                                delegate: Rectangle {
+                                                    width: cLbl.implicitWidth + 20; height: 28; radius: 4
+                                                    color: modelData.active ? "#4cc2ff" : (candH.containsMouse ? "#383838" : "#2c2c2c")
+                                                    border.color: modelData.active ? "#4cc2ff" : "#22ffffff"
+                                                    Text { id: cLbl; anchors.centerIn: parent; text: modelData.label; color: modelData.active ? "#000000" : "#f0f0f0"; font.pixelSize: 11; font.weight: modelData.active ? Font.DemiBold : Font.Normal }
+                                                    MouseArea {
+                                                        id: candH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (bridge.setDefaultAppForRole(roleBlock.rId, modelData.desktop)) {
+                                                                root.expandedMimeRole = "";
+                                                                root.refreshLiveState();
+                                                                root.showToast("Predeterminada cambiada a " + modelData.label);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1609,9 +1870,10 @@ Rectangle {
                                             id: dispNameIn
                                             anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
                                             verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12; selectByMouse: true; clip: true
-                                            text: root.activeDisplayName
+                                            Component.onCompleted: text = root.activeDisplayName
                                             onAccepted: {
                                                 if (bridge.setDisplayName(text)) {
+                                                    root.forceActiveFocus();
                                                     root.refreshLiveState();
                                                     root.showToast("Nombre visible guardado");
                                                 }
@@ -1639,7 +1901,7 @@ Rectangle {
                                 Flow {
                                     Layout.fillWidth: true; spacing: 8; Layout.topMargin: 4
                                     FluentBtn { label: "Bloquear equipo (Win+L)"; onClicked: bridge.runCtlAction("lock") }
-                                    FluentBtn { label: "Cambiar contraseña"; onClicked: bridge.launchRealApp("kitty -e passwd") }
+                                    FluentBtn { label: "Cambiar contraseña"; onClicked: bridge.launchRealApp("kitty -e sh -c 'passwd; echo \"\"; read -p \"Presiona Enter para cerrar...\" _'") }
                                     FluentBtn { label: "Abrir carpeta personal"; onClicked: bridge.launchRealApp("/usr/bin/x64-win11-app explorer 'Inicio'") }
                                 }
                             }
@@ -1647,7 +1909,7 @@ Rectangle {
                     }
 
                     // =========================================================
-                    // PAGE 7: HORA E IDIOMA
+                    // PAGE 7: HORA E IDIOMA (100% Interactive: 12h/24h Clock, NTP, Timezone & Keyboard Layout!)
                     // =========================================================
                     Column {
                         width: parent.width; spacing: 10
@@ -1660,32 +1922,111 @@ Rectangle {
                                 id: clkCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 18; spacing: 4
                                 Text { text: root.clockTimeStr; color: "#ffffff"; font.pixelSize: 32; font.weight: Font.DemiBold }
                                 Text { text: root.clockDateStr; color: "#4cc2ff"; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-                                Text { text: "Zona horaria:  " + (root.extData.timeLang ? root.extData.timeLang.timezone : "Local"); color: "#a8a8a8"; font.pixelSize: 12; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                Text { text: "Zona horaria:  " + (root.extData.timeLang ? root.extData.timeLang.timezone : "Local") + "  •  Idioma: " + (root.extData.timeLang ? root.extData.timeLang.locale : ""); color: "#a8a8a8"; font.pixelSize: 12; Layout.fillWidth: true; wrapMode: Text.WordWrap }
                             }
                         }
 
+                        ToggleCard {
+                            iconFile: "fluent-refresh.svg"
+                            title: "Formato de reloj de 12 horas (AM / PM)"
+                            subtitle: "Cambia el reloj de la barra de tareas y pantalla de bloqueo entre 24h y 12h"
+                            checked: Boolean(root.cfg.clock12h)
+                            onToggled: (v) => {
+                                root.updateCfg("clock12h", v);
+                                var now = new Date();
+                                root.clockTimeStr = v ? Qt.formatTime(now, "h:mm:ss AP") : Qt.formatTime(now, "hh:mm:ss");
+                                root.showToast(v ? "Reloj en formato 12 horas" : "Reloj en formato 24 horas");
+                            }
+                        }
+
+                        ToggleCard {
+                            iconFile: "fluent-refresh.svg"
+                            title: "Establecer hora automáticamente (NTP)"
+                            subtitle: (root.extData.timeLang && root.extData.timeLang.synced) ? "Reloj sincronizado con servidores de tiempo del sistema" : "Sincronización automática desactivada"
+                            checked: Boolean(root.extData.timeLang && root.extData.timeLang.ntpActive)
+                            onToggled: (v) => {
+                                if (bridge.setNtpEnabled(v)) {
+                                    root.refreshLiveState();
+                                    root.showToast(v ? "Sincronización NTP activada" : "Sincronización NTP desactivada");
+                                } else {
+                                    root.showToast("Cambio de NTP cancelado");
+                                }
+                            }
+                        }
+
+                        // Real Keyboard Layout Selector (ES / US / LATAM -> labwc reconfigure live!)
                         Rectangle {
-                            width: parent.width; implicitHeight: tzCol.implicitHeight + 28
+                            width: parent.width; implicitHeight: kbCol.implicitHeight + 28
                             radius: 6; color: "#262626"; border.color: "#1cffffff"; border.width: 1
                             ColumnLayout {
-                                id: tzCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 16; spacing: 10
-                                RowLayout {
-                                    Layout.fillWidth: true; spacing: 12
-                                    WinSvg { width: 20; height: 20; iconFile: "fluent-refresh.svg" }
-                                    ColumnLayout {
-                                        Layout.fillWidth: true; spacing: 2
-                                        Text { text: "Sincronización automática de reloj (NTP)"; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium }
-                                        Text { text: (root.extData.timeLang && root.extData.timeLang.synced) ? "Reloj sincronizado automáticamente con servidores de hora" : "Reloj local sin sincronización NTP"; color: (root.extData.timeLang && root.extData.timeLang.synced) ? "#4ade80" : "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-                                    }
-                                }
-                                Rectangle { Layout.fillWidth: true; height: 1; color: "#18ffffff" }
+                                id: kbCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 16; spacing: 10
                                 RowLayout {
                                     Layout.fillWidth: true; spacing: 12
                                     WinSvg { width: 20; height: 20; iconFile: "fluent-keyboard.svg" }
                                     ColumnLayout {
                                         Layout.fillWidth: true; spacing: 2
-                                        Text { text: "Idioma y distribución de teclado"; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium }
-                                        Text { text: "Idioma del sistema: " + (root.extData.timeLang ? root.extData.timeLang.locale : "es_ES.UTF-8") + "  •  Cambia entre ES y US con Alt + Shift"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                        Text { text: "Distribución de teclado principal"; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium }
+                                        Text { text: "Aplica inmediatamente en Wayland (labwc) y sincroniza la barra de tareas. También puedes alternar con Alt + Shift"; color: "#9e9e9e"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                                    }
+                                }
+                                Flow {
+                                    Layout.fillWidth: true; spacing: 8
+                                    Repeater {
+                                        model: [
+                                            { code: "es",    tag: "ES",    label: "Español (España)" },
+                                            { code: "latam", tag: "LATAM", label: "Español (Latinoamérica)" },
+                                            { code: "us",    tag: "US",    label: "Inglés (Estados Unidos)" }
+                                        ]
+                                        delegate: Rectangle {
+                                            readonly property bool isCur: (root.extData.timeLang ? String(root.extData.timeLang.kbLayout || "ES") : "ES") === modelData.tag
+                                            width: kbTxt.implicitWidth + 24; height: 32; radius: 5
+                                            color: isCur ? "#4cc2ff" : (kbHov.containsMouse ? "#383838" : "#2f2f2f")
+                                            border.color: isCur ? "#4cc2ff" : "#22ffffff"
+                                            Text { id: kbTxt; anchors.centerIn: parent; text: modelData.label; color: parent.isCur ? "#000000" : "#f0f0f0"; font.pixelSize: 12; font.weight: parent.isCur ? Font.DemiBold : Font.Normal }
+                                            MouseArea {
+                                                id: kbHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (bridge.setKeyboardLayout(modelData.code)) {
+                                                        root.refreshLiveState();
+                                                        root.showToast("Teclado cambiado a " + modelData.label);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Real Timezone Picker (via timedatectl)
+                        Rectangle {
+                            width: parent.width; implicitHeight: tzPickCol.implicitHeight + 28
+                            radius: 6; color: "#262626"; border.color: "#1cffffff"; border.width: 1
+                            ColumnLayout {
+                                id: tzPickCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 16; spacing: 10
+                                Text { text: "Cambiar zona horaria"; color: "#f2f2f2"; font.pixelSize: 13; font.weight: Font.Medium }
+                                Flow {
+                                    Layout.fillWidth: true; spacing: 6
+                                    Repeater {
+                                        model: ["America/Panama", "America/Bogota", "America/Mexico_City", "America/Lima", "America/Santiago", "America/Argentina/Buenos_Aires", "America/New_York", "Europe/Madrid", "UTC"]
+                                        delegate: Rectangle {
+                                            readonly property bool isCur: root.extData.timeLang && String(root.extData.timeLang.timezone || "").indexOf(modelData) !== -1
+                                            width: tzLbl.implicitWidth + 18; height: 28; radius: 4
+                                            color: isCur ? "#4cc2ff" : (tzHov.containsMouse ? "#383838" : "#2f2f2f")
+                                            border.color: isCur ? "#4cc2ff" : "#22ffffff"
+                                            Text { id: tzLbl; anchors.centerIn: parent; text: modelData.replace("_", " "); color: parent.isCur ? "#000000" : "#e8e8e8"; font.pixelSize: 11; font.weight: parent.isCur ? Font.DemiBold : Font.Normal }
+                                            MouseArea {
+                                                id: tzHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (bridge.setSystemTimezone(modelData)) {
+                                                        root.refreshLiveState();
+                                                        root.showToast("Zona horaria: " + modelData);
+                                                    } else {
+                                                        root.showToast("Cambio de zona horaria cancelado");
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1744,10 +2085,14 @@ Rectangle {
 
                         Repeater {
                             model: [
-                                { icon: "x64lios.png",  title: "X64 Hello — Centro de Optimización", desc: "Gestiona planificadores SCX, DNS, drivers GPU y perfiles gaming", cmd: "x64-hello" },
-                                { icon: "taskmgr.svg",  title: "Administrador de tareas (Multi-GPU)", desc: "Monitorea CPU por núcleo, VRAM y temperatura de todas tus GPUs", cmd: "/usr/bin/x64-win11-app taskmgr" }
+                                { icon: "x64lios.png",  title: "X64 Hello — Centro de Optimización", desc: "Gestiona planificadores SCX, DNS, drivers GPU y perfiles gaming", cmd: "x64-hello", show: true },
+                                { icon: "taskmgr.svg",  title: "Administrador de tareas (Multi-GPU)", desc: "Monitorea CPU por núcleo, VRAM y temperatura de todas tus GPUs", cmd: "/usr/bin/x64-win11-app taskmgr performance", show: true },
+                                { icon: "steam.svg",    title: "Steam", desc: "Biblioteca de juegos con Proton y aceleración NTSYNC activa", cmd: "steam", show: Boolean(root.extData.gamingStack && root.extData.gamingStack.hasSteam) },
+                                { icon: "fluent-games.svg", title: "Heroic Games Launcher", desc: "Epic Games, GOG y Amazon Games en Linux", cmd: "heroic", show: Boolean(root.extData.gamingStack && root.extData.gamingStack.hasHeroic) },
+                                { icon: "fluent-games.svg", title: "Lutris", desc: "Gestor universal de bibliotecas gaming y emuladores", cmd: "lutris", show: Boolean(root.extData.gamingStack && root.extData.gamingStack.hasLutris) }
                             ]
                             delegate: Rectangle {
+                                visible: Boolean(modelData.show)
                                 width: parent.width; implicitHeight: gmRow.implicitHeight + 24
                                 radius: 6; color: "#262626"; border.color: "#1cffffff"; border.width: 1
                                 GridLayout {
@@ -1846,6 +2191,57 @@ Rectangle {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Authentic WinUI 3 Wi-Fi Password Modal (for connecting to new secured networks including SSIDs with spaces!)
+    Rectangle {
+        visible: root.wifiPassModalOpen
+        anchors.fill: parent; color: "#77000000"; z: 90
+        MouseArea { anchors.fill: parent; onClicked: root.wifiPassModalOpen = false }
+
+        Rectangle {
+            anchors.centerIn: parent; width: Math.min(390, root.width - 36); implicitHeight: wpModCol.implicitHeight + 36
+            radius: 10; color: "#f8242424"; border.color: "#36ffffff"; border.width: 1
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                id: wpModCol; anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 18; spacing: 10
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 10
+                    WinSvg { width: 22; height: 22; iconFile: "fluent-wifi.svg" }
+                    Text { text: "Conectar a " + root.wifiPassSsid; color: "#ffffff"; font.pixelSize: 15; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
+                }
+                Text { text: "Escribe la clave de seguridad de red:"; color: "#b8b8b8"; font.pixelSize: 12 }
+                Rectangle {
+                    Layout.fillWidth: true; height: 34; radius: 5; clip: true
+                    color: "#151515"; border.color: wifiPassField.activeFocus ? "#4cc2ff" : "#34ffffff"
+                    TextInput {
+                        id: wifiPassField
+                        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12
+                        echoMode: TextInput.Password; selectByMouse: true; clip: true
+                        Keys.onEscapePressed: root.wifiPassModalOpen = false
+                        onAccepted: {
+                            var r = bridge.connectWifi(root.wifiPassSsid, text);
+                            if (r === "ok") {
+                                root.wifiPassModalOpen = false;
+                                root.refreshLiveState();
+                                root.showToast("Conectado a " + root.wifiPassSsid);
+                            } else {
+                                root.wifiPassErr = r.replace(/^error:/, "") || "Contraseña incorrecta";
+                            }
+                        }
+                    }
+                }
+                Text { visible: root.wifiPassErr !== ""; text: root.wifiPassErr; color: "#f87171"; font.pixelSize: 11; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    Item { Layout.fillWidth: true }
+                    FluentBtn { label: "Cancelar"; onClicked: root.wifiPassModalOpen = false }
+                    FluentBtn { label: "Conectar"; accent: true; onClicked: wifiPassField.accepted() }
                 }
             }
         }

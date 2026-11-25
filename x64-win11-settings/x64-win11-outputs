@@ -30,3 +30,25 @@ if [ -n "$internal" ] && [ "${#externals[@]}" -gt 0 ]; then
         cur_x=$((cur_x + 1920))
     done
 fi
+
+# Apply persisted per-monitor scale/mode saved from Settings (if any)
+MON_CFG="${HOME}/.local/state/x64-win11/monitors.json"
+if [ -f "$MON_CFG" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$MON_CFG" <<'PYEOF'
+import json, subprocess, sys
+try:
+    data = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+    for out_name, conf in (data or {}).items():
+        if not isinstance(conf, dict):
+            continue
+        cmd = ["wlr-randr", "--output", str(out_name)]
+        if conf.get("scale"):
+            cmd += ["--scale", str(conf["scale"])]
+        if conf.get("mode"):
+            cmd += ["--mode", str(conf["mode"])]
+        if len(cmd) > 3:
+            subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+except Exception:
+    pass
+PYEOF
+fi

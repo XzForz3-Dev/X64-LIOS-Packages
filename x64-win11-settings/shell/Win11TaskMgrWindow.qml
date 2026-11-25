@@ -9,7 +9,7 @@ Rectangle {
     color: "#191919"
     focus: true
 
-    property string activeTab: "processes" // "processes" | "performance" | "startup"
+    property string activeTab: (typeof initialArg !== "undefined" && (initialArg === "startup" || initialArg === "performance")) ? initialArg : "processes" // "processes" | "performance" | "startup"
     property string perfSubTab: "cpu"      // "cpu" | "ram" | "disk" | "net" | "gpu_0" | "gpu_1" ...
     property bool cpuShowPerCore: false
     property int historyTick: 0

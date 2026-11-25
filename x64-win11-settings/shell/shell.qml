@@ -95,6 +95,7 @@ ShellRoot {
     property bool taskbarLeftAlign: false
     property bool showBatteryPct: true
     property int wallpaperMode: 0
+    property bool clock12h: false
     property string kbLayout: "ES"
     property string searchQuery: ""
 
@@ -486,7 +487,7 @@ ShellRoot {
         repeat: true
         onTriggered: {
             var now = new Date();
-            shellRoot.currentTimeStr = Qt.formatTime(now, "hh:mm");
+            shellRoot.currentTimeStr = shellRoot.clock12h ? Qt.formatTime(now, "h:mm AP") : Qt.formatTime(now, "hh:mm");
             shellRoot.currentDateStr = Qt.formatDate(now, "dd/MM/yyyy");
             shellRoot.currentLongDateStr = Qt.formatDate(now, "dddd, d 'de' MMMM 'de' yyyy");
             shellRoot.currentLockDateStr = Qt.formatDate(now, "dddd, d 'de' MMMM");
@@ -1027,6 +1028,11 @@ ShellRoot {
                             if (cfg.wallpaperMode !== undefined) shellRoot.wallpaperMode = Number(cfg.wallpaperMode);
                             if (cfg.customWallpaperUrl !== undefined) shellRoot.customWallpaperUrl = String(cfg.customWallpaperUrl);
                             if (cfg.userAvatarUrl !== undefined) shellRoot.userAvatarUrl = String(cfg.userAvatarUrl);
+                            if (cfg.clock12h !== undefined) {
+                                shellRoot.clock12h = Boolean(cfg.clock12h);
+                                shellRoot.currentTimeStr = shellRoot.clock12h ? Qt.formatTime(new Date(), "h:mm AP") : Qt.formatTime(new Date(), "hh:mm");
+                            }
+                            if (cfg.kbLayout !== undefined) shellRoot.kbLayout = String(cfg.kbLayout).toUpperCase();
                             if (cfg.desktopIconSizeMode !== undefined) shellRoot.desktopIconSizeMode = String(cfg.desktopIconSizeMode);
                             if (cfg.showDesktopIcons !== undefined) shellRoot.showDesktopIcons = Boolean(cfg.showDesktopIcons);
                             if (cfg.desktopAutoArrange !== undefined) shellRoot.desktopAutoArrange = Boolean(cfg.desktopAutoArrange);
