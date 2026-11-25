@@ -59,6 +59,10 @@ EOF
             mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
             cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
             chmod 755 "$udir/.config/labwc/autostart" 2>/dev/null || true
+            if [ -f /etc/xdg/x64-win11/mimeapps.list ]; then
+                cp -f /etc/xdg/x64-win11/mimeapps.list "$udir/.config/mimeapps.list" 2>/dev/null || true
+                chown "$ug" "$udir/.config/mimeapps.list" 2>/dev/null || true
+            fi
 
             # Remove any residual X64 Theme Studio / Cyberpunk overrides from previous desktop
             rm -f "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css" "$udir/.config/kitty/x64-theme.conf" "$udir/.config/btop/themes/x64-theme.theme" 2>/dev/null || true
@@ -77,7 +81,7 @@ gtk-theme-name=adw-gtk3-dark
 gtk-icon-theme-name=Papirus-Dark
 gtk-cursor-theme-name=breeze_cursors
 gtk-cursor-theme-size=24
-gtk-font-name=Sans 10
+gtk-font-name=Inter 10
 GTKINI
             done
 
@@ -89,6 +93,7 @@ GTKINI
         fi
     done
 
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/x64-win11-power.conf 2>/dev/null || true
     update-desktop-database /usr/share/applications 2>/dev/null || true
 }
 

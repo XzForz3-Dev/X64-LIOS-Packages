@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <linearGradient id="rim" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#606060"/>
+      <stop offset="0.2" stop-color="#4c4c4c"/>
+      <stop offset="1" stop-color="#383838"/>
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="10" fill="#454545" stroke="url(#rim)" stroke-width="1"/>
+</svg>

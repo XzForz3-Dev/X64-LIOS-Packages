@@ -1,0 +1,41 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tmBg" x1="6" y1="8" x2="58" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E3A5F"/>
+      <stop offset="100%" stop-color="#0F1F38"/>
+    </linearGradient>
+    <linearGradient id="tmTop" x1="6" y1="8" x2="58" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2986CC"/>
+      <stop offset="100%" stop-color="#0067C0"/>
+    </linearGradient>
+    <linearGradient id="tmArea" x1="32" y1="22" x2="32" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4CC2FF" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#4CC2FF" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="tmLine" x1="10" y1="36" x2="54" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#7CE0FF"/>
+      <stop offset="100%" stop-color="#4CC2FF"/>
+    </linearGradient>
+  </defs>
+  <!-- Main Window Card -->
+  <rect x="4" y="8" width="56" height="48" rx="9" fill="url(#tmBg)" stroke="#4CC2FF" stroke-opacity="0.45" stroke-width="1.5"/>
+  <!-- Top Window Title Strip -->
+  <path d="M4 17C4 12.0294 8.02944 8 13 8H51C55.9706 8 60 12.0294 60 17V20H4V17Z" fill="url(#tmTop)"/>
+  <circle cx="12.5" cy="14" r="2" fill="#E0F4FF" fill-opacity="0.9"/>
+  <circle cx="19" cy="14" r="2" fill="#E0F4FF" fill-opacity="0.65"/>
+  <rect x="38" y="12.5" width="14" height="3" rx="1.5" fill="#E0F4FF" fill-opacity="0.45"/>
+  <!-- Subtle Telemetry Grid -->
+  <line x1="6" y1="30" x2="58" y2="30" stroke="#4CC2FF" stroke-opacity="0.14" stroke-width="1"/>
+  <line x1="6" y1="40" x2="58" y2="40" stroke="#4CC2FF" stroke-opacity="0.14" stroke-width="1"/>
+  <line x1="6" y1="49" x2="58" y2="49" stroke="#4CC2FF" stroke-opacity="0.14" stroke-width="1"/>
+  <line x1="18" y1="20" x2="18" y2="54" stroke="#4CC2FF" stroke-opacity="0.12" stroke-width="1"/>
+  <line x1="32" y1="20" x2="32" y2="54" stroke="#4CC2FF" stroke-opacity="0.12" stroke-width="1"/>
+  <line x1="46" y1="20" x2="46" y2="54" stroke="#4CC2FF" stroke-opacity="0.12" stroke-width="1"/>
+  <!-- Telemetry Area Fill -->
+  <path d="M8 42 H18 L23.5 31 L29.5 47 L37 25.5 L42.5 42 H56 V53 C56 54.1 55.1 55 54 55 H10 C8.9 55 8 54.1 8 53 Z" fill="url(#tmArea)"/>
+  <!-- Crisp Heartbeat / Performance Waveform -->
+  <path d="M9 42 H18 L23.5 31 L29.5 47 L37 25.5 L42.5 42 H55" stroke="url(#tmLine)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Live Pulse Dot -->
+  <circle cx="37" cy="25.5" r="3" fill="#FFFFFF"/>
+</svg>

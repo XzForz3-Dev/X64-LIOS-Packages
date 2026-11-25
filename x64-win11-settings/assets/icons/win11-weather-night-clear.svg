@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="moonG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A5D8FF"/>
+      <stop offset="50%" stop-color="#74C0FC"/>
+      <stop offset="100%" stop-color="#339AF0"/>
+    </linearGradient>
+  </defs>
+  <path d="M29.5 9.2A15.5 15.5 0 1 0 40.8 29a12.5 12.5 0 0 1-11.3-19.8z" fill="url(#moonG)"/>
+  <circle cx="37" cy="12" r="1.6" fill="#FFE066"/>
+  <circle cx="41" cy="19" r="1.2" fill="#FFE066"/>
+  <circle cx="32" cy="17" r="1.0" fill="#E7F5FF"/>
+</svg>

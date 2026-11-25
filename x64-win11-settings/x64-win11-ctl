@@ -1,13 +1,362 @@
 #!/usr/bin/env bash
-# X64 LIOS - Windows 11 26H2 Desktop Controller (IPC & Hotkeys)
+# X64 LIOS - Windows 11 26H2 Desktop Controller (IPC, Hotkeys & Hardware Controls)
 STATE_DIR="${HOME}/.local/state/x64-win11"
 mkdir -p "$STATE_DIR"
 CMD_FILE="${STATE_DIR}/cmd"
 
 case "$1" in
-    toggle-start| toggle-qs| toggle-calendar| toggle-run| lock)
+    toggle-start| toggle-qs| toggle-calendar| toggle-taskview| toggle-winx| toggle-run| lock)
         printf '%s:%s\n' "$1" "$(date +%s%N)" > "${CMD_FILE}.tmp"
         mv -f "${CMD_FILE}.tmp" "$CMD_FILE"
+        ;;
+    new-desktop-folder)
+        DESK_DIR="${HOME}/Escritorio"
+        [ ! -d "$DESK_DIR" ] && [ -d "${HOME}/Desktop" ] && DESK_DIR="${HOME}/Desktop"
+        mkdir -p "$DESK_DIR"
+        TARGET="${DESK_DIR}/Nueva carpeta"
+        N=2
+        while [ -e "$TARGET" ]; do
+            TARGET="${DESK_DIR}/Nueva carpeta (${N})"
+            N=$((N + 1))
+        done
+        mkdir -p "$TARGET"
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    new-desktop-doc)
+        DESK_DIR="${HOME}/Escritorio"
+        [ ! -d "$DESK_DIR" ] && [ -d "${HOME}/Desktop" ] && DESK_DIR="${HOME}/Desktop"
+        mkdir -p "$DESK_DIR"
+        TARGET="${DESK_DIR}/Nuevo documento de texto.txt"
+        N=2
+        while [ -e "$TARGET" ]; do
+            TARGET="${DESK_DIR}/Nuevo documento de texto (${N}).txt"
+            N=$((N + 1))
+        done
+        : > "$TARGET"
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    new-desktop-md)
+        DESK_DIR="${HOME}/Escritorio"
+        [ ! -d "$DESK_DIR" ] && [ -d "${HOME}/Desktop" ] && DESK_DIR="${HOME}/Desktop"
+        mkdir -p "$DESK_DIR"
+        TARGET="${DESK_DIR}/Notas.md"
+        N=2
+        while [ -e "$TARGET" ]; do
+            TARGET="${DESK_DIR}/Notas (${N}).md"
+            N=$((N + 1))
+        done
+        printf '# Notas\n\n' > "$TARGET"
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    new-desktop-zip)
+        python3 - <<'PYEOF'
+import os, zipfile
+desk = os.path.expanduser("~/Escritorio")
+if not os.path.isdir(desk) and os.path.isdir(os.path.expanduser("~/Desktop")):
+    desk = os.path.expanduser("~/Desktop")
+os.makedirs(desk, exist_ok=True)
+target = os.path.join(desk, "Nueva carpeta comprimida.zip")
+idx = 2
+while os.path.exists(target):
+    target = os.path.join(desk, f"Nueva carpeta comprimida ({idx}).zip")
+    idx += 1
+with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED):
+    pass
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    new-desktop-shortcut)
+        python3 - "$2" "$3" <<'PYEOF'
+import os, sys, re
+name = (sys.argv[1] or "Acceso directo").strip()
+cmd = (sys.argv[2] or "kitty").strip()
+desk = os.path.expanduser("~/Escritorio")
+if not os.path.isdir(desk) and os.path.isdir(os.path.expanduser("~/Desktop")):
+    desk = os.path.expanduser("~/Desktop")
+os.makedirs(desk, exist_ok=True)
+safe = re.sub(r'[^a-zA-Z0-9_-]+', '-', name).strip('-') or "shortcut"
+target = os.path.join(desk, f"{safe}.desktop")
+idx = 2
+while os.path.exists(target):
+    target = os.path.join(desk, f"{safe}-{idx}.desktop")
+    idx += 1
+icon_guess = cmd.split()[0].split("/")[-1]
+with open(target, "w", encoding="utf-8") as f:
+    f.write(f"[Desktop Entry]\nType=Application\nName={name}\nExec={cmd}\nIcon={icon_guess}\nTerminal=false\n")
+os.chmod(target, 0o755)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    empty-trash)
+        rm -rf "${HOME}/.local/share/Trash/files/"* "${HOME}/.local/share/Trash/files/".[!.]* \
+               "${HOME}/.local/share/Trash/info/"* 2>/dev/null || true
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    trash-path)
+        shift
+        python3 - "$@" <<'PYEOF'
+import os, sys, shutil, urllib.parse
+from datetime import datetime
+home = os.path.expanduser("~")
+t_files = os.path.join(home, ".local", "share", "Trash", "files")
+t_info = os.path.join(home, ".local", "share", "Trash", "info")
+os.makedirs(t_files, exist_ok=True)
+os.makedirs(t_info, exist_ok=True)
+for target in sys.argv[1:]:
+    if target and os.path.exists(target) and os.path.abspath(target) not in ("/", home):
+        base = os.path.basename(target.rstrip("/"))
+        dest = base
+        idx = 2
+        stem, ext = os.path.splitext(base)
+        while os.path.exists(os.path.join(t_files, dest)):
+            dest = f"{stem}_{idx}{ext}"
+            idx += 1
+        shutil.move(target, os.path.join(t_files, dest))
+        now_s = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        with open(os.path.join(t_info, f"{dest}.trashinfo"), "w", encoding="utf-8") as f:
+            f.write(f"[Trash Info]\nPath={urllib.parse.quote(os.path.abspath(target))}\nDeletionDate={now_s}\n")
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    rename-path)
+        python3 - "$2" "$3" <<'PYEOF'
+import os, sys
+old_p = sys.argv[1]
+new_n = (sys.argv[2] or "").strip().replace("/", "")
+if old_p and new_n and os.path.exists(old_p):
+    if old_p.endswith(".desktop") and not new_n.endswith(".desktop"):
+        # Update Name= inside .desktop file as well as filename!
+        lines = []
+        replaced = False
+        for ln in open(old_p, "r", encoding="utf-8", errors="ignore"):
+            if ln.startswith("Name=") and not replaced:
+                lines.append(f"Name={new_n}\n")
+                replaced = True
+            else:
+                lines.append(ln)
+        with open(old_p, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    else:
+        dest = os.path.join(os.path.dirname(old_p.rstrip("/")), new_n)
+        if not os.path.exists(dest):
+            os.rename(old_p, dest)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    paste-desktop)
+        mode="$2"
+        shift 2
+        python3 - "$mode" "$@" <<'PYEOF'
+import os, sys, shutil
+mode = sys.argv[1] # "cut" | "copy"
+sources = sys.argv[2:]
+# Backward compat if called as (src, mode)
+if mode not in ("cut", "copy") and len(sources) == 1 and sources[0] in ("cut", "copy"):
+    sources, mode = [mode], sources[0]
+desk = os.path.expanduser("~/Escritorio")
+if not os.path.isdir(desk) and os.path.isdir(os.path.expanduser("~/Desktop")):
+    desk = os.path.expanduser("~/Desktop")
+os.makedirs(desk, exist_ok=True)
+for src in sources:
+    if src and os.path.exists(src):
+        base = os.path.basename(src.rstrip("/"))
+        target = os.path.join(desk, base)
+        if mode == "cut" and os.path.abspath(src) == os.path.abspath(target):
+            continue
+        idx = 2
+        stem, ext = os.path.splitext(base)
+        while os.path.exists(target):
+            suf = " - copia" if idx == 2 else f" - copia ({idx})"
+            target = os.path.join(desk, f"{stem}{suf}{ext}")
+            idx += 1
+        if mode == "cut":
+            shutil.move(src, target)
+        elif os.path.isdir(src):
+            shutil.copytree(src, target)
+        else:
+            shutil.copy2(src, target)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    zip-path)
+        shift
+        python3 - "$@" <<'PYEOF'
+import os, sys, zipfile
+paths = [p for p in sys.argv[1:] if p and os.path.exists(p)]
+if paths:
+    parent = os.path.dirname(paths[0].rstrip("/"))
+    if len(paths) == 1:
+        base = os.path.basename(paths[0].rstrip("/"))
+        stem = os.path.splitext(base)[0] if os.path.isfile(paths[0]) else base
+    else:
+        stem = "Archivo"
+    out = os.path.join(parent, f"{stem}.zip")
+    idx = 2
+    while os.path.exists(out):
+        out = os.path.join(parent, f"{stem} ({idx}).zip")
+        idx += 1
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for p in paths:
+            base = os.path.basename(p.rstrip("/"))
+            if os.path.isdir(p):
+                for rdir, _, files in os.walk(p):
+                    for fn in files:
+                        fp = os.path.join(rdir, fn)
+                        zf.write(fp, os.path.relpath(fp, parent))
+            else:
+                zf.write(p, base)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    copy-text)
+        printf '%s' "$2" | wl-copy 2>/dev/null || true
+        ;;
+    open-terminal)
+        target_dir="$2"
+        if [ -z "$target_dir" ] || [ "$target_dir" = "desktop" ]; then
+            target_dir="${HOME}/Escritorio"
+            [ ! -d "$target_dir" ] && [ -d "${HOME}/Desktop" ] && target_dir="${HOME}/Desktop"
+        elif [ "$target_dir" = "home" ]; then
+            target_dir="$HOME"
+        elif [ -f "$target_dir" ]; then
+            target_dir="$(dirname "$target_dir")"
+        fi
+        [ ! -d "$target_dir" ] && target_dir="$HOME"
+        cd "$target_dir" 2>/dev/null || cd "$HOME"
+        KITTY_BIN="$(command -v kitty 2>/dev/null || echo /usr/bin/kitty)"
+        setsid -f "$KITTY_BIN" --directory "$target_dir" >/dev/null 2>&1 &
+        ;;
+    move-to)
+        dest_dir="$2"
+        shift 2
+        python3 - "$dest_dir" "$@" <<'PYEOF'
+import os, sys, shutil
+dest_dir = sys.argv[1]
+sources = sys.argv[2:]
+if not dest_dir or not os.path.isdir(dest_dir):
+    sys.exit(1)
+dest_real = os.path.realpath(dest_dir)
+moved = False
+for src in sources:
+    if not src or not os.path.exists(src):
+        continue
+    src_real = os.path.realpath(src)
+    # Prevent moving a directory into itself or onto its own parent
+    if src_real == dest_real or dest_real.startswith(src_real + os.sep):
+        continue
+    if os.path.realpath(os.path.dirname(src.rstrip("/"))) == dest_real:
+        continue
+    base = os.path.basename(src.rstrip("/"))
+    target = os.path.join(dest_dir, base)
+    idx = 2
+    stem, ext = os.path.splitext(base)
+    while os.path.exists(target):
+        target = os.path.join(dest_dir, f"{stem} ({idx}){ext}")
+        idx += 1
+    try:
+        shutil.move(src, target)
+        moved = True
+    except Exception:
+        pass
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    set-clipboard)
+        mode="$2"
+        shift 2
+        python3 - "$mode" "$@" <<'PYEOF'
+import json, os, sys
+p = os.path.expanduser("~/.local/state/x64-win11/clipboard.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+data = {"mode": sys.argv[1], "paths": [x for x in sys.argv[2:] if x]}
+with open(p + ".tmp", "w", encoding="utf-8") as f:
+    json.dump(data, f)
+os.replace(p + ".tmp", p)
+PYEOF
+        ;;
+    hide-desktop-id)
+        shift
+        python3 - "$@" <<'PYEOF'
+import json, os, sys
+p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+os.makedirs(os.path.dirname(p), exist_ok=True)
+cfg = json.load(open(p)) if os.path.isfile(p) else {}
+arr = list(cfg.get("hiddenDesktopIds", []) or [])
+for item_id in sys.argv[1:]:
+    if item_id and item_id not in arr:
+        arr.append(item_id)
+cfg["hiddenDesktopIds"] = arr
+with open(p + ".tmp", "w") as f: json.dump(cfg, f)
+os.replace(p + ".tmp", p)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    restore-desktop-icons)
+        python3 - <<'PYEOF'
+import json, os
+p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+if os.path.isfile(p):
+    cfg = json.load(open(p))
+    cfg["hiddenDesktopIds"] = []
+    with open(p + ".tmp", "w") as f: json.dump(cfg, f)
+    os.replace(p + ".tmp", p)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    toggle-pin-start)
+        python3 - "$2" "$3" "$4" <<'PYEOF'
+import json, os, sys
+name, cmd, icon_url = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg_p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+sys_p = os.path.expanduser("~/.local/state/x64-win11/sysinfo.json")
+os.makedirs(os.path.dirname(cfg_p), exist_ok=True)
+cfg = json.load(open(cfg_p)) if os.path.isfile(cfg_p) else {}
+sys_d = json.load(open(sys_p)) if os.path.isfile(sys_p) else {}
+cur_cmds = {x.get("cmd") for x in (sys_d.get("startPinned") or [])}
+unpinned = list(cfg.get("unpinnedStartCmds") or [])
+extra = [x for x in (cfg.get("extraStartPinned") or []) if isinstance(x, dict)]
+if cmd in cur_cmds:
+    if cmd not in unpinned:
+        unpinned.append(cmd)
+    extra = [x for x in extra if x.get("cmd") != cmd]
+else:
+    unpinned = [c for c in unpinned if c != cmd]
+    if not any(x.get("cmd") == cmd for x in extra):
+        extra.append({"name": name, "cmd": cmd, "iconUrl": icon_url})
+cfg["unpinnedStartCmds"] = unpinned
+cfg["extraStartPinned"] = extra
+with open(cfg_p + ".tmp", "w") as f: json.dump(cfg, f)
+os.replace(cfg_p + ".tmp", cfg_p)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    toggle-pin-taskbar)
+        python3 - "$2" "$3" "$4" "$5" <<'PYEOF'
+import json, os, sys, re
+title, cmd, icon_url, match_k = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+cfg_p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+sys_p = os.path.expanduser("~/.local/state/x64-win11/sysinfo.json")
+os.makedirs(os.path.dirname(cfg_p), exist_ok=True)
+cfg = json.load(open(cfg_p)) if os.path.isfile(cfg_p) else {}
+sys_d = json.load(open(sys_p)) if os.path.isfile(sys_p) else {}
+cur_cmds = {x.get("cmd") for x in (sys_d.get("taskbarPinned") or [])}
+unpinned = list(cfg.get("unpinnedTaskbarCmds") or [])
+extra = [x for x in (cfg.get("extraTaskbarPinned") or []) if isinstance(x, dict)]
+if cmd in cur_cmds:
+    if cmd not in unpinned:
+        unpinned.append(cmd)
+    extra = [x for x in extra if x.get("cmd") != cmd]
+else:
+    unpinned = [c for c in unpinned if c != cmd]
+    if not any(x.get("cmd") == cmd for x in extra):
+        slug = re.sub(r'[^a-z0-9]+', '', title.lower()) or "app"
+        extra.append({"id": slug, "title": title, "match": match_k or slug, "cmd": cmd, "iconUrl": icon_url})
+cfg["unpinnedTaskbarCmds"] = unpinned
+cfg["extraTaskbarPinned"] = extra
+with open(cfg_p + ".tmp", "w") as f: json.dump(cfg, f)
+os.replace(cfg_p + ".tmp", cfg_p)
+PYEOF
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
         ;;
     explorer)
         setsid -f /usr/bin/x64-win11-app explorer "${2:-Este equipo}" >/dev/null 2>&1 &
@@ -47,6 +396,103 @@ with open(tmp, "w", encoding="utf-8") as f:
 os.replace(tmp, p)
 PYEOF
         ;;
+    wifi)
+        case "$2" in
+            toggle)
+                cur=$(LC_ALL=C nmcli -t -f WIFI g 2>/dev/null || echo "enabled")
+                if [ "$cur" = "enabled" ]; then
+                    nmcli radio wifi off >/dev/null 2>&1 || true
+                else
+                    nmcli radio wifi on >/dev/null 2>&1 || true
+                fi
+                ;;
+            on)
+                nmcli radio wifi on >/dev/null 2>&1 || true
+                ;;
+            off)
+                nmcli radio wifi off >/dev/null 2>&1 || true
+                ;;
+            rescan)
+                nmcli dev wifi rescan >/dev/null 2>&1 || true
+                ;;
+            connect)
+                ssid="$3"
+                if [ -n "$ssid" ]; then
+                    if ! nmcli dev wifi connect "$ssid" >/dev/null 2>&1; then
+                        setsid -f nm-connection-editor >/dev/null 2>&1 &
+                    fi
+                fi
+                ;;
+        esac
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    bluetooth)
+        case "$2" in
+            toggle)
+                if rfkill list bluetooth 2>/dev/null | grep -qi "Soft blocked: yes"; then
+                    rfkill unblock bluetooth >/dev/null 2>&1 || true
+                    bluetoothctl power on >/dev/null 2>&1 || true
+                else
+                    bluetoothctl power off >/dev/null 2>&1 || true
+                    rfkill block bluetooth >/dev/null 2>&1 || true
+                fi
+                ;;
+        esac
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
+        ;;
+    power-profile)
+        target_prof="${2:-balanced}"
+        [ "$target_prof" = "powersave" ] && target_prof="power-saver"
+
+        # 1. Immediately update sysinfo.json atomically (<15ms) so UI pollers never read stale state
+        python3 - "$target_prof" <<'PYEOF'
+import json, os, sys
+prof = sys.argv[1]
+labels = {"performance": "Gaming X64", "balanced": "Equilibrado", "power-saver": "Ahorro energía"}
+p = os.path.expanduser("~/.local/state/x64-win11/sysinfo.json")
+if os.path.isfile(p):
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        hw = data.setdefault("hwControls", {})
+        hw["powerProfile"] = prof
+        hw["cpuGovernor"] = labels.get(prof, "Equilibrado")
+        hw["gamingActive"] = (prof == "performance")
+        hw["powerSaverActive"] = (prof == "power-saver")
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, p)
+    except Exception:
+        pass
+PYEOF
+
+        # 2. Apply real hardware & scx_loader profile via power-profiles-daemon (or sysfs fallback)
+        if command -v powerprofilesctl >/dev/null 2>&1 && systemctl is-active --quiet power-profiles-daemon 2>/dev/null; then
+            powerprofilesctl set "$target_prof" >/dev/null 2>&1 || true
+        else
+            case "$target_prof" in
+                performance)
+                    target_gov="performance"
+                    target_epp="performance"
+                    ;;
+                power-saver)
+                    target_gov="powersave"
+                    target_epp="power"
+                    ;;
+                *)
+                    target_gov="powersave"
+                    target_epp="balance_performance"
+                    ;;
+            esac
+            for gfile in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+                [ -w "$gfile" ] && echo "$target_gov" > "$gfile" 2>/dev/null || true
+            done
+            for efile in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
+                [ -w "$efile" ] && echo "$target_epp" > "$efile" 2>/dev/null || true
+            done
+        fi
+        ;;
     volume)
         case "$2" in
             up)   wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
@@ -55,12 +501,24 @@ PYEOF
         esac
         ;;
     brightness)
-        if command -v brightnessctl >/dev/null 2>&1; then
-            case "$2" in
-                up)   brightnessctl set +5% >/dev/null 2>&1 || true ;;
-                down) brightnessctl set 5%- >/dev/null 2>&1 || true ;;
-            esac
-        fi
+        target_pct="${3:-80}"
+        for bdir in /sys/class/backlight/*; do
+            if [ -f "$bdir/brightness" ] && [ -f "$bdir/max_brightness" ]; then
+                max_b=$(cat "$bdir/max_brightness" 2>/dev/null || echo 100)
+                cur_b=$(cat "$bdir/brightness" 2>/dev/null || echo 100)
+                case "$2" in
+                    up)   new_pct=$(( (cur_b * 100 / max_b) + 5 )) ;;
+                    down) new_pct=$(( (cur_b * 100 / max_b) - 5 )) ;;
+                    set)  new_pct="$target_pct" ;;
+                esac
+                [ "$new_pct" -gt 100 ] 2>/dev/null && new_pct=100
+                [ "$new_pct" -lt 10 ] 2>/dev/null && new_pct=10
+                new_val=$(( new_pct * max_b / 100 ))
+                [ -w "$bdir/brightness" ] && echo "$new_val" > "$bdir/brightness" 2>/dev/null || true
+            fi
+        done
+        /usr/bin/x64-win11-ctl set-config brightnessPct "${new_pct:-$target_pct}" >/dev/null 2>&1 || true
+        /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
         ;;
     screenshot)
         SHOT_DIR="${HOME}/Imágenes/Capturas"

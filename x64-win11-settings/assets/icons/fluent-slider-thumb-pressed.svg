@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <radialGradient id="sh" cx="12" cy="13" r="11" gradientUnits="userSpaceOnUse">
+      <stop offset="0.72" stop-color="#000000" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#525252"/>
+      <stop offset="1" stop-color="#383838"/>
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12.6" r="10.5" fill="url(#sh)"/>
+  <circle cx="12" cy="12" r="9.5" fill="#424242" stroke="url(#rim)" stroke-width="1"/>
+  <circle cx="12" cy="12" r="4.5" fill="#3ab4f2"/>
+</svg>

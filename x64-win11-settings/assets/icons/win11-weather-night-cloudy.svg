@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="moonC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A5D8FF"/>
+      <stop offset="100%" stop-color="#339AF0"/>
+    </linearGradient>
+    <linearGradient id="cldN" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#DEE2E6"/>
+      <stop offset="100%" stop-color="#868E96"/>
+    </linearGradient>
+  </defs>
+  <path d="M22.5 7.5A11 11 0 1 0 31 21.5a9 9 0 0 1-8.5-14z" fill="url(#moonC)"/>
+  <circle cx="33" cy="10" r="1.4" fill="#FFE066"/>
+  <path d="M15 36h20a7.5 7.5 0 0 0 .9-14.9A10.5 10.5 0 0 0 15.6 19 8.5 8.5 0 0 0 15 36z" fill="url(#cldN)"/>
+</svg>

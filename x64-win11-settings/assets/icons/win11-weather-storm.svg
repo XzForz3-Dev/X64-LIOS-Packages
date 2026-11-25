@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="cldS" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CED4DA"/>
+      <stop offset="100%" stop-color="#868E96"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 29h21a8 8 0 0 0 1-15.9A11 11 0 0 0 14.6 11 9 9 0 0 0 14 29z" fill="url(#cldS)"/>
+  <polygon points="25,28 18,37 24,37 21,45 31,34 25,34" fill="#FCC419"/>
+</svg>

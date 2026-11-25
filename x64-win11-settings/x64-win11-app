@@ -17,16 +17,21 @@ import pwd
 import glob
 import json
 import shutil
+import signal
 import socket
 import calendar
 import subprocess
 import urllib.parse
+import urllib.request
+import zipfile
+import time
 from datetime import datetime
 
 HOME_DIR = os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME_DIR, ".local", "state", "x64-win11")
 CONFIG_FILE = os.path.join(STATE_DIR, "config.json")
 SYSINFO_FILE = os.path.join(STATE_DIR, "sysinfo.json")
+WEATHER_CACHE_FILE = os.path.join(STATE_DIR, "weather.json")
 ASSET_DIR = "/usr/share/x64-win11/assets/icons/"
 WP_DIR = "/usr/share/x64-win11/assets/wallpapers/"
 if not os.path.isdir(ASSET_DIR):
@@ -146,6 +151,134 @@ def get_battery_status():
     }
 
 
+def get_live_hardware_controls():
+    # 1. Wi-Fi state & active SSID + nearby networks (--rescan no is <15ms)
+    wifi_enabled = True
+    wifi_ssid = "Wi-Fi"
+    wifi_networks = []
+    try:
+        env = dict(os.environ, LC_ALL="C")
+        out_g = subprocess.check_output(
+            ["nmcli", "-t", "-f", "WIFI", "g"],
+            text=True, timeout=1.2, env=env, stderr=subprocess.DEVNULL
+        ).strip().lower()
+        wifi_enabled = (out_g == "enabled")
+        if wifi_enabled:
+            out_w = subprocess.check_output(
+                ["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "no"],
+                text=True, timeout=1.5, env=env, stderr=subprocess.DEVNULL
+            ).splitlines()
+            seen_ssids = set()
+            for line in out_w:
+                parts = line.split(":")
+                if len(parts) < 4:
+                    continue
+                act = (parts[0].strip().lower() == "yes")
+                ssid = parts[1].strip()
+                if not ssid:
+                    continue
+                try:
+                    sig = int(parts[2].strip())
+                except Exception:
+                    sig = 50
+                sec = parts[3].strip() or "Abierta"
+                if act:
+                    wifi_ssid = ssid
+                if ssid not in seen_ssids or act:
+                    seen_ssids.add(ssid)
+                    wifi_networks.append({
+                        "ssid": ssid,
+                        "signal": sig,
+                        "security": sec,
+                        "active": act
+                    })
+            wifi_networks.sort(key=lambda x: (not x["active"], -x["signal"]))
+        else:
+            wifi_ssid = "Desactivado"
+    except Exception:
+        pass
+
+    # 2. Bluetooth state via rfkill
+    bt_enabled = True
+    try:
+        out_bt = subprocess.check_output(
+            ["rfkill", "list", "bluetooth"],
+            text=True, timeout=1.0, stderr=subprocess.DEVNULL
+        ).lower()
+        if "soft blocked: yes" in out_bt or "hard blocked: yes" in out_bt:
+            bt_enabled = False
+    except Exception:
+        pass
+
+    # 3. Brightness via brightnessctl -m
+    brightness_pct = 100
+    try:
+        out_br = subprocess.check_output(
+            ["brightnessctl", "-m"],
+            text=True, timeout=1.0, stderr=subprocess.DEVNULL
+        ).strip()
+        # Format: device,class,curr,pct%,max
+        for field in out_br.split(","):
+            if field.endswith("%"):
+                brightness_pct = max(5, min(100, int(field[:-1])))
+                break
+    except Exception:
+        pass
+
+    # 4. Real 3-State Hardware Power Profile (performance | balanced | power-saver)
+    power_profile = "balanced"
+    ppd_ok = False
+    if shutil.which("powerprofilesctl"):
+        try:
+            out_pp = subprocess.check_output(
+                ["powerprofilesctl", "get"],
+                text=True, timeout=1.2, stderr=subprocess.DEVNULL
+            ).strip().lower()
+            if out_pp in ("performance", "balanced", "power-saver"):
+                power_profile = out_pp
+                ppd_ok = True
+        except Exception:
+            pass
+
+    if not ppd_ok:
+        try:
+            epp_path = "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference"
+            gov_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+            if os.path.isfile(epp_path):
+                with open(epp_path, "r", encoding="utf-8") as f:
+                    epp = f.read().strip().lower()
+                if epp == "performance":
+                    power_profile = "performance"
+                elif epp in ("power", "balance_power"):
+                    power_profile = "power-saver"
+                else:
+                    power_profile = "balanced"
+            elif os.path.isfile(gov_path):
+                with open(gov_path, "r", encoding="utf-8") as f:
+                    gov = f.read().strip().lower()
+                power_profile = "performance" if gov == "performance" else "power-saver"
+        except Exception:
+            pass
+
+    profile_labels = {
+        "performance": "Gaming X64",
+        "balanced": "Equilibrado",
+        "power-saver": "Ahorro energía",
+    }
+
+    return {
+        "wifiEnabled": wifi_enabled,
+        "wifiSsid": wifi_ssid,
+        "wifiNetworks": wifi_networks[:8],
+        "btEnabled": bt_enabled,
+        "brightnessPct": brightness_pct,
+        "powerProfile": power_profile,
+        "cpuGovernor": profile_labels.get(power_profile, "Equilibrado"),
+        "gamingActive": (power_profile == "performance"),
+        "powerSaverActive": (power_profile == "power-saver")
+    }
+
+
 def detect_default_browser():
     candidates = [
         ("chromium", "Chromium", "chromium.png"),
@@ -171,15 +304,22 @@ def resolve_app_icon_url(icon_name):
         return f"file://{ASSET_DIR}windows.svg"
 
     low = icon_name.lower()
+    if low in ("shelly", "org.x64.shelly", "com.shellyorg.shelly"):
+        if os.path.isfile("/usr/share/icons/hicolor/256x256/apps/shelly.png"):
+            return "file:///usr/share/icons/hicolor/256x256/apps/shelly.png"
+
     builtin_map = {
+        "x64-win11-taskmgr": "taskmgr.svg",
+        "taskmgr": "taskmgr.svg",
+        "gnome-system-monitor": "taskmgr.svg",
+        "x64-win11-explorer": "explorer.svg",
+        "x64-win11-settings-app": "settings.svg",
         "antigravity-ide": "antigravity.png",
         "antigravity": "antigravity.png",
         "chromium": "chromium.png",
         "google-chrome": "chrome.svg",
         "firefox": "edge.svg",
         "brave": "edge.svg",
-        "shelly": "store.svg",
-        "org.X64.shelly": "store.svg",
         "kitty": "terminal.svg",
         "utilities-terminal": "terminal.svg",
         "x64-hello": "x64lios.png",
@@ -345,57 +485,381 @@ def build_calendar_data():
     }
 
 
+def wmo_code_to_spanish_and_icon(code, is_night=False):
+    c = int(code or 0)
+    if c == 0:
+        if is_night:
+            return "Noche despejada", "win11-weather-night-clear.svg"
+        return "Soleado", "win11-weather-clear.svg"
+    if c in (1, 2):
+        if is_night:
+            return "Parcialmente nublado", "win11-weather-night-cloudy.svg"
+        return "Parcialmente nublado", "win11-weather.svg"
+    if c == 3:
+        if is_night:
+            return "Noche nublada", "win11-weather-night-cloudy.svg"
+        return "Nublado", "win11-weather.svg"
+    if c in (45, 48):
+        return "Niebla", "win11-weather.svg"
+    if c in (51, 53, 55, 56, 57):
+        return "Llovizna", "win11-weather-rain.svg"
+    if c in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "Lluvia", "win11-weather-rain.svg"
+    if c in (71, 73, 75, 77, 85, 86):
+        return "Nieve", "win11-weather-rain.svg"
+    if c in (95, 96, 99):
+        return "Tormenta eléctrica", "win11-weather-storm.svg"
+    return ("Noche nublada", "win11-weather-night-cloudy.svg") if is_night else ("Parcialmente nublado", "win11-weather.svg")
+
+
+def get_live_weather_data(force_refresh=False):
+    os.makedirs(STATE_DIR, exist_ok=True)
+    if not force_refresh and os.path.isfile(WEATHER_CACHE_FILE):
+        try:
+            age = time.time() - os.path.getmtime(WEATHER_CACHE_FILE)
+            if age < 180:  # 3 minutes background cache; opening the panel forces live refresh
+                with open(WEATHER_CACHE_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+
+    try:
+        req = urllib.request.Request("https://ipwho.is/", headers={"User-Agent": "Mozilla/5.0"})
+        geo = json.loads(urllib.request.urlopen(req, timeout=2.5).read().decode("utf-8"))
+        lat = geo.get("latitude", 8.9824)
+        lon = geo.get("longitude", -79.5199)
+        city = geo.get("city") or "Ciudad"
+        country = geo.get("country") or ""
+
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,surface_pressure"
+            "&hourly=temperature_2m,weather_code,is_day"
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+            "&timezone=auto&forecast_days=5"
+        )
+        wreq = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        w = json.loads(urllib.request.urlopen(wreq, timeout=3.0).read().decode("utf-8"))
+
+        cur = w.get("current", {})
+        temp = round(float(cur.get("temperature_2m", 24)))
+        feels = round(float(cur.get("apparent_temperature", temp)))
+        hum = int(cur.get("relative_humidity_2m", 65))
+        wind = round(float(cur.get("wind_speed_10m", 10)))
+        press = round(float(cur.get("surface_pressure", 1012)))
+        cur_hour = datetime.now().hour
+        cur_is_night = (cur.get("is_day") == 0) if ("is_day" in cur) else (cur_hour < 6 or cur_hour >= 18)
+        desc, icon = wmo_code_to_spanish_and_icon(cur.get("weather_code", 1), is_night=cur_is_night)
+
+        # Hourly (next 5 intervals of 3 hours)
+        hourly_raw = w.get("hourly", {})
+        h_times = hourly_raw.get("time", [])
+        h_temps = hourly_raw.get("temperature_2m", [])
+        h_codes = hourly_raw.get("weather_code", [])
+        h_is_day = hourly_raw.get("is_day", [])
+        now_hour_str = datetime.now().strftime("%Y-%m-%dT%H:00")
+        start_idx = 0
+        for idx, tstr in enumerate(h_times):
+            if tstr >= now_hour_str:
+                start_idx = idx
+                break
+
+        hourly_list = []
+        for step in range(0, 15, 3):
+            ii = start_idx + step
+            if ii < len(h_times) and ii < len(h_temps):
+                hh = h_times[ii].split("T")[-1][:5]
+                try:
+                    slot_hr = int(hh.split(":")[0])
+                except Exception:
+                    slot_hr = 12
+                slot_night = (h_is_day[ii] == 0) if (ii < len(h_is_day)) else (slot_hr < 6 or slot_hr >= 18)
+                _, hic = wmo_code_to_spanish_and_icon(h_codes[ii] if ii < len(h_codes) else 0, is_night=slot_night)
+                hourly_list.append({
+                    "time": "Ahora" if step == 0 else hh,
+                    "temp": f"{round(float(h_temps[ii]))}°",
+                    "icon": hic
+                })
+
+        # 5-Day Forecast
+        daily_raw = w.get("daily", {})
+        d_times = daily_raw.get("time", [])
+        d_max = daily_raw.get("temperature_2m_max", [])
+        d_min = daily_raw.get("temperature_2m_min", [])
+        d_codes = daily_raw.get("weather_code", [])
+        d_rain = daily_raw.get("precipitation_probability_max", [])
+        weekdays_es = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        daily_list = []
+        for i in range(min(5, len(d_times))):
+            try:
+                dt = datetime.strptime(d_times[i], "%Y-%m-%d")
+                day_lbl = "Hoy" if i == 0 else ("Mañana" if i == 1 else f"{weekdays_es[dt.weekday()]} {dt.day}")
+            except Exception:
+                day_lbl = d_times[i]
+            ddesc, dic = wmo_code_to_spanish_and_icon(d_codes[i] if i < len(d_codes) else 0)
+            rain_pct = int(d_rain[i]) if i < len(d_rain) and d_rain[i] is not None else 0
+            daily_list.append({
+                "day": day_lbl,
+                "desc": ddesc,
+                "icon": dic,
+                "max": f"{round(float(d_max[i]))}°",
+                "min": f"{round(float(d_min[i]))}°",
+                "rain": f"{rain_pct}%"
+            })
+
+        today_max = daily_list[0]["max"] if daily_list else f"{temp}°"
+        today_min = daily_list[0]["min"] if daily_list else f"{temp}°"
+        today_rain = daily_list[0]["rain"] if daily_list else "0%"
+
+        result = {
+            "city": city,
+            "country": country,
+            "location": f"{city}, {country}" if country else city,
+            "temp": f"{temp}°C",
+            "desc": desc,
+            "icon": icon,
+            "feelsLike": f"{feels}°C",
+            "humidity": f"{hum}%",
+            "wind": f"{wind} km/h",
+            "pressure": f"{press} hPa",
+            "todayMax": today_max,
+            "todayMin": today_min,
+            "rainProb": today_rain,
+            "updatedAt": datetime.now().strftime("%H:%M:%S"),
+            "hourly": hourly_list,
+            "daily": daily_list
+        }
+        tmp = WEATHER_CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(result, f)
+        os.replace(tmp, WEATHER_CACHE_FILE)
+        return result
+    except Exception:
+        if os.path.isfile(WEATHER_CACHE_FILE):
+            try:
+                with open(WEATHER_CACHE_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {
+            "city": "Local",
+            "country": "",
+            "location": "Ubicación local",
+            "temp": "24°C",
+            "desc": "Despejado",
+            "icon": "win11-weather.svg",
+            "feelsLike": "25°C",
+            "humidity": "60%",
+            "wind": "10 km/h",
+            "pressure": "1013 hPa",
+            "todayMax": "28°",
+            "todayMin": "21°",
+            "rainProb": "10%",
+            "updatedAt": datetime.now().strftime("%H:%M"),
+            "hourly": [],
+            "daily": []
+        }
+
+
 def generate_sysinfo_dict():
     display_name, uname, hostname = get_real_user_info()
     bat = get_battery_status()
     browser_cmd, browser_label, browser_icon = detect_default_browser()
 
+    cfg_cur = load_cfg()
+    hidden_desk_ids = set(cfg_cur.get("hiddenDesktopIds", []) or [])
+    unpinned_tb = set(cfg_cur.get("unpinnedTaskbarCmds", []) or [])
+    extra_tb = cfg_cur.get("extraTaskbarPinned", []) or []
+    unpinned_start = set(cfg_cur.get("unpinnedStartCmds", []) or [])
+    extra_start = cfg_cur.get("extraStartPinned", []) or []
+
     trash_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
-    trash_has_files = os.path.isdir(trash_dir) and len(os.listdir(trash_dir)) > 0
+    trash_entries = os.listdir(trash_dir) if os.path.isdir(trash_dir) else []
+    trash_has_files = len(trash_entries) > 0
+    trash_total_bytes = 0
+    for te in trash_entries[:80]:
+        tp = os.path.join(trash_dir, te)
+        try:
+            if os.path.isfile(tp):
+                trash_total_bytes += os.path.getsize(tp)
+        except Exception:
+            pass
+    if trash_total_bytes < 1024:
+        trash_size_lbl = f"{trash_total_bytes} B"
+    elif trash_total_bytes < 1024 ** 2:
+        trash_size_lbl = f"{trash_total_bytes / 1024:.1f} KB"
+    else:
+        trash_size_lbl = f"{trash_total_bytes / (1024 ** 2):.1f} MB"
     trash_icon = "trash-full.svg" if trash_has_files else "trash.svg"
 
-    # 1. Universal Desktop Icons
-    desktop_icons = [
-        {"title": "Este equipo",            "iconUrl": f"file://{ASSET_DIR}thispc.svg",      "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
-        {"title": "Papelera de\nreciclaje", "iconUrl": f"file://{ASSET_DIR}{trash_icon}",    "cmd": "/usr/bin/x64-win11-app explorer 'Papelera'"},
-        {"title": display_name,             "iconUrl": f"file://{ASSET_DIR}folder-home.svg", "cmd": "/usr/bin/x64-win11-app explorer 'Inicio'"},
-        {"title": browser_label,            "iconUrl": f"file://{ASSET_DIR}{browser_icon}",  "cmd": browser_cmd},
-    ]
-    if shutil.which("shelly"):
-        desktop_icons.append({"title": "Tienda\nShelly", "iconUrl": f"file://{ASSET_DIR}store.svg", "cmd": "shelly"})
-    if shutil.which("antigravity-ide"):
-        desktop_icons.append({"title": "Antigravity\nIDE", "iconUrl": resolve_app_icon_url("antigravity-ide"), "cmd": "/usr/bin/antigravity-ide"})
-    if shutil.which("x64-hello"):
-        desktop_icons.append({"title": "X64 Hello", "iconUrl": f"file://{ASSET_DIR}x64lios.png", "cmd": "x64-hello"})
-    desktop_icons.append({"title": "Configuración\n26H2", "iconUrl": f"file://{ASSET_DIR}settings.svg", "cmd": "/usr/bin/x64-win11-app settings"})
+    def fmt_bytes(sb):
+        if sb < 1024:
+            return f"{sb} B"
+        if sb < 1024 ** 2:
+            return f"{sb / 1024:.1f} KB"
+        if sb < 1024 ** 3:
+            return f"{sb / (1024 ** 2):.1f} MB"
+        return f"{sb / (1024 ** 3):.2f} GB"
 
-    # 2. Universal Taskbar Pinned Apps (only apps installed on this machine)
-    taskbar_pinned = [
-        {"id": "explorer", "match": "explorer", "iconUrl": f"file://{ASSET_DIR}explorer.svg", "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
-        {"id": "browser",  "match": browser_cmd.split()[0], "iconUrl": f"file://{ASSET_DIR}{browser_icon}", "cmd": browser_cmd},
+    # 1. Universal Desktop Icons (with complete metadata for 1:1 Context Menus & Sorting)
+    desktop_icons = [
+        {
+            "id": "sys_thispc", "kind": "thispc", "title": "Este equipo",
+            "iconUrl": f"file://{ASSET_DIR}thispc.svg",
+            "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'",
+            "realPath": "/", "typeLabel": "Objeto del sistema",
+            "sizeBytes": 0, "sizeLabel": "Unidades del sistema", "mtimeTs": 4, "mtimeStr": "Sistema"
+        },
+        {
+            "id": "sys_trash", "kind": "trash", "title": "Papelera de\nreciclaje",
+            "iconUrl": f"file://{ASSET_DIR}{trash_icon}",
+            "cmd": "/usr/bin/x64-win11-app explorer 'Papelera'",
+            "realPath": trash_dir, "typeLabel": "Papelera de reciclaje",
+            "trashHasFiles": trash_has_files, "trashCount": len(trash_entries), "trashSize": trash_size_lbl,
+            "sizeBytes": trash_total_bytes, "sizeLabel": f"{len(trash_entries)} elementos ({trash_size_lbl})",
+            "mtimeTs": 3, "mtimeStr": "Sistema"
+        },
+        {
+            "id": "sys_home", "kind": "userhome", "title": display_name,
+            "iconUrl": f"file://{ASSET_DIR}folder-home.svg",
+            "cmd": "/usr/bin/x64-win11-app explorer 'Inicio'",
+            "realPath": HOME_DIR, "typeLabel": "Carpeta personal del usuario",
+            "sizeBytes": 0, "sizeLabel": HOME_DIR, "mtimeTs": 2, "mtimeStr": "Usuario"
+        },
+    ]
+
+    shelly_cmd = "/usr/bin/shelly-ui" if os.path.isfile("/usr/bin/shelly-ui") else "shelly"
+    shelly_icon = resolve_app_icon_url("shelly")
+    builtin_desk_apps = [
+        ("app_browser", browser_label, f"file://{ASSET_DIR}{browser_icon}", browser_cmd, shutil.which(browser_cmd.split()[0]) or "/usr/bin"),
+    ]
+    if shutil.which("shelly") or os.path.isfile("/usr/bin/shelly-ui"):
+        builtin_desk_apps.append(("app_shelly", "Tienda\nShelly", shelly_icon, shelly_cmd, shelly_cmd))
+    if shutil.which("antigravity-ide"):
+        builtin_desk_apps.append(("app_antigravity", "Antigravity\nIDE", resolve_app_icon_url("antigravity-ide"), "/usr/bin/antigravity-ide", "/usr/bin/antigravity-ide"))
+    if shutil.which("x64-hello"):
+        builtin_desk_apps.append(("app_x64hello", "X64 Hello", f"file://{ASSET_DIR}x64lios.png", "x64-hello", "/usr/bin/x64-hello"))
+    builtin_desk_apps.append(("app_settings", "Configuración\n26H2", f"file://{ASSET_DIR}settings.svg", "/usr/bin/x64-win11-app settings", "/usr/bin/x64-win11-app"))
+
+    for aid, atitle, aicon, acmd, apath in builtin_desk_apps:
+        if aid not in hidden_desk_ids:
+            desktop_icons.append({
+                "id": aid, "kind": "app", "title": atitle, "iconUrl": aicon, "cmd": acmd,
+                "realPath": apath, "typeLabel": "Acceso directo de aplicación",
+                "sizeBytes": 1024, "sizeLabel": "1.0 KB", "mtimeTs": 1, "mtimeStr": "Aplicación instalada"
+            })
+
+    # Include real user files, folders & .desktop shortcuts from ~/Escritorio (or ~/Desktop)
+    user_desk_dir = os.path.join(HOME_DIR, "Escritorio")
+    if not os.path.isdir(user_desk_dir):
+        alt_desk = os.path.join(HOME_DIR, "Desktop")
+        if os.path.isdir(alt_desk):
+            user_desk_dir = alt_desk
+    if os.path.isdir(user_desk_dir):
+        try:
+            for entry in sorted(os.listdir(user_desk_dir))[:24]:
+                if entry.startswith("."):
+                    continue
+                full_p = os.path.join(user_desk_dir, entry)
+                safe_p = full_p.replace("'", "'\\''")
+                st = os.stat(full_p)
+                mtime_str = datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M")
+                if os.path.isdir(full_p):
+                    sub_cnt = 0
+                    try:
+                        sub_cnt = len([x for x in os.listdir(full_p) if not x.startswith(".")])
+                    except Exception:
+                        pass
+                    desktop_icons.append({
+                        "id": f"fs_{entry}", "kind": "folder", "title": entry,
+                        "iconUrl": f"file://{ASSET_DIR}folder.svg",
+                        "cmd": f"/usr/bin/x64-win11-app explorer '{safe_p}'",
+                        "realPath": full_p, "typeLabel": "Carpeta de archivos",
+                        "sizeBytes": sub_cnt, "sizeLabel": f"{sub_cnt} elementos",
+                        "mtimeTs": st.st_mtime, "mtimeStr": mtime_str
+                    })
+                elif entry.endswith(".desktop"):
+                    d_name = entry[:-8]
+                    d_exec = f"xdg-open '{safe_p}'"
+                    d_icon = "windows.svg"
+                    try:
+                        with open(full_p, "r", encoding="utf-8", errors="ignore") as df:
+                            for ln in df:
+                                ln = ln.strip()
+                                if ln.startswith("Name="):
+                                    d_name = ln.split("=", 1)[1].strip()
+                                elif ln.startswith("Exec="):
+                                    raw_ex = ln.split("=", 1)[1].strip()
+                                    d_exec = " ".join(tok for tok in raw_ex.split() if not tok.startswith("%"))
+                                elif ln.startswith("Icon="):
+                                    d_icon = ln.split("=", 1)[1].strip()
+                    except Exception:
+                        pass
+                    desktop_icons.append({
+                        "id": f"fs_{entry}", "kind": "shortcut_file", "title": d_name,
+                        "iconUrl": resolve_app_icon_url(d_icon),
+                        "cmd": d_exec,
+                        "realPath": full_p, "typeLabel": "Acceso directo (.desktop)",
+                        "sizeBytes": st.st_size, "sizeLabel": fmt_bytes(st.st_size),
+                        "mtimeTs": st.st_mtime, "mtimeStr": mtime_str
+                    })
+                else:
+                    ext = os.path.splitext(entry)[1].lower()
+                    is_img = ext in (".png", ".jpg", ".jpeg", ".svg", ".webp")
+                    if is_img:
+                        ic_u = f"file://{full_p}"
+                        t_lbl = f"Imagen {ext[1:].upper()}"
+                    elif ext in (".zip", ".tar", ".gz", ".zst", ".7z"):
+                        ic_u = f"file://{ASSET_DIR}fluent-folder-zip.svg"
+                        t_lbl = f"Archivo comprimido ({ext})"
+                    else:
+                        ic_u = f"file://{ASSET_DIR}fluent-document.svg"
+                        t_lbl = f"Documento ({ext})" if ext else "Archivo"
+                    desktop_icons.append({
+                        "id": f"fs_{entry}", "kind": "file", "title": entry,
+                        "iconUrl": ic_u, "isImage": is_img,
+                        "cmd": f"xdg-open '{safe_p}'",
+                        "realPath": full_p, "typeLabel": t_lbl,
+                        "sizeBytes": st.st_size, "sizeLabel": fmt_bytes(st.st_size),
+                        "mtimeTs": st.st_mtime, "mtimeStr": mtime_str
+                    })
+        except Exception:
+            pass
+
+    # 2. Universal Taskbar Pinned Apps (honoring user pin/unpin choices)
+    raw_tb_pinned = [
+        {"id": "explorer", "title": "Explorador de archivos", "match": "explorer", "iconUrl": f"file://{ASSET_DIR}explorer.svg", "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
+        {"id": "browser",  "title": browser_label,            "match": browser_cmd.split()[0], "iconUrl": f"file://{ASSET_DIR}{browser_icon}", "cmd": browser_cmd},
     ]
     if shutil.which("antigravity-ide"):
-        taskbar_pinned.append({"id": "antigravity", "match": "antigravity", "iconUrl": resolve_app_icon_url("antigravity-ide"), "cmd": "/usr/bin/antigravity-ide"})
-    if shutil.which("shelly"):
-        taskbar_pinned.append({"id": "shelly", "match": "shelly", "iconUrl": f"file://{ASSET_DIR}store.svg", "cmd": "shelly"})
+        raw_tb_pinned.append({"id": "antigravity", "title": "Antigravity IDE", "match": "antigravity", "iconUrl": resolve_app_icon_url("antigravity-ide"), "cmd": "/usr/bin/antigravity-ide"})
+    if shutil.which("shelly") or os.path.isfile("/usr/bin/shelly-ui"):
+        raw_tb_pinned.append({"id": "shelly", "title": "Tienda Shelly", "match": "shelly", "iconUrl": shelly_icon, "cmd": shelly_cmd})
     if shutil.which("kitty"):
-        taskbar_pinned.append({"id": "kitty", "match": "kitty", "iconUrl": f"file://{ASSET_DIR}terminal.svg", "cmd": "kitty"})
+        raw_tb_pinned.append({"id": "kitty", "title": "Terminal", "match": "kitty", "iconUrl": f"file://{ASSET_DIR}terminal.svg", "cmd": "kitty"})
     if shutil.which("x64-hello"):
-        taskbar_pinned.append({"id": "x64hello", "match": "x64-hello", "iconUrl": f"file://{ASSET_DIR}x64lios.png", "cmd": "x64-hello"})
-    taskbar_pinned.append({"id": "settings", "match": "settings", "iconUrl": f"file://{ASSET_DIR}settings.svg", "cmd": "/usr/bin/x64-win11-app settings"})
+        raw_tb_pinned.append({"id": "x64hello", "title": "X64 Hello", "match": "x64-hello", "iconUrl": f"file://{ASSET_DIR}x64lios.png", "cmd": "x64-hello"})
+    raw_tb_pinned.append({"id": "settings", "title": "Configuración", "match": "settings", "iconUrl": f"file://{ASSET_DIR}settings.svg", "cmd": "/usr/bin/x64-win11-app settings"})
+
+    taskbar_pinned = [x for x in raw_tb_pinned if x["cmd"] not in unpinned_tb]
+    existing_tb_cmds = {x["cmd"] for x in taskbar_pinned}
+    for ex in extra_tb:
+        if isinstance(ex, dict) and ex.get("cmd") and ex["cmd"] not in existing_tb_cmds and ex["cmd"] not in unpinned_tb:
+            taskbar_pinned.append(ex)
+            existing_tb_cmds.add(ex["cmd"])
 
     # 3. Dynamically Scanned Installed Applications
     all_apps = scan_installed_desktop_apps()
 
-    # Build Start Menu Pinned Apps (Core Windows 11 + Installed Apps on this system)
-    start_pinned = [
+    # Build Start Menu Pinned Apps (Core Windows 11 + Installed Apps + User Custom Pins)
+    raw_start_pinned = [
         {"name": "Explorador",    "iconUrl": f"file://{ASSET_DIR}explorer.svg",         "cmd": "/usr/bin/x64-win11-app explorer 'Este equipo'"},
         {"name": browser_label,   "iconUrl": f"file://{ASSET_DIR}{browser_icon}",       "cmd": browser_cmd},
         {"name": "Configuración", "iconUrl": f"file://{ASSET_DIR}settings.svg",         "cmd": "/usr/bin/x64-win11-app settings"},
-        {"name": "Admin. tareas", "iconUrl": f"file://{ASSET_DIR}thispc.svg",           "cmd": "/usr/bin/x64-win11-app taskmgr"},
+        {"name": "Admin. tareas", "iconUrl": f"file://{ASSET_DIR}taskmgr.svg",          "cmd": "/usr/bin/x64-win11-app taskmgr"},
     ]
     optional_pinned = [
-        ("shelly",           "Tienda Shelly", f"file://{ASSET_DIR}store.svg",            "shelly"),
+        ("shelly",           "Tienda Shelly", shelly_icon,                               shelly_cmd),
         ("x64-hello",        "X64 Hello",     f"file://{ASSET_DIR}x64lios.png",          "x64-hello"),
         ("x64-update",       "X64 Update",    f"file://{ASSET_DIR}update.svg",           "x64-update"),
         ("kitty",            "Terminal",      f"file://{ASSET_DIR}terminal.svg",         "kitty"),
@@ -403,14 +867,15 @@ def generate_sysinfo_dict():
         ("steam",            "Steam",         f"file://{ASSET_DIR}steam.svg",            "steam"),
         ("discord",          "Discord",       f"file://{ASSET_DIR}discord.svg",          "discord"),
         ("gnome-calculator", "Calculadora",   f"file://{ASSET_DIR}calculator.svg",       "gnome-calculator"),
+        ("gnome-text-editor","Bloc de notas", resolve_app_icon_url("org.gnome.TextEditor"), "gnome-text-editor"),
+        ("loupe",            "Fotos",         f"file://{ASSET_DIR}folder-images.svg",    "loupe"),
         ("gnome-disks",      "Discos",        f"file://{ASSET_DIR}drive-c.svg",          "gnome-disks"),
         ("opencode",         "OpenCode AI",   resolve_app_icon_url("opencode"),          "kitty -e opencode"),
     ]
     for bin_check, title, ic_url, cmd in optional_pinned:
         if shutil.which(bin_check):
-            start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
+            raw_start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
 
-    # Fill up to 18 pinned items with standard user folders & X64 Dashboard
     folder_Shortcuts = [
         ("Este equipo", f"file://{ASSET_DIR}thispc.svg",           "/usr/bin/x64-win11-app explorer 'Este equipo'"),
         ("Descargas",   f"file://{ASSET_DIR}folder-download.svg",  "/usr/bin/x64-win11-app explorer 'Descargas'"),
@@ -419,31 +884,54 @@ def generate_sysinfo_dict():
         ("Consola X64", f"file://{ASSET_DIR}x64lios.png",          "kitty -e x64-dashboard"),
     ]
     for title, ic_url, cmd in folder_Shortcuts:
-        if len(start_pinned) < 18:
-            start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
+        if len(raw_start_pinned) < 18:
+            raw_start_pinned.append({"name": title, "iconUrl": ic_url, "cmd": cmd})
 
-    # Build 26H2 Dynamic Categories from actually installed apps
-    cat_sys = []
-    cat_dev_game = []
+    start_pinned = [x for x in raw_start_pinned if x["cmd"] not in unpinned_start]
+    existing_st_cmds = {x["cmd"] for x in start_pinned}
+    for exs in extra_start:
+        if isinstance(exs, dict) and exs.get("cmd") and exs["cmd"] not in existing_st_cmds and exs["cmd"] not in unpinned_start:
+            start_pinned.append(exs)
+            existing_st_cmds.add(exs["cmd"])
+
+    # Build Authentic Windows 11 26H2 Multi-Genre Category Folders from installed apps
+    buckets = [
+        ("Productividad e Internet", []),
+        ("Desarrollo y Código", []),
+        ("Juegos y Multimedia", []),
+        ("Utilidades", []),
+        ("Sistema", []),
+        ("Otras aplicaciones", []),
+    ]
     for a in all_apps:
         c = a["categories"]
-        if any(k in c for k in ("game", "development", "ide", "graphics", "audiovideo")):
-            if len(cat_dev_game) < 4:
-                cat_dev_game.append(a)
-        elif any(k in c for k in ("system", "settings", "utility", "network")):
-            if len(cat_sys) < 4:
-                cat_sys.append(a)
+        nm = a["name"].lower()
+        aid = a["id"].lower()
+        tag = f"{c} {nm} {aid}"
+        if any(k in tag for k in ("webbrowser", "network", "email", "office", "chat", "instantmessaging", "chromium", "firefox", "brave", "discord", "telegram")):
+            buckets[0][1].append(a)
+        elif any(k in tag for k in ("development", "ide", "antigravity", "opencode", "code", "nvim", "git", "meld", "cmake")):
+            buckets[1][1].append(a)
+        elif any(k in tag for k in ("game", "steam", "heroic", "lutris", "faugus", "mangohud", "goverlay", "audiovideo", "music", "video", "graphics", "mpv", "vlc", "obs")):
+            buckets[2][1].append(a)
+        elif any(k in tag for k in ("utility", "accessories", "calculator", "archive", "shelly", "loupe", "papers", "fileroller")):
+            buckets[3][1].append(a)
+        elif any(k in tag for k in ("system", "settings", "monitor", "terminal", "kitty", "btop", "disk", "bluetooth", "print", "update")):
+            buckets[4][1].append(a)
+        else:
+            buckets[5][1].append(a)
 
-    if len(cat_sys) < 4:
-        for p in start_pinned[:4]:
-            if len(cat_sys) < 4:
-                cat_sys.append(p)
-    if len(cat_dev_game) < 4:
-        for p in start_pinned[4:8]:
-            if len(cat_dev_game) < 4:
-                cat_dev_game.append(p)
+    categories_out = []
+    for cat_title, items in buckets:
+        if len(items) > 0:
+            categories_out.append({
+                "cat": cat_title,
+                "preview": items[:4],
+                "items": items
+            })
 
     kdeconnect_installed = os.path.isfile("/usr/lib/kdeconnectd") or shutil.which("kdeconnect-cli") is not None
+    hw_ctrl = get_live_hardware_controls()
 
     return {
         "user": display_name,
@@ -454,16 +942,19 @@ def generate_sysinfo_dict():
         "batteryPct": bat["batteryPct"],
         "batteryCharging": bat["batteryCharging"],
         "batteryText": bat["batteryText"],
+        "trashHasFiles": trash_has_files,
+        "trashCount": len(trash_entries),
+        "trashSize": trash_size_lbl,
+        "hasHiddenDesktopIcons": len(hidden_desk_ids) > 0,
         "kdeConnectInstalled": kdeconnect_installed,
+        "hwControls": hw_ctrl,
         "desktopIcons": desktop_icons,
         "taskbarPinned": taskbar_pinned,
         "startPinned": start_pinned[:18],
-        "allApps": all_apps[:60],
-        "categories": [
-            {"cat": "Sistema y Utilidades", "items": cat_sys[:4]},
-            {"cat": "Aplicaciones Instaladas", "items": cat_dev_game[:4]},
-        ],
-        "calendar": build_calendar_data()
+        "allApps": all_apps[:80],
+        "categories": categories_out,
+        "calendar": build_calendar_data(),
+        "weather": get_live_weather_data(force_refresh=False)
     }
 
 
@@ -573,9 +1064,13 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "--dump-sysinfo":
         dump_sysinfo_file()
         sys.exit(0)
+    if len(sys.argv) > 1 and sys.argv[1] == "--refresh-weather":
+        get_live_weather_data(force_refresh=True)
+        dump_sysinfo_file()
+        sys.exit(0)
 
     from PyQt6.QtCore import QObject, pyqtSlot, QUrl
-    from PyQt6.QtGui import QGuiApplication, QColor
+    from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon
     from PyQt6.QtQuick import QQuickView
 
     class AppBridge(QObject):
@@ -584,6 +1079,16 @@ def main():
             self.view = view
             self._prev_cpu_total = 0
             self._prev_cpu_idle = 0
+            self._prev_core_stats = {}
+            self._prev_disk_ts = 0.0
+            self._prev_disk_r = 0
+            self._prev_disk_w = 0
+            self._prev_disk_io_ms = 0
+            self._prev_net_ts = 0.0
+            self._prev_net_rx = 0
+            self._prev_net_tx = 0
+            self._gpu_cache_ts = 0.0
+            self._gpu_cache = None
 
         @pyqtSlot(result=str)
         def getConfigJson(self):
@@ -616,10 +1121,64 @@ def main():
         def closeWindow(self):
             QGuiApplication.quit()
 
-        @pyqtSlot(str, str, result=bool)
-        def createNewItem(self, folder_key, item_type):
+        @pyqtSlot(str)
+        def openTerminalIn(self, path_or_section):
+            raw = (path_or_section or "").strip()
+            if raw in ("Este equipo", "This PC"):
+                target_dir = "/"
+            elif raw in ("", "desktop", "Escritorio"):
+                target_dir = resolve_special_folder("Escritorio")
+            else:
+                target_dir = resolve_special_folder(raw)
+                if os.path.isfile(target_dir):
+                    target_dir = os.path.dirname(target_dir)
+            if not os.path.isdir(target_dir):
+                target_dir = HOME_DIR
+            kitty_bin = shutil.which("kitty") or "/usr/bin/kitty"
+            try:
+                subprocess.Popen([kitty_bin, "--directory", target_dir], cwd=target_dir, start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(str, result=str)
+        def getSpecialFolderPath(self, section_name):
+            if section_name in ("Este equipo", "This PC"):
+                return "Este equipo"
+            return resolve_special_folder(section_name)
+
+        @pyqtSlot(result=str)
+        def getSharedClipboardJson(self):
+            clip_p = os.path.join(STATE_DIR, "clipboard.json")
+            if os.path.isfile(clip_p):
+                try:
+                    with open(clip_p, "r", encoding="utf-8") as f:
+                        return f.read()
+                except Exception:
+                    pass
+            return json.dumps({"mode": "copy", "paths": []})
+
+        @pyqtSlot(str, bool)
+        def setSharedClipboardJson(self, paths_json, is_cut):
+            os.makedirs(STATE_DIR, exist_ok=True)
+            clip_p = os.path.join(STATE_DIR, "clipboard.json")
+            try:
+                paths = json.loads(paths_json or "[]")
+            except Exception:
+                paths = []
+            try:
+                tmp = clip_p + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump({"mode": "cut" if is_cut else "copy", "paths": paths}, f)
+                os.replace(tmp, clip_p)
+            except Exception:
+                pass
+
+        @pyqtSlot(str, str, result=str)
+        def createNewItemPath(self, folder_key, item_type):
             base = resolve_special_folder(folder_key)
-            if not os.path.isdir(base) or not os.access(base, os.W_OK):
+            if folder_key in ("Este equipo", "This PC") or not os.path.isdir(base) or not os.access(base, os.W_OK):
+                base = resolve_special_folder("Escritorio")
+            if not os.path.isdir(base):
                 base = HOME_DIR
             try:
                 if item_type == "folder":
@@ -630,6 +1189,15 @@ def main():
                         target = os.path.join(base, f"{name} ({idx})")
                         idx += 1
                     os.makedirs(target, exist_ok=True)
+                elif item_type == "md":
+                    name = "Notas"
+                    target = os.path.join(base, f"{name}.md")
+                    idx = 2
+                    while os.path.exists(target):
+                        target = os.path.join(base, f"{name} ({idx}).md")
+                        idx += 1
+                    with open(target, "w", encoding="utf-8") as f:
+                        f.write("# Notas\n\n")
                 else:
                     name = "Nuevo documento de texto"
                     target = os.path.join(base, f"{name}.txt")
@@ -639,20 +1207,869 @@ def main():
                         idx += 1
                     with open(target, "w", encoding="utf-8") as f:
                         f.write("")
+                dump_sysinfo_file()
+                return target
+            except Exception:
+                return ""
+
+        @pyqtSlot(str, str, result=bool)
+        def createNewItem(self, folder_key, item_type):
+            return bool(self.createNewItemPath(folder_key, item_type))
+
+        @pyqtSlot(str, str, result=bool)
+        def renameItem(self, old_path, new_name):
+            clean = (new_name or "").strip().replace("/", "")
+            if not clean or not os.path.exists(old_path):
+                return False
+            parent = os.path.dirname(old_path.rstrip("/"))
+            target = os.path.join(parent, clean)
+            if os.path.exists(target):
+                return False
+            try:
+                os.rename(old_path, target)
+                dump_sysinfo_file()
                 return True
             except Exception:
                 return False
+
+        @pyqtSlot(str, result=bool)
+        def trashItem(self, target_path):
+            if not target_path or not os.path.exists(target_path) or target_path in ("/", HOME_DIR):
+                return False
+            trash_files = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+            trash_info = os.path.join(HOME_DIR, ".local", "share", "Trash", "info")
+            os.makedirs(trash_files, exist_ok=True)
+            os.makedirs(trash_info, exist_ok=True)
+            base_name = os.path.basename(target_path.rstrip("/"))
+            dest_name = base_name
+            idx = 2
+            while os.path.exists(os.path.join(trash_files, dest_name)):
+                stem, ext = os.path.splitext(base_name)
+                dest_name = f"{stem}_{idx}{ext}"
+                idx += 1
+            try:
+                shutil.move(target_path, os.path.join(trash_files, dest_name))
+                del_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                info_txt = f"[Trash Info]\nPath={urllib.parse.quote(target_path)}\nDeletionDate={del_date}\n"
+                with open(os.path.join(trash_info, f"{dest_name}.trashinfo"), "w", encoding="utf-8") as f:
+                    f.write(info_txt)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(result=bool)
+        def emptyTrash(self):
+            trash_files = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+            trash_info = os.path.join(HOME_DIR, ".local", "share", "Trash", "info")
+            try:
+                for d in (trash_files, trash_info):
+                    if os.path.isdir(d):
+                        for entry in os.listdir(d):
+                            p = os.path.join(d, entry)
+                            if os.path.isdir(p) and not os.path.islink(p):
+                                shutil.rmtree(p, ignore_errors=True)
+                            else:
+                                try:
+                                    os.remove(p)
+                                except Exception:
+                                    pass
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def restoreTrashItem(self, trash_item_path):
+            if not trash_item_path or not os.path.exists(trash_item_path):
+                return False
+            base = os.path.basename(trash_item_path.rstrip("/"))
+            info_p = os.path.join(HOME_DIR, ".local", "share", "Trash", "info", f"{base}.trashinfo")
+            orig_path = os.path.join(HOME_DIR, "Escritorio", base)
+            if os.path.isfile(info_p):
+                try:
+                    for ln in open(info_p, "r", encoding="utf-8", errors="ignore"):
+                        if ln.startswith("Path="):
+                            raw_p = urllib.parse.unquote(ln.split("=", 1)[1].strip())
+                            if raw_p.startswith("/"):
+                                orig_path = raw_p
+                            break
+                except Exception:
+                    pass
+            os.makedirs(os.path.dirname(orig_path), exist_ok=True)
+            target = orig_path
+            idx = 2
+            stem, ext = os.path.splitext(orig_path)
+            while os.path.exists(target):
+                target = f"{stem} ({idx}){ext}"
+                idx += 1
+            try:
+                shutil.move(trash_item_path, target)
+                if os.path.isfile(info_p):
+                    os.remove(info_p)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def deletePermanently(self, target_path):
+            if not target_path or not os.path.exists(target_path) or target_path in ("/", HOME_DIR):
+                return False
+            try:
+                base = os.path.basename(target_path.rstrip("/"))
+                info_p = os.path.join(HOME_DIR, ".local", "share", "Trash", "info", f"{base}.trashinfo")
+                if os.path.isdir(target_path) and not os.path.islink(target_path):
+                    shutil.rmtree(target_path)
+                else:
+                    os.remove(target_path)
+                if os.path.isfile(info_p):
+                    os.remove(info_p)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def compressToZip(self, target_path):
+            if not target_path or not os.path.exists(target_path):
+                return False
+            parent = os.path.dirname(target_path.rstrip("/"))
+            base = os.path.basename(target_path.rstrip("/"))
+            stem = os.path.splitext(base)[0] if os.path.isfile(target_path) else base
+            out_zip = os.path.join(parent, f"{stem}.zip")
+            idx = 2
+            while os.path.exists(out_zip):
+                out_zip = os.path.join(parent, f"{stem} ({idx}).zip")
+                idx += 1
+            try:
+                with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+                    if os.path.isdir(target_path):
+                        for rdir, _, files in os.walk(target_path):
+                            for fn in files:
+                                fp = os.path.join(rdir, fn)
+                                arc = os.path.relpath(fp, parent)
+                                zf.write(fp, arc)
+                    else:
+                        zf.write(target_path, base)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def trashItemsJson(self, paths_json):
+            try:
+                paths = json.loads(paths_json or "[]")
+            except Exception:
+                paths = []
+            ok = False
+            for p in paths:
+                if self.trashItem(p):
+                    ok = True
+            return ok
+
+        @pyqtSlot(str, result=bool)
+        def restoreTrashItemsJson(self, paths_json):
+            try:
+                paths = json.loads(paths_json or "[]")
+            except Exception:
+                paths = []
+            ok = False
+            for p in paths:
+                if self.restoreTrashItem(p):
+                    ok = True
+            return ok
+
+        @pyqtSlot(str, result=bool)
+        def deletePermanentlyJson(self, paths_json):
+            try:
+                paths = json.loads(paths_json or "[]")
+            except Exception:
+                paths = []
+            ok = False
+            for p in paths:
+                if self.deletePermanently(p):
+                    ok = True
+            return ok
+
+        @pyqtSlot(str, str, bool, result=bool)
+        def pasteClipboardItemsJson(self, paths_json, dest_folder_key, is_cut):
+            try:
+                paths = json.loads(paths_json or "[]")
+            except Exception:
+                paths = []
+            ok = False
+            for p in paths:
+                if self.pasteClipboardItem(p, dest_folder_key, is_cut):
+                    ok = True
+            return ok
+
+        @pyqtSlot(str, result=bool)
+        def compressItemsToZipJson(self, paths_json):
+            try:
+                paths = [p for p in json.loads(paths_json or "[]") if p and os.path.exists(p)]
+            except Exception:
+                paths = []
+            if not paths:
+                return False
+            if len(paths) == 1:
+                return self.compressToZip(paths[0])
+            parent = os.path.dirname(paths[0].rstrip("/"))
+            out_zip = os.path.join(parent, "Archivo.zip")
+            idx = 2
+            while os.path.exists(out_zip):
+                out_zip = os.path.join(parent, f"Archivo ({idx}).zip")
+                idx += 1
+            try:
+                with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for tp in paths:
+                        base = os.path.basename(tp.rstrip("/"))
+                        if os.path.isdir(tp):
+                            for rdir, _, files in os.walk(tp):
+                                for fn in files:
+                                    fp = os.path.join(rdir, fn)
+                                    zf.write(fp, os.path.relpath(fp, parent))
+                        else:
+                            zf.write(tp, base)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+        @pyqtSlot(str, str, bool, result=bool)
+        def pasteClipboardItem(self, src_path, dest_folder_key, is_cut):
+            if not src_path or not os.path.exists(src_path):
+                return False
+            dest_dir = resolve_special_folder(dest_folder_key)
+            if not os.path.isdir(dest_dir) or not os.access(dest_dir, os.W_OK):
+                return False
+            src_real = os.path.realpath(src_path)
+            dest_real = os.path.realpath(dest_dir)
+            if src_real == dest_real or dest_real.startswith(src_real + os.sep):
+                return False
+            base_name = os.path.basename(src_path.rstrip("/"))
+            target = os.path.join(dest_dir, base_name)
+            if os.path.abspath(src_path) == os.path.abspath(target) and is_cut:
+                return True
+            idx = 2
+            stem, ext = os.path.splitext(base_name)
+            while os.path.exists(target):
+                suffix = " - copia" if idx == 2 else f" - copia ({idx})"
+                target = os.path.join(dest_dir, f"{stem}{suffix}{ext}")
+                idx += 1
+            try:
+                if is_cut:
+                    shutil.move(src_path, target)
+                elif os.path.isdir(src_path):
+                    shutil.copytree(src_path, target)
+                else:
+                    shutil.copy2(src_path, target)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=int)
+        def moveItemsToDirJson(self, paths_json, dest_folder_key):
+            try:
+                paths = [p for p in json.loads(paths_json or "[]") if p and os.path.exists(p)]
+            except Exception:
+                paths = []
+            if not paths:
+                return 0
+            if dest_folder_key in ("Papelera", "Papelera de reciclaje", "Trash") or str(dest_folder_key).endswith("/Trash/files"):
+                moved = 0
+                for p in paths:
+                    if self.trashItem(p):
+                        moved += 1
+                return moved
+            dest_dir = resolve_special_folder(dest_folder_key)
+            if not os.path.isdir(dest_dir) or not os.access(dest_dir, os.W_OK):
+                return 0
+            dest_real = os.path.realpath(dest_dir)
+            moved = 0
+            for src in paths:
+                src_real = os.path.realpath(src)
+                if src_real == dest_real or dest_real.startswith(src_real + os.sep):
+                    continue
+                if os.path.realpath(os.path.dirname(src.rstrip("/"))) == dest_real:
+                    continue
+                base = os.path.basename(src.rstrip("/"))
+                target = os.path.join(dest_dir, base)
+                idx = 2
+                stem, ext = os.path.splitext(base)
+                while os.path.exists(target):
+                    target = os.path.join(dest_dir, f"{stem} ({idx}){ext}")
+                    idx += 1
+                try:
+                    shutil.move(src, target)
+                    moved += 1
+                except Exception:
+                    pass
+            if moved > 0:
+                dump_sysinfo_file()
+            return moved
+
+        @pyqtSlot(result=int)
+        def restoreAllTrash(self):
+            trash_files = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+            if not os.path.isdir(trash_files):
+                return 0
+            count = 0
+            for entry in list(os.listdir(trash_files)):
+                if self.restoreTrashItem(os.path.join(trash_files, entry)):
+                    count += 1
+            return count
+
+        @pyqtSlot(str, result=bool)
+        def extractArchive(self, archive_path):
+            if not archive_path or not os.path.isfile(archive_path):
+                return False
+            low = archive_path.lower()
+            parent = os.path.dirname(archive_path)
+            base = os.path.basename(archive_path)
+            stem = base
+            for suf in (".tar.gz", ".tar.xz", ".tar.bz2", ".tar.zst", ".tgz", ".zip", ".tar"):
+                if low.endswith(suf):
+                    stem = base[:-len(suf)]
+                    break
+            dest = os.path.join(parent, stem or "Extraido")
+            idx = 2
+            while os.path.exists(dest):
+                dest = os.path.join(parent, f"{stem} ({idx})")
+                idx += 1
+            try:
+                if low.endswith(".zip"):
+                    os.makedirs(dest, exist_ok=True)
+                    with zipfile.ZipFile(archive_path, "r") as zf:
+                        zf.extractall(dest)
+                    dump_sysinfo_file()
+                    return True
+                elif low.endswith((".tar", ".tar.gz", ".tgz", ".tar.xz", ".tar.bz2")):
+                    import tarfile
+                    os.makedirs(dest, exist_ok=True)
+                    with tarfile.open(archive_path, "r:*") as tf:
+                        tf.extractall(dest)
+                    dump_sysinfo_file()
+                    return True
+                else:
+                    subprocess.Popen(["file-roller", archive_path], start_new_session=True)
+                    return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def setAsWallpaper(self, img_path):
+            if not img_path or not os.path.isfile(img_path):
+                return False
+            cfg = load_cfg()
+            cfg["customWallpaperUrl"] = f"file://{img_path}"
+            cfg["wallpaperMode"] = 3
+            save_cfg(cfg)
+            return True
+
+        @pyqtSlot(str, result=str)
+        def getItemPropertiesJson(self, target_path):
+            if not target_path or not os.path.exists(target_path):
+                return "{}"
+            try:
+                lst = os.lstat(target_path)
+                st = os.stat(target_path)
+                is_dir = os.path.isdir(target_path)
+                is_link = os.path.islink(target_path)
+                total_bytes = st.st_size if not is_dir else 0
+                file_cnt = 0
+                dir_cnt = 0
+                if is_dir:
+                    walked = 0
+                    for rdir, dirs, files in os.walk(target_path):
+                        dir_cnt += len(dirs)
+                        file_cnt += len(files)
+                        for fn in files:
+                            walked += 1
+                            if walked > 4000:
+                                break
+                            try:
+                                total_bytes += os.path.getsize(os.path.join(rdir, fn))
+                            except Exception:
+                                pass
+                        if walked > 4000:
+                            break
+                if total_bytes < 1024:
+                    sz_str = f"{total_bytes} B"
+                elif total_bytes < 1024 ** 2:
+                    sz_str = f"{total_bytes / 1024:.1f} KB"
+                elif total_bytes < 1024 ** 3:
+                    sz_str = f"{total_bytes / (1024 ** 2):.2f} MB"
+                else:
+                    sz_str = f"{total_bytes / (1024 ** 3):.2f} GB"
+                try:
+                    owner = pwd.getpwuid(st.st_uid).pw_name
+                except Exception:
+                    owner = str(st.st_uid)
+                import stat as statmod
+                perms = statmod.filemode(st.st_mode)
+                is_exec = bool(st.st_mode & 0o111) and not is_dir
+                mtime_s = datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+                atime_s = datetime.fromtimestamp(st.st_atime).strftime("%d/%m/%Y %H:%M:%S")
+                mime_s = "Carpeta de archivos" if is_dir else "Archivo"
+                if not is_dir:
+                    try:
+                        mime_s = subprocess.check_output(["file", "-b", "--mime-type", target_path], text=True, timeout=1.0).strip()
+                    except Exception:
+                        pass
+                return json.dumps({
+                    "name": os.path.basename(target_path.rstrip("/")) or target_path,
+                    "path": target_path,
+                    "parent": os.path.dirname(target_path.rstrip("/")) or "/",
+                    "isDir": is_dir,
+                    "isLink": is_link,
+                    "linkTarget": os.readlink(target_path) if is_link else "",
+                    "sizeStr": sz_str,
+                    "sizeBytes": total_bytes,
+                    "contentsStr": f"{file_cnt} archivos, {dir_cnt} carpetas" if is_dir else "",
+                    "owner": owner,
+                    "perms": perms,
+                    "isExecutable": is_exec,
+                    "mtime": mtime_s,
+                    "atime": atime_s,
+                    "mime": mime_s
+                })
+            except Exception:
+                return "{}"
+
+        @pyqtSlot(str, bool, result=bool)
+        def setFileExecutable(self, target_path, enabled):
+            if not target_path or not os.path.isfile(target_path):
+                return False
+            try:
+                mode = os.stat(target_path).st_mode
+                if enabled:
+                    os.chmod(target_path, mode | 0o111)
+                else:
+                    os.chmod(target_path, mode & ~0o111)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, bool, result=str)
+        def searchDirectoryJson(self, base_section_or_path, query, show_hidden=False):
+            q = (query or "").strip().lower()
+            if not q:
+                return json.dumps({"items": [], "count": 0})
+            base_dir = HOME_DIR if base_section_or_path in ("Este equipo", "This PC", "") else resolve_special_folder(base_section_or_path)
+            if not os.path.isdir(base_dir):
+                return json.dumps({"items": [], "count": 0})
+            results = []
+            base_depth = base_dir.rstrip("/").count("/")
+            try:
+                for rdir, dirs, files in os.walk(base_dir):
+                    depth = rdir.rstrip("/").count("/") - base_depth
+                    if not show_hidden:
+                        dirs[:] = [d for d in dirs if not d.startswith(".")]
+                    if depth >= 5:
+                        dirs[:] = []
+                    for nm in dirs + files:
+                        if not show_hidden and nm.startswith("."):
+                            continue
+                        if q in nm.lower():
+                            fp = os.path.join(rdir, nm)
+                            try:
+                                st = os.stat(fp)
+                                is_dir = os.path.isdir(fp)
+                                ext = os.path.splitext(nm)[1].lower()
+                                is_img = (not is_dir) and ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif")
+                                is_arc = (not is_dir) and (ext in (".zip", ".tar", ".gz", ".xz", ".bz2", ".zst", ".7z", ".rar") or nm.lower().endswith((".tar.gz", ".tar.xz", ".tar.bz2")))
+                                sb = st.st_size if not is_dir else -1
+                                sz = "" if is_dir else (f"{sb} B" if sb < 1024 else (f"{sb/1024:.1f} KB" if sb < 1024**2 else f"{sb/(1024**2):.1f} MB"))
+                                results.append({
+                                    "name": nm,
+                                    "path": fp,
+                                    "fileUrl": f"file://{fp}",
+                                    "isDir": is_dir,
+                                    "isImage": is_img,
+                                    "isArchive": is_arc,
+                                    "icon": "folder.svg" if is_dir else ("folder-images.svg" if is_img else ("fluent-folder-zip.svg" if is_arc else "fluent-document.svg")),
+                                    "typeLabel": os.path.relpath(rdir, base_dir) if rdir != base_dir else ("Carpeta" if is_dir else "Archivo"),
+                                    "sizeLabel": sz,
+                                    "sub": os.path.relpath(rdir, base_dir),
+                                    "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M"),
+                                    "mtimeTs": st.st_mtime,
+                                    "sizeBytes": sb
+                                })
+                                if len(results) >= 120:
+                                    return json.dumps({"items": results, "count": len(results)})
+                            except Exception:
+                                continue
+            except Exception:
+                pass
+            return json.dumps({"items": results, "count": len(results)})
+
+        @pyqtSlot(str, result=bool)
+        def killProcessTree(self, pid_str):
+            try:
+                pid = int(pid_str)
+                if pid <= 2 or pid == os.getpid():
+                    return False
+                protected = {"systemd", "labwc", "quickshell", "dbus-daemon", "pipewire", "wireplumber"}
+                to_kill = [pid]
+                # Find descendants via /proc
+                children_map = {}
+                for entry in os.listdir("/proc"):
+                    if not entry.isdigit():
+                        continue
+                    try:
+                        with open(f"/proc/{entry}/stat", "r", encoding="utf-8") as f:
+                            st_txt = f.read()
+                        rp = st_txt.rfind(")")
+                        ppid = int(st_txt[rp + 2:].split()[1])
+                        children_map.setdefault(ppid, []).append(int(entry))
+                    except Exception:
+                        continue
+                stack = [pid]
+                while stack:
+                    cur = stack.pop()
+                    for ch in children_map.get(cur, []):
+                        if ch not in to_kill:
+                            to_kill.append(ch)
+                            stack.append(ch)
+                killed_any = False
+                for kpid in reversed(to_kill):
+                    if kpid <= 2 or kpid == os.getpid():
+                        continue
+                    try:
+                        comm = open(f"/proc/{kpid}/comm", "r", encoding="utf-8").read().strip().lower()
+                        if comm in protected:
+                            continue
+                    except Exception:
+                        pass
+                    try:
+                        os.kill(kpid, signal.SIGTERM)
+                        killed_any = True
+                    except Exception:
+                        pass
+                return killed_any
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def openProcessLocation(self, pid_str):
+            try:
+                pid = int(pid_str)
+                exe = os.readlink(f"/proc/{pid}/exe")
+                folder = os.path.dirname(exe)
+                if os.path.isdir(folder):
+                    subprocess.Popen(["/usr/bin/x64-win11-app", "explorer", folder], start_new_session=True)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        @pyqtSlot(str, result=bool)
+        def killProcess(self, pid_str):
+            try:
+                pid = int(pid_str)
+                if pid <= 2 or pid == os.getpid():
+                    return False
+                comm = ""
+                try:
+                    with open(f"/proc/{pid}/comm", "r", encoding="utf-8") as f:
+                        comm = f.read().strip().lower()
+                except Exception:
+                    pass
+                if comm in ("systemd", "labwc", "quickshell", "dbus-daemon", "pipewire", "wireplumber"):
+                    return False
+                os.kill(pid, signal.SIGTERM)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str)
+        def runCtlAction(self, args_space_sep):
+            try:
+                parts = [p for p in args_space_sep.split(" ") if p]
+                subprocess.Popen(["/usr/bin/x64-win11-ctl"] + parts, start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(int)
+        def setPipewireVolume(self, pct):
+            p = max(0, min(100, int(pct)))
+            try:
+                subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{p}%"], start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(str)
+        def copyTextToClipboard(self, txt):
+            try:
+                p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE)
+                p.communicate(input=(txt or "").encode("utf-8"), timeout=1.5)
+            except Exception:
+                pass
+
+        @pyqtSlot(result=str)
+        def getLiveHardwareJson(self):
+            hw = get_live_hardware_controls()
+            vol_pct = 80
+            muted = False
+            try:
+                vout = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"], text=True, timeout=1.0).strip()
+                muted = "MUTED" in vout
+                for tok in vout.split():
+                    try:
+                        vol_pct = int(round(float(tok) * 100))
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+            local_ip = "Sin conexión IP"
+            try:
+                rout = subprocess.check_output(["ip", "-4", "route", "get", "1.1.1.1"], text=True, timeout=1.0)
+                parts = rout.split()
+                if "src" in parts:
+                    local_ip = parts[parts.index("src") + 1]
+            except Exception:
+                pass
+            gpu_name = "Gráficos integrados / PCIe"
+            try:
+                lout = subprocess.check_output(["lspci"], text=True, timeout=1.2)
+                for ln in lout.splitlines():
+                    if "VGA compatible controller:" in ln or "3D controller:" in ln:
+                        gpu_name = ln.split(":", 2)[-1].strip()
+                        break
+            except Exception:
+                pass
+            monitors = []
+            try:
+                for st_path in sorted(glob.glob("/sys/class/drm/card*-*/status")):
+                    if open(st_path).read().strip() == "connected":
+                        mname = os.path.basename(os.path.dirname(st_path)).split("-", 1)[-1]
+                        mode_p = os.path.join(os.path.dirname(st_path), "modes")
+                        res = open(mode_p).readline().strip() if os.path.isfile(mode_p) else "1920x1080"
+                        monitors.append(f"{mname} ({res})")
+            except Exception:
+                pass
+            pending_updates = 0
+            hw["volumePct"] = vol_pct
+            hw["muted"] = muted
+            hw["localIp"] = local_ip
+            hw["gpu"] = gpu_name
+            hw["monitors"] = " • ".join(monitors) if monitors else "Pantalla activa (1080p)"
+            hw["pendingUpdates"] = pending_updates
+            return json.dumps(hw)
+
+        @pyqtSlot(result=str)
+        def getInstalledAppsJson(self):
+            return json.dumps(scan_installed_desktop_apps()[:120])
+
+        @pyqtSlot(result=str)
+        def getStartupAppsJson(self):
+            user_dir = os.path.join(HOME_DIR, ".config", "autostart")
+            sys_dir = "/etc/xdg/autostart"
+            entries = {}
+
+            def parse_desktop(fp):
+                data = {"name": "", "name_es": "", "icon": "windows.svg", "exec": "", "comment": "", "hidden": False, "enabled": True}
+                try:
+                    with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+                        in_entry = False
+                        for raw in f:
+                            ln = raw.strip()
+                            if not ln or ln.startswith("#"):
+                                continue
+                            if ln.startswith("["):
+                                if ln == "[Desktop Entry]":
+                                    in_entry = True
+                                    continue
+                                elif in_entry:
+                                    break
+                            if not in_entry or "=" not in ln:
+                                continue
+                            k, v = ln.split("=", 1)
+                            k, v = k.strip(), v.strip()
+                            if k == "Name":
+                                data["name"] = v
+                            elif k in ("Name[es]", "Name[es_ES]"):
+                                data["name_es"] = v
+                            elif k == "Icon":
+                                data["icon"] = v
+                            elif k == "Exec":
+                                data["exec"] = v
+                            elif k == "Comment":
+                                data["comment"] = v
+                            elif k == "Hidden" and v.lower() == "true":
+                                data["hidden"] = True
+                            elif k == "X-GNOME-Autostart-enabled" and v.lower() == "false":
+                                data["enabled"] = False
+                except Exception:
+                    pass
+                return data
+
+            if os.path.isdir(sys_dir):
+                for fn in sorted(os.listdir(sys_dir)):
+                    if fn.endswith(".desktop"):
+                        fp = os.path.join(sys_dir, fn)
+                        d = parse_desktop(fp)
+                        entries[fn] = {"sys": d, "user": None, "sysPath": fp, "userPath": ""}
+
+            if os.path.isdir(user_dir):
+                for fn in sorted(os.listdir(user_dir)):
+                    if fn.endswith(".desktop"):
+                        fp = os.path.join(user_dir, fn)
+                        d = parse_desktop(fp)
+                        if fn in entries:
+                            entries[fn]["user"] = d
+                            entries[fn]["userPath"] = fp
+                        else:
+                            entries[fn] = {"sys": None, "user": d, "sysPath": "", "userPath": fp}
+
+            items = []
+            for fn in sorted(entries.keys()):
+                rec = entries[fn]
+                u = rec["user"]
+                s = rec["sys"]
+                primary = u or s
+                fallback = s or u
+                if not primary:
+                    continue
+                name = (primary.get("name_es") or primary.get("name") or (fallback.get("name_es") if fallback else "") or (fallback.get("name") if fallback else "") or fn[:-8]).strip()
+                exec_cmd = (primary.get("exec") or (fallback.get("exec") if fallback else "") or "").strip()
+                icon = (primary.get("icon") or (fallback.get("icon") if fallback else "") or "windows.svg").strip()
+                if not name:
+                    continue
+                is_enabled = not primary.get("hidden", False) and primary.get("enabled", True)
+                low_exec = exec_cmd.lower()
+                if any(k in low_exec for k in ("discord", "steam", "chromium", "chrome", "electron", "antigravity", "spotify")):
+                    impact = "Alto"
+                elif any(k in low_exec for k in ("kdeconnect", "blueman", "nm-applet", "polkit", "x64-update", "tray")):
+                    impact = "Medio"
+                elif exec_cmd:
+                    impact = "Bajo"
+                else:
+                    impact = "No medido"
+                items.append({
+                    "id": fn,
+                    "name": name,
+                    "execCmd": exec_cmd or "(Servicio del sistema)",
+                    "publisher": "Usuario" if (u and not s) else "Sistema",
+                    "enabled": is_enabled,
+                    "status": "Habilitado" if is_enabled else "Deshabilitado",
+                    "impact": impact,
+                    "filePath": rec["userPath"] or rec["sysPath"],
+                    "canRemove": bool(u and not s),
+                    "iconUrl": resolve_app_icon_url(icon)
+                })
+            items.sort(key=lambda x: (not x["enabled"], x["name"].lower()))
+            return json.dumps(items[:80])
+
+        @pyqtSlot(str, bool, result=bool)
+        def setStartupAppEnabled(self, desktop_id, enabled):
+            if not desktop_id or "/" in desktop_id or not desktop_id.endswith(".desktop"):
+                return False
+            user_dir = os.path.join(HOME_DIR, ".config", "autostart")
+            os.makedirs(user_dir, exist_ok=True)
+            user_fp = os.path.join(user_dir, desktop_id)
+            sys_fp = os.path.join("/etc/xdg/autostart", desktop_id)
+            src_fp = user_fp if os.path.isfile(user_fp) else (sys_fp if os.path.isfile(sys_fp) else "")
+            if not src_fp:
+                return False
+            try:
+                with open(src_fp, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.read().splitlines()
+                out = []
+                in_entry = False
+                set_h = False
+                set_g = False
+                for ln in lines:
+                    s = ln.strip()
+                    if s.startswith("["):
+                        if in_entry:
+                            if not set_h:
+                                out.append(f"Hidden={'false' if enabled else 'true'}")
+                                set_h = True
+                            if not set_g:
+                                out.append(f"X-GNOME-Autostart-enabled={'true' if enabled else 'false'}")
+                                set_g = True
+                        in_entry = (s == "[Desktop Entry]")
+                        out.append(ln)
+                        continue
+                    if in_entry and s.startswith("Hidden="):
+                        out.append(f"Hidden={'false' if enabled else 'true'}")
+                        set_h = True
+                        continue
+                    if in_entry and s.startswith("X-GNOME-Autostart-enabled="):
+                        out.append(f"X-GNOME-Autostart-enabled={'true' if enabled else 'false'}")
+                        set_g = True
+                        continue
+                    out.append(ln)
+                if not set_h:
+                    out.append(f"Hidden={'false' if enabled else 'true'}")
+                if not set_g:
+                    out.append(f"X-GNOME-Autostart-enabled={'true' if enabled else 'false'}")
+                with open(user_fp, "w", encoding="utf-8") as f:
+                    f.write("\n".join(out) + "\n")
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, str, result=bool)
+        def addStartupApp(self, name, cmd, icon_name):
+            clean_name = (name or "").strip()
+            clean_cmd = (cmd or "").strip()
+            if not clean_name or not clean_cmd:
+                return False
+            import re as remod
+            user_dir = os.path.join(HOME_DIR, ".config", "autostart")
+            os.makedirs(user_dir, exist_ok=True)
+            slug = remod.sub(r"[^a-zA-Z0-9_-]+", "-", clean_name.lower()).strip("-") or "custom-app"
+            fp = os.path.join(user_dir, f"{slug}.desktop")
+            idx = 2
+            while os.path.exists(fp):
+                fp = os.path.join(user_dir, f"{slug}-{idx}.desktop")
+                idx += 1
+            ic = (icon_name or "").strip() or clean_cmd.split()[0].split("/")[-1]
+            try:
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(
+                        "[Desktop Entry]\n"
+                        "Type=Application\n"
+                        f"Name={clean_name}\n"
+                        f"Exec={clean_cmd}\n"
+                        f"Icon={ic}\n"
+                        "Hidden=false\n"
+                        "X-GNOME-Autostart-enabled=true\n"
+                    )
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def removeStartupApp(self, desktop_id):
+            if not desktop_id or "/" in desktop_id:
+                return False
+            user_fp = os.path.join(HOME_DIR, ".config", "autostart", desktop_id)
+            if os.path.isfile(user_fp):
+                try:
+                    os.remove(user_fp)
+                    return True
+                except Exception:
+                    return False
+            return False
 
         @pyqtSlot(result=str)
         def getDrivesJson(self):
             return json.dumps(get_dynamic_drives())
 
-        @pyqtSlot(str, str, result=str)
-        def listDirectoryJson(self, section_or_path, sort_by="name"):
+        @pyqtSlot(str, str, bool, bool, result=str)
+        def listDirectoryExJson(self, section_or_path, sort_by="name", sort_asc=True, show_hidden=False):
             if section_or_path in ("Este equipo", "This PC"):
                 return json.dumps({"mode": "thispc", "path": "Este equipo", "items": [], "count": 8})
 
             real_path = resolve_special_folder(section_or_path)
+            is_trash = real_path.endswith("/Trash/files")
+            trash_info_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "info")
             items = []
             try:
                 entries = list(os.scandir(real_path))
@@ -660,12 +2077,26 @@ def main():
                 entries = []
 
             for e in entries:
-                if e.name.startswith("."):
+                if not show_hidden and e.name.startswith("."):
                     continue
                 try:
                     st = e.stat(follow_symlinks=True)
                     is_dir = e.is_dir(follow_symlinks=True)
                     mtime = datetime.fromtimestamp(st.st_mtime).strftime("%d/%m/%Y %H:%M")
+                    is_img = False
+                    is_arc = False
+                    orig_path = ""
+                    if is_trash:
+                        ip = os.path.join(trash_info_dir, f"{e.name}.trashinfo")
+                        if os.path.isfile(ip):
+                            try:
+                                for ln in open(ip, "r", encoding="utf-8", errors="ignore"):
+                                    if ln.startswith("Path="):
+                                        orig_path = urllib.parse.unquote(ln.split("=", 1)[1].strip())
+                                    elif ln.startswith("DeletionDate="):
+                                        mtime = ln.split("=", 1)[1].strip().replace("T", " ")[:16]
+                            except Exception:
+                                pass
                     if is_dir:
                         low = e.name.lower()
                         if "descarg" in low or "download" in low:
@@ -684,25 +2115,33 @@ def main():
                             icon = "folder-games.svg"
                         else:
                             icon = "folder.svg"
-                        size_str = "Carpeta de archivos"
+                        type_label = "Carpeta de archivos"
+                        size_val = ""
+                        size_str = orig_path if orig_path else type_label
                         size_bytes = -1
                     else:
                         ext = os.path.splitext(e.name)[1].lower()
+                        low_n = e.name.lower()
                         if ext in (".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"):
                             icon = "folder-images.svg"
-                            size_str = "Imagen"
+                            type_label = f"Imagen {ext[1:].upper()}"
+                            is_img = True
                         elif ext in (".mp4", ".mkv", ".webm", ".avi"):
                             icon = "folder-videos.svg"
-                            size_str = "Vídeo"
+                            type_label = f"Vídeo {ext[1:].upper()}"
                         elif ext in (".mp3", ".flac", ".ogg", ".wav"):
                             icon = "folder-music.svg"
-                            size_str = "Audio"
-                        elif ext in (".sh", ".py", ".qml", ".js", ".ts", ".rs", ".c", ".cpp", ".md"):
-                            icon = "terminal.svg"
-                            size_str = f"Código ({ext})"
+                            type_label = f"Audio {ext[1:].upper()}"
+                        elif ext in (".sh", ".py", ".qml", ".js", ".ts", ".rs", ".c", ".cpp", ".md", ".json", ".xml", ".txt", ".conf", ".ini"):
+                            icon = "fluent-document.svg"
+                            type_label = f"Archivo {ext[1:].upper()}"
+                        elif ext in (".zip", ".tar", ".gz", ".zst", ".xz", ".bz2", ".7z", ".rar") or low_n.endswith((".tar.gz", ".tar.xz", ".tar.bz2")):
+                            icon = "fluent-folder-zip.svg"
+                            type_label = f"Comprimido {ext[1:].upper()}"
+                            is_arc = True
                         else:
-                            icon = "folder-documents.svg"
-                            size_str = "Archivo"
+                            icon = "fluent-document.svg"
+                            type_label = f"Archivo {ext[1:].upper()}" if ext else "Archivo"
                         sb = st.st_size
                         size_bytes = sb
                         if sb < 1024:
@@ -713,13 +2152,20 @@ def main():
                             size_val = f"{sb / (1024 ** 2):.1f} MB"
                         else:
                             size_val = f"{sb / (1024 ** 3):.2f} GB"
-                        size_str = f"{size_val} • {size_str}"
+                        size_str = orig_path if orig_path else f"{size_val} • {type_label}"
 
                     items.append({
                         "name": e.name,
                         "path": e.path,
+                        "fileUrl": f"file://{e.path}",
                         "isDir": is_dir,
+                        "isImage": is_img,
+                        "isArchive": is_arc,
+                        "isHidden": e.name.startswith("."),
+                        "origPath": orig_path,
                         "icon": icon,
+                        "typeLabel": type_label,
+                        "sizeLabel": size_val,
                         "sub": size_str,
                         "mtime": mtime,
                         "mtimeTs": st.st_mtime,
@@ -728,39 +2174,88 @@ def main():
                 except Exception:
                     continue
 
-            items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
+            dirs_only = [x for x in items if x["isDir"]]
+            files_only = [x for x in items if not x["isDir"]]
+            if sort_by == "date":
+                dirs_only.sort(key=lambda x: x["mtimeTs"], reverse=sort_asc)
+                files_only.sort(key=lambda x: x["mtimeTs"], reverse=sort_asc)
+            elif sort_by == "size":
+                dirs_only.sort(key=lambda x: x["name"].lower(), reverse=not sort_asc)
+                files_only.sort(key=lambda x: (x["sizeBytes"], x["name"].lower()), reverse=sort_asc)
+            elif sort_by == "type":
+                dirs_only.sort(key=lambda x: x["name"].lower(), reverse=not sort_asc)
+                files_only.sort(key=lambda x: (x["typeLabel"].lower(), x["name"].lower()), reverse=not sort_asc)
+            else:
+                dirs_only.sort(key=lambda x: x["name"].lower(), reverse=not sort_asc)
+                files_only.sort(key=lambda x: x["name"].lower(), reverse=not sort_asc)
+
+            combined = dirs_only + files_only
             return json.dumps({
                 "mode": "dir",
                 "path": real_path,
-                "items": items[:150],
-                "count": len(items)
+                "isTrash": is_trash,
+                "items": combined[:500],
+                "count": len(combined)
             })
+
+        @pyqtSlot(str, str, result=str)
+        def listDirectoryJson(self, section_or_path, sort_by="name"):
+            return self.listDirectoryExJson(section_or_path, sort_by, True, False)
 
         @pyqtSlot(str, result=str)
         def getParentDir(self, current_path):
             if current_path in ("Este equipo", "/", ""):
                 return "Este equipo"
             real = resolve_special_folder(current_path)
-            if real == "/" or real == HOME_DIR:
+            if real == "/":
                 return "Este equipo"
-            return os.path.dirname(real)
+            parent = os.path.dirname(real.rstrip("/"))
+            return parent if parent else "/"
 
         @pyqtSlot(result=str)
         def getSystemTelemetryJson(self):
+            now_ts = time.monotonic()
             display_name, uname, hostname = get_real_user_info()
             cpu_model = "Procesador x86_64"
+            cpu_cache = "—"
+            cpu_virt = "No detectada"
+            phys_cores = set()
             try:
                 with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                    phys_id = "0"
                     for line in f:
-                        if "model name" in line:
+                        if "model name" in line and cpu_model == "Procesador x86_64":
                             cpu_model = line.split(":", 1)[1].strip()
-                            break
+                        elif line.startswith("cache size") and cpu_cache == "—":
+                            kb_s = line.split(":", 1)[1].strip().split()[0]
+                            try:
+                                cpu_cache = f"{int(kb_s) / 1024:.0f} MB" if int(kb_s) >= 1024 else f"{kb_s} KB"
+                            except Exception:
+                                cpu_cache = line.split(":", 1)[1].strip()
+                        elif line.startswith("flags") and cpu_virt == "No detectada":
+                            fl = line.split(":", 1)[1].split()
+                            if "vmx" in fl:
+                                cpu_virt = "Habilitada (Intel VT-x)"
+                            elif "svm" in fl:
+                                cpu_virt = "Habilitada (AMD-V)"
+                        elif line.startswith("physical id"):
+                            phys_id = line.split(":", 1)[1].strip()
+                        elif line.startswith("core id"):
+                            phys_cores.add((phys_id, line.split(":", 1)[1].strip()))
             except Exception:
                 pass
+            logical_cores = os.cpu_count() or 4
+            physical_cores = len(phys_cores) if phys_cores else max(1, logical_cores // 2)
 
+            # Detailed Memory & Swap / ZRAM from /proc/meminfo
             mem_total_gb = 16.0
             mem_used_gb = 2.0
+            mem_avail_gb = 14.0
+            mem_cached_gb = 1.0
+            swap_total_gb = 0.0
+            swap_used_gb = 0.0
             mem_pct = 12
+            swap_pct = 0
             try:
                 mem = {}
                 with open("/proc/meminfo", "r", encoding="utf-8") as f:
@@ -770,21 +2265,81 @@ def main():
                             mem[parts[0].strip()] = int(parts[1].strip().split()[0])
                 mem_total_gb = mem.get("MemTotal", 16384000) / (1024 ** 2)
                 mem_avail_gb = mem.get("MemAvailable", 14000000) / (1024 ** 2)
-                mem_used_gb = mem_total_gb - mem_avail_gb
-                mem_pct = int(round((mem_used_gb / max(1.0, mem_total_gb)) * 100))
+                mem_used_gb = max(0.0, mem_total_gb - mem_avail_gb)
+                mem_cached_gb = (mem.get("Cached", 0) + mem.get("Buffers", 0) + mem.get("SReclaimable", 0)) / (1024 ** 2)
+                swap_total_gb = mem.get("SwapTotal", 0) / (1024 ** 2)
+                swap_free_gb = mem.get("SwapFree", 0) / (1024 ** 2)
+                swap_used_gb = max(0.0, swap_total_gb - swap_free_gb)
+                mem_pct = int(round((mem_used_gb / max(0.1, mem_total_gb)) * 100))
+                swap_pct = int(round((swap_used_gb / max(0.1, swap_total_gb)) * 100)) if swap_total_gb > 0.05 else 0
             except Exception:
                 pass
 
+            # Overall CPU % + Live Per-Core CPU % from /proc/stat
             cpu_pct = 4
+            per_core = []
             try:
                 with open("/proc/stat", "r", encoding="utf-8") as f:
-                    fields = [int(x) for x in f.readline().split()[1:8]]
-                idle = fields[3] + fields[4]
-                total = sum(fields)
-                if self._prev_cpu_total > 0 and total > self._prev_cpu_total:
-                    cpu_pct = int(round((1.0 - (idle - self._prev_cpu_idle) / (total - self._prev_cpu_total)) * 100))
-                self._prev_cpu_total = total
-                self._prev_cpu_idle = idle
+                    for ln in f:
+                        if ln.startswith("cpu "):
+                            fields = [int(x) for x in ln.split()[1:8]]
+                            idle = fields[3] + fields[4]
+                            total = sum(fields)
+                            if self._prev_cpu_total > 0 and total > self._prev_cpu_total:
+                                cpu_pct = int(round((1.0 - (idle - self._prev_cpu_idle) / (total - self._prev_cpu_total)) * 100))
+                            self._prev_cpu_total = total
+                            self._prev_cpu_idle = idle
+                        elif ln.startswith("cpu") and ln[3:4].isdigit():
+                            toks = ln.split()
+                            cname = toks[0]
+                            fields = [int(x) for x in toks[1:8]]
+                            idle = fields[3] + fields[4]
+                            total = sum(fields)
+                            prev = self._prev_core_stats.get(cname)
+                            cp = 0
+                            if prev and total > prev[0]:
+                                cp = int(round((1.0 - (idle - prev[1]) / (total - prev[0])) * 100))
+                            self._prev_core_stats[cname] = (total, idle)
+                            per_core.append(max(0, min(100, cp)))
+                        else:
+                            break
+            except Exception:
+                pass
+            if not per_core:
+                per_core = [cpu_pct] * min(16, logical_cores)
+
+            # CPU Frequency (current avg & max) + CPU Temperature
+            cpu_ghz = "—"
+            cpu_max_ghz = "—"
+            try:
+                cur_freqs = []
+                for fp in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq"):
+                    try:
+                        cur_freqs.append(int(open(fp).read().strip()))
+                    except Exception:
+                        pass
+                if cur_freqs:
+                    cpu_ghz = f"{(sum(cur_freqs) / len(cur_freqs)) / 1_000_000:.2f} GHz"
+                max_p = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+                if os.path.isfile(max_p):
+                    cpu_max_ghz = f"{int(open(max_p).read().strip()) / 1_000_000:.2f} GHz"
+            except Exception:
+                pass
+
+            cpu_temp_str = "—"
+            try:
+                for hw in sorted(glob.glob("/sys/class/hwmon/hwmon*")):
+                    np = os.path.join(hw, "name")
+                    if not os.path.isfile(np):
+                        continue
+                    hname = open(np).read().strip().lower()
+                    if any(k in hname for k in ("coretemp", "k10temp", "zenpower", "cpu_thermal", "acpitz")):
+                        tp = os.path.join(hw, "temp1_input")
+                        if os.path.isfile(tp):
+                            t_c = int(open(tp).read().strip()) / 1000.0
+                            if 10 < t_c < 120:
+                                cpu_temp_str = f"{t_c:.0f} °C"
+                                break
             except Exception:
                 pass
 
@@ -799,35 +2354,270 @@ def main():
             except Exception:
                 pass
 
+            # Root Disk info + Live Read/Write MB/s & Active % from /proc/diskstats
             root_fstype = "Btrfs"
+            root_dev = ""
             try:
                 with open("/proc/mounts", "r", encoding="utf-8") as f:
                     for line in f:
                         parts = line.split()
                         if len(parts) >= 3 and parts[1] == "/":
+                            root_dev = parts[0]
                             root_fstype = parts[2].upper()
                             break
             except Exception:
                 pass
-
-            procs = []
+            base_blk = ""
             try:
-                out = subprocess.check_output(
-                    ["ps", "-eo", "pid,comm,%cpu,rss", "--sort=-%cpu"],
-                    text=True, timeout=1.5
-                ).splitlines()[1:16]
-                for line in out:
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        pid, comm, pcpu, rss_kb = parts[0], parts[1], parts[2], int(parts[3])
-                        procs.append({
-                            "pid": pid,
-                            "name": comm,
-                            "cpu": f"{float(pcpu):.1f}%",
-                            "mem": f"{rss_kb / 1024:.1f} MB"
-                        })
+                real_dev = os.path.realpath(root_dev) if root_dev else ""
+                bname = os.path.basename(real_dev)
+                if bname.startswith("nvme") and "p" in bname:
+                    base_blk = bname.rsplit("p", 1)[0]
+                else:
+                    base_blk = bname.rstrip("0123456789")
             except Exception:
                 pass
+            disk_model = "Unidad del sistema"
+            disk_type = "SSD"
+            disk_io_sched = "adios"
+            if base_blk:
+                try:
+                    mp = f"/sys/block/{base_blk}/device/model"
+                    if os.path.isfile(mp):
+                        disk_model = open(mp).read().strip() or disk_model
+                    rp = f"/sys/block/{base_blk}/queue/rotational"
+                    if os.path.isfile(rp):
+                        rot = open(rp).read().strip()
+                        if base_blk.startswith("nvme"):
+                            disk_type = "NVMe SSD"
+                        else:
+                            disk_type = "HDD" if rot == "1" else "SSD"
+                    sp = f"/sys/block/{base_blk}/queue/scheduler"
+                    if os.path.isfile(sp):
+                        stxt = open(sp).read().strip()
+                        if "[" in stxt and "]" in stxt:
+                            disk_io_sched = stxt.split("[", 1)[1].split("]", 1)[0]
+                except Exception:
+                    pass
+
+            disk_read_mbs = 0.0
+            disk_write_mbs = 0.0
+            disk_active_pct = 0
+            try:
+                r_sec = 0
+                w_sec = 0
+                io_ms = 0
+                with open("/proc/diskstats", "r", encoding="utf-8") as f:
+                    for ln in f:
+                        p = ln.split()
+                        if len(p) >= 14 and ((base_blk and p[2] == base_blk) or (not base_blk and p[2] in ("sda", "nvme0n1", "vda"))):
+                            r_sec = int(p[5])
+                            w_sec = int(p[9])
+                            io_ms = int(p[12])
+                            break
+                if self._prev_disk_ts > 0 and now_ts > self._prev_disk_ts:
+                    dt = now_ts - self._prev_disk_ts
+                    disk_read_mbs = max(0.0, ((r_sec - self._prev_disk_r) * 512.0) / (1024 ** 2) / dt)
+                    disk_write_mbs = max(0.0, ((w_sec - self._prev_disk_w) * 512.0) / (1024 ** 2) / dt)
+                    disk_active_pct = max(0, min(100, int(round(((io_ms - self._prev_disk_io_ms) / (dt * 1000.0)) * 100))))
+                self._prev_disk_ts = now_ts
+                self._prev_disk_r = r_sec
+                self._prev_disk_w = w_sec
+                self._prev_disk_io_ms = io_ms
+            except Exception:
+                pass
+
+            disk_used_pct = 15
+            disk_total_gb = 0.0
+            disk_free_gb = 0.0
+            try:
+                du = shutil.disk_usage("/")
+                disk_total_gb = du.total / (1024 ** 3)
+                disk_free_gb = du.free / (1024 ** 3)
+                disk_used_pct = int(round(((du.total - du.free) / max(1, du.total)) * 100))
+            except Exception:
+                pass
+
+            # Live Network Throughput from /proc/net/dev
+            net_iface = "Sin red"
+            net_type = "Red"
+            net_ip = "Sin conexión"
+            net_mac = "—"
+            net_recv_kbs = 0.0
+            net_send_kbs = 0.0
+            net_tot_rx_gb = 0.0
+            net_tot_tx_gb = 0.0
+            try:
+                rout = subprocess.check_output(["ip", "-4", "route", "get", "1.1.1.1"], text=True, timeout=0.6, stderr=subprocess.DEVNULL)
+                rtoks = rout.split()
+                if "dev" in rtoks:
+                    net_iface = rtoks[rtoks.index("dev") + 1]
+                if "src" in rtoks:
+                    net_ip = rtoks[rtoks.index("src") + 1]
+                if net_iface != "Sin red":
+                    net_type = "Wi-Fi" if os.path.isdir(f"/sys/class/net/{net_iface}/wireless") else "Ethernet"
+                    mac_p = f"/sys/class/net/{net_iface}/address"
+                    if os.path.isfile(mac_p):
+                        net_mac = open(mac_p).read().strip().upper()
+            except Exception:
+                pass
+
+            try:
+                rx_b = 0
+                tx_b = 0
+                with open("/proc/net/dev", "r", encoding="utf-8") as f:
+                    for ln in f.readlines()[2:]:
+                        if ":" not in ln:
+                            continue
+                        ifn, rest = ln.split(":", 1)
+                        ifn = ifn.strip()
+                        if ifn == "lo":
+                            continue
+                        if net_iface != "Sin red" and ifn != net_iface:
+                            continue
+                        vals = rest.split()
+                        rx_b += int(vals[0])
+                        tx_b += int(vals[8])
+                        if net_iface == "Sin red":
+                            net_iface = ifn
+                net_tot_rx_gb = rx_b / (1024 ** 3)
+                net_tot_tx_gb = tx_b / (1024 ** 3)
+                if self._prev_net_ts > 0 and now_ts > self._prev_net_ts:
+                    dt = now_ts - self._prev_net_ts
+                    net_recv_kbs = max(0.0, (rx_b - self._prev_net_rx) / 1024.0 / dt)
+                    net_send_kbs = max(0.0, (tx_b - self._prev_net_tx) / 1024.0 / dt)
+                self._prev_net_ts = now_ts
+                self._prev_net_rx = rx_b
+                self._prev_net_tx = tx_b
+            except Exception:
+                pass
+
+            def fmt_rate(kbs):
+                if kbs >= 1024.0:
+                    return f"{kbs / 1024.0:.2f} MB/s"
+                return f"{kbs:.0f} KB/s"
+
+            # GPU Telemetry (cached 2s — universal NVIDIA nvidia-smi + AMD/Intel DRM sysfs)
+            if self._gpu_cache is None or (now_ts - self._gpu_cache_ts) >= 2.0:
+                g_name = "Adaptador gráfico"
+                g_pct = 0
+                g_temp = "—"
+                g_vram_used = 0
+                g_vram_tot = 0
+                g_driver = "DRM/KMS"
+                if shutil.which("nvidia-smi"):
+                    try:
+                        nout = subprocess.check_output(
+                            ["nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total,driver_version",
+                             "--format=csv,noheader,nounits"],
+                            text=True, timeout=1.2, stderr=subprocess.DEVNULL
+                        ).splitlines()
+                        if nout:
+                            gp = [x.strip() for x in nout[0].split(",")]
+                            if len(gp) >= 6:
+                                g_name = gp[0]
+                                g_pct = int(float(gp[1])) if gp[1].replace(".", "", 1).isdigit() else 0
+                                g_temp = f"{gp[2]} °C" if gp[2].isdigit() else "—"
+                                g_vram_used = int(float(gp[3])) if gp[3].replace(".", "", 1).isdigit() else 0
+                                g_vram_tot = int(float(gp[4])) if gp[4].replace(".", "", 1).isdigit() else 0
+                                g_driver = f"NVIDIA {gp[5]}"
+                    except Exception:
+                        pass
+                if g_name == "Adaptador gráfico":
+                    try:
+                        lout = subprocess.check_output(["lspci"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
+                        for ln in lout.splitlines():
+                            if "VGA compatible controller:" in ln or "3D controller:" in ln:
+                                g_name = ln.split(":", 2)[-1].strip()
+                                break
+                    except Exception:
+                        pass
+                    for card in sorted(glob.glob("/sys/class/drm/card*/device")):
+                        bp = os.path.join(card, "gpu_busy_percent")
+                        if os.path.isfile(bp):
+                            try:
+                                g_pct = int(open(bp).read().strip())
+                            except Exception:
+                                pass
+                        vu = os.path.join(card, "mem_info_vram_used")
+                        vt = os.path.join(card, "mem_info_vram_total")
+                        if os.path.isfile(vu) and os.path.isfile(vt):
+                            try:
+                                g_vram_used = int(open(vu).read().strip()) // (1024 ** 2)
+                                g_vram_tot = int(open(vt).read().strip()) // (1024 ** 2)
+                            except Exception:
+                                pass
+                self._gpu_cache = {
+                    "gpuName": g_name,
+                    "gpuPct": max(0, min(100, g_pct)),
+                    "gpuTemp": g_temp,
+                    "gpuVramUsedMb": g_vram_used,
+                    "gpuVramTotalMb": g_vram_tot,
+                    "gpuVramStr": f"{g_vram_used / 1024:.1f} / {g_vram_tot / 1024:.1f} GB" if g_vram_tot > 0 else "Compartida",
+                    "gpuDriver": g_driver
+                }
+                self._gpu_cache_ts = now_ts
+
+            # Processes (top 80 with PPID, User, Threads, Command Line & Exe Path)
+            procs = []
+            proc_total = 0
+            thread_total = 0
+            try:
+                all_lines = subprocess.check_output(
+                    ["ps", "-eo", "pid,ppid,user:16,state,nlwp,%cpu,rss,comm", "--sort=-%cpu"],
+                    text=True, timeout=1.5
+                ).splitlines()
+                proc_total = max(0, len(all_lines) - 1)
+                for line in all_lines[1:]:
+                    parts = line.split(None, 7)
+                    if len(parts) < 8:
+                        continue
+                    try:
+                        nlwp = int(parts[4])
+                    except Exception:
+                        nlwp = 1
+                    thread_total += nlwp
+                    if len(procs) >= 80:
+                        continue
+                    pid, ppid, puser, st_ch = parts[0], parts[1], parts[2], parts[3]
+                    pcpu = float(parts[5])
+                    rss_kb = int(parts[6])
+                    comm = parts[7].strip()
+                    mem_mb = rss_kb / 1024.0
+                    st_lbl = "En ejecución" if st_ch == "R" else ("Suspendido" if st_ch == "T" else "En segundo plano")
+                    cmdline = ""
+                    try:
+                        cmdline = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\x00", b" ").decode("utf-8", errors="ignore").strip()[:180]
+                    except Exception:
+                        pass
+                    procs.append({
+                        "pid": pid,
+                        "ppid": ppid,
+                        "user": puser,
+                        "name": comm,
+                        "cmdline": cmdline or comm,
+                        "threads": nlwp,
+                        "state": st_lbl,
+                        "cpuNum": round(pcpu, 1),
+                        "cpu": f"{pcpu:.1f}%",
+                        "memNum": round(mem_mb, 1),
+                        "mem": f"{mem_mb:.1f} MB",
+                        "iconUrl": resolve_app_icon_url(comm)
+                    })
+            except Exception:
+                pass
+
+            uptime_str = "0:00:00:00"
+            try:
+                up_s = int(float(open("/proc/uptime").read().split()[0]))
+                d_u, rem = divmod(up_s, 86400)
+                h_u, rem = divmod(rem, 3600)
+                m_u, s_u = divmod(rem, 60)
+                uptime_str = f"{d_u}:{h_u:02d}:{m_u:02d}:{s_u:02d}"
+            except Exception:
+                pass
+
+            net_pct = max(0, min(100, int(round(min(100.0, ((net_recv_kbs + net_send_kbs) / 2048.0) * 100.0)))))
 
             return json.dumps({
                 "user": display_name,
@@ -835,16 +2625,63 @@ def main():
                 "hostname": hostname,
                 "userEmail": f"{uname}@{hostname}",
                 "cpu": cpu_model,
+                "cpuCores": logical_cores,
+                "cpuPhysCores": physical_cores,
+                "cpuPerCore": per_core,
+                "cpuGhz": cpu_ghz,
+                "cpuMaxGhz": cpu_max_ghz,
+                "cpuTemp": cpu_temp_str,
+                "cpuCache": cpu_cache,
+                "cpuVirt": cpu_virt,
                 "cpuPct": max(1, min(100, cpu_pct)),
                 "ram": f"{mem_used_gb:.1f} / {mem_total_gb:.1f} GB ({mem_pct}%)",
+                "ramShort": f"{mem_used_gb:.1f}/{mem_total_gb:.0f} GB",
                 "ramPct": mem_pct,
+                "ramUsedGb": round(mem_used_gb, 1),
+                "ramTotalGb": round(mem_total_gb, 1),
+                "ramAvailGb": round(mem_avail_gb, 1),
+                "ramCachedGb": round(mem_cached_gb, 1),
+                "swapUsedGb": round(swap_used_gb, 1),
+                "swapTotalGb": round(swap_total_gb, 1),
+                "swapPct": swap_pct,
+                "uptime": uptime_str,
+                "procCount": proc_total,
+                "threadCount": thread_total,
                 "kernel": kernel,
                 "sched": sched,
-                "diskLabel": f"Disco del Sistema ({root_fstype})",
-                "diskInfo": f"Activo • {root_fstype}",
+                "diskLabel": f"Disco (C:) {disk_type}",
+                "diskModel": disk_model,
+                "diskType": disk_type,
+                "diskFs": root_fstype,
+                "diskIoSched": disk_io_sched,
+                "diskPct": disk_used_pct,
+                "diskActivePct": disk_active_pct,
+                "diskReadStr": f"{disk_read_mbs:.1f} MB/s",
+                "diskWriteStr": f"{disk_write_mbs:.1f} MB/s",
+                "diskFreeGb": round(disk_free_gb, 1),
+                "diskTotalGb": round(disk_total_gb, 1),
+                "diskInfo": f"{disk_model} • {root_fstype}",
+                "netIface": net_iface,
+                "netType": net_type,
+                "netIp": net_ip,
+                "netMac": net_mac,
+                "netRecvKbs": round(net_recv_kbs, 1),
+                "netSendKbs": round(net_send_kbs, 1),
+                "netRecvStr": fmt_rate(net_recv_kbs),
+                "netSendStr": fmt_rate(net_send_kbs),
+                "netPct": net_pct,
+                "netTotalRecvStr": f"{net_tot_rx_gb:.2f} GB",
+                "netTotalSentStr": f"{net_tot_tx_gb:.2f} GB",
+                "gpuName": self._gpu_cache["gpuName"],
+                "gpuPct": self._gpu_cache["gpuPct"],
+                "gpuTemp": self._gpu_cache["gpuTemp"],
+                "gpuVramUsedMb": self._gpu_cache["gpuVramUsedMb"],
+                "gpuVramTotalMb": self._gpu_cache["gpuVramTotalMb"],
+                "gpuVramStr": self._gpu_cache["gpuVramStr"],
+                "gpuDriver": self._gpu_cache["gpuDriver"],
                 "procs": procs
             })
-
+    
     mode = sys.argv[1] if len(sys.argv) > 1 else "explorer"
     arg2 = sys.argv[2] if len(sys.argv) > 2 else ""
     if arg2.startswith("file://"):
@@ -853,24 +2690,28 @@ def main():
     dump_sysinfo_file()
 
     app = QGuiApplication(sys.argv)
+    app.setFont(QFont("Inter", 10))
     if mode == "settings":
         app.setApplicationName("x64-win11-settings-app")
         app.setDesktopFileName("x64-win11-settings-app")
-        title = "Configuración — Windows 11 26H2"
+        app.setWindowIcon(QIcon(os.path.join(ASSET_DIR, "settings.svg")))
+        title = "Configuración"
         qml_file = "Win11SettingsWindow.qml"
-        w, h = 960, 650
+        w, h = 1020, 680
     elif mode == "taskmgr":
         app.setApplicationName("x64-win11-taskmgr")
         app.setDesktopFileName("x64-win11-taskmgr")
-        title = "Administrador de tareas — Windows 11 26H2"
+        app.setWindowIcon(QIcon(os.path.join(ASSET_DIR, "taskmgr.svg")))
+        title = "Administrador de tareas"
         qml_file = "Win11TaskMgrWindow.qml"
-        w, h = 780, 560
+        w, h = 980, 650
     else:
         app.setApplicationName("x64-win11-explorer")
         app.setDesktopFileName("x64-win11-explorer")
-        title = "Explorador de archivos — Windows 11 26H2"
+        app.setWindowIcon(QIcon(os.path.join(ASSET_DIR, "explorer.svg")))
+        title = "Explorador de archivos"
         qml_file = "Win11ExplorerWindow.qml"
-        w, h = 1080, 680
+        w, h = 1120, 700
 
     qml_dir = "/usr/share/x64-win11/shell"
     if not os.path.isdir(qml_dir):
