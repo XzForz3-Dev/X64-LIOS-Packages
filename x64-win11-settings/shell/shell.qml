@@ -100,6 +100,7 @@ ShellRoot {
 
     // Universal Dynamic System & User State (Synchronized from ~/.local/state/x64-win11/sysinfo.json)
     property string userName: "Usuario"
+    property string userAvatarUrl: ""
     property string hostName: "x64-lios"
     property bool hasBattery: false
     property int batteryPct: 100
@@ -1025,6 +1026,7 @@ ShellRoot {
                             if (cfg.showBatteryPct !== undefined) shellRoot.showBatteryPct = Boolean(cfg.showBatteryPct);
                             if (cfg.wallpaperMode !== undefined) shellRoot.wallpaperMode = Number(cfg.wallpaperMode);
                             if (cfg.customWallpaperUrl !== undefined) shellRoot.customWallpaperUrl = String(cfg.customWallpaperUrl);
+                            if (cfg.userAvatarUrl !== undefined) shellRoot.userAvatarUrl = String(cfg.userAvatarUrl);
                             if (cfg.desktopIconSizeMode !== undefined) shellRoot.desktopIconSizeMode = String(cfg.desktopIconSizeMode);
                             if (cfg.showDesktopIcons !== undefined) shellRoot.showDesktopIcons = Boolean(cfg.showDesktopIcons);
                             if (cfg.desktopAutoArrange !== undefined) shellRoot.desktopAutoArrange = Boolean(cfg.desktopAutoArrange);
@@ -1045,6 +1047,7 @@ ShellRoot {
                             try {
                                 var sys = JSON.parse(sysRaw);
                                 if (sys.user) shellRoot.userName = sys.user;
+                                if (sys.userAvatarUrl !== undefined) shellRoot.userAvatarUrl = String(sys.userAvatarUrl);
                                 if (sys.hostname) shellRoot.hostName = sys.hostname;
                                 if (sys.hasBattery !== undefined) shellRoot.hasBattery = Boolean(sys.hasBattery);
                                 if (sys.batteryPct !== undefined) shellRoot.batteryPct = Number(sys.batteryPct);
@@ -4874,7 +4877,16 @@ ShellRoot {
                                             color: "#2e2e2e"
                                             border.color: "#28ffffff"
                                             border.width: 1
+                                            Image {
+                                                visible: shellRoot.userAvatarUrl !== ""
+                                                anchors.fill: parent
+                                                source: shellRoot.userAvatarUrl
+                                                sourceSize.width: 64; sourceSize.height: 64
+                                                fillMode: Image.PreserveAspectFit
+                                                mipmap: true; smooth: true; cache: false
+                                            }
                                             WinSvg {
+                                                visible: shellRoot.userAvatarUrl === ""
                                                 anchors.centerIn: parent
                                                 width: 18; height: 18
                                                 iconFile: "fluent-person.svg"
@@ -4894,7 +4906,7 @@ ShellRoot {
                                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
                                         onClicked: {
                                             shellRoot.closeAllPopups();
-                                            shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Sistema'");
+                                            shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Cuentas'");
                                         }
                                     }
                                 }
@@ -7107,14 +7119,23 @@ ShellRoot {
                     if (visible && shellRoot.lockPromptOpen) lockPassInput.forceActiveFocus();
                 }
 
-                // Frosted Circular User Avatar
+                // Frosted Circular User Avatar (synced live with Configuración -> Cuentas!)
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: 128; height: 128; radius: 64
                     color: "#28ffffff"
                     border.color: "#38ffffff"
-                    border.width: 1
+                    border.width: 2
+                    Image {
+                        visible: shellRoot.userAvatarUrl !== ""
+                        anchors.fill: parent; anchors.margins: 2
+                        source: shellRoot.userAvatarUrl
+                        sourceSize.width: 256; sourceSize.height: 256
+                        fillMode: Image.PreserveAspectFit
+                        mipmap: true; smooth: true; cache: false
+                    }
                     WinSvg {
+                        visible: shellRoot.userAvatarUrl === ""
                         anchors.centerIn: parent
                         width: 62; height: 62
                         iconFile: "fluent-person.svg"

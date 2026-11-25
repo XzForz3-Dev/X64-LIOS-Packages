@@ -57,6 +57,15 @@ def get_real_user_info():
     except Exception:
         uname = os.environ.get("USER", "x64")
         display_name = uname.capitalize()
+    try:
+        if os.path.isfile(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as cf:
+                c = json.load(cf)
+                ov = str(c.get("displayNameOverride", "") or "").strip()
+                if ov:
+                    display_name = ov
+    except Exception:
+        pass
     hostname = socket.gethostname()
     return display_name, uname, hostname
 
@@ -938,6 +947,7 @@ def generate_sysinfo_dict():
         "username": uname,
         "hostname": hostname,
         "userEmail": f"{uname}@{hostname}",
+        "userAvatarUrl": str(cfg_cur.get("userAvatarUrl", "") or ""),
         "hasBattery": bat["hasBattery"],
         "batteryPct": bat["batteryPct"],
         "batteryCharging": bat["batteryCharging"],
@@ -1069,9 +1079,16 @@ def main():
         dump_sysinfo_file()
         sys.exit(0)
 
-    from PyQt6.QtCore import QObject, pyqtSlot, QUrl
-    from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon
+    from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QRectF
+    from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QLinearGradient
     from PyQt6.QtQuick import QQuickView
+    try:
+        from PyQt6.QtWidgets import QApplication, QFileDialog
+        _HAS_QTWIDGETS = True
+    except Exception:
+        QApplication = QGuiApplication
+        QFileDialog = None
+        _HAS_QTWIDGETS = False
 
     class AppBridge(QObject):
         def __init__(self, view):
@@ -1799,6 +1816,491 @@ def main():
                 subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{p}%"], start_new_session=True)
             except Exception:
                 pass
+
+        @pyqtSlot()
+        def toggleAudioMute(self):
+            try:
+                subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(int)
+        def setMicVolume(self, pct):
+            p = max(0, min(100, int(pct)))
+            try:
+                subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SOURCE@", f"{p}%"], start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot()
+        def toggleMicMute(self):
+            try:
+                subprocess.Popen(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"], start_new_session=True)
+            except Exception:
+                pass
+
+        @pyqtSlot(str, result=bool)
+        def setDefaultAudioSink(self, sink_id):
+            if not str(sink_id).isdigit():
+                return False
+            try:
+                subprocess.run(["wpctl", "set-default", str(sink_id)], timeout=1.5, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, str, result=bool)
+        def applyMonitorSetting(self, output_name, scale_str, mode_str):
+            if not output_name:
+                return False
+            cmd = ["wlr-randr", "--output", str(output_name)]
+            if scale_str:
+                cmd += ["--scale", str(scale_str)]
+            if mode_str:
+                cmd += ["--mode", str(mode_str)]
+            if len(cmd) <= 3:
+                return False
+            try:
+                subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, bool, result=bool)
+        def toggleBluetoothDevice(self, mac, do_connect):
+            if not mac:
+                return False
+            act = "connect" if do_connect else "disconnect"
+            try:
+                subprocess.Popen(["bluetoothctl", act, str(mac)], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        def _save_avatar_qimage(self, src_img):
+            if src_img.isNull():
+                return ""
+            os.makedirs(STATE_DIR, exist_ok=True)
+            side = min(src_img.width(), src_img.height())
+            x0 = (src_img.width() - side) // 2
+            y0 = (src_img.height() - side) // 2
+            sq = src_img.copy(x0, y0, side, side).scaled(
+                256, 256, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation
+            )
+            # Save square ~/.face & ~/.face.icon for SDDM / system login screens
+            for fp in (os.path.join(HOME_DIR, ".face"), os.path.join(HOME_DIR, ".face.icon")):
+                try:
+                    sq.save(fp, "PNG")
+                except Exception:
+                    pass
+            # Render razor-sharp anti-aliased circular RGBA PNG for Win11 Settings, Start & Lock Screen
+            circ = QImage(256, 256, QImage.Format.Format_ARGB32_Premultiplied)
+            circ.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(circ)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            path = QPainterPath()
+            path.addEllipse(QRectF(0, 0, 256, 256))
+            painter.setClipPath(path)
+            painter.drawImage(0, 0, sq)
+            painter.end()
+            out_p = os.path.join(STATE_DIR, "avatar.png")
+            circ.save(out_p, "PNG")
+            url = f"file://{out_p}?v={int(time.time() * 1000)}"
+            cfg = load_cfg()
+            cfg["userAvatarUrl"] = url
+            save_cfg(cfg)
+            dump_sysinfo_file()
+            return url
+
+        @pyqtSlot(result=str)
+        def pickAndSetUserAvatar(self):
+            if not _HAS_QTWIDGETS or QFileDialog is None:
+                return ""
+            start_dir = resolve_special_folder("Imágenes")
+            if not os.path.isdir(start_dir):
+                start_dir = HOME_DIR
+            fname, _ = QFileDialog.getOpenFileName(
+                None,
+                "Seleccionar imagen de cuenta",
+                start_dir,
+                "Imágenes (*.png *.jpg *.jpeg *.webp *.bmp *.svg)"
+            )
+            if not fname or not os.path.isfile(fname):
+                return ""
+            return self._save_avatar_qimage(QImage(fname))
+
+        @pyqtSlot(str, result=str)
+        def setPresetUserAvatar(self, preset_id):
+            display_name, uname, _ = get_real_user_info()
+            initials = "".join(w[0].upper() for w in (display_name or uname).split()[:2]) or "X"
+            palettes = {
+                "fluent_blue":    ("#0078D4", "#4CC2FF", "#FFFFFF"),
+                "fluent_purple":  ("#6B21A8", "#C084FC", "#FFFFFF"),
+                "fluent_emerald": ("#047857", "#34D399", "#FFFFFF"),
+                "fluent_crimson": ("#991B1B", "#FF2B2B", "#FFFFFF"),
+                "fluent_amber":   ("#B45309", "#FBBF24", "#111111"),
+                "fluent_slate":   ("#1E293B", "#475569", "#F8FAFC"),
+            }
+            if preset_id == "x64_logo":
+                logo_p = os.path.join(ASSET_DIR, "x64lios.png")
+                if os.path.isfile(logo_p):
+                    bg = QImage(256, 256, QImage.Format.Format_ARGB32_Premultiplied)
+                    bg.fill(QColor("#111318"))
+                    p = QPainter(bg)
+                    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+                    lg = QImage(logo_p).scaled(186, 186, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    p.drawImage((256 - lg.width()) // 2, (256 - lg.height()) // 2, lg)
+                    p.end()
+                    return self._save_avatar_qimage(bg)
+            c1, c2, fg = palettes.get(preset_id, palettes["fluent_blue"])
+            img = QImage(256, 256, QImage.Format.Format_ARGB32_Premultiplied)
+            img.fill(Qt.GlobalColor.transparent)
+            p = QPainter(img)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            grad = QLinearGradient(0, 0, 256, 256)
+            grad.setColorAt(0.0, QColor(c1))
+            grad.setColorAt(1.0, QColor(c2))
+            p.fillRect(0, 0, 256, 256, grad)
+            p.setPen(QColor(fg))
+            font = QFont("Inter", 92, QFont.Weight.DemiBold)
+            p.setFont(font)
+            p.drawText(QRectF(0, 0, 256, 256), Qt.AlignmentFlag.AlignCenter, initials)
+            p.end()
+            return self._save_avatar_qimage(img)
+
+        @pyqtSlot(result=bool)
+        def resetUserAvatar(self):
+            av_p = os.path.join(STATE_DIR, "avatar.png")
+            try:
+                if os.path.isfile(av_p):
+                    os.remove(av_p)
+            except Exception:
+                pass
+            cfg = load_cfg()
+            cfg["userAvatarUrl"] = ""
+            save_cfg(cfg)
+            dump_sysinfo_file()
+            return True
+
+        @pyqtSlot(str, result=bool)
+        def setDisplayName(self, new_name):
+            clean = (new_name or "").strip()[:48]
+            cfg = load_cfg()
+            cfg["displayNameOverride"] = clean
+            save_cfg(cfg)
+            dump_sysinfo_file()
+            return True
+
+        @pyqtSlot(result=str)
+        def pickAndSetWallpaper(self):
+            if not _HAS_QTWIDGETS or QFileDialog is None:
+                return ""
+            start_dir = resolve_special_folder("Imágenes")
+            if not os.path.isdir(start_dir):
+                start_dir = HOME_DIR
+            fname, _ = QFileDialog.getOpenFileName(
+                None,
+                "Elegir fondo de escritorio",
+                start_dir,
+                "Imágenes (*.png *.jpg *.jpeg *.webp *.bmp)"
+            )
+            if not fname or not os.path.isfile(fname):
+                return ""
+            url = f"file://{fname}"
+            cfg = load_cfg()
+            cfg["customWallpaperUrl"] = url
+            cfg["wallpaperMode"] = 3
+            save_cfg(cfg)
+            return url
+
+        @pyqtSlot(result=str)
+        def checkPendingUpdatesJson(self):
+            pkgs = []
+            try:
+                cmd = ["checkupdates"] if shutil.which("checkupdates") else ["pacman", "-Qu"]
+                out = subprocess.check_output(cmd, text=True, timeout=8.0, stderr=subprocess.DEVNULL)
+                for ln in out.splitlines():
+                    ln = ln.strip()
+                    if ln:
+                        pkgs.append(ln)
+            except subprocess.CalledProcessError as e:
+                if e.returncode == 2:
+                    pkgs = []
+            except Exception:
+                pass
+            return json.dumps({
+                "count": len(pkgs),
+                "packages": pkgs[:40],
+                "checkedAt": datetime.now().strftime("%H:%M:%S")
+            })
+
+        @pyqtSlot(result=str)
+        def getSettingsExtendedJson(self):
+            import grp
+            display_name, uname, hostname = get_real_user_info()
+            cfg = load_cfg()
+            # 1. Monitors via wlr-randr
+            monitors_list = []
+            try:
+                wout = subprocess.check_output(["wlr-randr"], text=True, timeout=1.5, stderr=subprocess.DEVNULL)
+                cur = None
+                in_modes = False
+                for raw in wout.splitlines():
+                    if raw and not raw.startswith(" "):
+                        if cur:
+                            monitors_list.append(cur)
+                        toks = raw.split(" ", 1)
+                        mname = toks[0].strip()
+                        desc = toks[1].strip().strip('"') if len(toks) > 1 else mname
+                        cur = {"name": mname, "desc": desc, "enabled": True, "currentMode": "", "modes": [], "scale": "1.0", "position": "0,0"}
+                        in_modes = False
+                    elif cur is not None:
+                        s = raw.strip()
+                        if s.startswith("Enabled:"):
+                            cur["enabled"] = ("yes" in s.lower())
+                        elif s.startswith("Scale:"):
+                            try:
+                                cur["scale"] = f"{float(s.split(':', 1)[1].strip()):.2f}".rstrip("0").rstrip(".")
+                            except Exception:
+                                cur["scale"] = "1"
+                        elif s.startswith("Position:"):
+                            cur["position"] = s.split(":", 1)[1].strip()
+                        elif s.startswith("Modes:"):
+                            in_modes = True
+                        elif in_modes and "px," in s:
+                            parts = s.split("px,")
+                            res = parts[0].strip()
+                            hz_part = parts[1].strip().split()[0]
+                            try:
+                                hz = f"{round(float(hz_part))} Hz"
+                                mode_arg = f"{res}@{float(hz_part):.3f}Hz"
+                            except Exception:
+                                hz = hz_part
+                                mode_arg = res
+                            lbl = f"{res} ({hz})"
+                            if "(current)" in s:
+                                cur["currentMode"] = lbl
+                            if len(cur["modes"]) < 8 and not any(m["label"] == lbl for m in cur["modes"]):
+                                cur["modes"].append({"label": lbl, "arg": mode_arg, "current": "(current)" in s})
+                        else:
+                            in_modes = False
+                if cur:
+                    monitors_list.append(cur)
+            except Exception:
+                pass
+
+            # 2. Audio Sinks & Sources via wpctl status
+            sinks = []
+            sources = []
+            mic_vol = 50
+            mic_muted = False
+            try:
+                sout = subprocess.check_output(["wpctl", "status"], text=True, timeout=1.2, stderr=subprocess.DEVNULL)
+                sec = ""
+                in_audio = False
+                for ln in sout.splitlines():
+                    if ln.startswith("Audio"):
+                        in_audio = True
+                        continue
+                    if in_audio and ln and not ln[0].isspace() and not ln.startswith("├") and not ln.startswith("└") and not ln.startswith("│"):
+                        in_audio = False
+                    if not in_audio:
+                        continue
+                    if "Sinks:" in ln:
+                        sec = "sinks"
+                        continue
+                    elif "Sources:" in ln:
+                        sec = "sources"
+                        continue
+                    elif "Devices:" in ln or "Filters:" in ln or "Streams:" in ln:
+                        sec = ""
+                        continue
+                    if sec in ("sinks", "sources") and "." in ln:
+                        is_act = "*" in ln.split(".", 1)[0]
+                        cleaned = ln.replace("│", "").replace("├", "").replace("└", "").replace("─", "").replace("*", "").strip()
+                        if "." in cleaned:
+                            did, rest = cleaned.split(".", 1)
+                            did = did.strip()
+                            if did.isdigit():
+                                name_only = rest.split("[vol:", 1)[0].strip()
+                                item = {"id": did, "name": name_only, "active": is_act}
+                                if sec == "sinks":
+                                    sinks.append(item)
+                                else:
+                                    sources.append(item)
+                mout = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, timeout=1.0, stderr=subprocess.DEVNULL).strip()
+                mic_muted = "MUTED" in mout
+                for tok in mout.split():
+                    try:
+                        mic_vol = int(round(float(tok) * 100))
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+
+            # 3. Bluetooth Paired Devices
+            bt_devices = []
+            try:
+                bout = subprocess.check_output(["bluetoothctl", "devices"], text=True, timeout=1.2, stderr=subprocess.DEVNULL)
+                for ln in bout.splitlines()[:10]:
+                    toks = ln.split(" ", 2)
+                    if len(toks) == 3 and toks[0] == "Device":
+                        mac, bname = toks[1], toks[2].strip()
+                        conn = False
+                        try:
+                            iout = subprocess.check_output(["bluetoothctl", "info", mac], text=True, timeout=0.8, stderr=subprocess.DEVNULL)
+                            conn = "Connected: yes" in iout
+                        except Exception:
+                            pass
+                        bt_devices.append({"mac": mac, "name": bname, "connected": conn})
+            except Exception:
+                pass
+
+            # 4. Network Extra Info
+            net_gw = "—"
+            net_dns = "—"
+            net_iface = "—"
+            try:
+                rout = subprocess.check_output(["ip", "route", "show", "default"], text=True, timeout=0.8, stderr=subprocess.DEVNULL).splitlines()
+                if rout:
+                    rt = rout[0].split()
+                    if "via" in rt:
+                        net_gw = rt[rt.index("via") + 1]
+                    if "dev" in rt:
+                        net_iface = rt[rt.index("dev") + 1]
+                if os.path.isfile("/etc/resolv.conf"):
+                    dns_l = [l.split()[1] for l in open("/etc/resolv.conf") if l.strip().startswith("nameserver")]
+                    if dns_l:
+                        net_dns = ", ".join(dns_l[:2])
+            except Exception:
+                pass
+
+            # 5. Account Info
+            groups = []
+            try:
+                groups = [g.gr_name for g in grp.getgrall() if uname in g.gr_mem]
+            except Exception:
+                pass
+            try:
+                user_shell = pwd.getpwuid(os.getuid()).pw_shell
+            except Exception:
+                user_shell = "/usr/bin/fish"
+
+            # 6. Time & Language
+            tz_str = "Local"
+            ntp_on = True
+            synced = True
+            try:
+                tout = subprocess.check_output(["timedatectl", "status"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
+                for ln in tout.splitlines():
+                    if "Time zone:" in ln:
+                        tz_str = ln.split(":", 1)[1].strip()
+                    elif "NTP service:" in ln:
+                        ntp_on = ("active" in ln.lower() and "inactive" not in ln.lower())
+                    elif "synchronized:" in ln:
+                        synced = ("yes" in ln.lower())
+            except Exception:
+                pass
+            locale_str = os.environ.get("LANG", "es_ES.UTF-8")
+
+            # 7. Default Apps via xdg-mime
+            def qmime(m):
+                try:
+                    d = subprocess.check_output(["xdg-mime", "query", "default", m], text=True, timeout=0.8, stderr=subprocess.DEVNULL).strip()
+                    friendly = {
+                        "chromium.desktop": "Chromium",
+                        "org.gnome.TextEditor.desktop": "Editor de texto",
+                        "org.gnome.Loupe.desktop": "Visor de imágenes (Loupe)",
+                        "org.gnome.Papers.desktop": "Documentos PDF (Papers)",
+                        "org.gnome.FileRoller.desktop": "Gestor de archivadores",
+                        "mpv.desktop": "Reproductor multimedia mpv",
+                        "x64-win11-explorer.desktop": "Explorador de archivos",
+                    }
+                    return friendly.get(d, d.replace(".desktop", "") or "Predeterminada")
+                except Exception:
+                    return "Predeterminada"
+
+            defaults_list = [
+                {"role": "Navegador web",          "app": qmime("x-scheme-handler/https"), "icon": "chromium.png"},
+                {"role": "Editor de texto (.txt)", "app": qmime("text/plain"),             "icon": "fluent-document.svg"},
+                {"role": "Visor de fotos",         "app": qmime("image/png"),              "icon": "folder-images.svg"},
+                {"role": "Documentos PDF",         "app": qmime("application/pdf"),        "icon": "folder-documents.svg"},
+                {"role": "Reproductor de vídeo",   "app": qmime("video/mp4"),              "icon": "folder-videos.svg"},
+                {"role": "Archivos comprimidos",   "app": qmime("application/zip"),        "icon": "fluent-folder-zip.svg"},
+                {"role": "Explorador de archivos", "app": qmime("inode/directory"),        "icon": "explorer.svg"},
+            ]
+
+            # 8. Gaming Stack Telemetry
+            def svc_active(svc, user=False):
+                try:
+                    cmd = ["systemctl"] + (["--user"] if user else []) + ["is-active", "--quiet", svc]
+                    return subprocess.run(cmd, timeout=0.6).returncode == 0
+                except Exception:
+                    return False
+
+            gaming_stack = {
+                "falcond": svc_active("falcond.service"),
+                "dmemcg": svc_active("dmemcg-booster-system.service"),
+                "ananicy": svc_active("ananicy-cpp.service"),
+                "ntsync": os.path.exists("/dev/ntsync") or os.environ.get("PROTON_USE_NTSYNC") == "1",
+                "hasSteam": shutil.which("steam") is not None,
+                "hasHeroic": shutil.which("heroic") is not None,
+                "hasLutris": shutil.which("lutris") is not None,
+            }
+
+            # 9. Recent System Updates from /var/log/pacman.log & installed pkg count
+            recent_upg = []
+            try:
+                if os.path.isfile("/var/log/pacman.log"):
+                    lines = open("/var/log/pacman.log", "r", encoding="utf-8", errors="ignore").readlines()[-400:]
+                    for ln in reversed(lines):
+                        if "[ALPM] upgraded " in ln:
+                            dt = ln[1:17].replace("T", " ")
+                            body = ln.split("[ALPM] upgraded ", 1)[1].strip()
+                            recent_upg.append({"date": dt, "entry": body})
+                            if len(recent_upg) >= 10:
+                                break
+            except Exception:
+                pass
+            try:
+                pkg_count = len(os.listdir("/var/lib/pacman/local")) - 1
+            except Exception:
+                pkg_count = 0
+
+            return json.dumps({
+                "monitors": monitors_list,
+                "sinks": sinks,
+                "sources": sources,
+                "micVol": mic_vol,
+                "micMuted": mic_muted,
+                "btDevices": bt_devices,
+                "netGateway": net_gw,
+                "netDns": net_dns,
+                "netIface": net_iface,
+                "account": {
+                    "displayName": display_name,
+                    "username": uname,
+                    "hostname": hostname,
+                    "homeDir": HOME_DIR,
+                    "shell": user_shell,
+                    "groups": ", ".join(groups[:8]) if groups else "usuario",
+                    "isAdmin": "wheel" in groups,
+                    "avatarUrl": str(cfg.get("userAvatarUrl", "") or "")
+                },
+                "timeLang": {
+                    "timezone": tz_str,
+                    "ntpActive": ntp_on,
+                    "synced": synced,
+                    "locale": locale_str
+                },
+                "defaultApps": defaults_list,
+                "gamingStack": gaming_stack,
+                "recentUpgrades": recent_upg,
+                "pkgCount": max(0, pkg_count)
+            })
 
         @pyqtSlot(str)
         def copyTextToClipboard(self, txt):
@@ -2796,7 +3298,7 @@ def main():
 
     dump_sysinfo_file()
 
-    app = QGuiApplication(sys.argv)
+    app = QApplication(sys.argv)
     app.setFont(QFont("Inter", 10))
     if mode == "settings":
         app.setApplicationName("x64-win11-settings-app")

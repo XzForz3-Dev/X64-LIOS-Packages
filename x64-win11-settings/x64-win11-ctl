@@ -362,7 +362,7 @@ PYEOF
         setsid -f /usr/bin/x64-win11-app explorer "${2:-Este equipo}" >/dev/null 2>&1 &
         ;;
     settings)
-        setsid -f /usr/bin/x64-win11-app settings "${2:-Personalización (26H2)}" >/dev/null 2>&1 &
+        setsid -f /usr/bin/x64-win11-app settings "${2:-Inicio}" >/dev/null 2>&1 &
         ;;
     taskmgr)
         setsid -f /usr/bin/x64-win11-app taskmgr >/dev/null 2>&1 &
