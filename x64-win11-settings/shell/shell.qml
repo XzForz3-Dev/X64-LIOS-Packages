@@ -113,6 +113,16 @@ ShellRoot {
     property int batteryPct: 100
     property string batteryText: "Conectado a CA"
     property bool kdeConnectInstalled: true
+    property var phoneLinkData: ({ "kdeInstalled": true, "kdeRunning": false, "scrcpyInstalled": true, "adbInstalled": true, "kdeDevices": [], "adbDevices": [], "mirrorActive": false, "mirrorMode": "", "mirrorSerial": "" })
+    property bool phoneMirrorActive: false
+    property string phoneMirrorMode: ""
+    property string phoneMirrorSerial: ""
+    property string _lastPhoneRaw: ""
+    onStartOpenChanged: {
+        if (startOpen && showPhoneLink) {
+            Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "phone", "refresh"]);
+        }
+    }
     property var desktopIcons: [
         { title: "Este equipo",            iconUrl: shellRoot.assetDir + "thispc.svg",      cmd: "/usr/bin/x64-win11-app explorer 'Este equipo'" },
         { title: "Papelera de\nreciclaje", iconUrl: shellRoot.assetDir + "trash.svg",       cmd: "/usr/bin/x64-win11-app explorer 'Papelera'" },
@@ -186,10 +196,16 @@ ShellRoot {
     ]
     property bool toastVisible: false
     property var activeToast: null
+    property bool notifEnabled: true
+    property bool notifShowBanners: true
+    property bool notifPlaySound: true
+    property int notifBannerSecs: 5
+    property var notifMutedApps: ({})
+    property var _seenNotifApps: ({})
 
     Timer {
         id: toastAutoHideTimer
-        interval: 5000
+        interval: Math.max(2, shellRoot.notifBannerSecs) * 1000
         repeat: false
         onTriggered: shellRoot.toastVisible = false
     }
@@ -209,10 +225,29 @@ ShellRoot {
         return shellRoot.assetDir + "windows.svg";
     }
 
+    function isNotifAppMuted(appTitle) {
+        var k = (appTitle || "Sistema").trim().toLowerCase();
+        var map = shellRoot.notifMutedApps || ({});
+        if (map[k] === true) return true;
+        for (var mk in map) {
+            if (map[mk] === true && mk.length >= 3 && k.indexOf(mk) !== -1) return true;
+        }
+        return false;
+    }
+
     function addInternalNotification(appTitle, summaryText, bodyText, customIconUrl) {
+        var cleanApp = (appTitle || "Sistema").trim();
+        var appKey = cleanApp.toLowerCase();
+        if (cleanApp !== "" && !shellRoot._seenNotifApps[appKey]) {
+            var sc = Object.assign({}, shellRoot._seenNotifApps);
+            sc[appKey] = true;
+            shellRoot._seenNotifApps = sc;
+            Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "record-notif-app", cleanApp]);
+        }
+        if (!shellRoot.notifEnabled || shellRoot.isNotifAppMuted(cleanApp)) return;
         var entry = {
             uid: Date.now() + Math.floor(Math.random() * 10000),
-            app: appTitle || "Sistema",
+            app: cleanApp || "Sistema",
             title: summaryText || "Notificación",
             body: bodyText || "",
             time: Qt.formatTime(new Date(), "hh:mm"),
@@ -224,9 +259,15 @@ ShellRoot {
         }
         shellRoot.notifItems = nextList;
         if (!shellRoot.qsDnd && !shellRoot.calendarOpen && !shellRoot.lockScreenOpen) {
-            shellRoot.activeToast = entry;
-            shellRoot.toastVisible = true;
-            toastAutoHideTimer.restart();
+            if (shellRoot.notifShowBanners) {
+                shellRoot.activeToast = entry;
+                shellRoot.toastVisible = true;
+                toastAutoHideTimer.interval = Math.max(2, shellRoot.notifBannerSecs) * 1000;
+                toastAutoHideTimer.restart();
+            }
+            if (shellRoot.notifPlaySound) {
+                Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "notif-sound"]);
+            }
         }
     }
 
@@ -355,6 +396,7 @@ ShellRoot {
         if (idx === -1) idx = 1;
         var nextIdx = Math.max(0, Math.min(steps.length - 1, idx + deltaSign));
         shellRoot.focusDurationMins = steps[nextIdx];
+        shellRoot.saveConfigKey("focusDurationMins", String(shellRoot.focusDurationMins));
     }
 
     function startFocusSession() {
@@ -414,6 +456,17 @@ ShellRoot {
     property bool qsBt: true
     property bool qsGaming: true
     property bool qsNightLight: false
+    property real qsNightLightStrength: 45
+    property bool identifyActive: false
+    property var identifyMap: ({})
+    property double lastIdentifyTs: 0
+    // Authentic Windows 11 26H2 Center-Bottom Hardware OSD Pill (Fn Volume / Brightness / Mic Mute)
+    property bool osdVisible: false
+    property string osdKind: "volume"
+    property int osdValue: 50
+    property bool osdMuted: false
+    property double lastOsdTs: 0
+    property string _lastOsdRaw: ""
     property bool qsBatterySaver: false
     property bool qsDnd: false
     property real qsBrightness: 100
@@ -427,6 +480,20 @@ ShellRoot {
         interval: 1200
         repeat: false
         onTriggered: shellRoot.brightnessAdjusting = false
+    }
+
+    Timer {
+        id: identifyHideTimer
+        interval: 3200
+        repeat: false
+        onTriggered: shellRoot.identifyActive = false
+    }
+
+    Timer {
+        id: osdHideTimer
+        interval: 1850
+        repeat: false
+        onTriggered: shellRoot.osdVisible = false
     }
 
     Timer {
@@ -982,7 +1049,7 @@ ShellRoot {
     // Poll IPC Command File, Config JSON, Shared Clipboard, Workspaces & Dynamic SysInfo JSON (Diff-guarded for zero flicker!)
     Process {
         id: statePoller
-        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'; echo '---SYS---'; cat ~/.local/state/x64-win11/sysinfo.json 2>/dev/null || echo '{}'; echo '---CLIP---'; cat ~/.local/state/x64-win11/clipboard.json 2>/dev/null || echo '{}'; echo '---WS---'; cat ~/.local/state/x64-win11/workspaces.json 2>/dev/null || echo '{}'"]
+        command: ["sh", "-c", "cat ~/.local/state/x64-win11/cmd 2>/dev/null || echo ''; echo '---CFG---'; cat ~/.local/state/x64-win11/config.json 2>/dev/null || echo '{}'; echo '---SYS---'; cat ~/.local/state/x64-win11/sysinfo.json 2>/dev/null || echo '{}'; echo '---CLIP---'; cat ~/.local/state/x64-win11/clipboard.json 2>/dev/null || echo '{}'; echo '---WS---'; cat ~/.local/state/x64-win11/workspaces.json 2>/dev/null || echo '{}'; echo '---OSD---'; cat ~/.local/state/x64-win11/osd.json 2>/dev/null || echo '{}'; echo '---PHONE---'; cat ~/.local/state/x64-win11/phone-mirror.json 2>/dev/null || echo '{}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var raw = text || "";
@@ -1022,6 +1089,9 @@ ShellRoot {
                         shellRoot.closeAllPopups();
                         shellRoot.lockPromptOpen = false;
                         shellRoot.lockScreenOpen = true;
+                    } else if (act === "clear-notifs") {
+                        shellRoot.clearAllNotifications();
+                        shellRoot.toastVisible = false;
                     }
                     shellRoot.lastCmdToken = cmdLine;
                 }
@@ -1054,7 +1124,26 @@ ShellRoot {
                             if (cfg.desktopSortMode !== undefined) shellRoot.desktopSortMode = String(cfg.desktopSortMode);
                             if (cfg.desktopSortAsc !== undefined) shellRoot.desktopSortAsc = Boolean(cfg.desktopSortAsc);
                             if (cfg.nightLight !== undefined) shellRoot.qsNightLight = Boolean(cfg.nightLight);
+                            if (cfg.nightLightStrength !== undefined) shellRoot.qsNightLightStrength = Math.max(15, Math.min(100, Number(cfg.nightLightStrength)));
+                            if (cfg.identifyDisplays && typeof cfg.identifyDisplays === "object") {
+                                var idTs = Number(cfg.identifyDisplays.ts || 0);
+                                if (idTs > shellRoot.lastIdentifyTs) {
+                                    var wasInit = (shellRoot.lastIdentifyTs === 0 && (Date.now() - idTs) > 4000);
+                                    shellRoot.lastIdentifyTs = idTs;
+                                    if (!wasInit) {
+                                        shellRoot.identifyMap = cfg.identifyDisplays.map || ({});
+                                        shellRoot.identifyActive = true;
+                                        identifyHideTimer.restart();
+                                    }
+                                }
+                            }
                             if (cfg.doNotDisturb !== undefined && !shellRoot.focusRunning) shellRoot.qsDnd = Boolean(cfg.doNotDisturb);
+                            if (cfg.notifEnabled !== undefined) shellRoot.notifEnabled = Boolean(cfg.notifEnabled);
+                            if (cfg.notifShowBanners !== undefined) shellRoot.notifShowBanners = Boolean(cfg.notifShowBanners);
+                            if (cfg.notifPlaySound !== undefined) shellRoot.notifPlaySound = Boolean(cfg.notifPlaySound);
+                            if (cfg.notifBannerSecs !== undefined) shellRoot.notifBannerSecs = Math.max(2, Math.min(20, Number(cfg.notifBannerSecs)));
+                            if (cfg.notifMutedApps !== undefined && typeof cfg.notifMutedApps === "object") shellRoot.notifMutedApps = cfg.notifMutedApps;
+                            if (cfg.focusDurationMins !== undefined && !shellRoot.focusRunning) shellRoot.focusDurationMins = Math.max(15, Math.min(240, Number(cfg.focusDurationMins)));
                             if (cfg.brightnessPct !== undefined && !shellRoot.brightnessAdjusting) shellRoot.qsBrightness = Number(cfg.brightnessPct);
                         } catch (e) {}
                     }
@@ -1077,6 +1166,7 @@ ShellRoot {
                                 if (sys.trashSize !== undefined) shellRoot.trashSize = String(sys.trashSize);
                                 if (sys.hasHiddenDesktopIcons !== undefined) shellRoot.hasHiddenDesktopIcons = Boolean(sys.hasHiddenDesktopIcons);
                                 if (sys.kdeConnectInstalled !== undefined) shellRoot.kdeConnectInstalled = Boolean(sys.kdeConnectInstalled);
+                                if (sys.phoneLink && typeof sys.phoneLink === "object") shellRoot.phoneLinkData = sys.phoneLink;
                                 if (sys.desktopIcons && sys.desktopIcons.length > 0) shellRoot.desktopIcons = sys.desktopIcons;
                                 if (sys.taskbarPinned && sys.taskbarPinned.length > 0) shellRoot.taskbarPinned = sys.taskbarPinned;
                                 if (sys.startPinned && sys.startPinned.length > 0) shellRoot.startPinned = sys.startPinned;
@@ -1120,7 +1210,8 @@ ShellRoot {
                                 } catch (e3) {}
                             }
                             if (clipWsParts.length > 1) {
-                                var wsRaw = (clipWsParts[1] || "{}").trim();
+                                var wsOsdParts = (clipWsParts[1] || "{}").split("---OSD---");
+                                var wsRaw = (wsOsdParts[0] || "{}").trim();
                                 if (wsRaw !== shellRoot._lastWsRaw && wsRaw !== "{}") {
                                     shellRoot._lastWsRaw = wsRaw;
                                     try {
@@ -1133,6 +1224,45 @@ ShellRoot {
                                         }
                                     } catch (e4) {}
                                 }
+                                if (wsOsdParts.length > 1) {
+                                    var osdPhoneParts = (wsOsdParts[1] || "{}").split("---PHONE---");
+                                    var osdRaw = (osdPhoneParts[0] || "{}").trim();
+                                    if (osdRaw !== shellRoot._lastOsdRaw && osdRaw !== "{}") {
+                                        shellRoot._lastOsdRaw = osdRaw;
+                                        try {
+                                            var ev = JSON.parse(osdRaw);
+                                            var evTs = Number(ev.ts || 0);
+                                            if (evTs > shellRoot.lastOsdTs) {
+                                                var staleInit = (shellRoot.lastOsdTs === 0 && (Date.now() - evTs) > 2500);
+                                                shellRoot.lastOsdTs = evTs;
+                                                if (!staleInit) {
+                                                    if (ev.kind === "brightness" && ev.value !== undefined && !shellRoot.brightnessAdjusting) {
+                                                        shellRoot.qsBrightness = Math.max(10, Math.min(100, Number(ev.value)));
+                                                    }
+                                                    if (ev.showOsd !== false) {
+                                                        shellRoot.osdKind = String(ev.kind || "volume");
+                                                        shellRoot.osdValue = Math.max(0, Math.min(150, Math.round(Number(ev.value !== undefined ? ev.value : 50))));
+                                                        shellRoot.osdMuted = Boolean(ev.muted);
+                                                        shellRoot.osdVisible = true;
+                                                        osdHideTimer.restart();
+                                                    }
+                                                }
+                                            }
+                                        } catch (e5) {}
+                                    }
+                                    if (osdPhoneParts.length > 1) {
+                                        var phRaw = (osdPhoneParts[1] || "{}").trim();
+                                        if (phRaw !== shellRoot._lastPhoneRaw) {
+                                            shellRoot._lastPhoneRaw = phRaw;
+                                            try {
+                                                var pm = JSON.parse(phRaw);
+                                                shellRoot.phoneMirrorActive = Boolean(pm && pm.active);
+                                                shellRoot.phoneMirrorMode = (pm && pm.mode) ? String(pm.mode) : "";
+                                                shellRoot.phoneMirrorSerial = (pm && pm.serial) ? String(pm.serial) : "";
+                                            } catch (e6) {}
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1142,7 +1272,7 @@ ShellRoot {
     }
 
     Timer {
-        interval: 220
+        interval: 150
         running: true
         repeat: true
         onTriggered: {
@@ -2005,13 +2135,13 @@ ShellRoot {
             // Empty input mask: 100% of mouse clicks & hovers pass through to apps below
             mask: Region {}
 
-            // 1. Smooth Natural Night Light (~4800K Subtle Warm Amber Filter across all monitors)
+            // 1. Smooth Natural Night Light (Adjustable Warm Amber Filter across all monitors!)
             Rectangle {
                 anchors.fill: parent
-                color: "#ff9838"
-                opacity: shellRoot.qsNightLight ? 0.065 : 0.0
+                color: "#ff9230"
+                opacity: shellRoot.qsNightLight ? (0.04 + (Math.max(15, Math.min(100, shellRoot.qsNightLightStrength)) / 100.0) * 0.22) : 0.0
                 Behavior on opacity {
-                    NumberAnimation { duration: 850; easing.type: Easing.InOutCubic }
+                    NumberAnimation { duration: 420; easing.type: Easing.InOutCubic }
                 }
             }
 
@@ -2020,6 +2150,80 @@ ShellRoot {
                 anchors.fill: parent
                 color: "#000000"
                 opacity: Math.max(0.0, Math.min(0.80, (100.0 - shellRoot.qsBrightness) / 112.0))
+            }
+
+            // 2B. Authentic Windows 11 26H2 "Identificar pantallas" Floating Badge per Monitor!
+            Rectangle {
+                readonly property string scrName: screenFilterWin.modelData ? (screenFilterWin.modelData.name || "") : ""
+                readonly property int monIdx: (shellRoot.identifyMap && shellRoot.identifyMap[scrName] !== undefined)
+                    ? Number(shellRoot.identifyMap[scrName])
+                    : (Quickshell.screens.indexOf(screenFilterWin.modelData) + 1)
+                visible: opacity > 0.01
+                opacity: shellRoot.identifyActive ? 1.0 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                x: 44
+                y: screenFilterWin.height - height - (shellRoot.taskbarCompact ? 62 : 72)
+                width: 156; height: 118; radius: 12
+                color: "#eb1c1c1c"
+                border.color: "#4cc2ff"; border.width: 2
+                Column {
+                    anchors.centerIn: parent; spacing: 2
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: String(parent.parent.monIdx)
+                        color: "#ffffff"; font.pixelSize: 54; font.weight: Font.Bold
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: parent.parent.scrName || "Pantalla"
+                        color: "#4cc2ff"; font.pixelSize: 13; font.weight: Font.DemiBold
+                    }
+                }
+            }
+
+            // 2C. Authentic Windows 11 26H2 Floating Center-Bottom OSD Pill (Fn Volume / Brightness / Mic Mute!)
+            Rectangle {
+                id: win11OsdPill
+                visible: opacity > 0.01
+                opacity: shellRoot.osdVisible ? 1.0 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                width: 244; height: 52; radius: 10
+                x: Math.round((screenFilterWin.width - width) / 2)
+                y: screenFilterWin.height - (shellRoot.taskbarCompact ? 38 : 48) - height - (shellRoot.osdVisible ? 20 : 10)
+                Behavior on y { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
+                color: "#f2222222"
+                border.color: "#32ffffff"; border.width: 1
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 12
+
+                    WinSvg {
+                        width: 20; height: 20
+                        iconFile: shellRoot.osdKind === "brightness"
+                                  ? "fluent-brightness.svg"
+                                  : (shellRoot.osdKind === "mic"
+                                     ? (shellRoot.osdMuted ? "audio-input-microphone-muted-symbolic.svg" : "audio-input-microphone-symbolic.svg")
+                                     : ((shellRoot.osdMuted || shellRoot.osdValue <= 0) ? "fluent-speaker-mute.svg" : "fluent-speaker-high.svg"))
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true; height: 4; radius: 2; color: "#4a4a4a"
+                        Rectangle {
+                            height: 4; radius: 2
+                            width: shellRoot.osdMuted ? 0 : Math.max(0, Math.min(parent.width, parent.width * (Math.min(100, shellRoot.osdValue) / 100.0)))
+                            color: shellRoot.osdValue > 100 ? "#fbbf24" : "#4cc2ff"
+                            Behavior on width { NumberAnimation { duration: 85; easing.type: Easing.OutCubic } }
+                        }
+                    }
+
+                    Text {
+                        text: shellRoot.osdMuted ? "Mute" : String(shellRoot.osdValue)
+                        color: shellRoot.osdMuted ? "#f87171" : (shellRoot.osdValue > 100 ? "#fbbf24" : "#f5f5f5")
+                        font.pixelSize: 13; font.weight: Font.DemiBold
+                        Layout.preferredWidth: 34; horizontalAlignment: Text.AlignRight
+                    }
+                }
             }
 
             // 3. Click-Through Authentic Windows 11 Taskbar Hover Tooltip Pill
@@ -5278,8 +5482,9 @@ ShellRoot {
                     }
                 }
 
-                // [B] Authentic Windows 11 26H2 Phone Link ("Enlace Móvil") Companion Panel (250x700)
+                // [B] Authentic Windows 11 26H2 Phone Link ("Enlace Móvil") Live Companion Panel (250x700)
                 Rectangle {
+                    id: phoneCompanionCard
                     visible: shellRoot.showPhoneLink
                     width: 250
                     height: 700
@@ -5289,15 +5494,28 @@ ShellRoot {
                     border.width: 1
                     MouseArea { anchors.fill: parent }
 
+                    readonly property var phData: shellRoot.phoneLinkData || ({})
+                    readonly property var kdeList: phData.kdeDevices || []
+                    readonly property var adbList: phData.adbDevices || []
+                    readonly property var activeKde: {
+                        for (var i = 0; i < kdeList.length; i++) if (kdeList[i].paired && kdeList[i].reachable) return kdeList[i];
+                        for (var j = 0; j < kdeList.length; j++) if (kdeList[j].paired) return kdeList[j];
+                        return null;
+                    }
+                    readonly property var activeAdb: {
+                        for (var i = 0; i < adbList.length; i++) if (adbList[i].authorized) return adbList[i];
+                        return adbList.length > 0 ? adbList[0] : null;
+                    }
+
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 18
-                        spacing: 14
+                        spacing: 12
 
                         // Header Row
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 8
+                            spacing: 6
                             WinSvg { width: 18; height: 18; iconFile: "fluent-phone.svg" }
                             Text {
                                 text: "Enlace Móvil"
@@ -5308,10 +5526,22 @@ ShellRoot {
                             }
                             Rectangle {
                                 width: 26; height: 26; radius: 5
+                                color: phSetHov.containsMouse ? "#24ffffff" : "transparent"
+                                WinSvg { anchors.centerIn: parent; width: 13; height: 13; iconFile: "fluent-settings.svg"; opacity: 0.85 }
+                                MouseArea {
+                                    id: phSetHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        shellRoot.closeAllPopups();
+                                        shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Bluetooth y dispositivos:Dispositivos móviles'");
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                width: 26; height: 26; radius: 5
                                 color: phCloseHov.containsMouse ? "#24ffffff" : "transparent"
                                 WinSvg { anchors.centerIn: parent; width: 11; height: 11; iconFile: "fluent-dismiss.svg"; opacity: 0.8 }
                                 MouseArea {
-                                    id: phCloseHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
+                                    id: phCloseHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         shellRoot.showPhoneLink = false;
                                         shellRoot.saveConfigKey("showPhoneLink", "false");
@@ -5320,63 +5550,105 @@ ShellRoot {
                             }
                         }
 
-                        // Phone Status + 4 Quick Action Buttons (Mensajes, Llamadas, Fotos, Enviar)
+                        // Phone Live Status + 4 Real Quick Actions (Acoplar, Flotante, Sonar, Ajustes)
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 128
+                            implicitHeight: phStatInner.implicitHeight + 24
                             radius: 8
                             color: "#282828"
-                            border.color: "#1fffffff"
+                            border.color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#444cc2ff" : "#1fffffff"
                             border.width: 1
 
                             Column {
-                                anchors.fill: parent
+                                id: phStatInner
+                                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
                                 anchors.margins: 12
                                 spacing: 12
 
                                 RowLayout {
-                                    width: 190
+                                    width: parent.width
                                     spacing: 10
                                     Rectangle {
                                         width: 36; height: 36; radius: 8
-                                        color: "#333333"
+                                        color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#264cc2ff" : "#333333"
                                         WinSvg { anchors.centerIn: parent; width: 20; height: 20; iconFile: "fluent-phone.svg" }
                                     }
                                     Column {
                                         Layout.fillWidth: true
                                         spacing: 2
                                         Text {
-                                            text: shellRoot.kdeConnectInstalled ? "Dispositivo listo" : "Sin dispositivo"
+                                            width: parent.width; elide: Text.ElideRight
+                                            text: phoneCompanionCard.activeAdb ? phoneCompanionCard.activeAdb.model
+                                                  : (phoneCompanionCard.activeKde ? phoneCompanionCard.activeKde.name : "Sin teléfono activo")
                                             color: "#ffffff"; font.pixelSize: 12; font.weight: Font.DemiBold
                                         }
                                         Text {
-                                            text: shellRoot.kdeConnectInstalled ? "Sincronizado en red" : "Android o iPhone"
-                                            color: "#a8a8a8"; font.pixelSize: 11
+                                            width: parent.width; elide: Text.ElideRight
+                                            text: {
+                                                if (shellRoot.phoneMirrorActive) {
+                                                    var ab = phoneCompanionCard.activeAdb && Number(phoneCompanionCard.activeAdb.battery) >= 0
+                                                        ? (" • " + phoneCompanionCard.activeAdb.battery + "%") : "";
+                                                    return "Pantalla activa" + ab;
+                                                }
+                                                if (phoneCompanionCard.activeAdb) {
+                                                    var adbBat = Number(phoneCompanionCard.activeAdb.battery);
+                                                    var batS = adbBat >= 0 ? (" • " + adbBat + "%" + (phoneCompanionCard.activeAdb.charging ? " (cargando)" : "")) : "";
+                                                    return phoneCompanionCard.activeAdb.authorized
+                                                        ? ((phoneCompanionCard.activeAdb.isWifi ? "Wi-Fi" : "USB") + batS)
+                                                        : "Acepta depuración en el móvil";
+                                                }
+                                                if (phoneCompanionCard.activeKde) {
+                                                    var b = Number(phoneCompanionCard.activeKde.battery);
+                                                    return (phoneCompanionCard.activeKde.reachable ? "Conectado" : "Fuera de alcance")
+                                                        + (b >= 0 ? (" • " + b + "%") : "");
+                                                }
+                                                return "KDE Connect + scrcpy listos";
+                                            }
+                                            color: (shellRoot.phoneMirrorActive || phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#4cc2ff" : "#a8a8a8"
+                                            font.pixelSize: 11
                                         }
                                     }
                                 }
 
-                                // 4 Quick Actions Row (Exact Windows 11 Phone Link Companion Layout)
+                                // 4 Distinct Real Quick Actions Row (Pantalla, Enviar, Sonar, Ajustes)
                                 Row {
-                                    spacing: 8
+                                    spacing: 6
                                     Repeater {
                                         model: [
-                                            { icon: "fluent-chat.svg",  tip: "Mensajes" },
-                                            { icon: "fluent-call.svg",  tip: "Llamadas" },
-                                            { icon: "fluent-image.svg", tip: "Fotos" },
-                                            { icon: "fluent-send.svg",  tip: "Enviar" }
+                                            { icon: "fluent-display.svg",  lbl: "Pantalla", act: "screen" },
+                                            { icon: "fluent-send.svg",     lbl: "Enviar",   act: "send" },
+                                            { icon: "fluent-bell.svg",     lbl: "Sonar",    act: "ring" },
+                                            { icon: "fluent-settings.svg", lbl: "Ajustes",  act: "settings" }
                                         ]
                                         delegate: Rectangle {
-                                            width: 41; height: 42; radius: 6
-                                            color: phActHov.containsMouse ? "#3c3c3c" : "#323232"
+                                            width: 44; height: 46; radius: 6
+                                            color: phActHov.containsMouse ? "#3e3e3e" : "#323232"
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             border.color: "#1affffff"
-                                            WinSvg { anchors.centerIn: parent; width: 17; height: 17; iconFile: modelData.icon }
+                                            Column {
+                                                anchors.centerIn: parent; spacing: 3
+                                                WinSvg { anchors.horizontalCenter: parent.horizontalCenter; width: 16; height: 16; iconFile: modelData.icon }
+                                                Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.lbl; color: "#d4d4d4"; font.pixelSize: 9 }
+                                            }
                                             MouseArea {
-                                                id: phActHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
+                                                id: phActHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     shellRoot.closeAllPopups();
-                                                    shellRoot.spawnCmd("kdeconnect-app || /usr/bin/x64-win11-app settings 'Bluetooth y dispositivos'");
+                                                    if (modelData.act === "screen") {
+                                                        shellRoot.spawnCmd(shellRoot.phoneMirrorActive ? "/usr/bin/x64-win11-ctl phone stop" : "/usr/bin/x64-win11-ctl phone mirror");
+                                                    } else if (modelData.act === "ring") {
+                                                        shellRoot.spawnCmd("/usr/bin/x64-win11-ctl phone ring");
+                                                    } else if (modelData.act === "send") {
+                                                        if (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.id) {
+                                                            shellRoot.spawnCmd("kdeconnect-app");
+                                                        } else if (phoneCompanionCard.activeAdb && phoneCompanionCard.activeAdb.authorized) {
+                                                            shellRoot.spawnCmd("/usr/bin/x64-win11-ctl phone send-file '" + phoneCompanionCard.activeAdb.serial + "'");
+                                                        } else {
+                                                            shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Bluetooth y dispositivos:Dispositivos móviles'");
+                                                        }
+                                                    } else {
+                                                        shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Bluetooth y dispositivos:Dispositivos móviles'");
+                                                    }
                                                 }
                                             }
                                         }
@@ -5385,7 +5657,7 @@ ShellRoot {
                             }
                         }
 
-                        // Continuity & Pairing Card (Fills companion gracefully like Microsoft Phone Link Promo/Activity Card)
+                        // Live Screen Mirroring & Continuity Card
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -5396,11 +5668,11 @@ ShellRoot {
 
                             ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: 16
-                                spacing: 12
+                                anchors.margins: 15
+                                spacing: 10
 
                                 Text {
-                                    text: "Tu teléfono, integrado en Inicio"
+                                    text: "Tu teléfono en el escritorio"
                                     color: "#ffffff"
                                     font.pixelSize: 13
                                     font.weight: Font.DemiBold
@@ -5409,7 +5681,9 @@ ShellRoot {
                                 }
 
                                 Text {
-                                    text: "Recibe notificaciones móviles, responde mensajes, comparte el portapapeles y arrastra fotos al instante entre tu móvil y el PC."
+                                    text: phoneCompanionCard.activeAdb
+                                          ? "Tu Android está detectado. Abre su pantalla flotante para controlarlo libremente en cualquiera de tus monitores."
+                                          : "Conecta tu Android por USB (Depuración USB) o Wi-Fi para ver y controlar su pantalla con ratón y teclado."
                                     color: "#b8b8b8"
                                     font.pixelSize: 11
                                     lineHeight: 1.25
@@ -5418,46 +5692,60 @@ ShellRoot {
                                 }
 
                                 Column {
-                                    spacing: 8
+                                    spacing: 7
                                     Layout.fillWidth: true
                                     Repeater {
                                         model: [
-                                            "Notificaciones y llamadas en vivo",
-                                            "Fotos recientes al instante",
-                                            "Envío directo de archivos"
+                                            "Control táctil 60/120 FPS + audio",
+                                            "Ventana flotante libre y fijable",
+                                            "Notificaciones y archivos (KDE Connect)"
                                         ]
                                         delegate: Row {
                                             spacing: 8
-                                            WinSvg { anchors.verticalCenter: parent.verticalCenter; width: 13; height: 13; iconFile: "fluent-checkmark.svg"; opacity: 0.85 }
-                                            Text { text: modelData; color: "#d8d8d8"; font.pixelSize: 11 }
+                                            WinSvg { anchors.verticalCenter: parent.verticalCenter; width: 12; height: 12; iconFile: "fluent-checkmark.svg"; opacity: 0.85 }
+                                            Text { text: modelData; color: "#d8d8d8"; font.pixelSize: 10; width: 164; wrapMode: Text.WordWrap }
                                         }
                                     }
                                 }
 
                                 Item { Layout.fillHeight: true }
 
-                                // Authentic WinUI 3 Primary Accent Button (#4cc2ff + #000000 text)
+                                // Single Clean Primary Action: Ver / Cerrar pantalla del móvil
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    height: 34
-                                    radius: 5
-                                    color: phLinkBtnHov.containsMouse ? "#5cd0ff" : "#4cc2ff"
+                                    height: 36; radius: 5
+                                    color: phMirBtnH.containsMouse ? "#5cd0ff" : "#4cc2ff"
                                     Behavior on color { ColorAnimation { duration: 110 } }
-
                                     Text {
                                         anchors.centerIn: parent
-                                        text: shellRoot.kdeConnectInstalled ? "Abrir Enlace Móvil" : "Vincular dispositivo"
-                                        color: "#000000"
-                                        font.pixelSize: 12
-                                        font.weight: Font.DemiBold
+                                        text: shellRoot.phoneMirrorActive ? "Cerrar pantalla del móvil" : "Ver pantalla del móvil"
+                                        color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold
                                     }
-
                                     MouseArea {
-                                        id: phLinkBtnHov
-                                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
+                                        id: phMirBtnH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             shellRoot.closeAllPopups();
-                                            shellRoot.spawnCmd("kdeconnect-app || /usr/bin/x64-win11-app settings 'Bluetooth y dispositivos'");
+                                            shellRoot.spawnCmd(shellRoot.phoneMirrorActive ? "/usr/bin/x64-win11-ctl phone stop" : "/usr/bin/x64-win11-ctl phone mirror");
+                                        }
+                                    }
+                                }
+
+                                // Secondary Action: Configurar Wi-Fi y KDE Connect
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 32; radius: 5
+                                    color: phCfgBtnH.containsMouse ? "#3a3a3a" : "#303030"
+                                    border.color: "#22ffffff"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "Configurar Wi-Fi y vinculación"
+                                        color: "#f0f0f0"; font.pixelSize: 11; font.weight: Font.Medium
+                                    }
+                                    MouseArea {
+                                        id: phCfgBtnH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            shellRoot.closeAllPopups();
+                                            shellRoot.spawnCmd("/usr/bin/x64-win11-app settings 'Bluetooth y dispositivos:Dispositivos móviles'");
                                         }
                                     }
                                 }

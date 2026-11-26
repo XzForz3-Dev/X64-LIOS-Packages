@@ -5,9 +5,58 @@ mkdir -p "$STATE_DIR"
 CMD_FILE="${STATE_DIR}/cmd"
 
 case "$1" in
-    toggle-start| toggle-qs| toggle-calendar| toggle-taskview| toggle-winx| toggle-run| lock)
+    toggle-start| toggle-qs| toggle-calendar| toggle-taskview| toggle-winx| toggle-run| lock| clear-notifs)
         printf '%s:%s\n' "$1" "$(date +%s%N)" > "${CMD_FILE}.tmp"
         mv -f "${CMD_FILE}.tmp" "$CMD_FILE"
+        ;;
+    notif-sound)
+        CHIME="${STATE_DIR}/notif-chime.wav"
+        if [ ! -f "$CHIME" ]; then
+            python3 - "$CHIME" <<'PYEOF' 2>/dev/null || true
+import math, struct, sys, wave
+sr, dur = 44100, 0.34
+n = int(sr * dur)
+buf = bytearray()
+for i in range(n):
+    t = i / sr
+    # Gentle Windows 11-inspired soft two-tone chime (E5 -> B5)
+    e1 = min(1.0, t / 0.012) * math.exp(-t * 10.0)
+    t2 = max(0.0, t - 0.085)
+    e2 = (min(1.0, t2 / 0.012) * math.exp(-t2 * 9.0)) if t >= 0.085 else 0.0
+    v = 0.22 * (e1 * math.sin(2 * math.pi * 659.25 * t) + 0.85 * e2 * math.sin(2 * math.pi * 987.77 * t2))
+    buf += struct.pack("<h", max(-32767, min(32767, int(v * 32767))))
+with wave.open(sys.argv[1], "wb") as wf:
+    wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr); wf.writeframes(bytes(buf))
+PYEOF
+        fi
+        if [ -f "$CHIME" ]; then
+            if command -v pw-play >/dev/null 2>&1; then
+                pw-play "$CHIME" >/dev/null 2>&1 &
+            elif command -v paplay >/dev/null 2>&1; then
+                paplay "$CHIME" >/dev/null 2>&1 &
+            fi
+        fi
+        ;;
+    record-notif-app)
+        APP_N="${2:-}"
+        if [ -n "$APP_N" ]; then
+            python3 - "${STATE_DIR}/notif-apps.json" "$APP_N" <<'PYEOF' 2>/dev/null || true
+import json, os, sys
+p, app = sys.argv[1], sys.argv[2].strip()[:48]
+if not app: sys.exit(0)
+data = []
+if os.path.isfile(p):
+    try: data = json.load(open(p, "r", encoding="utf-8"))
+    except Exception: data = []
+if not isinstance(data, list): data = []
+low = app.lower()
+if not any(str(x).lower() == low for x in data):
+    data.insert(0, app)
+    data = data[:24]
+    with open(p + ".tmp", "w", encoding="utf-8") as f: json.dump(data, f)
+    os.replace(p + ".tmp", p)
+PYEOF
+        fi
         ;;
     new-desktop-folder)
         DESK_DIR="${HOME}/Escritorio"
@@ -473,8 +522,10 @@ if os.path.isfile(p):
         pass
 PYEOF
 
-        # 2. Apply real hardware & scx_loader profile via power-profiles-daemon (or sysfs fallback)
-        if command -v powerprofilesctl >/dev/null 2>&1 && systemctl is-active --quiet power-profiles-daemon 2>/dev/null; then
+        # 2. Apply real hardware & scx_loader profile via instant D-Bus busctl (~4ms, fallback powerprofilesctl/sysfs)
+        if command -v busctl >/dev/null 2>&1 && systemctl is-active --quiet power-profiles-daemon 2>/dev/null; then
+            busctl set-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile s "$target_prof" >/dev/null 2>&1 || powerprofilesctl set "$target_prof" >/dev/null 2>&1 || true
+        elif command -v powerprofilesctl >/dev/null 2>&1 && systemctl is-active --quiet power-profiles-daemon 2>/dev/null; then
             powerprofilesctl set "$target_prof" >/dev/null 2>&1 || true
         else
             case "$target_prof" in
@@ -500,16 +551,37 @@ PYEOF
         fi
         ;;
     volume)
+        OVER_AMP=$(python3 -c 'import json,os; d=json.load(open(os.path.expanduser("~/.local/state/x64-win11/config.json"))); print("1.5" if d.get("audioOverAmplify") else "1.0")' 2>/dev/null || echo "1.0")
         case "$2" in
-            up)   wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
-            down) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
-            mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+            up)       wpctl set-volume -l "$OVER_AMP" @DEFAULT_AUDIO_SINK@ 5%+ ;;
+            down)     wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+            mute)     wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+            mic-mute) wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
         esac
+        OSD_KIND="volume"
+        WP_TARGET="@DEFAULT_AUDIO_SINK@"
+        if [ "$2" = "mic-mute" ]; then
+            OSD_KIND="mic"
+            WP_TARGET="@DEFAULT_AUDIO_SOURCE@"
+        fi
+        V_RAW=$(wpctl get-volume "$WP_TARGET" 2>/dev/null || echo "Volume: 0.50")
+        V_MUTED="false"
+        echo "$V_RAW" | grep -q "MUTED" && V_MUTED="true"
+        V_PCT=$(echo "$V_RAW" | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+(\.[0-9]+)?$/){printf "%d", ($i*100)+0.5; exit}}')
+        [ -z "$V_PCT" ] && V_PCT=50
+        OSD_TS=$(date +%s%3N)
+        printf '{"kind":"%s","value":%d,"muted":%s,"showOsd":true,"ts":%s}\n' "$OSD_KIND" "$V_PCT" "$V_MUTED" "$OSD_TS" > "${STATE_DIR}/osd.json.tmp"
+        mv -f "${STATE_DIR}/osd.json.tmp" "${STATE_DIR}/osd.json"
         ;;
     brightness)
         target_pct="${3:-80}"
+        SHOW_OSD="true"
+        [ "$2" = "set" ] && SHOW_OSD="false"
+        HAS_HW_BL=0
+        new_pct=""
         for bdir in /sys/class/backlight/*; do
             if [ -f "$bdir/brightness" ] && [ -f "$bdir/max_brightness" ]; then
+                HAS_HW_BL=1
                 max_b=$(cat "$bdir/max_brightness" 2>/dev/null || echo 100)
                 cur_b=$(cat "$bdir/brightness" 2>/dev/null || echo 100)
                 case "$2" in
@@ -523,7 +595,21 @@ PYEOF
                 [ -w "$bdir/brightness" ] && echo "$new_val" > "$bdir/brightness" 2>/dev/null || true
             fi
         done
-        /usr/bin/x64-win11-ctl set-config brightnessPct "${new_pct:-$target_pct}" >/dev/null 2>&1 || true
+        if [ "$HAS_HW_BL" -eq 0 ]; then
+            cur_cfg=$(python3 -c 'import json,os; d=json.load(open(os.path.expanduser("~/.local/state/x64-win11/config.json"))); print(int(round(float(d.get("brightnessPct",100)))))' 2>/dev/null || echo 100)
+            case "$2" in
+                up)   new_pct=$(( cur_cfg + 5 )) ;;
+                down) new_pct=$(( cur_cfg - 5 )) ;;
+                set)  new_pct="$target_pct" ;;
+            esac
+            [ "$new_pct" -gt 100 ] 2>/dev/null && new_pct=100
+            [ "$new_pct" -lt 10 ] 2>/dev/null && new_pct=10
+        fi
+        FINAL_BPCT="${new_pct:-$target_pct}"
+        /usr/bin/x64-win11-ctl set-config brightnessPct "$FINAL_BPCT" >/dev/null 2>&1 || true
+        OSD_TS=$(date +%s%3N)
+        printf '{"kind":"brightness","value":%d,"muted":false,"showOsd":%s,"ts":%s}\n' "$FINAL_BPCT" "$SHOW_OSD" "$OSD_TS" > "${STATE_DIR}/osd.json.tmp"
+        mv -f "${STATE_DIR}/osd.json.tmp" "${STATE_DIR}/osd.json"
         /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 || true
         ;;
     screenshot)
@@ -537,5 +623,187 @@ PYEOF
                 notify-send -a "Recortes de Windows 11" "Captura guardada y copiada" "$OUT" 2>/dev/null || true
             fi
         fi
+        ;;
+    phone)
+        sub="$2"
+        MIRROR_JSON="${STATE_DIR}/phone-mirror.json"
+        MIRROR_PID="${STATE_DIR}/scrcpy.pid"
+        case "$sub" in
+            stop)
+                if [ -f "$MIRROR_PID" ]; then
+                    old_p=$(cat "$MIRROR_PID" 2>/dev/null || true)
+                    [ -n "$old_p" ] && kill "$old_p" 2>/dev/null || true
+                    rm -f "$MIRROR_PID"
+                fi
+                pkill -f "scrcpy.*X64-Phone-" 2>/dev/null || true
+                printf '{"active":false,"mode":"","serial":"","pid":0}\n' > "${MIRROR_JSON}.tmp"
+                mv -f "${MIRROR_JSON}.tmp" "$MIRROR_JSON"
+                ;;
+            mirror)
+                serial="${3:-}"
+                # Backward-compat if old mode token passed as $3
+                if [ "$serial" = "float" ] || [ "$serial" = "docked" ] || [ "$serial" = "float-pin" ]; then
+                    serial="${4:-}"
+                fi
+                if ! command -v scrcpy >/dev/null 2>&1 || ! command -v adb >/dev/null 2>&1; then
+                    notify-send -a "Enlace Móvil" "scrcpy no disponible" "Instala scrcpy y android-tools para proyectar tu móvil Android." 2>/dev/null || true
+                    exit 1
+                fi
+                if [ -f "$MIRROR_PID" ]; then
+                    old_p=$(cat "$MIRROR_PID" 2>/dev/null || true)
+                    [ -n "$old_p" ] && kill "$old_p" 2>/dev/null || true
+                    rm -f "$MIRROR_PID"
+                fi
+                pkill -f "scrcpy.*X64-Phone" 2>/dev/null || true
+                sleep 0.12
+
+                if [ -z "$serial" ]; then
+                    serial=$(adb devices 2>/dev/null | awk 'NR>1 && $2=="device" {print $1; exit}')
+                fi
+                if [ -z "$serial" ]; then
+                    unauth=$(adb devices 2>/dev/null | awk 'NR>1 && $2=="unauthorized" {print $1; exit}')
+                    if [ -n "$unauth" ]; then
+                        notify-send -a "Enlace Móvil" "Autoriza este PC en tu teléfono" "Acepta el aviso de «Permitir depuración USB» que aparece en la pantalla de tu móvil Android." 2>/dev/null || true
+                    else
+                        notify-send -a "Enlace Móvil" "Ningún Android detectado" "Conecta tu móvil por USB con Depuración USB activada o usa Modo Wi-Fi en Configuración › Dispositivos móviles." 2>/dev/null || true
+                    fi
+                    printf '{"active":false,"mode":"","serial":"","pid":0}\n' > "${MIRROR_JSON}.tmp"
+                    mv -f "${MIRROR_JSON}.tmp" "$MIRROR_JSON"
+                    exit 1
+                fi
+
+                eval "$(python3 - <<'PYEOF'
+import json, os
+p = os.path.expanduser("~/.local/state/x64-win11/config.json")
+c = {}
+if os.path.isfile(p):
+    try: c = json.load(open(p, "r", encoding="utf-8"))
+    except Exception: c = {}
+fps = int(c.get("phoneMaxFps", 60) or 60)
+if fps not in (30, 60, 90, 120): fps = 60
+br = str(c.get("phoneBitrate", "8M") or "8M")
+if br not in ("4M", "8M", "12M", "16M"): br = "8M"
+audio = "1" if c.get("phoneAudio", True) is not False else "0"
+scroff = "1" if bool(c.get("phoneTurnScreenOff", False)) else "0"
+awake = "1" if c.get("phoneStayAwake", True) is not False else "0"
+ontop = "1" if bool(c.get("phoneAlwaysOnTop", False)) else "0"
+print(f"P_FPS={fps}\nP_BR={br}\nP_AUDIO={audio}\nP_SCROFF={scroff}\nP_AWAKE={awake}\nP_ONTOP={ontop}")
+PYEOF
+)"
+                ARGS=("-s" "$serial" "--max-fps=${P_FPS:-60}" "--video-bit-rate=${P_BR:-8M}" "--window-height=760")
+                [ "${P_AUDIO:-1}" = "0" ] && ARGS+=("--no-audio")
+                [ "${P_SCROFF:-0}" = "1" ] && ARGS+=("--turn-screen-off")
+                [ "${P_AWAKE:-1}" = "1" ] && ARGS+=("--stay-awake")
+                if [ "${P_ONTOP:-0}" = "1" ]; then
+                    mode="float-pin"
+                    ARGS+=("--window-title=X64-Phone-Pin — Enlace Móvil" "--always-on-top")
+                else
+                    mode="float"
+                    ARGS+=("--window-title=X64-Phone — Enlace Móvil")
+                fi
+
+                # Launch scrcpy supervised in background so state clears automatically when closed
+                (
+                    scrcpy "${ARGS[@]}" >/tmp/x64-phone-mirror.log 2>&1 &
+                    SPID=$!
+                    echo "$SPID" > "$MIRROR_PID"
+                    printf '{"active":true,"mode":"%s","serial":"%s","pid":%d}\n' "$mode" "$serial" "$SPID" > "${MIRROR_JSON}.tmp"
+                    mv -f "${MIRROR_JSON}.tmp" "$MIRROR_JSON"
+                    wait "$SPID" 2>/dev/null || true
+                    cur_p=$(cat "$MIRROR_PID" 2>/dev/null || true)
+                    if [ "$cur_p" = "$SPID" ]; then
+                        rm -f "$MIRROR_PID"
+                        printf '{"active":false,"mode":"","serial":"","pid":0}\n' > "${MIRROR_JSON}.tmp"
+                        mv -f "${MIRROR_JSON}.tmp" "$MIRROR_JSON"
+                    fi
+                ) >/dev/null 2>&1 &
+                ;;
+            key)
+                k="${3:-back}"
+                ser=$(python3 -c 'import json,os; d=json.load(open(os.path.expanduser("~/.local/state/x64-win11/phone-mirror.json"))); print(d.get("serial",""))' 2>/dev/null || true)
+                kc=""
+                case "$k" in
+                    back)    kc="4" ;;
+                    home)    kc="3" ;;
+                    recents) kc="187" ;;
+                    power)   kc="26" ;;
+                    volup)   kc="24" ;;
+                    voldown) kc="25" ;;
+                esac
+                if [ -n "$kc" ] && command -v adb >/dev/null 2>&1; then
+                    if [ -n "$ser" ]; then
+                        adb -s "$ser" shell input keyevent "$kc" >/dev/null 2>&1 &
+                    else
+                        adb shell input keyevent "$kc" >/dev/null 2>&1 &
+                    fi
+                fi
+                ;;
+            refresh)
+                if ! pgrep -x kdeconnectd >/dev/null 2>&1; then
+                    if [ -x /usr/bin/kdeconnectd ]; then
+                        setsid -f /usr/bin/kdeconnectd >/dev/null 2>&1 || true
+                    elif [ -x /usr/lib/kdeconnectd ]; then
+                        setsid -f /usr/lib/kdeconnectd >/dev/null 2>&1 || true
+                    fi
+                fi
+                command -v kdeconnect-cli >/dev/null 2>&1 && kdeconnect-cli --refresh >/dev/null 2>&1 &
+                /usr/bin/x64-win11-app --dump-sysinfo >/dev/null 2>&1 &
+                ;;
+            ring)
+                did=""
+                dname=""
+                if command -v busctl >/dev/null 2>&1; then
+                    eval "$(python3 - <<'PYEOF'
+import json, subprocess
+try:
+    out = subprocess.check_output(
+        ["busctl", "--user", "--json=short", "call", "org.kde.kdeconnect", "/modules/kdeconnect",
+         "org.kde.kdeconnect.daemon", "deviceNames", "bb", "true", "true"],
+        text=True, timeout=0.8, stderr=subprocess.DEVNULL
+    )
+    m = json.loads(out).get("data", [{}])[0]
+    if isinstance(m, dict) and m:
+        did, dname = next(iter(m.items()))
+        print(f'did="{did}"\ndname="{dname.replace(chr(34), "")}"')
+except Exception:
+    pass
+PYEOF
+)"
+                fi
+                if [ -n "$did" ]; then
+                    busctl --user call org.kde.kdeconnect "/modules/kdeconnect/devices/${did}/findmyphone" org.kde.kdeconnect.device.findmyphone ring >/dev/null 2>&1 || kdeconnect-cli -d "$did" --ring >/dev/null 2>&1 &
+                    notify-send -a "Enlace Móvil" "Haciendo sonar ${dname:-tu teléfono}" "Pulsa «Encontrado» en el móvil para detener el timbre." 2>/dev/null || true
+                else
+                    notify-send -a "Enlace Móvil" "«Hacer sonar» requiere KDE Connect" "Instala y vincula la app KDE Connect en tu móvil (Android o iPhone) desde Configuración › Dispositivos móviles." 2>/dev/null || true
+                fi
+                ;;
+            send-file)
+                ser="${3:-}"
+                if [ -z "$ser" ] && command -v adb >/dev/null 2>&1; then
+                    ser=$(adb devices 2>/dev/null | awk 'NR>1 && $2=="device" {print $1; exit}')
+                fi
+                if [ -z "$ser" ]; then
+                    notify-send -a "Enlace Móvil" "Ningún móvil conectado" "Conecta tu Android por USB/Wi-Fi o vincula KDE Connect para enviar archivos." 2>/dev/null || true
+                    exit 1
+                fi
+                python3 - "$ser" <<'PYEOF' >/dev/null 2>&1 &
+import os, subprocess, sys
+from PyQt6.QtWidgets import QApplication, QFileDialog
+ser = sys.argv[1]
+app = QApplication([])
+fp, _ = QFileDialog.getOpenFileName(None, "Enviar archivo al teléfono (Descargas)", os.path.expanduser("~"), "Todos los archivos (*)")
+if not fp or not os.path.isfile(fp):
+    sys.exit(0)
+base = os.path.basename(fp)
+dest = f"/sdcard/Download/{base}"
+r = subprocess.run(["adb", "-s", ser, "push", fp, dest], capture_output=True, text=True, timeout=180)
+if r.returncode == 0:
+    subprocess.run(["adb", "-s", ser, "shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", f"file://{dest}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+    subprocess.Popen(["notify-send", "-a", "Enlace Móvil", "Archivo enviado al teléfono", f"{base} guardado en Descargas del móvil."])
+else:
+    subprocess.Popen(["notify-send", "-a", "Enlace Móvil", "Error al enviar archivo", (r.stderr or r.stdout or "No se pudo transferir")[:90]])
+PYEOF
+                ;;
+        esac
         ;;
 esac

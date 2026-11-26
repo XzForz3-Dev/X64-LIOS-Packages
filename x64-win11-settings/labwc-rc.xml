@@ -146,6 +146,9 @@
     <keybind key="XF86AudioMute">
       <action name="Execute" command="/usr/bin/x64-win11-ctl volume mute" />
     </keybind>
+    <keybind key="XF86AudioMicMute">
+      <action name="Execute" command="/usr/bin/x64-win11-ctl volume mic-mute" />
+    </keybind>
     <keybind key="XF86MonBrightnessUp">
       <action name="Execute" command="/usr/bin/x64-win11-ctl brightness up" />
     </keybind>
@@ -165,4 +168,12 @@
       </mousebind>
     </context>
   </mouse>
+
+  <windowRules>
+    <!-- X64 Enlace Móvil (scrcpy) floating phone window -->
+    <windowRule title="X64-Phone-Pin*" serverDecoration="yes">
+      <action name="ToggleAlwaysOnTop" />
+    </windowRule>
+    <windowRule title="X64-Phone*" serverDecoration="yes" />
+  </windowRules>
 </labwc_config>

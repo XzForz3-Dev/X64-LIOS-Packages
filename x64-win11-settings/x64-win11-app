@@ -45,7 +45,13 @@ DEFAULT_CFG = {
     "showRecommended": False,
     "showPhoneLink": True,
     "showBatteryPct": True,
-    "wallpaperMode": 0
+    "wallpaperMode": 0,
+    "phoneMaxFps": 60,
+    "phoneBitrate": "8M",
+    "phoneAudio": True,
+    "phoneTurnScreenOff": False,
+    "phoneStayAwake": True,
+    "phoneAlwaysOnTop": False
 }
 
 
@@ -220,25 +226,40 @@ def get_live_hardware_controls():
     except Exception:
         pass
 
-    # 3. Brightness via brightnessctl -m
-    brightness_pct = 100
-    try:
-        out_br = subprocess.check_output(
-            ["brightnessctl", "-m"],
-            text=True, timeout=1.0, stderr=subprocess.DEVNULL
-        ).strip()
-        # Format: device,class,curr,pct%,max
-        for field in out_br.split(","):
-            if field.endswith("%"):
-                brightness_pct = max(5, min(100, int(field[:-1])))
-                break
-    except Exception:
-        pass
+    # 3. Universal Brightness: hardware backlight if present, else saved overlay cfg.brightnessPct
+    brightness_pct = int(round(float(load_cfg().get("brightnessPct", 100))))
+    if glob.glob("/sys/class/backlight/*/brightness"):
+        try:
+            out_br = subprocess.check_output(
+                ["brightnessctl", "-m"],
+                text=True, timeout=1.0, stderr=subprocess.DEVNULL
+            ).strip()
+            for field in out_br.split(","):
+                if field.endswith("%"):
+                    brightness_pct = max(10, min(100, int(field[:-1])))
+                    break
+        except Exception:
+            pass
+    brightness_pct = max(10, min(100, brightness_pct))
 
     # 4. Real 3-State Hardware Power Profile (performance | balanced | power-saver)
+    # Fast D-Bus read via busctl (~4ms) instead of spawning Python powerprofilesctl (~178ms)!
     power_profile = "balanced"
     ppd_ok = False
-    if shutil.which("powerprofilesctl"):
+    try:
+        out_bus = subprocess.check_output(
+            ["busctl", "get-property", "net.hadess.PowerProfiles", "/net/hadess/PowerProfiles",
+             "net.hadess.PowerProfiles", "ActiveProfile"],
+            text=True, timeout=0.6, stderr=subprocess.DEVNULL
+        ).strip()
+        if '"' in out_bus:
+            val_pp = out_bus.split('"')[1].strip().lower()
+            if val_pp in ("performance", "balanced", "power-saver"):
+                power_profile = val_pp
+                ppd_ok = True
+    except Exception:
+        pass
+    if not ppd_ok and shutil.which("powerprofilesctl"):
         try:
             out_pp = subprocess.check_output(
                 ["powerprofilesctl", "get"],
@@ -940,8 +961,9 @@ def generate_sysinfo_dict():
                 "items": items
             })
 
-    kdeconnect_installed = os.path.isfile("/usr/lib/kdeconnectd") or shutil.which("kdeconnect-cli") is not None
+    kdeconnect_installed = (shutil.which("kdeconnectd") is not None) or os.path.isfile("/usr/bin/kdeconnectd") or os.path.isfile("/usr/lib/kdeconnectd") or (shutil.which("kdeconnect-cli") is not None)
     hw_ctrl = get_live_hardware_controls()
+    phone_link = get_phone_link_status()
 
     return {
         "user": display_name,
@@ -958,6 +980,7 @@ def generate_sysinfo_dict():
         "trashSize": trash_size_lbl,
         "hasHiddenDesktopIcons": len(hidden_desk_ids) > 0,
         "kdeConnectInstalled": kdeconnect_installed,
+        "phoneLink": phone_link,
         "hwControls": hw_ctrl,
         "desktopIcons": desktop_icons,
         "taskbarPinned": taskbar_pinned,
@@ -966,6 +989,160 @@ def generate_sysinfo_dict():
         "categories": categories_out,
         "calendar": build_calendar_data(),
         "weather": get_live_weather_data(force_refresh=False)
+    }
+
+
+_ADB_META_CACHE = {}
+
+def get_phone_link_status():
+    kde_inst = (shutil.which("kdeconnectd") is not None) or os.path.isfile("/usr/bin/kdeconnectd") or os.path.isfile("/usr/lib/kdeconnectd") or (shutil.which("kdeconnect-cli") is not None)
+    scrcpy_inst = shutil.which("scrcpy") is not None
+    adb_inst = shutil.which("adb") is not None
+    kde_running = False
+    try:
+        kde_running = subprocess.run(["pgrep", "-x", "kdeconnectd"], timeout=0.4, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    except Exception:
+        pass
+
+    kde_devs = []
+    if kde_inst and kde_running and shutil.which("busctl"):
+        try:
+            raw_j = subprocess.check_output(
+                ["busctl", "--user", "--json=short", "call",
+                 "org.kde.kdeconnect", "/modules/kdeconnect",
+                 "org.kde.kdeconnect.daemon", "deviceNames", "bb", "false", "false"],
+                text=True, timeout=0.6, stderr=subprocess.DEVNULL
+            )
+            parsed = json.loads(raw_j)
+            dev_map = parsed.get("data", [{}])[0] if isinstance(parsed.get("data"), list) and parsed.get("data") else {}
+            if isinstance(dev_map, dict):
+                for did, dname in dev_map.items():
+                    paired, reach, bat_pct, bat_chg = False, False, -1, False
+                    try:
+                        p_out = subprocess.check_output(
+                            ["busctl", "--user", "get-property", "org.kde.kdeconnect",
+                             f"/modules/kdeconnect/devices/{did}", "org.kde.kdeconnect.device",
+                             "isPaired", "isReachable"],
+                            text=True, timeout=0.4, stderr=subprocess.DEVNULL
+                        ).strip().splitlines()
+                        if len(p_out) >= 1:
+                            paired = "true" in p_out[0].lower()
+                        if len(p_out) >= 2:
+                            reach = "true" in p_out[1].lower()
+                    except Exception:
+                        pass
+                    if paired and reach:
+                        try:
+                            b_out = subprocess.check_output(
+                                ["busctl", "--user", "get-property", "org.kde.kdeconnect",
+                                 f"/modules/kdeconnect/devices/{did}/battery", "org.kde.kdeconnect.device.battery",
+                                 "charge", "isCharging"],
+                                text=True, timeout=0.4, stderr=subprocess.DEVNULL
+                            ).strip().splitlines()
+                            if len(b_out) >= 1:
+                                toks = b_out[0].strip().split()
+                                if len(toks) >= 2 and toks[-1].lstrip("-").isdigit():
+                                    v = int(toks[-1])
+                                    if 0 <= v <= 100:
+                                        bat_pct = v
+                            if len(b_out) >= 2:
+                                bat_chg = "true" in b_out[1].lower()
+                        except Exception:
+                            pass
+                    kde_devs.append({
+                        "id": str(did), "name": str(dname), "paired": paired,
+                        "reachable": reach, "battery": bat_pct, "charging": bat_chg
+                    })
+        except Exception:
+            pass
+
+    adb_devs = []
+    now_m = time.monotonic()
+    if adb_inst:
+        try:
+            aout = subprocess.check_output(["adb", "devices", "-l"], text=True, timeout=0.8, stderr=subprocess.DEVNULL)
+            for ln in aout.splitlines()[1:]:
+                s = ln.strip()
+                if not s or s.startswith("*"):
+                    continue
+                toks = s.split()
+                if len(toks) < 2:
+                    continue
+                ser, st = toks[0], toks[1]
+                model = ser
+                for tk in toks[2:]:
+                    if tk.startswith("model:"):
+                        model = tk.split(":", 1)[1].replace("_", " ")
+                        break
+                disp_name = model
+                bat_pct = -1
+                bat_chg = False
+                if st == "device":
+                    cached = _ADB_META_CACHE.get(ser)
+                    if cached and (now_m - cached["ts"]) < 10.0:
+                        disp_name, bat_pct, bat_chg = cached["name"], cached["battery"], cached["charging"]
+                    else:
+                        try:
+                            meta_out = subprocess.check_output(
+                                ["adb", "-s", ser, "shell",
+                                 "settings get global device_name 2>/dev/null; echo '---M---'; getprop ro.product.marketname 2>/dev/null; echo '---B---'; dumpsys battery 2>/dev/null | head -n 18"],
+                                text=True, timeout=0.9, stderr=subprocess.DEVNULL
+                            )
+                            p1 = meta_out.split("---M---")
+                            dn = (p1[0] or "").strip() if len(p1) > 0 else ""
+                            p2 = (p1[1] if len(p1) > 1 else "").split("---B---")
+                            mn = (p2[0] or "").strip() if len(p2) > 0 else ""
+                            bs = p2[1] if len(p2) > 1 else ""
+                            if dn and dn.lower() not in ("null", "none"):
+                                disp_name = dn
+                            elif mn and mn.lower() not in ("null", "none"):
+                                disp_name = mn
+                            m_lvl = re.search(r"level:\s*(\d+)", bs)
+                            if m_lvl:
+                                v = int(m_lvl.group(1))
+                                if 0 <= v <= 100:
+                                    bat_pct = v
+                            m_st = re.search(r"status:\s*(\d+)", bs)
+                            if m_st and m_st.group(1) in ("2", "5"):
+                                bat_chg = True
+                            elif any(k in bs for k in ("USB powered: true", "AC powered: true", "Wireless powered: true")):
+                                bat_chg = True
+                            _ADB_META_CACHE[ser] = {"ts": now_m, "name": disp_name, "battery": bat_pct, "charging": bat_chg}
+                        except Exception:
+                            pass
+                adb_devs.append({
+                    "serial": ser, "model": disp_name, "rawModel": model, "state": st,
+                    "authorized": (st == "device"), "isWifi": (":" in ser),
+                    "battery": bat_pct, "charging": bat_chg
+                })
+        except Exception:
+            pass
+
+    mirror_active = False
+    mirror_mode = ""
+    mirror_serial = ""
+    mp = os.path.join(STATE_DIR, "phone-mirror.json")
+    if os.path.isfile(mp):
+        try:
+            md = json.load(open(mp, "r", encoding="utf-8"))
+            pid = int(md.get("pid", 0) or 0)
+            if md.get("active") and pid > 1 and os.path.isdir(f"/proc/{pid}"):
+                mirror_active = True
+                mirror_mode = str(md.get("mode", "") or "")
+                mirror_serial = str(md.get("serial", "") or "")
+        except Exception:
+            pass
+
+    return {
+        "kdeInstalled": kde_inst,
+        "kdeRunning": kde_running,
+        "scrcpyInstalled": scrcpy_inst,
+        "adbInstalled": adb_inst,
+        "kdeDevices": kde_devs,
+        "adbDevices": adb_devs,
+        "mirrorActive": mirror_active,
+        "mirrorMode": mirror_mode,
+        "mirrorSerial": mirror_serial
     }
 
 
@@ -1272,7 +1449,7 @@ def main():
         dump_sysinfo_file()
         sys.exit(0)
 
-    from PyQt6.QtCore import QObject, QEvent, pyqtSlot, pyqtSignal, QThread, QUrl, Qt, QRectF
+    from PyQt6.QtCore import QObject, QEvent, pyqtSlot, pyqtSignal, QThread, QUrl, Qt, QRectF, QFileSystemWatcher
     from PyQt6.QtGui import QGuiApplication, QColor, QFont, QIcon, QImage, QPainter, QPainterPath, QLinearGradient
     from PyQt6.QtQuick import QQuickView
     try:
@@ -1305,14 +1482,135 @@ def main():
                 "checkedAt": datetime.now().strftime("%H:%M:%S")
             }))
 
+    class _SettingsRefreshWorker(QThread):
+        done = pyqtSignal(str)
+        def __init__(self, bridge_ref, force_slow=False):
+            super().__init__()
+            self._bridge = bridge_ref
+            self._force_slow = bool(force_slow)
+        def run(self):
+            try:
+                payload = self._bridge._collect_live_bundle_json(force_slow=self._force_slow)
+                self.done.emit(payload)
+            except Exception:
+                self.done.emit("{}")
+
+    class _MicTestWorker(QThread):
+        stateChanged = pyqtSignal(str)
+        def run(self):
+            tmp_wav = os.path.join(STATE_DIR, "mic-test.wav")
+            os.makedirs(STATE_DIR, exist_ok=True)
+            try:
+                if os.path.exists(tmp_wav):
+                    os.remove(tmp_wav)
+                rec_bin = shutil.which("parecord") or shutil.which("pw-record")
+                play_bin = shutil.which("paplay") or shutil.which("pw-play")
+                if not rec_bin or not play_bin:
+                    self.stateChanged.emit("error:Herramientas de audio no disponibles")
+                    return
+                self.stateChanged.emit("recording")
+                cmd = [rec_bin, "--file-format=wav", tmp_wav] if rec_bin.endswith("parecord") else [rec_bin, tmp_wav]
+                proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(3.0)
+                try:
+                    import signal
+                    proc.send_signal(signal.SIGINT)
+                    proc.wait(timeout=1.5)
+                except Exception:
+                    proc.kill()
+                if not os.path.isfile(tmp_wav) or os.path.getsize(tmp_wav) < 100:
+                    self.stateChanged.emit("error:No se captó audio del micrófono")
+                    return
+                self.stateChanged.emit("playing")
+                subprocess.run([play_bin, tmp_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5.0)
+                try:
+                    os.remove(tmp_wav)
+                except Exception:
+                    pass
+                self.stateChanged.emit("done")
+            except Exception as ex:
+                self.stateChanged.emit(f"error:{str(ex)[:60]}")
+
+    class _BtScanWorker(QThread):
+        scanDone = pyqtSignal(str)
+        def run(self):
+            found = []
+            try:
+                subprocess.run(
+                    ["bluetoothctl", "--timeout", "7", "scan", "on"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10.0
+                )
+            except Exception:
+                pass
+            try:
+                bout = subprocess.check_output(["bluetoothctl", "devices"], text=True, timeout=2.0, stderr=subprocess.DEVNULL)
+                for ln in bout.splitlines()[:24]:
+                    toks = ln.split(" ", 2)
+                    if len(toks) == 3 and toks[0] == "Device":
+                        mac, bname = toks[1], toks[2].strip()
+                        paired, conn, bat_pct, icon_k = False, False, -1, ""
+                        try:
+                            iout = subprocess.check_output(["bluetoothctl", "info", mac], text=True, timeout=0.8, stderr=subprocess.DEVNULL)
+                            paired = "Paired: yes" in iout
+                            conn = "Connected: yes" in iout
+                            m_bat = re.search(r"Battery Percentage:.*?\((\d+)\)", iout)
+                            if m_bat:
+                                bat_pct = int(m_bat.group(1))
+                            m_ic = re.search(r"Icon:\s*(\S+)", iout)
+                            if m_ic:
+                                icon_k = m_ic.group(1).strip().lower()
+                        except Exception:
+                            pass
+                        if not paired:
+                            found.append({
+                                "mac": mac, "name": bname, "paired": False,
+                                "connected": conn, "battery": bat_pct, "btIcon": icon_k
+                            })
+            except Exception:
+                pass
+            self.scanDone.emit(json.dumps(found))
+
     class AppBridge(QObject):
         updatesChecked = pyqtSignal(str)
+        liveStateReady = pyqtSignal(str)
+        micTestStateChanged = pyqtSignal(str)
+        btScanFinished = pyqtSignal(str)
+        hwOsdUpdated = pyqtSignal(str)
         mouseBackPressed = pyqtSignal()
         mouseForwardPressed = pyqtSignal()
         def __init__(self, view):
             super().__init__()
             self.view = view
             self._upd_worker = None
+            self._mic_worker = None
+            self._bt_scan_worker = None
+            self._refresh_worker = None
+            self._last_osd_ts = 0
+            try:
+                os.makedirs(STATE_DIR, exist_ok=True)
+                self._osd_watcher = QFileSystemWatcher(self)
+                self._osd_watcher.addPath(STATE_DIR)
+                self._osd_watcher.directoryChanged.connect(self._on_state_dir_changed)
+            except Exception:
+                self._osd_watcher = None
+            self._refresh_pending = False
+            self._refresh_pending_slow = False
+            self._cfg_rev = 0
+            self._cache_printers_ts = 0.0
+            self._cache_printers = []
+            self._cache_storage_ts = 0.0
+            self._cache_storage = {
+                "trashCount": 0, "trashSize": "0 B",
+                "pacmanCacheSize": "0 B", "pacmanCacheCount": 0,
+                "userCacheSize": "0 B", "userCacheBytes": 0,
+                "journalSize": "0 B", "journalBytes": 0,
+                "userFolders": []
+            }
+            self._cache_about_static = None
+            self._cache_meta_ts = 0.0
+            self._cache_meta = None
+            self._cache_gpu_name_ts = 0.0
+            self._cache_gpu_name = "Gráficos integrados / PCIe"
             self._prev_cpu_total = 0
             self._prev_cpu_idle = 0
             self._prev_core_stats = {}
@@ -1326,12 +1624,64 @@ def main():
             self._gpu_cache_ts = 0.0
             self._gpu_cache = None
 
+        def _on_state_dir_changed(self, _path):
+            osd_p = os.path.join(STATE_DIR, "osd.json")
+            try:
+                if not os.path.isfile(osd_p):
+                    return
+                raw = open(osd_p, "r", encoding="utf-8").read().strip()
+                if not raw:
+                    return
+                ev = json.loads(raw)
+                ts = int(ev.get("ts", 0))
+                if ts > self._last_osd_ts:
+                    self._last_osd_ts = ts
+                    self.hwOsdUpdated.emit(raw)
+            except Exception:
+                pass
+
+        def _collect_live_bundle_json(self, force_slow=False):
+            rev_start = self._cfg_rev
+            hw_state = json.loads(self.getLiveHardwareJson())
+            drives_d = json.loads(self.getDrivesJson())
+            ext_d = self._build_settings_extended_dict(force_slow=force_slow)
+            # Always read config.json LAST so in-flight background refreshes never carry stale cfg!
+            cfg_now = load_cfg()
+            return json.dumps({
+                "cfg": cfg_now,
+                "cfgRev": self._cfg_rev,
+                "cfgStale": (self._cfg_rev != rev_start),
+                "hwState": hw_state,
+                "drives": drives_d,
+                "extData": ext_d,
+            })
+
+        @pyqtSlot(bool)
+        def requestAsyncRefresh(self, force_slow=False):
+            if self._refresh_worker is not None and self._refresh_worker.isRunning():
+                self._refresh_pending = True
+                if force_slow:
+                    self._refresh_pending_slow = True
+                return
+            w = _SettingsRefreshWorker(self, force_slow=bool(force_slow))
+            def _on_done(payload):
+                self.liveStateReady.emit(payload)
+                if self._refresh_pending:
+                    fs = self._refresh_pending_slow
+                    self._refresh_pending = False
+                    self._refresh_pending_slow = False
+                    self.requestAsyncRefresh(fs)
+            w.done.connect(_on_done)
+            self._refresh_worker = w
+            w.start()
+
         @pyqtSlot(result=str)
         def getConfigJson(self):
             return json.dumps(load_cfg())
 
         @pyqtSlot(str, str)
         def setConfigValue(self, key, val_json):
+            self._cfg_rev += 1
             cfg = load_cfg()
             try:
                 cfg[key] = json.loads(val_json)
@@ -1510,10 +1860,114 @@ def main():
                                     os.remove(p)
                                 except Exception:
                                     pass
+                self._cache_storage_ts = 0.0
                 dump_sysinfo_file()
                 return True
             except Exception:
                 return False
+
+        @pyqtSlot(result=str)
+        def cleanPacmanCache(self):
+            def _dir_bytes(path):
+                tot = 0
+                try:
+                    if os.path.isdir(path):
+                        for e in os.scandir(path):
+                            if e.is_file(follow_symlinks=False):
+                                tot += e.stat(follow_symlinks=False).st_size
+                except Exception:
+                    pass
+                return tot
+            def _fmt_sz(nb):
+                if nb < 1024: return f"{nb} B"
+                if nb < 1024**2: return f"{nb / 1024:.1f} KB"
+                if nb < 1024**3: return f"{nb / (1024**2):.1f} MB"
+                return f"{nb / (1024**3):.2f} GB"
+            pac_dir = "/var/cache/pacman/pkg"
+            before = _dir_bytes(pac_dir)
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     "if command -v paccache >/dev/null 2>&1; then paccache -rk1 && paccache -ruk0; else pacman -Sc --noconfirm; fi"],
+                    capture_output=True, text=True, timeout=120.0
+                )
+                if r.returncode != 0:
+                    return "error:Limpieza cancelada o sin permisos"
+                after = _dir_bytes(pac_dir)
+                freed = max(0, before - after)
+                self._cache_storage_ts = 0.0
+                dump_sysinfo_file()
+                return f"ok:{_fmt_sz(freed)}"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(result=str)
+        def cleanUserCache(self):
+            cache_dir = os.path.join(HOME_DIR, ".cache")
+            if not os.path.isdir(cache_dir):
+                return "ok:0 B"
+            protected = {
+                "dconf", "gvfs", "gvfs-burn", "keyring", "antigravity",
+                "quickshell", "fontconfig", "mesa_shader_cache", "mesa_shader_cache_db",
+                "nvidia", "x64-win11", "systemd", "dbus-1", "ibus"
+            }
+            def _path_bytes(p):
+                tot = 0
+                try:
+                    if os.path.isfile(p) or os.path.islink(p):
+                        return os.lstat(p).st_size
+                    for rdir, _, fls in os.walk(p):
+                        for fn in fls:
+                            try:
+                                tot += os.lstat(os.path.join(rdir, fn)).st_size
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                return tot
+            def _fmt_sz(nb):
+                if nb < 1024: return f"{nb} B"
+                if nb < 1024**2: return f"{nb / 1024:.1f} KB"
+                if nb < 1024**3: return f"{nb / (1024**2):.1f} MB"
+                return f"{nb / (1024**3):.2f} GB"
+            freed = 0
+            try:
+                for entry in list(os.scandir(cache_dir)):
+                    if entry.name in protected or entry.name.startswith("."):
+                        continue
+                    p = entry.path
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        sz = _path_bytes(p)
+                        if entry.is_dir(follow_symlinks=False):
+                            shutil.rmtree(p, ignore_errors=True)
+                            after_sz = _path_bytes(p) if os.path.exists(p) else 0
+                            freed += max(0, sz - after_sz)
+                        elif entry.is_file(follow_symlinks=False):
+                            os.remove(p)
+                            freed += sz
+                    except Exception:
+                        pass
+                self._cache_storage_ts = 0.0
+                dump_sysinfo_file()
+                return f"ok:{_fmt_sz(freed)}"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(result=str)
+        def vacuumJournalLogs(self):
+            try:
+                r = subprocess.run(
+                    ["pkexec", "journalctl", "--vacuum-time=7d"],
+                    capture_output=True, text=True, timeout=30.0
+                )
+                if r.returncode != 0:
+                    return "error:Limpieza cancelada o sin permisos"
+                self._cache_storage_ts = 0.0
+                return "ok"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
 
         @pyqtSlot(str, result=bool)
         def restoreTrashItem(self, trash_item_path):
@@ -2030,42 +2484,607 @@ def main():
 
         @pyqtSlot(int)
         def setPipewireVolume(self, pct):
-            p = max(0, min(100, int(pct)))
+            p = max(0, min(150, int(pct)))
             try:
-                subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{p}%"], start_new_session=True)
+                if shutil.which("pactl"):
+                    subprocess.Popen(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{p}%"], start_new_session=True)
+                else:
+                    subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{p}%"], start_new_session=True)
             except Exception:
                 pass
 
         @pyqtSlot(result=bool)
         def toggleAudioMute(self):
             try:
-                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], timeout=1.2, stderr=subprocess.DEVNULL)
+                cmd = ["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"] if shutil.which("pactl") else ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]
+                subprocess.run(cmd, timeout=1.2, stderr=subprocess.DEVNULL)
                 return True
             except Exception:
                 return False
 
         @pyqtSlot(int)
         def setMicVolume(self, pct):
-            p = max(0, min(100, int(pct)))
+            p = max(0, min(150, int(pct)))
             try:
-                subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SOURCE@", f"{p}%"], start_new_session=True)
+                if shutil.which("pactl"):
+                    subprocess.Popen(["pactl", "set-source-volume", "@DEFAULT_SOURCE@", f"{p}%"], start_new_session=True)
+                else:
+                    subprocess.Popen(["wpctl", "set-volume", "@DEFAULT_AUDIO_SOURCE@", f"{p}%"], start_new_session=True)
             except Exception:
                 pass
 
         @pyqtSlot(result=bool)
         def toggleMicMute(self):
             try:
-                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"], timeout=1.2, stderr=subprocess.DEVNULL)
+                cmd = ["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "toggle"] if shutil.which("pactl") else ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "toggle"]
+                subprocess.run(cmd, timeout=1.2, stderr=subprocess.DEVNULL)
                 return True
             except Exception:
                 return False
 
         @pyqtSlot(str, result=bool)
-        def setDefaultAudioSink(self, sink_id):
-            if not str(sink_id).isdigit():
+        def setDefaultAudioSink(self, sink_target):
+            t = (sink_target or "").strip()
+            if not t:
                 return False
             try:
-                subprocess.run(["wpctl", "set-default", str(sink_id)], timeout=1.5, stderr=subprocess.DEVNULL)
+                cmd = ["pactl", "set-default-sink", t] if shutil.which("pactl") else ["wpctl", "set-default", t]
+                r = subprocess.run(cmd, timeout=1.5, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def setDefaultAudioSource(self, source_target):
+            t = (source_target or "").strip()
+            if not t:
+                return False
+            try:
+                cmd = ["pactl", "set-default-source", t] if shutil.which("pactl") else ["wpctl", "set-default", t]
+                r = subprocess.run(cmd, timeout=1.5, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def setSinkPort(self, sink_target, port_name):
+            t = (sink_target or "").strip()
+            p = (port_name or "").strip()
+            if not t or not p:
+                return False
+            try:
+                r = subprocess.run(["pactl", "set-sink-port", t, p], timeout=1.5, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def setSourcePort(self, source_target, port_name):
+            t = (source_target or "").strip()
+            p = (port_name or "").strip()
+            if not t or not p:
+                return False
+            try:
+                r = subprocess.run(["pactl", "set-source-port", t, p], timeout=1.5, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def setCardProfile(self, card_name, profile_name):
+            c = (card_name or "").strip()
+            p = (profile_name or "").strip()
+            if not c or not p:
+                return False
+            try:
+                r = subprocess.run(["pactl", "set-card-profile", c, p], timeout=2.0, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, int, result=bool)
+        def setStreamVolume(self, stream_id, pct):
+            sid = (stream_id or "").strip()
+            if not sid.isdigit():
+                return False
+            p = max(0, min(150, int(pct)))
+            try:
+                subprocess.Popen(["pactl", "set-sink-input-volume", sid, f"{p}%"], start_new_session=True)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def toggleStreamMute(self, stream_id):
+            sid = (stream_id or "").strip()
+            if not sid.isdigit():
+                return False
+            try:
+                r = subprocess.run(["pactl", "set-sink-input-mute", sid, "toggle"], timeout=1.2, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def moveStreamToSink(self, stream_id, sink_target):
+            sid = (stream_id or "").strip()
+            t = (sink_target or "").strip()
+            if not sid.isdigit() or not t:
+                return False
+            try:
+                r = subprocess.run(["pactl", "move-sink-input", sid, t], timeout=1.5, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot()
+        def startMicTest(self):
+            if self._mic_worker is not None and self._mic_worker.isRunning():
+                return
+            w = _MicTestWorker()
+            w.stateChanged.connect(self.micTestStateChanged.emit)
+            self._mic_worker = w
+            w.start()
+
+        @pyqtSlot(result=bool)
+        def playTestSound(self):
+            try:
+                import math, struct, tempfile, wave
+                sr = 44100
+                dur = 0.38
+                n = int(sr * dur)
+                frames = bytearray()
+                for i in range(n):
+                    t = i / sr
+                    env = min(1.0, t / 0.015) * math.exp(-t * 7.5)
+                    # Pleasant Windows 11-like major fifth chime (523.25 Hz C5 + 783.99 Hz G5)
+                    val = 0.35 * env * (math.sin(2 * math.pi * 523.25 * t) + 0.65 * math.sin(2 * math.pi * 783.99 * t))
+                    frames += struct.pack("<h", max(-32767, min(32767, int(val * 32767))))
+                tmp_wav = os.path.join(STATE_DIR, "test-chime.wav")
+                os.makedirs(STATE_DIR, exist_ok=True)
+                with wave.open(tmp_wav, "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(sr)
+                    wf.writeframes(bytes(frames))
+                player = shutil.which("pw-play") or shutil.which("paplay") or shutil.which("aplay")
+                if not player:
+                    return False
+                subprocess.Popen([player, tmp_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(result=bool)
+        def sendTestNotification(self):
+            try:
+                subprocess.Popen([
+                    "notify-send", "-a", "Configuración", "-i", "preferences-system",
+                    "Notificación de prueba",
+                    "Los avisos y el centro de notificaciones de X64 Windows 11 funcionan correctamente."
+                ], start_new_session=True)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(bool, result=bool)
+        def setCaffeineEnabled(self, enabled):
+            pid_p = os.path.join(STATE_DIR, "caffeine.pid")
+            os.makedirs(STATE_DIR, exist_ok=True)
+            # Clean any existing caffeine inhibitor first
+            if os.path.isfile(pid_p):
+                try:
+                    old_pid = int(open(pid_p, "r", encoding="utf-8").read().strip())
+                    if old_pid > 1:
+                        os.kill(old_pid, 15)
+                except Exception:
+                    pass
+                try:
+                    os.remove(pid_p)
+                except Exception:
+                    pass
+            if not enabled:
+                return True
+            try:
+                proc = subprocess.Popen(
+                    ["systemd-inhibit", "--what=idle:sleep:handle-lid-switch", "--who=X64 Configuración",
+                     "--why=Modo Cafeína activado por el usuario", "sleep", "infinity"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
+                )
+                with open(pid_p, "w", encoding="utf-8") as f:
+                    f.write(str(proc.pid))
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=str)
+        def setLidExternalAction(self, action):
+            act = (action or "").strip().lower()
+            if act not in ("suspend", "ignore"):
+                return "error:Acción de tapa no válida"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     'mkdir -p /etc/systemd/logind.conf.d && printf "[Login]\\nHandleLidSwitchExternalPower=%s\\nHandleLidSwitchDocked=%s\\n" "$1" "$1" > /etc/systemd/logind.conf.d/90-x64-power.conf && systemctl kill -s HUP systemd-logind',
+                     "--", act],
+                    capture_output=True, text=True, timeout=20.0
+                )
+                if r.returncode == 0:
+                    return "ok"
+                return "error:Cambio cancelado o sin permisos"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(str, result=bool)
+        def triggerPowerAction(self, action):
+            act = (action or "").strip().lower()
+            try:
+                if act == "lock":
+                    subprocess.Popen(["/usr/bin/x64-win11-ctl", "lock"], start_new_session=True)
+                    return True
+                elif act == "suspend":
+                    subprocess.Popen(["systemctl", "suspend"], start_new_session=True)
+                    return True
+                elif act == "reboot":
+                    subprocess.Popen(["systemctl", "reboot"], start_new_session=True)
+                    return True
+                elif act == "poweroff":
+                    subprocess.Popen(["systemctl", "poweroff"], start_new_session=True)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        @pyqtSlot(str, result=str)
+        def setSystemHostname(self, new_name):
+            clean = re.sub(r"[^a-zA-Z0-9\-]", "", (new_name or "").strip()).strip("-")[:48]
+            if not clean:
+                return "error:Nombre no válido (usa letras, números o guiones)"
+            try:
+                r = subprocess.run(["pkexec", "hostnamectl", "set-hostname", clean], capture_output=True, text=True, timeout=20.0)
+                if r.returncode == 0:
+                    dump_sysinfo_file()
+                    return "ok"
+                return "error:Cambio cancelado o sin permisos"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(str, result=bool)
+        def removeBluetoothDevice(self, mac):
+            m = (mac or "").strip()
+            if not m or ":" not in m:
+                return False
+            try:
+                subprocess.run(["bluetoothctl", "disconnect", m], timeout=2.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                r = subprocess.run(["bluetoothctl", "remove", m], timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(bool, result=bool)
+        def setBluetoothDiscoverable(self, enabled):
+            val = "on" if enabled else "off"
+            try:
+                subprocess.run(["bluetoothctl", "pairable", val], timeout=2.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                r = subprocess.run(["bluetoothctl", "discoverable", val], timeout=2.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot()
+        def startBluetoothScan(self):
+            if self._bt_scan_worker is not None and self._bt_scan_worker.isRunning():
+                return
+            w = _BtScanWorker()
+            w.scanDone.connect(self.btScanFinished.emit)
+            self._bt_scan_worker = w
+            w.start()
+
+        @pyqtSlot(str, result=str)
+        def pairBluetoothDevice(self, mac):
+            m = (mac or "").strip()
+            if not m or ":" not in m:
+                return "error:Dirección MAC no válida"
+            try:
+                subprocess.run(["bluetoothctl", "trust", m], timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                rp = subprocess.run(["bluetoothctl", "pair", m], capture_output=True, text=True, timeout=12.0)
+                rc = subprocess.run(["bluetoothctl", "connect", m], capture_output=True, text=True, timeout=10.0)
+                dump_sysinfo_file()
+                if rc.returncode == 0 or rp.returncode == 0:
+                    return "ok"
+                return "error:No se pudo emparejar (usa Gestor avanzado si requiere PIN)"
+            except Exception as ex:
+                return f"error:{str(ex)[:70]}"
+
+        @pyqtSlot(str, result=str)
+        def ejectUsbDrive(self, device_path):
+            dev = (device_path or "").strip()
+            if not dev.startswith("/dev/"):
+                return "error:Dispositivo no válido"
+            try:
+                subprocess.run(["udisksctl", "unmount", "-b", dev, "--no-user-interaction"], capture_output=True, text=True, timeout=8.0)
+                base_dev = re.sub(r"p?\d+$", "", dev)
+                r = subprocess.run(["udisksctl", "power-off", "-b", base_dev, "--no-user-interaction"], capture_output=True, text=True, timeout=8.0)
+                dump_sysinfo_file()
+                if r.returncode == 0:
+                    return "ok"
+                return "error:Unidad desmontada (puedes retirarla con seguridad)"
+            except Exception as ex:
+                return f"error:{str(ex)[:70]}"
+
+        @pyqtSlot(str, result=bool)
+        def setDefaultPrinter(self, name):
+            n = (name or "").strip()
+            if not n:
+                return False
+            try:
+                r = subprocess.run(["lpadmin", "-d", n], timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def printTestPage(self, name):
+            n = (name or "").strip()
+            if not n:
+                return False
+            try:
+                for cand in ("/usr/share/cups/data/testprint", "/usr/share/cups/data/default-testpage.pdf"):
+                    if os.path.isfile(cand):
+                        r = subprocess.run(["lp", "-d", n, cand], timeout=5.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        return r.returncode == 0
+                return False
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=str)
+        def phoneMirrorStart(self, serial=""):
+            args = ["/usr/bin/x64-win11-ctl", "phone", "mirror"]
+            if (serial or "").strip():
+                args.append(serial.strip())
+            try:
+                r = subprocess.run(args, timeout=3.0, stderr=subprocess.DEVNULL)
+                if r.returncode != 0:
+                    return "error:Conecta un móvil Android con Depuración USB o Wi-Fi ADB"
+                # Wait briefly so phone-mirror.json reflects active=true immediately on next UI refresh
+                mp = os.path.join(STATE_DIR, "phone-mirror.json")
+                for _ in range(8):
+                    time.sleep(0.05)
+                    if os.path.isfile(mp):
+                        try:
+                            if json.load(open(mp, "r", encoding="utf-8")).get("active"):
+                                break
+                        except Exception:
+                            pass
+                return "ok"
+            except Exception as ex:
+                return f"error:{str(ex)[:70]}"
+
+        @pyqtSlot(result=bool)
+        def phoneMirrorStop(self):
+            try:
+                subprocess.run(["/usr/bin/x64-win11-ctl", "phone", "stop"], timeout=2.0, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=str)
+        def phoneSendFileAdb(self, serial=""):
+            if not shutil.which("adb"):
+                return "error:adb no instalado"
+            ser = (serial or "").strip()
+            if not ser:
+                try:
+                    out = subprocess.check_output(["adb", "devices"], text=True, timeout=1.5, stderr=subprocess.DEVNULL)
+                    for ln in out.splitlines()[1:]:
+                        toks = ln.strip().split()
+                        if len(toks) >= 2 and toks[1] == "device":
+                            ser = toks[0]; break
+                except Exception:
+                    pass
+            if not ser:
+                return "error:Conecta un móvil Android primero"
+            fp, _ = QFileDialog.getOpenFileName(None, "Enviar archivo al teléfono (Descargas)", HOME_DIR, "Todos los archivos (*)")
+            if not fp or not os.path.isfile(fp):
+                return "cancel"
+            base = os.path.basename(fp)
+            dest = f"/sdcard/Download/{base}"
+            try:
+                r = subprocess.run(["adb", "-s", ser, "push", fp, dest], capture_output=True, text=True, timeout=120.0)
+                if r.returncode == 0:
+                    subprocess.Popen(["adb", "-s", ser, "shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", f"file://{dest}"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                    return f"ok:{base} enviado a Descargas del móvil"
+                return "error:No se pudo enviar el archivo"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(str, result=bool)
+        def phoneDisconnectWifiAdb(self, serial):
+            s = (serial or "").strip()
+            if not s or ":" not in s:
+                return False
+            try:
+                subprocess.run(["adb", "disconnect", s], timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                _ADB_META_CACHE.pop(s, None)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=str)
+        def phoneEnableWifiAdb(self, serial=""):
+            if not shutil.which("adb"):
+                return "error:adb no instalado"
+            try:
+                target = (serial or "").strip()
+                if not target:
+                    out = subprocess.check_output(["adb", "devices"], text=True, timeout=2.0, stderr=subprocess.DEVNULL)
+                    for ln in out.splitlines()[1:]:
+                        toks = ln.strip().split()
+                        if len(toks) >= 2 and toks[1] == "device" and ":" not in toks[0]:
+                            target = toks[0]; break
+                if not target:
+                    return "error:Conecta el móvil Android por USB primero"
+                ip_out = subprocess.check_output(["adb", "-s", target, "shell", "ip", "-4", "addr", "show", "wlan0"], text=True, timeout=3.0, stderr=subprocess.DEVNULL)
+                m_ip = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", ip_out)
+                if not m_ip:
+                    ip_out2 = subprocess.check_output(["adb", "-s", target, "shell", "ip", "route"], text=True, timeout=3.0, stderr=subprocess.DEVNULL)
+                    m_ip = re.search(r"src\s+(\d+\.\d+\.\d+\.\d+)", ip_out2)
+                if not m_ip:
+                    return "error:El móvil no parece estar conectado a la red Wi-Fi"
+                phone_ip = m_ip.group(1)
+                subprocess.run(["adb", "-s", target, "tcpip", "5555"], timeout=4.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(1.1)
+                rc = subprocess.run(["adb", "connect", f"{phone_ip}:5555"], capture_output=True, text=True, timeout=6.0)
+                if "connected" in (rc.stdout or "").lower():
+                    dump_sysinfo_file()
+                    return f"ok:{phone_ip}:5555"
+                return "error:No se pudo enlazar por Wi-Fi (verifica misma red LAN)"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(str, result=str)
+        def phoneConnectWifiAdb(self, addr):
+            a = (addr or "").strip()
+            if not a:
+                return "error:Escribe la IP del móvil (ej. 192.168.3.50)"
+            if ":" not in a:
+                a = f"{a}:5555"
+            try:
+                rc = subprocess.run(["adb", "connect", a], capture_output=True, text=True, timeout=6.0)
+                out = (rc.stdout or rc.stderr or "").strip()
+                if "connected" in out.lower():
+                    dump_sysinfo_file()
+                    return f"ok:{a}"
+                return "error:" + (out.splitlines()[-1][:80] if out else "No se pudo conectar")
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(str, str, result=str)
+        def phoneKdeAction(self, action, dev_id=""):
+            if not shutil.which("kdeconnect-cli"):
+                return "error:KDE Connect no instalado"
+            kde_daemon = shutil.which("kdeconnectd") or ("/usr/bin/kdeconnectd" if os.path.isfile("/usr/bin/kdeconnectd") else ("/usr/lib/kdeconnectd" if os.path.isfile("/usr/lib/kdeconnectd") else ""))
+            if kde_daemon:
+                try:
+                    if subprocess.run(["pgrep", "-x", "kdeconnectd"], timeout=0.4, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+                        subprocess.Popen([kde_daemon], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        time.sleep(0.4)
+                except Exception:
+                    pass
+            act = (action or "").strip().lower()
+            did = (dev_id or "").strip()
+            try:
+                if act == "refresh":
+                    subprocess.run(["kdeconnect-cli", "--refresh"], timeout=2.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    dump_sysinfo_file()
+                    return "ok:Buscando teléfonos en la red Wi-Fi..."
+                if not did:
+                    return "error:Selecciona un dispositivo"
+                if act == "pair":
+                    subprocess.Popen(["kdeconnect-cli", "-d", did, "--pair"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return "ok:Solicitud enviada — acepta en tu teléfono"
+                elif act == "unpair":
+                    subprocess.run(["kdeconnect-cli", "-d", did, "--unpair"], timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    dump_sysinfo_file()
+                    return "ok:Dispositivo desvinculado"
+                elif act == "ring":
+                    subprocess.Popen(["kdeconnect-cli", "-d", did, "--ring"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return "ok:Haciendo sonar el teléfono..."
+                elif act == "ping":
+                    subprocess.Popen(["kdeconnect-cli", "-d", did, "--ping-msg", "Hola desde X64 Windows 11"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return "ok:Ping enviado al teléfono"
+                elif act == "clipboard":
+                    subprocess.Popen(["kdeconnect-cli", "-d", did, "--send-clipboard"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return "ok:Portapapeles enviado al teléfono"
+                elif act == "share-file":
+                    fp, _ = QFileDialog.getOpenFileName(None, "Enviar archivo al teléfono", HOME_DIR, "Todos los archivos (*)")
+                    if not fp:
+                        return "cancel"
+                    subprocess.Popen(["kdeconnect-cli", "-d", did, "--share", fp], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return f"ok:Enviando {os.path.basename(fp)}..."
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+            return "error:Acción no reconocida"
+
+        @pyqtSlot(result=str)
+        def openKdeConnectFirewall(self):
+            if not shutil.which("ufw"):
+                return "ok:Sin firewall UFW activo"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     'ufw allow 1714:1764/tcp comment "X64 KDE Connect" && ufw allow 1714:1764/udp comment "X64 KDE Connect"'],
+                    capture_output=True, text=True, timeout=20.0
+                )
+                return "ok:Puertos 1714–1764 abiertos en UFW" if r.returncode == 0 else "error:Cancelado o sin permisos"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(str, result=bool)
+        def saveInputConfigJson(self, json_str):
+            """Apply real Mouse & Touchpad libinput settings into ~/.config/labwc/rc.xml + SIGHUP!"""
+            try:
+                d = json.loads(json_str)
+            except Exception:
+                return False
+            rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+            if not os.path.isfile(rc_p):
+                return False
+            try:
+                m_spd = max(-1.0, min(1.0, float(d.get("mouseSpeed", 0.0))))
+                m_acc = "flat" if str(d.get("mouseAccel", "adaptive")) == "flat" else "adaptive"
+                m_lh = "yes" if bool(d.get("mouseLeftHanded", False)) else "no"
+                m_ns = "yes" if bool(d.get("mouseNaturalScroll", False)) else "no"
+                m_sf = max(0.3, min(3.0, float(d.get("mouseScrollFactor", 1.0))))
+                m_me = "yes" if bool(d.get("mouseMiddleEmulation", False)) else "no"
+                t_tap = "yes" if bool(d.get("tpTap", True)) else "no"
+                t_tad = "yes" if bool(d.get("tpTapAndDrag", True)) else "no"
+                t_3fd = "yes" if bool(d.get("tpThreeFingerDrag", False)) else "no"
+                t_ns = "yes" if bool(d.get("tpNaturalScroll", True)) else "no"
+                t_dwt = "yes" if bool(d.get("tpDisableTyping", True)) else "no"
+                t_spd = max(-1.0, min(1.0, float(d.get("tpSpeed", 0.0))))
+                raw_se = str(d.get("tpSendEvents", "yes"))
+                t_se = raw_se if raw_se in ("yes", "no", "disabledOnExternalMouse") else "yes"
+                raw_cm = str(d.get("tpClickMethod", "clickfinger"))
+                t_cm = raw_cm if raw_cm in ("clickfinger", "buttonAreas") else "clickfinger"
+
+                blk = (
+                    "  <libinput>\n"
+                    "    <device category=\"non-touch\">\n"
+                    f"      <pointerSpeed>{m_spd:.2f}</pointerSpeed>\n"
+                    f"      <accelProfile>{m_acc}</accelProfile>\n"
+                    f"      <leftHanded>{m_lh}</leftHanded>\n"
+                    f"      <naturalScroll>{m_ns}</naturalScroll>\n"
+                    f"      <scrollFactor>{m_sf:.2f}</scrollFactor>\n"
+                    f"      <middleEmulation>{m_me}</middleEmulation>\n"
+                    "    </device>\n"
+                    "    <device category=\"touchpad\">\n"
+                    f"      <sendEventsMode>{t_se}</sendEventsMode>\n"
+                    f"      <tap>{t_tap}</tap>\n"
+                    f"      <tapAndDrag>{t_tad}</tapAndDrag>\n"
+                    f"      <threeFingerDrag>{t_3fd}</threeFingerDrag>\n"
+                    f"      <naturalScroll>{t_ns}</naturalScroll>\n"
+                    f"      <disableWhileTyping>{t_dwt}</disableWhileTyping>\n"
+                    f"      <clickMethod>{t_cm}</clickMethod>\n"
+                    f"      <pointerSpeed>{t_spd:.2f}</pointerSpeed>\n"
+                    "    </device>\n"
+                    "  </libinput>"
+                )
+                txt = open(rc_p, "r", encoding="utf-8").read()
+                if re.search(r"<libinput\b[^>]*>.*?</libinput>", txt, flags=re.S):
+                    new_txt = re.sub(r"[ \t]*<libinput\b[^>]*>.*?</libinput>", blk, txt, count=1, flags=re.S)
+                elif "</labwc_config>" in txt:
+                    new_txt = txt.replace("</labwc_config>", "\n" + blk + "\n</labwc_config>", 1)
+                else:
+                    return False
+                tmp = rc_p + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    f.write(new_txt)
+                os.replace(tmp, rc_p)
+                subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.0, stderr=subprocess.DEVNULL)
                 return True
             except Exception:
                 return False
@@ -2125,6 +3144,71 @@ def main():
             except Exception:
                 return False
 
+        def _save_monitors_patch(self, patches):
+            mon_p = os.path.join(STATE_DIR, "monitors.json")
+            os.makedirs(STATE_DIR, exist_ok=True)
+            mdata = {}
+            if os.path.isfile(mon_p):
+                try:
+                    mdata = json.load(open(mon_p, "r", encoding="utf-8"))
+                except Exception:
+                    mdata = {}
+            if not isinstance(mdata, dict):
+                mdata = {}
+            for name, upd in (patches or {}).items():
+                ent = dict(mdata.get(str(name), {}))
+                ent.update(upd)
+                mdata[str(name)] = ent
+            with open(mon_p + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(mdata, f)
+            os.replace(mon_p + ".tmp", mon_p)
+
+        def _repack_monitors_contiguous(self, order_override=None):
+            """Recalculate exact contiguous --pos X,0 for all enabled outputs (zero dead cursor gaps!)."""
+            try:
+                wdata = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.8, stderr=subprocess.DEVNULL))
+                if not isinstance(wdata, list):
+                    return False
+                by_name = {str(m.get("name", "")): m for m in wdata if m.get("name")}
+                enabled = [m for m in wdata if m.get("enabled") and m.get("name")]
+                if order_override:
+                    ordered = [by_name[n] for n in order_override if n in by_name and by_name[n].get("enabled")]
+                    for m in enabled:
+                        if m not in ordered:
+                            ordered.append(m)
+                else:
+                    ordered = sorted(enabled, key=lambda m: (int((m.get("position") or {}).get("x", 0)), int((m.get("position") or {}).get("y", 0)), str(m.get("name", ""))))
+                if not ordered:
+                    return True
+                cmd = ["wlr-randr"]
+                patches = {}
+                cur_x = 0
+                for m in ordered:
+                    nm = str(m["name"])
+                    sc = float(m.get("scale") or 1.0)
+                    if sc <= 0.1:
+                        sc = 1.0
+                    tr = str(m.get("transform") or "normal")
+                    mw, mh = 1920, 1080
+                    for md in (m.get("modes") or []):
+                        if md.get("current"):
+                            mw = int(md.get("width", 1920))
+                            mh = int(md.get("height", 1080))
+                            break
+                    if tr in ("90", "270", "flipped-90", "flipped-270"):
+                        mw, mh = mh, mw
+                    log_w = max(320, int(round(mw / sc)))
+                    pos_s = f"{cur_x},0"
+                    cmd += ["--output", nm, "--pos", pos_s]
+                    patches[nm] = {"pos": pos_s, "enabled": True}
+                    cur_x += log_w
+                if len(cmd) > 1:
+                    subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+                    self._save_monitors_patch(patches)
+                return True
+            except Exception:
+                return False
+
         @pyqtSlot(str, str, str, result=bool)
         def applyMonitorSetting(self, output_name, scale_str, mode_str):
             if not output_name:
@@ -2139,25 +3223,135 @@ def main():
             try:
                 r = subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
                 if r.returncode == 0:
-                    mon_p = os.path.join(STATE_DIR, "monitors.json")
-                    os.makedirs(STATE_DIR, exist_ok=True)
-                    mdata = {}
-                    if os.path.isfile(mon_p):
-                        try:
-                            mdata = json.load(open(mon_p, "r", encoding="utf-8"))
-                        except Exception:
-                            mdata = {}
-                    entry = dict(mdata.get(str(output_name), {}))
+                    entry = {}
                     if scale_str:
                         entry["scale"] = str(scale_str)
                     if mode_str:
                         entry["mode"] = str(mode_str)
-                    mdata[str(output_name)] = entry
-                    with open(mon_p + ".tmp", "w", encoding="utf-8") as f:
-                        json.dump(mdata, f)
-                    os.replace(mon_p + ".tmp", mon_p)
+                    self._save_monitors_patch({str(output_name): entry})
+                    self._repack_monitors_contiguous()
                     return True
                 return False
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, str, str, result=str)
+        def applyMonitorAdvanced(self, output_name, transform_str, adaptive_str, power_str):
+            if not output_name:
+                return "error:Monitor inválido"
+            # Safety guard: never allow turning off the only enabled monitor!
+            if power_str == "off":
+                try:
+                    wdata = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.5, stderr=subprocess.DEVNULL))
+                    enabled_mons = [m.get("name") for m in (wdata if isinstance(wdata, list) else []) if m.get("enabled")]
+                    if len(enabled_mons) <= 1 and output_name in enabled_mons:
+                        return "error:No puedes apagar la única pantalla activa"
+                except Exception:
+                    return "error:No se pudo comprobar las pantallas activas"
+            cmd = ["wlr-randr", "--output", str(output_name)]
+            if power_str == "on":
+                cmd += ["--on"]
+            elif power_str == "off":
+                cmd += ["--off"]
+            if transform_str in ("normal", "90", "180", "270"):
+                cmd += ["--transform", transform_str]
+            if adaptive_str in ("enabled", "disabled"):
+                cmd += ["--adaptive-sync", adaptive_str]
+            if len(cmd) <= 3:
+                return "error:Sin cambios"
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=2.5)
+                if r.returncode != 0:
+                    err = (r.stderr or r.stdout or "El monitor no soporta este ajuste").strip()
+                    return f"error:{err[:90]}"
+                entry = {}
+                if transform_str:
+                    entry["transform"] = transform_str
+                if adaptive_str:
+                    entry["adaptiveSync"] = adaptive_str
+                if power_str == "on":
+                    entry["enabled"] = True
+                elif power_str == "off":
+                    entry["enabled"] = False
+                if entry:
+                    self._save_monitors_patch({str(output_name): entry})
+                if transform_str or power_str in ("on", "off"):
+                    self._repack_monitors_contiguous()
+                return "ok"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(result=str)
+        def swapMonitorOrder(self):
+            try:
+                wdata = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.8, stderr=subprocess.DEVNULL))
+                enabled = sorted(
+                    [m for m in (wdata if isinstance(wdata, list) else []) if m.get("enabled") and m.get("name")],
+                    key=lambda m: (int((m.get("position") or {}).get("x", 0)), int((m.get("position") or {}).get("y", 0)), str(m.get("name", "")))
+                )
+                if len(enabled) < 2:
+                    return "error:Se necesitan al menos 2 pantallas activas"
+                rev_names = [str(m["name"]) for m in reversed(enabled)]
+                if self._repack_monitors_contiguous(order_override=rev_names):
+                    return "ok"
+                return "error:No se pudo reordenar las pantallas"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(str, result=str)
+        def setMultiMonitorMode(self, mode_str):
+            try:
+                wdata = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.8, stderr=subprocess.DEVNULL))
+                mons = [m for m in (wdata if isinstance(wdata, list) else []) if m.get("name")]
+                if len(mons) < 2:
+                    return "error:Solo hay una pantalla conectada"
+                mode_str = (mode_str or "").strip()
+                if mode_str == "extend":
+                    cmd = ["wlr-randr"]
+                    patches = {}
+                    for m in mons:
+                        nm = str(m["name"])
+                        cmd += ["--output", nm, "--on"]
+                        patches[nm] = {"enabled": True}
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=2.5)
+                    if r.returncode != 0:
+                        return f"error:{(r.stderr or 'Error al extender').strip()[:80]}"
+                    self._save_monitors_patch(patches)
+                    self._repack_monitors_contiguous()
+                    return "ok"
+                elif mode_str.startswith("only:"):
+                    target = mode_str.split(":", 1)[1].strip()
+                    if not any(str(m["name"]) == target for m in mons):
+                        return "error:Pantalla no encontrada"
+                    cmd = ["wlr-randr", "--output", target, "--on", "--pos", "0,0"]
+                    patches = {target: {"enabled": True, "pos": "0,0"}}
+                    for m in mons:
+                        nm = str(m["name"])
+                        if nm != target:
+                            cmd += ["--output", nm, "--off"]
+                            patches[nm] = {"enabled": False}
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=2.5)
+                    if r.returncode != 0:
+                        return f"error:{(r.stderr or 'Error al cambiar pantalla').strip()[:80]}"
+                    self._save_monitors_patch(patches)
+                    return "ok"
+                return "error:Modo desconocido"
+            except Exception as ex:
+                return f"error:{str(ex)[:80]}"
+
+        @pyqtSlot(result=bool)
+        def identifyDisplays(self):
+            try:
+                wdata = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.5, stderr=subprocess.DEVNULL))
+                mons = sorted(
+                    [m for m in (wdata if isinstance(wdata, list) else []) if m.get("name")],
+                    key=lambda m: (not bool(m.get("enabled", True)), int((m.get("position") or {}).get("x", 0)), int((m.get("position") or {}).get("y", 0)), str(m.get("name", "")))
+                )
+                id_map = {str(m["name"]): idx + 1 for idx, m in enumerate(mons)}
+                cfg = load_cfg()
+                cfg["identifyDisplays"] = {"ts": int(time.time() * 1000), "map": id_map}
+                save_cfg(cfg)
+                return True
             except Exception:
                 return False
 
@@ -2412,12 +3606,17 @@ def main():
 
         @pyqtSlot(result=str)
         def getSettingsExtendedJson(self):
+            return json.dumps(self._build_settings_extended_dict(force_slow=True))
+
+        def _build_settings_extended_dict(self, force_slow=False):
             import grp
+            now_ts = time.monotonic()
             display_name, uname, hostname = get_real_user_info()
             cfg = load_cfg()
-            # 1. Monitors via wlr-randr --json (exact current mode + Hz precision)
+            # 1. Monitors via wlr-randr --json (left-to-right physical order + separated Resolutions & Hz!)
             monitors_list = []
             try:
+                import math
                 wraw = subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=1.5, stderr=subprocess.DEVNULL)
                 wdata = json.loads(wraw)
                 for mon in (wdata if isinstance(wdata, list) else []):
@@ -2425,117 +3624,535 @@ def main():
                     if not mname:
                         continue
                     desc = str(mon.get("description") or mname).strip()
+                    make = str(mon.get("make") or "").strip()
+                    model_m = str(mon.get("model") or "").strip()
+                    ps = mon.get("physical_size") or {}
+                    pw_mm = int(ps.get("width", 0)) if isinstance(ps, dict) else 0
+                    ph_mm = int(ps.get("height", 0)) if isinstance(ps, dict) else 0
+                    diag_in = f'{math.hypot(pw_mm, ph_mm) / 25.4:.1f}"' if (pw_mm > 50 and ph_mm > 50) else ""
                     enabled = bool(mon.get("enabled", True))
-                    sc_val = mon.get("scale", 1.0)
-                    try:
-                        scale_s = f"{float(sc_val):.2f}".rstrip("0").rstrip(".") or "1"
-                    except Exception:
-                        scale_s = "1"
+                    sc_val = float(mon.get("scale") or 1.0)
+                    if sc_val <= 0.1:
+                        sc_val = 1.0
+                    scale_s = f"{sc_val:.2f}".rstrip("0").rstrip(".") or "1"
                     pos = mon.get("position") or {}
-                    pos_s = f"{pos.get('x', 0)},{pos.get('y', 0)}" if isinstance(pos, dict) else "0,0"
+                    pos_x = int(pos.get("x", 0)) if isinstance(pos, dict) else 0
+                    pos_y = int(pos.get("y", 0)) if isinstance(pos, dict) else 0
+                    pos_s = f"{pos_x},{pos_y}"
+                    transform_s = str(mon.get("transform") or "normal")
+                    vrr_on = bool(mon.get("adaptive_sync", False))
                     cur_mode_lbl = ""
-                    modes_by_lbl = {}
-                    modes_order = []
+                    cur_res = ""
+                    cur_hz = 60
+                    cur_hz_exact = "60.00 Hz"
+                    cur_arg = ""
+                    cur_w, cur_h = 1920, 1080
+                    res_buckets = {}
                     for m in (mon.get("modes") or []):
                         w = int(m.get("width", 0))
                         h = int(m.get("height", 0))
                         if w <= 0 or h <= 0:
                             continue
                         ref = float(m.get("refresh", 60.0))
+                        hz_int = max(1, int(round(ref)))
                         is_cur = bool(m.get("current", False))
-                        lbl = f"{w}x{h} ({round(ref)} Hz)"
+                        is_pref = bool(m.get("preferred", False))
+                        rkey = f"{w}x{h}"
                         arg = f"{w}x{h}@{ref:.6f}Hz"
                         if is_cur:
-                            cur_mode_lbl = lbl
-                        if lbl not in modes_by_lbl:
-                            modes_by_lbl[lbl] = {"label": lbl, "arg": arg, "current": is_cur}
-                            modes_order.append(lbl)
-                        elif is_cur:
-                            modes_by_lbl[lbl] = {"label": lbl, "arg": arg, "current": True}
-                    final_modes = [modes_by_lbl[k] for k in modes_order[:8]]
-                    if cur_mode_lbl and not any(x["current"] for x in final_modes) and cur_mode_lbl in modes_by_lbl:
-                        final_modes = [modes_by_lbl[cur_mode_lbl]] + final_modes[:7]
+                            cur_mode_lbl = f"{w}×{h} ({hz_int} Hz)"
+                            cur_res = rkey
+                            cur_hz = hz_int
+                            cur_hz_exact = f"{ref:.2f} Hz"
+                            cur_arg = arg
+                            cur_w, cur_h = w, h
+                        b = res_buckets.setdefault(rkey, {
+                            "w": w, "h": h, "res": rkey, "label": f"{w} × {h}",
+                            "preferred": False, "current": False, "rates_by_hz": {}
+                        })
+                        if is_pref:
+                            b["preferred"] = True
+                        if is_cur:
+                            b["current"] = True
+                        prev_r = b["rates_by_hz"].get(hz_int)
+                        cand = {"hz": hz_int, "exact": ref, "label": f"{hz_int} Hz", "arg": arg, "current": is_cur, "preferred": is_pref}
+                        if prev_r is None or is_cur or (not prev_r["current"] and (is_pref or ref > prev_r["exact"])):
+                            b["rates_by_hz"][hz_int] = cand
+
+                    # Build clean deduplicated Resolutions list sorted by pixel area descending
+                    resolutions = []
+                    for rkey, b in sorted(res_buckets.items(), key=lambda kv: (kv[1]["w"] * kv[1]["h"], kv[1]["w"]), reverse=True):
+                        all_rates = sorted(b["rates_by_hz"].values(), key=lambda x: x["hz"], reverse=True)
+                        # Filter out cinema-only <45Hz clutter unless current or no >=45Hz rate exists!
+                        usable_rates = [rt for rt in all_rates if rt["hz"] >= 45 or rt["current"]]
+                        if not usable_rates:
+                            usable_rates = all_rates
+                        best = next((rt for rt in usable_rates if rt["current"]), next((rt for rt in usable_rates if rt["preferred"]), usable_rates[0]))
+                        resolutions.append({
+                            "res": b["res"],
+                            "label": b["label"] + (" (Recomendada)" if b["preferred"] else ""),
+                            "shortLabel": b["label"],
+                            "preferred": b["preferred"],
+                            "current": b["current"],
+                            "bestArg": best["arg"],
+                            "rates": [{"hz": rt["hz"], "label": rt["label"], "arg": rt["arg"], "current": rt["current"]} for rt in usable_rates]
+                        })
+                    if not cur_res and resolutions:
+                        cur_res = resolutions[0]["res"]
+                        cur_mode_lbl = resolutions[0]["shortLabel"]
+
+                    eff_w, eff_h = (cur_h, cur_w) if transform_s in ("90", "270") else (cur_w, cur_h)
+                    log_w = max(320, int(round(eff_w / sc_val)))
+                    log_h = max(240, int(round(eff_h / sc_val)))
+                    # Real ~1.5ms hardware VRR/FreeSync capability probe via wlr-randr --dryrun (zero flicker!)
+                    vrr_supported = bool(vrr_on)
+                    if enabled and not vrr_supported:
+                        try:
+                            vr = subprocess.run(
+                                ["wlr-randr", "--dryrun", "--output", mname, "--adaptive-sync", "enabled"],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.6
+                            )
+                            vrr_supported = (vr.returncode == 0)
+                        except Exception:
+                            vrr_supported = False
                     monitors_list.append({
                         "name": mname,
                         "desc": desc,
+                        "make": make,
+                        "model": model_m,
+                        "diagInches": diag_in,
                         "enabled": enabled,
                         "currentMode": cur_mode_lbl,
-                        "modes": final_modes,
+                        "currentRes": cur_res,
+                        "currentHz": cur_hz,
+                        "currentHzExact": cur_hz_exact,
+                        "currentArg": cur_arg,
+                        "resolutions": resolutions[:12],
                         "scale": scale_s,
                         "position": pos_s,
+                        "posX": pos_x,
+                        "posY": pos_y,
+                        "widthPx": cur_w,
+                        "heightPx": cur_h,
+                        "logicalW": log_w,
+                        "logicalH": log_h,
+                        "transform": transform_s,
+                        "adaptiveSync": vrr_on,
+                        "vrrSupported": vrr_supported,
                     })
+                # Sort enabled monitors left-to-right by real physical posX, disabled at the end!
+                monitors_list.sort(key=lambda m: (not m["enabled"], m["posX"], m["posY"], m["name"]))
             except Exception:
                 pass
 
-            # 2. Audio Sinks & Sources via wpctl status
+            # 2. Full Structured PipeWire Audio via pactl --format=json (Sinks, Sources, Ports, Per-App Streams & Card Profiles!)
             sinks = []
             sources = []
+            audio_streams = []
+            audio_cards = []
             mic_vol = 50
             mic_muted = False
+
+            def _avg_vol_pct(vol_obj):
+                vals = []
+                if isinstance(vol_obj, dict):
+                    for ch in vol_obj.values():
+                        if isinstance(ch, dict):
+                            vp = str(ch.get("value_percent", "")).replace("%", "").strip()
+                            if vp.isdigit():
+                                vals.append(int(vp))
+                return int(round(sum(vals) / len(vals))) if vals else 80
+
+            def _bus_type(name_s, props, active_port=""):
+                low = (name_s or "").lower()
+                ap = (active_port or "").lower()
+                dbus = str((props or {}).get("device.bus", "")).lower()
+                if "bluez" in low or dbus == "bluetooth":
+                    return "Bluetooth"
+                if "hdmi" in low or "hdmi" in ap or "displayport" in ap:
+                    return "HDMI"
+                if "usb" in low or dbus == "usb":
+                    return "USB"
+                return "Interno"
+
             try:
-                sout = subprocess.check_output(["wpctl", "status"], text=True, timeout=1.2, stderr=subprocess.DEVNULL)
-                sec = ""
-                in_audio = False
-                for ln in sout.splitlines():
-                    if ln.startswith("Audio"):
-                        in_audio = True
+                def_sink = subprocess.check_output(["pactl", "get-default-sink"], text=True, timeout=0.8, stderr=subprocess.DEVNULL).strip()
+                def_source = subprocess.check_output(["pactl", "get-default-source"], text=True, timeout=0.8, stderr=subprocess.DEVNULL).strip()
+
+                raw_sinks = json.loads(subprocess.check_output(["pactl", "--format=json", "list", "sinks"], text=True, timeout=1.2, stderr=subprocess.DEVNULL))
+                sink_id_map = {}
+                for s in (raw_sinks if isinstance(raw_sinks, list) else []):
+                    sname = str(s.get("name") or "")
+                    sid = str(s.get("index", ""))
+                    sdesc = str(s.get("description") or sname)
+                    act_port = str(s.get("active_port") or "")
+                    ports_out = []
+                    act_port_lbl = ""
+                    for p in (s.get("ports") or []):
+                        pn = str(p.get("name") or "")
+                        pl = str(p.get("description") or pn)
+                        av = str(p.get("availability") or "") != "not available"
+                        if pn == act_port:
+                            act_port_lbl = pl
+                        ports_out.append({"name": pn, "label": pl, "available": av, "active": (pn == act_port)})
+                    sink_id_map[sid] = sdesc
+                    sinks.append({
+                        "id": sid,
+                        "nodeName": sname,
+                        "name": sdesc,
+                        "active": (sname == def_sink),
+                        "volume": _avg_vol_pct(s.get("volume")),
+                        "muted": bool(s.get("mute", False)),
+                        "busType": _bus_type(sname, s.get("properties"), act_port),
+                        "activePort": act_port,
+                        "activePortLabel": act_port_lbl,
+                        "ports": ports_out
+                    })
+
+                raw_sources = json.loads(subprocess.check_output(["pactl", "--format=json", "list", "sources"], text=True, timeout=1.2, stderr=subprocess.DEVNULL))
+                for src in (raw_sources if isinstance(raw_sources, list) else []):
+                    sname = str(src.get("name") or "")
+                    if ".monitor" in sname:
                         continue
-                    if in_audio and ln and not ln[0].isspace() and not ln.startswith("├") and not ln.startswith("└") and not ln.startswith("│"):
-                        in_audio = False
-                    if not in_audio:
+                    sid = str(src.get("index", ""))
+                    sdesc = str(src.get("description") or sname)
+                    act_port = str(src.get("active_port") or "")
+                    ports_out = []
+                    act_port_lbl = ""
+                    for p in (src.get("ports") or []):
+                        pn = str(p.get("name") or "")
+                        pl = str(p.get("description") or pn)
+                        av = str(p.get("availability") or "") != "not available"
+                        if pn == act_port:
+                            act_port_lbl = pl
+                        ports_out.append({"name": pn, "label": pl, "available": av, "active": (pn == act_port)})
+                    is_def = (sname == def_source)
+                    v_pct = _avg_vol_pct(src.get("volume"))
+                    is_mut = bool(src.get("mute", False))
+                    if is_def:
+                        mic_vol = v_pct
+                        mic_muted = is_mut
+                    sources.append({
+                        "id": sid,
+                        "nodeName": sname,
+                        "name": sdesc,
+                        "active": is_def,
+                        "volume": v_pct,
+                        "muted": is_mut,
+                        "busType": _bus_type(sname, src.get("properties"), act_port),
+                        "activePort": act_port,
+                        "activePortLabel": act_port_lbl,
+                        "ports": ports_out
+                    })
+
+                raw_si = json.loads(subprocess.check_output(["pactl", "--format=json", "list", "sink-inputs"], text=True, timeout=1.0, stderr=subprocess.DEVNULL))
+                for si in (raw_si if isinstance(raw_si, list) else []):
+                    props = si.get("properties") or {}
+                    app_n = str(props.get("application.name") or props.get("media.name") or "Aplicación")
+                    med_n = str(props.get("media.name") or "")
+                    if med_n == app_n:
+                        med_n = ""
+                    sk_id = str(si.get("sink", ""))
+                    audio_streams.append({
+                        "id": str(si.get("index", "")),
+                        "appName": app_n,
+                        "mediaName": med_n,
+                        "sinkId": sk_id,
+                        "sinkName": sink_id_map.get(sk_id, "Salida predeterminada"),
+                        "volume": _avg_vol_pct(si.get("volume")),
+                        "muted": bool(si.get("mute", False))
+                    })
+
+                raw_cards = json.loads(subprocess.check_output(["pactl", "--format=json", "list", "cards"], text=True, timeout=1.0, stderr=subprocess.DEVNULL))
+                for c in (raw_cards if isinstance(raw_cards, list) else []):
+                    cname = str(c.get("name") or "")
+                    props = c.get("properties") or {}
+                    cdesc = str(props.get("device.description") or cname)
+                    act_p = str(c.get("active_profile") or "")
+                    ports_d = c.get("ports") or {}
+                    has_usable_port = any(str(pv.get("availability") or "") != "not available" for pv in ports_d.values()) if isinstance(ports_d, dict) else True
+                    if act_p == "off" and not has_usable_port:
                         continue
-                    if "Sinks:" in ln:
-                        sec = "sinks"
-                        continue
-                    elif "Sources:" in ln:
-                        sec = "sources"
-                        continue
-                    elif "Devices:" in ln or "Filters:" in ln or "Streams:" in ln:
-                        sec = ""
-                        continue
-                    if sec in ("sinks", "sources") and "." in ln:
-                        is_act = "*" in ln.split(".", 1)[0]
-                        cleaned = ln.replace("│", "").replace("├", "").replace("└", "").replace("─", "").replace("*", "").strip()
-                        if "." in cleaned:
-                            did, rest = cleaned.split(".", 1)
-                            did = did.strip()
-                            if did.isdigit():
-                                name_only = rest.split("[vol:", 1)[0].strip()
-                                item = {"id": did, "name": name_only, "active": is_act}
-                                if sec == "sinks":
-                                    sinks.append(item)
-                                else:
-                                    sources.append(item)
-                mout = subprocess.check_output(["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"], text=True, timeout=1.0, stderr=subprocess.DEVNULL).strip()
-                mic_muted = "MUTED" in mout
-                for tok in mout.split():
-                    try:
-                        mic_vol = int(round(float(tok) * 100))
-                        break
-                    except ValueError:
-                        continue
+                    profs_out = []
+                    act_p_lbl = act_p
+                    for pk, pv in (c.get("profiles") or {}).items():
+                        if not isinstance(pv, dict):
+                            continue
+                        if not pv.get("available", True) and pk != act_p:
+                            continue
+                        plbl = str(pv.get("description") or pk)
+                        if pk == act_p:
+                            act_p_lbl = plbl
+                        profs_out.append({"name": pk, "label": plbl, "active": (pk == act_p)})
+                    if profs_out:
+                        audio_cards.append({
+                            "id": str(c.get("index", "")),
+                            "cardName": cname,
+                            "name": cdesc,
+                            "busType": _bus_type(cname, props, act_p),
+                            "activeProfile": act_p,
+                            "activeProfileLabel": act_p_lbl,
+                            "profiles": profs_out
+                        })
             except Exception:
                 pass
 
-            # 3. Bluetooth Paired Devices
+            # 3. Bluetooth Adapter + Paired Devices (with Battery % & Device Type Icon!)
+            bt_adapter = {"present": False, "powered": False, "discoverable": False, "pairable": False, "alias": hostname, "address": ""}
             bt_devices = []
             try:
+                show_out = subprocess.check_output(["bluetoothctl", "show"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
+                m_ctrl = re.search(r"Controller\s+([0-9A-Fa-f:]{17})", show_out)
+                if m_ctrl:
+                    bt_adapter["present"] = True
+                    bt_adapter["address"] = m_ctrl.group(1).upper()
+                    bt_adapter["powered"] = "Powered: yes" in show_out
+                    bt_adapter["discoverable"] = "Discoverable: yes" in show_out
+                    bt_adapter["pairable"] = "Pairable: yes" in show_out
+                    m_al = re.search(r"Alias:\s*(.+)", show_out)
+                    if m_al:
+                        bt_adapter["alias"] = m_al.group(1).strip()
+            except Exception:
+                pass
+            try:
                 bout = subprocess.check_output(["bluetoothctl", "devices"], text=True, timeout=1.2, stderr=subprocess.DEVNULL)
-                for ln in bout.splitlines()[:10]:
+                for ln in bout.splitlines()[:16]:
                     toks = ln.split(" ", 2)
                     if len(toks) == 3 and toks[0] == "Device":
                         mac, bname = toks[1], toks[2].strip()
+                        paired = False
                         conn = False
+                        bat_pct = -1
+                        icon_k = ""
                         try:
                             iout = subprocess.check_output(["bluetoothctl", "info", mac], text=True, timeout=0.8, stderr=subprocess.DEVNULL)
+                            paired = "Paired: yes" in iout
                             conn = "Connected: yes" in iout
+                            m_bat = re.search(r"Battery Percentage:.*?\((\d+)\)", iout)
+                            if m_bat:
+                                bat_pct = int(m_bat.group(1))
+                            m_ic = re.search(r"Icon:\s*(\S+)", iout)
+                            if m_ic:
+                                icon_k = m_ic.group(1).strip().lower()
                         except Exception:
                             pass
-                        bt_devices.append({"mac": mac, "name": bname, "connected": conn})
+                        if paired or conn:
+                            bt_devices.append({
+                                "mac": mac, "name": bname, "paired": paired,
+                                "connected": conn, "battery": bat_pct, "btIcon": icon_k
+                            })
             except Exception:
                 pass
 
-            # 4. Network Extra Info
+            # 3B. Live USB Peripherals enriched with /sys/bus/usb/devices (Speed + Category + Vendor + Safe Eject!)
+            sysfs_usb = {}
+            try:
+                for ud in glob.glob("/sys/bus/usb/devices/*"):
+                    vp = os.path.join(ud, "idVendor")
+                    pp = os.path.join(ud, "idProduct")
+                    if not (os.path.isfile(vp) and os.path.isfile(pp)):
+                        continue
+                    vid = open(vp, "r", errors="ignore").read().strip().lower()
+                    pid = open(pp, "r", errors="ignore").read().strip().lower()
+                    bcls = open(os.path.join(ud, "bDeviceClass"), "r", errors="ignore").read().strip().lower() if os.path.isfile(os.path.join(ud, "bDeviceClass")) else ""
+                    if bcls == "09":
+                        continue
+                    spd_raw = open(os.path.join(ud, "speed"), "r", errors="ignore").read().strip() if os.path.isfile(os.path.join(ud, "speed")) else ""
+                    mfg = open(os.path.join(ud, "manufacturer"), "r", errors="ignore").read().strip() if os.path.isfile(os.path.join(ud, "manufacturer")) else ""
+                    prod = open(os.path.join(ud, "product"), "r", errors="ignore").read().strip() if os.path.isfile(os.path.join(ud, "product")) else ""
+                    ifcs = set()
+                    for ip in glob.glob(os.path.join(ud, "*:*/bInterfaceClass")):
+                        try:
+                            ifcs.add(open(ip, "r", errors="ignore").read().strip().lower())
+                        except Exception:
+                            pass
+                    spd_map = {"1.5": "USB 1.1 • 1.5 Mbps", "12": "USB 1.1 • 12 Mbps", "480": "USB 2.0 • 480 Mbps", "5000": "USB 3.0 • 5 Gbps", "10000": "USB 3.1 • 10 Gbps", "20000": "USB 3.2 • 20 Gbps"}
+                    spd_lbl = spd_map.get(spd_raw, (f"{spd_raw} Mbps" if spd_raw else "USB"))
+                    if "01" in ifcs:
+                        cat_lbl, cat_ic = "Audio", "audio-speakers-symbolic.svg"
+                    elif "08" in ifcs:
+                        cat_lbl, cat_ic = "Almacenamiento", "drive-c.svg"
+                    elif "e0" in ifcs or bcls == "e0":
+                        cat_lbl, cat_ic = "Bluetooth", "fluent-bluetooth.svg"
+                    elif "0e" in ifcs:
+                        cat_lbl, cat_ic = "Cámara", "fluent-image.svg"
+                    elif "07" in ifcs:
+                        cat_lbl, cat_ic = "Impresora", "printer-symbolic.svg"
+                    elif "03" in ifcs:
+                        low_p = (prod + " " + mfg).lower()
+                        if "keyboard" in low_p or "teclado" in low_p:
+                            cat_lbl, cat_ic = "Teclado", "fluent-keyboard.svg"
+                        elif "mouse" in low_p or "ratón" in low_p:
+                            cat_lbl, cat_ic = "Mouse", "input-mouse-symbolic.svg"
+                        elif "gamepad" in low_p or "controller" in low_p or "xbox" in low_p or "dual" in low_p:
+                            cat_lbl, cat_ic = "Mando", "fluent-games.svg"
+                        else:
+                            cat_lbl, cat_ic = "Periférico HID", "usb-hub-symbolic.svg"
+                    else:
+                        cat_lbl, cat_ic = "USB", "usb-hub-symbolic.svg"
+                    sysfs_usb[f"{vid}:{pid}"] = {"speed": spd_lbl, "mfg": mfg, "prod": prod, "category": cat_lbl, "icon": cat_ic}
+            except Exception:
+                pass
+
+            # Map mounted removable USB block devices for safe eject button!
+            rem_usb_devs = []
+            try:
+                for drv in get_dynamic_drives():
+                    if drv.get("isRemovable") and drv.get("device"):
+                        rem_usb_devs.append({"device": drv["device"], "name": drv.get("name", ""), "mounted": bool(drv.get("mounted"))})
+            except Exception:
+                pass
+
+            usb_devices = []
+            try:
+                uout = subprocess.check_output(["lsusb"], text=True, timeout=1.2, stderr=subprocess.DEVNULL)
+                for ln in uout.splitlines():
+                    if "root hub" in ln.lower():
+                        continue
+                    m_u = re.match(r"Bus\s+(\d+)\s+Device\s+(\d+):\s+ID\s+([0-9a-fA-F:]+)\s*(.*)", ln.strip())
+                    if m_u:
+                        bus, devn, usbid, uname_d = m_u.groups()
+                        uk = usbid.lower()
+                        meta = sysfs_usb.get(uk, {})
+                        uname_d = uname_d.strip() or meta.get("prod") or f"Dispositivo USB ({usbid})"
+                        cat_lbl = meta.get("category", "USB")
+                        cat_ic = meta.get("icon", "usb-hub-symbolic.svg")
+                        low_n = uname_d.lower()
+                        if cat_lbl in ("USB", "Periférico HID"):
+                            if "mouse" in low_n:
+                                cat_lbl, cat_ic = "Mouse", "input-mouse-symbolic.svg"
+                            elif "keyboard" in low_n:
+                                cat_lbl, cat_ic = "Teclado", "fluent-keyboard.svg"
+                            elif "bluetooth" in low_n:
+                                cat_lbl, cat_ic = "Bluetooth", "fluent-bluetooth.svg"
+                            elif "audio" in low_n or "dac" in low_n or "headset" in low_n:
+                                cat_lbl, cat_ic = "Audio", "audio-speakers-symbolic.svg"
+                        ej_dev = ""
+                        if cat_lbl == "Almacenamiento" and rem_usb_devs:
+                            ej_dev = rem_usb_devs[0]["device"]
+                        usb_devices.append({
+                            "bus": bus, "dev": devn, "id": usbid, "name": uname_d,
+                            "mfg": meta.get("mfg", ""),
+                            "speed": meta.get("speed", "USB"),
+                            "category": cat_lbl,
+                            "icon": cat_ic,
+                            "ejectDevice": ej_dev
+                        })
+            except Exception:
+                pass
+
+            # Lazy-cached CUPS printers + service status (lpstat -p can block ~1s when idle — only query on demand!)
+            cups_active = False
+            try:
+                cups_active = (subprocess.run(["systemctl", "is-active", "--quiet", "cups.service"], timeout=0.5).returncode == 0
+                               or subprocess.run(["systemctl", "is-active", "--quiet", "cups.socket"], timeout=0.5).returncode == 0)
+            except Exception:
+                pass
+            if force_slow:
+                printers_list = []
+                def_prn = ""
+                try:
+                    dout = subprocess.check_output(["lpstat", "-d"], text=True, timeout=0.6, stderr=subprocess.DEVNULL)
+                    if ":" in dout:
+                        def_prn = dout.split(":", 1)[1].strip()
+                except Exception:
+                    pass
+                try:
+                    pout = subprocess.check_output(["lpstat", "-p"], text=True, timeout=0.9, stderr=subprocess.DEVNULL)
+                    for ln in pout.splitlines():
+                        if ln.strip():
+                            toks = ln.strip().split()
+                            if len(toks) >= 2:
+                                pname = toks[1]
+                                printers_list.append({
+                                    "name": pname,
+                                    "status": " ".join(toks[2:])[:60] or "Lista",
+                                    "isDefault": (pname == def_prn)
+                                })
+                except Exception:
+                    pass
+                self._cache_printers = printers_list
+                self._cache_printers_ts = now_ts
+            else:
+                printers_list = self._cache_printers
+
+            # Detect real Mouse & Touchpad hardware names from /proc/bus/input/devices (<0.2ms!)
+            mouse_hw_name = ""
+            touchpad_hw_name = ""
+            try:
+                if os.path.isfile("/proc/bus/input/devices"):
+                    cur_n = ""
+                    for ln in open("/proc/bus/input/devices", "r", encoding="utf-8", errors="ignore"):
+                        if ln.startswith("N: Name="):
+                            cur_n = ln.split("=", 1)[1].strip().strip('"').strip()
+                        elif ln.startswith("H: Handlers="):
+                            low_n = cur_n.lower()
+                            if "mouse" in ln:
+                                if any(k in low_n for k in ("touchpad", "synaptics", "elan", "trackpad", "alps", "cypress")):
+                                    if not touchpad_hw_name:
+                                        touchpad_hw_name = cur_n
+                                elif not mouse_hw_name and "virtual" not in low_n:
+                                    mouse_hw_name = cur_n
+            except Exception:
+                pass
+
+            input_cfg = {
+                "mouseSpeed": 0.0,
+                "mouseAccel": "adaptive",
+                "mouseLeftHanded": False,
+                "mouseNaturalScroll": False,
+                "mouseScrollFactor": 1.0,
+                "mouseMiddleEmulation": False,
+                "mouseHwName": mouse_hw_name,
+                "hasTouchpad": bool(touchpad_hw_name),
+                "touchpadHwName": touchpad_hw_name,
+                "tpSendEvents": "yes",
+                "tpTap": True,
+                "tpTapAndDrag": True,
+                "tpThreeFingerDrag": False,
+                "tpNaturalScroll": True,
+                "tpDisableTyping": True,
+                "tpClickMethod": "clickfinger",
+                "tpSpeed": 0.0,
+            }
+            try:
+                rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+                if os.path.isfile(rc_p):
+                    import xml.etree.ElementTree as ET
+                    tree = ET.parse(rc_p)
+                    lib_el = tree.getroot().find("libinput")
+                    if lib_el is not None:
+                        for dev_el in lib_el.findall("device"):
+                            cat = (dev_el.attrib.get("category") or "default").strip().lower()
+                            def _txt(tag, default=""):
+                                el = dev_el.find(tag)
+                                return el.text.strip() if (el is not None and el.text) else default
+                            if cat == "non-touch":
+                                try: input_cfg["mouseSpeed"] = float(_txt("pointerSpeed", "0"))
+                                except Exception: pass
+                                acc = _txt("accelProfile", "adaptive").lower()
+                                input_cfg["mouseAccel"] = "flat" if acc == "flat" else "adaptive"
+                                input_cfg["mouseLeftHanded"] = (_txt("leftHanded", "no").lower() == "yes")
+                                input_cfg["mouseNaturalScroll"] = (_txt("naturalScroll", "no").lower() == "yes")
+                                input_cfg["mouseMiddleEmulation"] = (_txt("middleEmulation", "no").lower() == "yes")
+                                try: input_cfg["mouseScrollFactor"] = float(_txt("scrollFactor", "1.0"))
+                                except Exception: pass
+                            elif cat == "touchpad":
+                                se = _txt("sendEventsMode", "yes")
+                                input_cfg["tpSendEvents"] = se if se in ("yes", "no", "disabledOnExternalMouse") else "yes"
+                                input_cfg["tpTap"] = (_txt("tap", "yes").lower() == "yes")
+                                input_cfg["tpTapAndDrag"] = (_txt("tapAndDrag", "yes").lower() == "yes")
+                                input_cfg["tpThreeFingerDrag"] = (_txt("threeFingerDrag", "no").lower() in ("yes", "3"))
+                                input_cfg["tpNaturalScroll"] = (_txt("naturalScroll", "yes").lower() == "yes")
+                                input_cfg["tpDisableTyping"] = (_txt("disableWhileTyping", "yes").lower() == "yes")
+                                cm = _txt("clickMethod", "clickfinger")
+                                input_cfg["tpClickMethod"] = cm if cm in ("clickfinger", "buttonAreas") else "clickfinger"
+                                try: input_cfg["tpSpeed"] = float(_txt("pointerSpeed", "0"))
+                                except Exception: pass
+            except Exception:
+                pass
+
+            # 4. Network Extra Info (prefer real NetworkManager upstream DNS over systemd-resolved 127.0.0.53!)
             net_gw = "—"
             net_dns = "—"
             net_iface = "—"
@@ -2547,10 +4164,24 @@ def main():
                         net_gw = rt[rt.index("via") + 1]
                     if "dev" in rt:
                         net_iface = rt[rt.index("dev") + 1]
-                if os.path.isfile("/etc/resolv.conf"):
+                dns_l = []
+                if net_iface != "—" and shutil.which("nmcli"):
+                    try:
+                        dout = subprocess.check_output(
+                            ["nmcli", "-t", "-f", "IP4.DNS", "dev", "show", net_iface],
+                            text=True, timeout=0.8, stderr=subprocess.DEVNULL
+                        ).splitlines()
+                        for dl in dout:
+                            if ":" in dl:
+                                v = dl.split(":", 1)[1].strip()
+                                if v and v not in dns_l:
+                                    dns_l.append(v)
+                    except Exception:
+                        pass
+                if not dns_l and os.path.isfile("/etc/resolv.conf"):
                     dns_l = [l.split()[1] for l in open("/etc/resolv.conf") if l.strip().startswith("nameserver")]
-                    if dns_l:
-                        net_dns = ", ".join(dns_l[:2])
+                if dns_l:
+                    net_dns = ", ".join(dns_l[:2])
             except Exception:
                 pass
 
@@ -2713,16 +4344,364 @@ def main():
             except Exception:
                 pkg_count = 0
 
-            return json.dumps({
+            # 10. Backlight, Ethernet/Wi-Fi Type, Battery & Storage Extras (Trash + Pacman Cache)
+            has_backlight = bool(glob.glob("/sys/class/backlight/*/brightness"))
+            net_is_eth = False
+            if net_iface and net_iface != "—":
+                net_is_eth = not os.path.isdir(f"/sys/class/net/{net_iface}/wireless")
+
+            ac_online = False
+            for ps_p in glob.glob("/sys/class/power_supply/*"):
+                try:
+                    if open(os.path.join(ps_p, "type")).read().strip().lower() == "mains":
+                        if open(os.path.join(ps_p, "online")).read().strip() == "1":
+                            ac_online = True
+                except Exception:
+                    pass
+
+            bat_info = {
+                "present": False, "pct": 100, "status": "AC", "acOnline": True,
+                "label": "Conectado a corriente alterna (Escritorio)",
+                "model": "Fuente CA", "tech": "", "healthPct": -1, "whDesign": "",
+                "voltageStr": "", "powerW": "", "cycles": 0
+            }
+            try:
+                bats = sorted(glob.glob("/sys/class/power_supply/BAT*"))
+                if bats:
+                    bdir = bats[0]
+                    def _rf(fn, default=""):
+                        p = os.path.join(bdir, fn)
+                        return open(p, "r", encoding="utf-8", errors="ignore").read().strip() if os.path.isfile(p) else default
+                    bpct = max(0, min(100, int(_rf("capacity", "0") or "0")))
+                    bstat = _rf("status", "Unknown")
+                    st_es = {"Charging": "Cargando", "Discharging": "Usando batería", "Full": "Carga completa", "Not charging": "Conectado a CA"}.get(bstat, bstat)
+                    mfg = _rf("manufacturer")
+                    mdl = _rf("model_name")
+                    tech = _rf("technology")
+                    volt_uv = int(_rf("voltage_now", "0") or "0")
+                    volt_str = f"{volt_uv / 1e6:.1f} V" if volt_uv > 0 else ""
+                    pow_uw = int(_rf("power_now", "0") or "0")
+                    pow_w = f"{pow_uw / 1e6:.1f} W" if pow_uw > 0 else ""
+                    cyc = int(_rf("cycle_count", "0") or "0")
+                    ef = int(_rf("energy_full", "0") or "0")
+                    efd = int(_rf("energy_full_design", "0") or "0")
+                    cf = int(_rf("charge_full", "0") or "0")
+                    cfd = int(_rf("charge_full_design", "0") or "0")
+                    health_pct = -1
+                    wh_des = ""
+                    if ef > 0 and efd > 0:
+                        health_pct = max(1, min(100, int(round((ef / efd) * 100))))
+                        wh_des = f"{efd / 1e6:.1f} Wh"
+                    elif cf > 0 and cfd > 0:
+                        health_pct = max(1, min(100, int(round((cf / cfd) * 100))))
+                        if volt_uv > 0:
+                            wh_des = f"{(cfd * volt_uv) / 1e12:.1f} Wh"
+                    tray_vis = not (bpct <= 0 and bstat in ("Charging", "Full", "Not charging", "Unknown"))
+                    bat_info = {
+                        "present": True, "trayVisible": tray_vis, "pct": bpct, "status": bstat, "acOnline": ac_online,
+                        "label": f"{bpct}% — {st_es}",
+                        "model": f"{mfg} {mdl}".strip() or "Batería integrada",
+                        "tech": tech,
+                        "healthPct": health_pct,
+                        "whDesign": wh_des,
+                        "voltageStr": volt_str,
+                        "powerW": pow_w,
+                        "cycles": cyc
+                    }
+            except Exception:
+                pass
+
+            # Real CPU Power Telemetry + Lid Sensor + Caffeine State
+            cpu_drv, cpu_epp, cpu_freq_s, cpu_max_s = "linux", "—", "—", "—"
+            try:
+                c0 = "/sys/devices/system/cpu/cpu0/cpufreq"
+                if os.path.isfile(f"{c0}/scaling_driver"):
+                    cpu_drv = open(f"{c0}/scaling_driver").read().strip()
+                if os.path.isfile(f"{c0}/energy_performance_preference"):
+                    cpu_epp = open(f"{c0}/energy_performance_preference").read().strip()
+                elif os.path.isfile(f"{c0}/scaling_governor"):
+                    cpu_epp = open(f"{c0}/scaling_governor").read().strip()
+                if os.path.isfile(f"{c0}/scaling_cur_freq"):
+                    cpu_freq_s = f"{int(open(f'{c0}/scaling_cur_freq').read().strip()) / 1e6:.2f} GHz"
+                if os.path.isfile(f"{c0}/scaling_max_freq"):
+                    cpu_max_s = f"{int(open(f'{c0}/scaling_max_freq').read().strip()) / 1e6:.2f} GHz"
+            except Exception:
+                pass
+
+            has_lid = bool(glob.glob("/proc/acpi/button/lid/*"))
+            enabled_mon_cnt = sum(1 for m in monitors_list if m.get("enabled"))
+            lid_ext_act = "ignore" if enabled_mon_cnt >= 2 else "suspend"
+            for lp in ("/etc/systemd/logind.conf", "/etc/systemd/logind.conf.d/90-x64-power.conf"):
+                if os.path.isfile(lp):
+                    try:
+                        for ln in open(lp, "r", encoding="utf-8", errors="ignore"):
+                            s = ln.strip()
+                            if s.startswith("HandleLidSwitchDocked=") or s.startswith("HandleLidSwitchExternalPower="):
+                                v = s.split("=", 1)[1].strip().lower()
+                                if v in ("suspend", "ignore"):
+                                    lid_ext_act = v
+                    except Exception:
+                        pass
+
+            caffeine_on = False
+            caf_pid_p = os.path.join(STATE_DIR, "caffeine.pid")
+            if os.path.isfile(caf_pid_p):
+                try:
+                    cpid = int(open(caf_pid_p, "r", encoding="utf-8").read().strip())
+                    if cpid > 1 and os.path.isdir(f"/proc/{cpid}"):
+                        caffeine_on = True
+                except Exception:
+                    pass
+
+            power_info = {
+                "cpuDriver": cpu_drv,
+                "cpuEpp": cpu_epp,
+                "cpuFreqGhz": cpu_freq_s,
+                "cpuMaxGhz": cpu_max_s,
+                "hasLid": has_lid,
+                "lidExtAction": lid_ext_act,
+                "caffeineActive": caffeine_on
+            }
+
+            if force_slow or (now_ts - self._cache_storage_ts) > 30.0:
+                trash_files_dir = os.path.join(HOME_DIR, ".local", "share", "Trash", "files")
+                tr_count = 0
+                tr_bytes = 0
+                try:
+                    if os.path.isdir(trash_files_dir):
+                        for e in os.scandir(trash_files_dir):
+                            tr_count += 1
+                            if e.is_file(follow_symlinks=False):
+                                tr_bytes += e.stat(follow_symlinks=False).st_size
+                            elif e.is_dir(follow_symlinks=False):
+                                for rdir, _, fls in os.walk(e.path):
+                                    for fn in fls:
+                                        try:
+                                            tr_bytes += os.path.getsize(os.path.join(rdir, fn))
+                                        except Exception:
+                                            pass
+                except Exception:
+                    pass
+                def fmt_sz(nb):
+                    if nb < 1024: return f"{nb} B"
+                    if nb < 1024**2: return f"{nb / 1024:.1f} KB"
+                    if nb < 1024**3: return f"{nb / (1024**2):.1f} MB"
+                    return f"{nb / (1024**3):.2f} GB"
+
+                pac_bytes = 0
+                pac_files = 0
+                try:
+                    pac_dir = "/var/cache/pacman/pkg"
+                    if os.path.isdir(pac_dir):
+                        for e in os.scandir(pac_dir):
+                            if e.is_file(follow_symlinks=False):
+                                pac_files += 1
+                                pac_bytes += e.stat(follow_symlinks=False).st_size
+                except Exception:
+                    pass
+
+                # Fast batched du -sb for ~/.cache, /var/log/journal, and personal folders (cached 30s in worker thread!)
+                user_cache_dir = os.path.join(HOME_DIR, ".cache")
+                journal_dir = "/var/log/journal"
+                folder_specs = [
+                    ("Descargas",  "folder-download.svg",  resolve_special_folder("Descargas")),
+                    ("Documentos", "folder-documents.svg", resolve_special_folder("Documentos")),
+                    ("Imágenes",   "folder-images.svg",    resolve_special_folder("Imágenes")),
+                    ("Vídeos",     "folder-videos.svg",    resolve_special_folder("Vídeos")),
+                    ("Música",     "folder-music.svg",     resolve_special_folder("Música")),
+                ]
+                du_targets = []
+                for p in [user_cache_dir, journal_dir] + [sp[2] for sp in folder_specs]:
+                    if p and os.path.isdir(p) and p not in du_targets:
+                        du_targets.append(p)
+                du_sizes = {}
+                if du_targets:
+                    try:
+                        du_res = subprocess.run(
+                            ["du", "-sb", "--"] + du_targets,
+                            capture_output=True, text=True, timeout=4.0
+                        )
+                        for ln in (du_res.stdout or "").splitlines():
+                            parts = ln.split("\t", 1)
+                            if len(parts) == 2 and parts[0].strip().isdigit():
+                                du_sizes[parts[1].strip()] = int(parts[0].strip())
+                    except Exception:
+                        pass
+
+                uc_bytes = du_sizes.get(user_cache_dir, 0)
+                jn_bytes = du_sizes.get(journal_dir, 0)
+                user_folders = []
+                for f_key, f_icon, f_path in folder_specs:
+                    f_bytes = du_sizes.get(f_path, 0)
+                    user_folders.append({
+                        "key": f_key,
+                        "name": f_key,
+                        "icon": f_icon,
+                        "path": f_path,
+                        "bytes": f_bytes,
+                        "size": fmt_sz(f_bytes)
+                    })
+
+                self._cache_storage = {
+                    "trashCount": tr_count,
+                    "trashSize": fmt_sz(tr_bytes),
+                    "pacmanCacheSize": fmt_sz(pac_bytes),
+                    "pacmanCacheCount": pac_files,
+                    "userCacheSize": fmt_sz(uc_bytes),
+                    "userCacheBytes": uc_bytes,
+                    "journalSize": fmt_sz(jn_bytes),
+                    "journalBytes": jn_bytes,
+                    "userFolders": user_folders
+                }
+                self._cache_storage_ts = now_ts
+
+            # 11. Detected & Core Notification Senders (for real per-app mute switches!)
+            notif_apps = []
+            seen_na = set()
+            def _add_na(name, desc, icon):
+                k = name.strip().lower()
+                if not k or k in seen_na:
+                    return
+                seen_na.add(k)
+                notif_apps.append({"key": k, "name": name.strip(), "desc": desc, "icon": icon})
+
+            na_p = os.path.join(STATE_DIR, "notif-apps.json")
+            if os.path.isfile(na_p):
+                try:
+                    for item in json.load(open(na_p, "r", encoding="utf-8")):
+                        s_n = str(item).strip()
+                        if s_n:
+                            _add_na(s_n, "Remitente detectado recientemente", "fluent-bell.svg")
+                except Exception:
+                    pass
+            core_senders = [
+                ("Configuración", "Avisos del sistema y pruebas de Configuración", "fluent-settings.svg", True),
+                ("Recortes de Windows 11", "Confirmaciones de capturas guardadas", "fluent-image.svg", True),
+                ("Actualización del sistema", "Avisos de paquetes y actualizaciones OTA", "update.svg", True),
+                ("Chromium", "Notificaciones web del navegador", "chromium.png", shutil.which("chromium") is not None),
+                ("Discord", "Mensajes y llamadas de Discord", "fluent-chat.svg", shutil.which("discord") is not None),
+                ("Steam", "Amigos, logros y descargas de juegos", "fluent-games.svg", shutil.which("steam") is not None),
+                ("Tienda Shelly", "Instalaciones y actualizaciones de aplicaciones", "fluent-apps-list.svg", shutil.which("shelly-ui") is not None),
+            ]
+            for cn, cd, ci, avail in core_senders:
+                if avail:
+                    _add_na(cn, cd, ci)
+
+            # 12. Real Hardware DMI + OS Specifications for Sistema › Acerca de (0ms cached!)
+            if self._cache_about_static is None:
+                junk_dmi = {
+                    "", "to be filled by o.e.m.", "default string", "system product name",
+                    "system manufacturer", "not specified", "unknown", "none", "o.e.m.", "invalid"
+                }
+                def _dmi(fn):
+                    p = f"/sys/class/dmi/id/{fn}"
+                    if not os.path.isfile(p):
+                        return ""
+                    try:
+                        v = open(p, "r", encoding="utf-8", errors="ignore").read().strip()
+                        return "" if v.lower() in junk_dmi else v
+                    except Exception:
+                        return ""
+                sys_v = _dmi("sys_vendor")
+                prod_n = _dmi("product_name")
+                vendor_model = " — ".join([x for x in (sys_v, prod_n) if x]) if (sys_v or prod_n) else ""
+                board_n = _dmi("board_name")
+                bios_v = _dmi("bios_version")
+                board_parts = []
+                if board_n:
+                    board_parts.append(board_n)
+                if bios_v:
+                    board_parts.append(f"BIOS {bios_v}")
+                board_bios = "  •  ".join(board_parts)
+
+                mach = os.uname().machine
+                bits = "64 bits" if ("64" in mach) else "32 bits"
+                arch_label = f"Sistema operativo de {bits}, procesador {mach}"
+
+                os_pretty = "X64 LIOS Linux"
+                try:
+                    if os.path.isfile("/etc/os-release"):
+                        for ln in open("/etc/os-release", "r", encoding="utf-8", errors="ignore"):
+                            if ln.startswith("PRETTY_NAME="):
+                                os_pretty = ln.split("=", 1)[1].strip().strip('"')
+                                break
+                except Exception:
+                    pass
+
+                def _pkg_ver(pkg_name):
+                    try:
+                        prefix = pkg_name + "-"
+                        for entry in os.listdir("/var/lib/pacman/local"):
+                            if entry.startswith(prefix):
+                                rest = entry[len(prefix):]
+                                if rest and rest[0].isdigit():
+                                    return rest
+                    except Exception:
+                        pass
+                    return ""
+
+                win11_ver = _pkg_ver("x64-win11-settings") or "26H2"
+                labwc_ver = _pkg_ver("labwc")
+                qs_ver = _pkg_ver("quickshell")
+                comp_parts = ["Wayland"]
+                comp_parts.append(f"labwc {labwc_ver.split('-')[0]}" if labwc_ver else "labwc")
+                if qs_ver:
+                    comp_parts.append(f"Quickshell {qs_ver.split('-')[0]}")
+                compositor_info = "  •  ".join(comp_parts)
+
+                self._cache_about_static = {
+                    "vendorModel": vendor_model,
+                    "boardBios": board_bios,
+                    "archLabel": arch_label,
+                    "osPretty": os_pretty,
+                    "shellVersion": f"x64-win11-settings {win11_ver}",
+                    "compositorInfo": compositor_info,
+                    "hasX64Hello": shutil.which("x64-hello") is not None
+                }
+
+            uptime_human = "—"
+            try:
+                up_s = int(float(open("/proc/uptime").read().split()[0]))
+                days, rem = divmod(up_s, 86400)
+                hrs, rem = divmod(rem, 3600)
+                mins = rem // 60
+                up_parts = []
+                if days > 0:
+                    up_parts.append(f"{days} día" + ("" if days == 1 else "s"))
+                if hrs > 0:
+                    up_parts.append(f"{hrs} h")
+                up_parts.append(f"{mins} min")
+                uptime_human = ", ".join(up_parts)
+            except Exception:
+                pass
+            about_info = dict(self._cache_about_static)
+            about_info["uptimeHuman"] = uptime_human
+
+            return {
                 "monitors": monitors_list,
+                "hasBacklight": has_backlight,
                 "sinks": sinks,
                 "sources": sources,
+                "audioStreams": audio_streams,
+                "audioCards": audio_cards,
+                "notifApps": notif_apps[:14],
                 "micVol": mic_vol,
                 "micMuted": mic_muted,
+                "btAdapter": bt_adapter,
                 "btDevices": bt_devices,
+                "usbDevices": usb_devices,
+                "printers": printers_list,
+                "cupsActive": cups_active,
+                "phoneLink": get_phone_link_status(),
+                "inputCfg": input_cfg,
                 "netGateway": net_gw,
                 "netDns": net_dns,
                 "netIface": net_iface,
+                "netIsEthernet": net_is_eth,
+                "battery": bat_info,
+                "powerInfo": power_info,
+                "storageExtras": self._cache_storage,
+                "about": about_info,
                 "account": {
                     "displayName": display_name,
                     "username": uname,
@@ -2745,7 +4724,7 @@ def main():
                 "tools": tool_flags,
                 "recentUpgrades": recent_upg,
                 "pkgCount": max(0, pkg_count)
-            })
+            }
 
         @pyqtSlot(str)
         def copyTextToClipboard(self, txt):
@@ -3976,6 +5955,15 @@ def main():
     view.setSource(QUrl.fromLocalFile(os.path.join(qml_dir, qml_file)))
     view.show()
 
+    def _cleanup_workers():
+        for w in (getattr(bridge, "_refresh_worker", None), getattr(bridge, "_upd_worker", None), getattr(bridge, "_mic_worker", None), getattr(bridge, "_bt_scan_worker", None)):
+            try:
+                if w is not None and w.isRunning():
+                    w.quit()
+                    w.wait(400)
+            except Exception:
+                pass
+    app.aboutToQuit.connect(_cleanup_workers)
     sys.exit(app.exec())
 
 

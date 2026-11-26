@@ -876,12 +876,18 @@ except Exception:
         else
             echo -e "  \e[0;37m-> Uninstalling full Windows 11 26H2 Edition suite...\e[0m"
         end
-        set -l win11_pkgs (pacman -Qq x64-win11-settings wlr-randr xdg-desktop-portal-wlr polkit-gnome 2>/dev/null | sort -u)
+        set -l win11_pkgs (pacman -Qq x64-win11-settings wlr-randr xdg-desktop-portal-wlr polkit-gnome scrcpy android-tools android-udev inter-font 2>/dev/null | sort -u)
+        if test "$target_id" != "3"
+            set -a win11_pkgs (pacman -Qq kdeconnect 2>/dev/null)
+        end
         if test "$target_id" != "7"
             set -a win11_pkgs (pacman -Qq labwc 2>/dev/null)
         end
         if not contains "$target_id" "1" "8"
-            set -a win11_pkgs (pacman -Qq quickshell 2>/dev/null)
+            set -a win11_pkgs (pacman -Qq quickshell mpv 2>/dev/null)
+        end
+        if not contains "$target_id" "1" "2" "5" "8"
+            set -a win11_pkgs (pacman -Qq gnome-text-editor 2>/dev/null)
         end
         if not contains "$target_id" "2" "4" "5" "6" "7"
             set -a win11_pkgs (pacman -Qq file-roller gnome-calculator 2>/dev/null)
@@ -1494,7 +1500,7 @@ function install_desktop_menu
             else
                 echo -e "\n  \e[1;32m[*] Installing Official X64 LIOS Windows 11 26H2 (Fluent Wayland Suite)...\e[0m"
             end
-            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr xorg-xwayland sddm x64-sddm-theme polkit-gnome python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp brightnessctl breeze-cursors breeze-icons file-roller loupe papers gnome-calculator gnome-disk-utility blueman adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
+            sudo pacman -Syu --needed --noconfirm --overwrite "*" labwc quickshell wlr-randr xorg-xwayland sddm x64-sddm-theme polkit-gnome power-profiles-daemon python-pyqt6 qt6-svg xdg-desktop-portal-wlr xdg-desktop-portal-gtk wl-clipboard grim slurp brightnessctl inter-font breeze-cursors breeze-icons file-roller gnome-text-editor loupe papers mpv gnome-calculator gnome-disk-utility blueman udisks2 ntfs-3g pacman-contrib kdeconnect scrcpy android-tools android-udev adw-gtk-theme papirus-icon-theme kitty chromium x64-win11-settings
             test $status -eq 0; and set install_ok 1
             if test $install_ok -eq 1
                 configure_desktop_boot_mode sddm "Windows 11 26H2 (X64 Fluent Edition)"

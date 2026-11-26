@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# X64 LIOS - Laptop-First Multi-Monitor Auto-Calibrator for labwc (wlroots)
-# Ensures internal laptop panel (LVDS/eDP) is on the left (0,0) and external HDMI/DP is on the right.
+# X64 LIOS - Laptop-First Multi-Monitor Auto-Calibrator & Persistence Replay for labwc (wlroots)
+# Ensures internal laptop panel (LVDS/eDP) is on the left (0,0) by default, then replays user
+# saved layout/scale/mode/transform/position/power from ~/.local/state/x64-win11/monitors.json.
 
 for _ in $(seq 1 20); do
     if wlr-randr >/dev/null 2>&1; then
@@ -31,23 +32,47 @@ if [ -n "$internal" ] && [ "${#externals[@]}" -gt 0 ]; then
     done
 fi
 
-# Apply persisted per-monitor scale/mode saved from Settings (if any)
+# Replay persisted per-monitor settings saved from Settings (with sole-monitor safety guard!)
 MON_CFG="${HOME}/.local/state/x64-win11/monitors.json"
 if [ -f "$MON_CFG" ] && command -v python3 >/dev/null 2>&1; then
     python3 - "$MON_CFG" <<'PYEOF'
 import json, subprocess, sys
 try:
-    data = json.load(open(sys.argv[1], "r", encoding="utf-8"))
-    for out_name, conf in (data or {}).items():
+    saved = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+    if not isinstance(saved, dict) or not saved:
+        sys.exit(0)
+    live = json.loads(subprocess.check_output(["wlr-randr", "--json"], text=True, timeout=2.0, stderr=subprocess.DEVNULL))
+    live_names = {str(m.get("name", "")) for m in (live if isinstance(live, list) else []) if m.get("name")}
+    # Safety: ensure at least one connected live monitor stays enabled!
+    will_enable = [n for n in live_names if saved.get(n, {}).get("enabled", True) is not False]
+    force_all_on = (len(will_enable) == 0)
+
+    cmd = ["wlr-randr"]
+    for out_name in live_names:
+        conf = saved.get(out_name)
         if not isinstance(conf, dict):
             continue
-        cmd = ["wlr-randr", "--output", str(out_name)]
-        if conf.get("scale"):
-            cmd += ["--scale", str(conf["scale"])]
-        if conf.get("mode"):
-            cmd += ["--mode", str(conf["mode"])]
-        if len(cmd) > 3:
-            subprocess.run(cmd, timeout=2.5, stderr=subprocess.DEVNULL)
+        sub = ["--output", out_name]
+        is_off = (conf.get("enabled") is False) and (not force_all_on)
+        if is_off:
+            sub += ["--off"]
+        else:
+            if conf.get("enabled") is True:
+                sub += ["--on"]
+            if conf.get("mode"):
+                sub += ["--mode", str(conf["mode"])]
+            if conf.get("scale"):
+                sub += ["--scale", str(conf["scale"])]
+            if conf.get("transform"):
+                sub += ["--transform", str(conf["transform"])]
+            if conf.get("pos"):
+                sub += ["--pos", str(conf["pos"])]
+            if conf.get("adaptiveSync") in ("enabled", "disabled"):
+                sub += ["--adaptive-sync", str(conf["adaptiveSync"])]
+        if len(sub) > 2:
+            cmd += sub
+    if len(cmd) > 1:
+        subprocess.run(cmd, timeout=3.0, stderr=subprocess.DEVNULL)
 except Exception:
     pass
 PYEOF

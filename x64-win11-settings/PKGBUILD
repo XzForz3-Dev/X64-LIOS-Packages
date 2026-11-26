@@ -1,7 +1,7 @@
 # Maintainer: X64 Studios <dev@x64lios.com>
 pkgname=x64-win11-settings
 pkgver=1.0.0
-pkgrel=16
+pkgrel=17
 pkgdesc="Official X64 LIOS Windows 11 26H2 Fluent Dark Wayland Desktop Environment (labwc + Quickshell)"
 arch=('any')
 url="https://x64lios.com"
@@ -36,8 +36,15 @@ depends=(
     'file-roller'
     'mpv'
     'gnome-calculator'
+    'gnome-disk-utility'
+    'blueman'
     'udisks2'
     'ntfs-3g'
+    'pacman-contrib'
+    'kdeconnect'
+    'scrcpy'
+    'android-tools'
+    'android-udev'
 )
 
 package() {

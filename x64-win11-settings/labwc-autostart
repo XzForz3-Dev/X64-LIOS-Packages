@@ -38,7 +38,9 @@ pkill -f 'quickshell.*x64-win11' 2>/dev/null || true
     if [ -x /usr/bin/x64-update-tray ]; then
         /usr/bin/x64-update-tray &
     fi
-    if [ -x /usr/lib/kdeconnectd ]; then
+    if [ -x /usr/bin/kdeconnectd ]; then
+        /usr/bin/kdeconnectd &
+    elif [ -x /usr/lib/kdeconnectd ]; then
         /usr/lib/kdeconnectd &
     fi
     if [ -f "${HOME}/.config/autostart/x64-hello.desktop" ] && ! grep -qi "^Hidden=true" "${HOME}/.config/autostart/x64-hello.desktop" 2>/dev/null; then

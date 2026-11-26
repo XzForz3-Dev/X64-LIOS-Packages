@@ -57,19 +57,27 @@ EOF
             uname=$(basename "$udir")
 
             mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
-            # Preserve existing user <desktops> configuration when upgrading labwc rc.xml
+            # Preserve existing user <desktops> and <libinput> configurations when upgrading labwc rc.xml
             local saved_desktops=""
-            if [ -f "$udir/.config/labwc/rc.xml" ] && grep -q "<desktops" "$udir/.config/labwc/rc.xml" 2>/dev/null; then
+            local saved_libinput=""
+            if [ -f "$udir/.config/labwc/rc.xml" ]; then
                 saved_desktops=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); m=re.search(r"[ \t]*<desktops\b[^>]*>.*?</desktops>",t,re.S); print(m.group(0) if m else "")' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
+                saved_libinput=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); m=re.search(r"[ \t]*<libinput\b[^>]*>.*?</libinput>",t,re.S); print(m.group(0) if m else "")' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
             fi
             cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
-            if [ -n "$saved_desktops" ] && [ -f "$udir/.config/labwc/rc.xml" ]; then
-                python3 - "$udir/.config/labwc/rc.xml" "$saved_desktops" <<'PYEOF' 2>/dev/null || true
+            if [ -f "$udir/.config/labwc/rc.xml" ] && { [ -n "$saved_desktops" ] || [ -n "$saved_libinput" ]; }; then
+                python3 - "$udir/.config/labwc/rc.xml" "$saved_desktops" "$saved_libinput" <<'PYEOF' 2>/dev/null || true
 import re, sys
-p, blk = sys.argv[1], sys.argv[2]
+p, dblk, lblk = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(p, "r", encoding="utf-8").read()
-new_txt = re.sub(r"[ \t]*<desktops\b[^>]*>.*?</desktops>", blk, txt, count=1, flags=re.S)
-open(p, "w", encoding="utf-8").write(new_txt)
+if dblk:
+    txt = re.sub(r"[ \t]*<desktops\b[^>]*>.*?</desktops>", dblk, txt, count=1, flags=re.S)
+if lblk:
+    if re.search(r"<libinput\b[^>]*>.*?</libinput>", txt, flags=re.S):
+        txt = re.sub(r"[ \t]*<libinput\b[^>]*>.*?</libinput>", lblk, txt, count=1, flags=re.S)
+    elif "</labwc_config>" in txt:
+        txt = txt.replace("</labwc_config>", "\n" + lblk + "\n</labwc_config>", 1)
+open(p, "w", encoding="utf-8").write(txt)
 PYEOF
             fi
             chmod 755 "$udir/.config/labwc/autostart" 2>/dev/null || true
@@ -108,6 +116,11 @@ GTKINI
     done
 
     systemd-tmpfiles --create /usr/lib/tmpfiles.d/x64-win11-power.conf 2>/dev/null || true
+    # Open KDE Connect LAN ports (1714-1764 TCP/UDP) in UFW automatically so Enlace Móvil works out of the box
+    if command -v ufw >/dev/null 2>&1; then
+        ufw allow 1714:1764/tcp comment "X64 KDE Connect" >/dev/null 2>&1 || true
+        ufw allow 1714:1764/udp comment "X64 KDE Connect" >/dev/null 2>&1 || true
+    fi
     update-desktop-database /usr/share/applications 2>/dev/null || true
     gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
     # Reload active labwc compositor icon cache so updated .desktop window titlebar icons appear immediately
