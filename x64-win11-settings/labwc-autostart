@@ -4,13 +4,51 @@
 dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP QT_QPA_PLATFORMTHEME >/dev/null 2>&1 || true
 systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP QT_QPA_PLATFORMTHEME >/dev/null 2>&1 || true
 
-# 0. Synchronize GTK/Libadwaita portal theme to clean Windows 11 Fluent Blue Dark
+# 0. Synchronize GTK/Libadwaita portal theme respecting saved user Personalization settings
 if command -v gsettings >/dev/null 2>&1; then
-    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark' 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface accent-color 'blue' 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface cursor-theme 'breeze_cursors' 2>/dev/null || true
+    python3 - <<'PYEOF' 2>/dev/null || true
+import json, os, subprocess
+home = os.path.expanduser("~")
+cfg = {}
+cp = os.path.join(home, ".local", "state", "x64-win11", "config.json")
+if os.path.isfile(cp):
+    try: cfg = json.load(open(cp, "r", encoding="utf-8"))
+    except Exception: pass
+gtk_dark = True
+cur_theme = "breeze_cursors"
+cur_size = 24
+ini_p = os.path.join(home, ".config", "gtk-3.0", "settings.ini")
+if os.path.isfile(ini_p):
+    for ln in open(ini_p, "r", encoding="utf-8", errors="ignore"):
+        if "=" not in ln: continue
+        k, v = [x.strip() for x in ln.split("=", 1)]
+        if k == "gtk-theme-name": gtk_dark = ("dark" in v.lower())
+        elif k == "gtk-application-prefer-dark-theme" and v == "0": gtk_dark = False
+        elif k == "gtk-cursor-theme-name" and v: cur_theme = v
+        elif k == "gtk-cursor-theme-size":
+            try: cur_size = int(v)
+            except Exception: pass
+accent_hex = str(cfg.get("accentColor", "#4cc2ff") or "#4cc2ff").lower()
+accent_map = {
+    "#4cc2ff": "blue", "#3b82f6": "blue", "#60cdff": "blue",
+    "#c084fc": "purple", "#a855f7": "purple",
+    "#34d399": "green", "#22c55e": "green",
+    "#ff6b6b": "red", "#ef4444": "red",
+    "#fbbf24": "yellow", "#f97316": "orange",
+    "#f472b6": "pink", "#2dd4bf": "teal",
+}
+g_acc = accent_map.get(accent_hex, "blue")
+cmds = [
+    ["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", "adw-gtk3-dark" if gtk_dark else "adw-gtk3"],
+    ["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", "Papirus-Dark" if gtk_dark else "Papirus-Light"],
+    ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-dark" if gtk_dark else "prefer-light"],
+    ["gsettings", "set", "org.gnome.desktop.interface", "accent-color", g_acc],
+    ["gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", cur_theme],
+    ["gsettings", "set", "org.gnome.desktop.interface", "cursor-size", str(cur_size)],
+]
+for c in cmds:
+    subprocess.run(c, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.0)
+PYEOF
 fi
 
 # 1. Generate dynamic user & hardware profile + calibrate multi-monitor layout + sync virtual desktops
@@ -36,7 +74,9 @@ pkill -f 'quickshell.*x64-win11' 2>/dev/null || true
 (
     sleep 1.0
     if [ -x /usr/bin/x64-update-tray ]; then
-        /usr/bin/x64-update-tray &
+        if [ ! -f "${HOME}/.config/autostart/x64-update-tray.desktop" ] || ( ! grep -qi "^Hidden=true" "${HOME}/.config/autostart/x64-update-tray.desktop" 2>/dev/null && ! grep -qi "^X-GNOME-Autostart-enabled=false" "${HOME}/.config/autostart/x64-update-tray.desktop" 2>/dev/null ); then
+            /usr/bin/x64-update-tray &
+        fi
     fi
     if [ -x /usr/bin/kdeconnectd ]; then
         /usr/bin/kdeconnectd &

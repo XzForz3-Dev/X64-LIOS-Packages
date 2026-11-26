@@ -12,7 +12,11 @@ export _JAVA_AWT_WM_NONREPARENTING=1
 
 mkdir -p "${HOME}/.local/state/x64-win11" "${HOME}/.config/labwc"
 rm -f "${HOME}/.local/state/x64-win11/cmd" 2>/dev/null || true
-cp -f /etc/xdg/x64-win11/labwc/* "${HOME}/.config/labwc/" 2>/dev/null || true
+# Only seed missing labwc config files so user customizations (cursor, theme, keyboard, libinput, desktops) persist across logins!
+for _f in /etc/xdg/x64-win11/labwc/*; do
+    _bn="$(basename "$_f")"
+    [ ! -f "${HOME}/.config/labwc/${_bn}" ] && cp -f "$_f" "${HOME}/.config/labwc/${_bn}" 2>/dev/null || true
+done
 chmod +x "${HOME}/.config/labwc/autostart" 2>/dev/null || true
 
 exec /usr/bin/labwc -C "${HOME}/.config/labwc"

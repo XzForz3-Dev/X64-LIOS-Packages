@@ -57,18 +57,29 @@ EOF
             uname=$(basename "$udir")
 
             mkdir -p "$udir/.config/labwc" "$udir/.local/state/x64-win11" "$udir/.config/gtk-3.0" "$udir/.config/gtk-4.0"
-            # Preserve existing user <desktops> and <libinput> configurations when upgrading labwc rc.xml
+            # Preserve existing user <desktops>, <libinput>, keyboard repeat/numlock, <core> VRR/tearing & labwc environment across upgrades
             local saved_desktops=""
             local saved_libinput=""
+            local saved_kb_opts=""
+            local saved_core_opts=""
+            local saved_env=""
             if [ -f "$udir/.config/labwc/rc.xml" ]; then
                 saved_desktops=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); m=re.search(r"[ \t]*<desktops\b[^>]*>.*?</desktops>",t,re.S); print(m.group(0) if m else "")' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
                 saved_libinput=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); m=re.search(r"[ \t]*<libinput\b[^>]*>.*?</libinput>",t,re.S); print(m.group(0) if m else "")' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
+                saved_kb_opts=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); tags=re.findall(r"[ \t]*<(?:repeatRate|repeatDelay|numlock)>[^<]*</(?:repeatRate|repeatDelay|numlock)>",t); print("\n".join(tags))' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
+                saved_core_opts=$(python3 -c 'import re,sys; t=open(sys.argv[1]).read(); tags=re.findall(r"[ \t]*<(?:adaptiveSync|allowTearing)>[^<]*</(?:adaptiveSync|allowTearing)>",t); print("\n".join(tags))' "$udir/.config/labwc/rc.xml" 2>/dev/null || true)
+            fi
+            if [ -f "$udir/.config/labwc/environment" ]; then
+                saved_env=$(cat "$udir/.config/labwc/environment" 2>/dev/null || true)
             fi
             cp -f /etc/xdg/x64-win11/labwc/* "$udir/.config/labwc/" 2>/dev/null || true
-            if [ -f "$udir/.config/labwc/rc.xml" ] && { [ -n "$saved_desktops" ] || [ -n "$saved_libinput" ]; }; then
-                python3 - "$udir/.config/labwc/rc.xml" "$saved_desktops" "$saved_libinput" <<'PYEOF' 2>/dev/null || true
+            if [ -n "$saved_env" ]; then
+                printf '%s\n' "$saved_env" > "$udir/.config/labwc/environment" 2>/dev/null || true
+            fi
+            if [ -f "$udir/.config/labwc/rc.xml" ] && { [ -n "$saved_desktops" ] || [ -n "$saved_libinput" ] || [ -n "$saved_kb_opts" ] || [ -n "$saved_core_opts" ]; }; then
+                python3 - "$udir/.config/labwc/rc.xml" "$saved_desktops" "$saved_libinput" "$saved_kb_opts" "$saved_core_opts" <<'PYEOF' 2>/dev/null || true
 import re, sys
-p, dblk, lblk = sys.argv[1], sys.argv[2], sys.argv[3]
+p, dblk, lblk, kblk, cblk = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 txt = open(p, "r", encoding="utf-8").read()
 if dblk:
     txt = re.sub(r"[ \t]*<desktops\b[^>]*>.*?</desktops>", dblk, txt, count=1, flags=re.S)
@@ -77,6 +88,12 @@ if lblk:
         txt = re.sub(r"[ \t]*<libinput\b[^>]*>.*?</libinput>", lblk, txt, count=1, flags=re.S)
     elif "</labwc_config>" in txt:
         txt = txt.replace("</labwc_config>", "\n" + lblk + "\n</labwc_config>", 1)
+if kblk and "<keyboard>" in txt:
+    txt = re.sub(r"\n?[ \t]*<(?:repeatRate|repeatDelay|numlock)>[^<]*</(?:repeatRate|repeatDelay|numlock)>", "", txt)
+    txt = txt.replace("<keyboard>", "<keyboard>\n" + kblk, 1)
+if cblk and "<core>" in txt:
+    txt = re.sub(r"\n?[ \t]*<(?:adaptiveSync|allowTearing)>[^<]*</(?:adaptiveSync|allowTearing)>", "", txt)
+    txt = txt.replace("<core>", "<core>\n" + cblk, 1)
 open(p, "w", encoding="utf-8").write(txt)
 PYEOF
             fi
@@ -86,8 +103,13 @@ PYEOF
                 chown "$ug" "$udir/.config/mimeapps.list" 2>/dev/null || true
             fi
 
-            # Remove any residual X64 Theme Studio / Cyberpunk overrides from previous desktop
-            rm -f "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css" "$udir/.config/kitty/x64-theme.conf" "$udir/.config/btop/themes/x64-theme.theme" 2>/dev/null || true
+            # Remove any residual X64 Theme Studio / Cyberpunk overrides from previous desktop (preserve Win11 Accent CSS!)
+            for gcss in "$udir/.config/gtk-3.0/gtk.css" "$udir/.config/gtk-4.0/gtk.css"; do
+                if [ -f "$gcss" ] && ! grep -q "X64-WIN11-ACCENT" "$gcss" 2>/dev/null; then
+                    rm -f "$gcss" 2>/dev/null || true
+                fi
+            done
+            rm -f "$udir/.config/kitty/x64-theme.conf" "$udir/.config/btop/themes/x64-theme.theme" 2>/dev/null || true
             rm -rf "$udir/.local/share/themes/X64-GTK-A" "$udir/.local/share/themes/X64-GTK-B" "$udir/.local/share/icons/Papirus-Dark-X64-A" "$udir/.local/share/icons/Papirus-Dark-X64-B" "$udir/.local/share/color-schemes/BreezeDark.colors" "$udir/.local/share/color-schemes/BreezeLight.colors" "$udir/.local/share/color-schemes/X64LiveTheme.colors" 2>/dev/null || true
 
             if [ -f /etc/xdg/kitty/kitty.conf ] && grep -q "x64-theme.conf" "$udir/.config/kitty/kitty.conf" 2>/dev/null; then
@@ -96,7 +118,8 @@ PYEOF
             fi
 
             for gver in gtk-3.0 gtk-4.0; do
-                cat << 'GTKINI' > "$udir/.config/$gver/settings.ini"
+                if [ ! -f "$udir/.config/$gver/settings.ini" ]; then
+                    cat << 'GTKINI' > "$udir/.config/$gver/settings.ini"
 [Settings]
 gtk-application-prefer-dark-theme=1
 gtk-theme-name=adw-gtk3-dark
@@ -105,6 +128,7 @@ gtk-cursor-theme-name=breeze_cursors
 gtk-cursor-theme-size=24
 gtk-font-name=Inter 10
 GTKINI
+                fi
             done
 
             if [ -S "/run/user/${uid_num}/bus" ] && command -v gsettings >/dev/null 2>&1; then

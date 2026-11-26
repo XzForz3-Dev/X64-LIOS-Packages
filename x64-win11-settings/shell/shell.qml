@@ -19,8 +19,8 @@ ShellRoot {
     property var activeScreen: Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
     property string currentTimeStr: Qt.formatTime(new Date(), "hh:mm")
     property string currentDateStr: Qt.formatDate(new Date(), "dd/MM/yyyy")
-    property string currentLongDateStr: Qt.formatDate(new Date(), "dddd, d 'de' MMMM 'de' yyyy")
-    property string currentLockDateStr: Qt.formatDate(new Date(), "dddd, d 'de' MMMM")
+    property string currentLongDateStr: formatSpanishDate(new Date(), true)
+    property string currentLockDateStr: formatSpanishDate(new Date(), false)
 
     property bool startOpen: false
     property bool searchOpen: false
@@ -61,6 +61,9 @@ ShellRoot {
     property bool lockScreenOpen: false
     property bool lockPromptOpen: false
     property bool lockShowPass: false
+    property bool lockRequireAuth: false
+    property string lockAuthError: ""
+    property bool lockAuthChecking: false
     property real ctxX: 200
     property real ctxY: 200
     property real ctxSubY: 0
@@ -99,10 +102,77 @@ ShellRoot {
     property bool showPhoneLink: true
     property bool taskbarCompact: false
     property bool taskbarLeftAlign: false
+    property string taskbarSearchMode: "box"     // "box" | "icon" | "hidden"
+    property bool showTaskViewBtn: true
+    property bool showWeatherWidget: true
     property bool showBatteryPct: true
-    property int wallpaperMode: 0
+    property int wallpaperMode: 0                // 0=BloomDark, 1=BloomLight, 2=Monolith, 3=Custom, 4=SolidColor
+    property string wallpaperFit: "fill"         // "fill" | "fit" | "stretch" | "center"
+    property string solidBgColor: "#141923"
+    property string accentColor: "#4cc2ff"
+    property bool transparencyEnabled: true
+    readonly property color taskbarBg: transparencyEnabled ? "#cc1c1c1c" : "#ff1c1c1c"
+    readonly property color panelBg: transparencyEnabled ? "#d6202020" : "#ff202020"
+    readonly property color menuBg: transparencyEnabled ? "#e2262626" : "#ff262626"
+    property var startRecentFiles: []
+    property int lockWallpaperMode: -1           // -1=same as desktop, 0..2=builtin, 3=custom lock img
+    property string lockWallpaperUrl: ""
+    property bool lockShowStatus: true
     property bool clock12h: false
+    property bool clockShowSeconds: false
+    property int tzOffsetMins: -99999
     property string kbLayout: "ES"
+
+    function getZonedNow() {
+        var now = new Date();
+        if (shellRoot.tzOffsetMins > -90000) {
+            var deltaMs = (shellRoot.tzOffsetMins + now.getTimezoneOffset()) * 60000;
+            return new Date(now.getTime() + deltaMs);
+        }
+        return now;
+    }
+
+    function formatSpanishDate(dt, withYear) {
+        var days = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+        var months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        var base = days[dt.getDay()] + ", " + dt.getDate() + " de " + months[dt.getMonth()];
+        return withYear ? (base + " de " + dt.getFullYear()) : base;
+    }
+
+    function formatTaskbarClock(dt) {
+        if (shellRoot.clock12h) {
+            return Qt.formatTime(dt, shellRoot.clockShowSeconds ? "h:mm:ss AP" : "h:mm AP");
+        }
+        return Qt.formatTime(dt, shellRoot.clockShowSeconds ? "hh:mm:ss" : "hh:mm");
+    }
+
+    function kbLangTop(code) {
+        var c = String(code || "ES").toUpperCase();
+        if (c === "ES" || c === "LATAM") return "ESP";
+        if (c === "US") return "ENG";
+        if (c === "BR") return "POR";
+        if (c === "FR") return "FRA";
+        if (c === "DE") return "DEU";
+        return c.slice(0, 3);
+    }
+
+    function kbLangSub(code) {
+        var c = String(code || "ES").toUpperCase();
+        return c === "LATAM" ? "LAT" : c;
+    }
+
+    function kbLangTooltip(code) {
+        var c = String(code || "ES").toUpperCase();
+        var names = {
+            "ES": "Español (España)",
+            "LATAM": "Español (Latinoamérica)",
+            "US": "Inglés (Estados Unidos)",
+            "BR": "Portugués (Brasil)",
+            "FR": "Francés",
+            "DE": "Alemán"
+        };
+        return (names[c] || c) + "\n(Haz clic para cambiar o usa tu atajo de teclado)";
+    }
     property string searchQuery: ""
 
     // Universal Dynamic System & User State (Synchronized from ~/.local/state/x64-win11/sysinfo.json)
@@ -306,7 +376,7 @@ ShellRoot {
     property int calSelectedDay: (new Date()).getDate()
     property bool calendarCollapsed: false
     property string calMonthTitle: ""
-    property string calShortTopDate: Qt.formatDate(new Date(), "dddd, d 'de' MMMM")
+    property string calShortTopDate: formatSpanishDate(new Date(), false)
     property var calDayCells: []
 
     function rebuildInteractiveCalendar() {
@@ -559,12 +629,12 @@ ShellRoot {
         running: true
         repeat: true
         onTriggered: {
-            var now = new Date();
-            shellRoot.currentTimeStr = shellRoot.clock12h ? Qt.formatTime(now, "h:mm AP") : Qt.formatTime(now, "hh:mm");
+            var now = shellRoot.getZonedNow();
+            shellRoot.currentTimeStr = shellRoot.formatTaskbarClock(now);
             shellRoot.currentDateStr = Qt.formatDate(now, "dd/MM/yyyy");
-            shellRoot.currentLongDateStr = Qt.formatDate(now, "dddd, d 'de' MMMM 'de' yyyy");
-            shellRoot.currentLockDateStr = Qt.formatDate(now, "dddd, d 'de' MMMM");
-            shellRoot.calShortTopDate = Qt.formatDate(now, "dddd, d 'de' MMMM");
+            shellRoot.currentLongDateStr = shellRoot.formatSpanishDate(now, true);
+            shellRoot.currentLockDateStr = shellRoot.formatSpanishDate(now, false);
+            shellRoot.calShortTopDate = shellRoot.formatSpanishDate(now, false);
             if (shellRoot.focusRunning) {
                 if (shellRoot.focusRemainingSecs > 1) {
                     shellRoot.focusRemainingSecs -= 1;
@@ -877,7 +947,14 @@ ShellRoot {
             Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "toggle-pin-taskbar", d.name || "App", d.cmd, d.iconUrl || "", mKey]);
             startAppCtxOpen = false;
         } else if (a === "uninstall") {
-            spawnCmd("/usr/bin/shelly-ui");
+            var rawName = String(d.id || d.name || d.title || "").replace(/\n/g, " ").trim();
+            var rawCmd = String(d.cmd || "").trim();
+            var uSpec = rawName !== "" ? (rawCmd !== "" ? (rawName + "||" + rawCmd) : rawName) : rawCmd;
+            if (uSpec !== "") {
+                Quickshell.execDetached(["/usr/bin/x64-win11-app", "settings", "Aplicaciones:Desinstalar:" + uSpec]);
+            } else {
+                Quickshell.execDetached(["/usr/bin/x64-win11-app", "settings", "Aplicaciones:Aplicaciones instaladas"]);
+            }
             startAppCtxOpen = false;
             startOpen = false;
         }
@@ -1046,6 +1123,42 @@ ShellRoot {
         }
     }
 
+    Process {
+        id: unlockAuthProc
+        command: ["/usr/bin/x64-win11-ctl", "verify-unlock"]
+        environment: ({ X64_UNLOCK_SECRET: "" })
+        onExited: (exitCode, exitStatus) => {
+            shellRoot.lockAuthChecking = false;
+            unlockAuthProc.environment = ({ X64_UNLOCK_SECRET: "" });
+            if (exitCode === 0) {
+                shellRoot.lockAuthError = "";
+                shellRoot.lockPromptOpen = false;
+                shellRoot.lockScreenOpen = false;
+            } else {
+                shellRoot.lockAuthError = "PIN o contraseña incorrectos. Inténtalo de nuevo.";
+            }
+        }
+    }
+
+    function submitLockUnlock(secretStr) {
+        if (!shellRoot.lockRequireAuth) {
+            shellRoot.lockAuthError = "";
+            shellRoot.lockPromptOpen = false;
+            shellRoot.lockScreenOpen = false;
+            return;
+        }
+        var s = String(secretStr || "");
+        if (s === "") {
+            shellRoot.lockAuthError = "Introduce tu PIN o contraseña para desbloquear.";
+            return;
+        }
+        if (shellRoot.lockAuthChecking) return;
+        shellRoot.lockAuthError = "";
+        shellRoot.lockAuthChecking = true;
+        unlockAuthProc.environment = ({ X64_UNLOCK_SECRET: s });
+        unlockAuthProc.running = true;
+    }
+
     // Poll IPC Command File, Config JSON, Shared Clipboard, Workspaces & Dynamic SysInfo JSON (Diff-guarded for zero flicker!)
     Process {
         id: statePoller
@@ -1106,15 +1219,31 @@ ShellRoot {
                             cfgObj = cfg;
                             if (cfg.taskbarCompact !== undefined) shellRoot.taskbarCompact = Boolean(cfg.taskbarCompact);
                             if (cfg.taskbarLeftAlign !== undefined) shellRoot.taskbarLeftAlign = Boolean(cfg.taskbarLeftAlign);
+                            if (cfg.taskbarSearchMode !== undefined) shellRoot.taskbarSearchMode = String(cfg.taskbarSearchMode);
+                            if (cfg.showTaskViewBtn !== undefined) shellRoot.showTaskViewBtn = Boolean(cfg.showTaskViewBtn);
+                            if (cfg.showWeatherWidget !== undefined) shellRoot.showWeatherWidget = Boolean(cfg.showWeatherWidget);
+                            if (cfg.startAllViewMode !== undefined) shellRoot.startAllViewMode = String(cfg.startAllViewMode);
                             if (cfg.showRecommended !== undefined) shellRoot.showRecommended = Boolean(cfg.showRecommended);
                             if (cfg.showPhoneLink !== undefined) shellRoot.showPhoneLink = Boolean(cfg.showPhoneLink);
                             if (cfg.showBatteryPct !== undefined) shellRoot.showBatteryPct = Boolean(cfg.showBatteryPct);
                             if (cfg.wallpaperMode !== undefined) shellRoot.wallpaperMode = Number(cfg.wallpaperMode);
+                            if (cfg.wallpaperFit !== undefined) shellRoot.wallpaperFit = String(cfg.wallpaperFit);
+                            if (cfg.solidBgColor !== undefined) shellRoot.solidBgColor = String(cfg.solidBgColor);
+                            if (cfg.accentColor !== undefined && String(cfg.accentColor).indexOf("#") === 0) shellRoot.accentColor = String(cfg.accentColor);
+                            if (cfg.transparencyEnabled !== undefined) shellRoot.transparencyEnabled = Boolean(cfg.transparencyEnabled);
+                            if (cfg.lockWallpaperMode !== undefined) shellRoot.lockWallpaperMode = Number(cfg.lockWallpaperMode);
+                            if (cfg.lockWallpaperUrl !== undefined) shellRoot.lockWallpaperUrl = String(cfg.lockWallpaperUrl);
+                            if (cfg.lockShowStatus !== undefined) shellRoot.lockShowStatus = Boolean(cfg.lockShowStatus);
+                            if (cfg.lockRequireAuth !== undefined) shellRoot.lockRequireAuth = Boolean(cfg.lockRequireAuth);
                             if (cfg.customWallpaperUrl !== undefined) shellRoot.customWallpaperUrl = String(cfg.customWallpaperUrl);
                             if (cfg.userAvatarUrl !== undefined) shellRoot.userAvatarUrl = String(cfg.userAvatarUrl);
                             if (cfg.clock12h !== undefined) {
                                 shellRoot.clock12h = Boolean(cfg.clock12h);
-                                shellRoot.currentTimeStr = shellRoot.clock12h ? Qt.formatTime(new Date(), "h:mm AP") : Qt.formatTime(new Date(), "hh:mm");
+                                shellRoot.currentTimeStr = shellRoot.formatTaskbarClock(shellRoot.getZonedNow());
+                            }
+                            if (cfg.clockShowSeconds !== undefined) {
+                                shellRoot.clockShowSeconds = Boolean(cfg.clockShowSeconds);
+                                shellRoot.currentTimeStr = shellRoot.formatTaskbarClock(shellRoot.getZonedNow());
                             }
                             if (cfg.kbLayout !== undefined) shellRoot.kbLayout = String(cfg.kbLayout).toUpperCase();
                             if (cfg.desktopIconSizeMode !== undefined) shellRoot.desktopIconSizeMode = String(cfg.desktopIconSizeMode);
@@ -1157,6 +1286,15 @@ ShellRoot {
                                 var sys = JSON.parse(sysRaw);
                                 if (sys.user) shellRoot.userName = sys.user;
                                 if (sys.userAvatarUrl !== undefined) shellRoot.userAvatarUrl = String(sys.userAvatarUrl);
+                                if (sys.tzOffsetMins !== undefined && !isNaN(Number(sys.tzOffsetMins))) {
+                                    shellRoot.tzOffsetMins = Number(sys.tzOffsetMins);
+                                    var zNow = shellRoot.getZonedNow();
+                                    shellRoot.currentTimeStr = shellRoot.formatTaskbarClock(zNow);
+                                    shellRoot.currentDateStr = Qt.formatDate(zNow, "dd/MM/yyyy");
+                                    shellRoot.currentLongDateStr = shellRoot.formatSpanishDate(zNow, true);
+                                    shellRoot.currentLockDateStr = shellRoot.formatSpanishDate(zNow, false);
+                                    shellRoot.calShortTopDate = shellRoot.formatSpanishDate(zNow, false);
+                                }
                                 if (sys.hostname) shellRoot.hostName = sys.hostname;
                                 if (sys.hasBattery !== undefined) shellRoot.hasBattery = Boolean(sys.hasBattery);
                                 if (sys.batteryPct !== undefined) shellRoot.batteryPct = Number(sys.batteryPct);
@@ -1170,6 +1308,7 @@ ShellRoot {
                                 if (sys.desktopIcons && sys.desktopIcons.length > 0) shellRoot.desktopIcons = sys.desktopIcons;
                                 if (sys.taskbarPinned && sys.taskbarPinned.length > 0) shellRoot.taskbarPinned = sys.taskbarPinned;
                                 if (sys.startPinned && sys.startPinned.length > 0) shellRoot.startPinned = sys.startPinned;
+                                if (sys.recentFiles !== undefined && Array.isArray(sys.recentFiles)) shellRoot.startRecentFiles = sys.recentFiles;
                                 if (sys.allApps && sys.allApps.length > 0) shellRoot.allApps = sys.allApps;
                                 if (sys.categories && sys.categories.length > 0) shellRoot.startCategories = sys.categories;
                                 if (sys.calendar) {
@@ -1360,7 +1499,7 @@ ShellRoot {
                 width: wSlider.internalRatio * parent.width
                 height: 4
                 radius: 2
-                color: "#4cc2ff"
+                color: shellRoot.accentColor
             }
         }
 
@@ -1460,8 +1599,8 @@ ShellRoot {
             implicitWidth: 40
             implicitHeight: 20
             radius: 10
-            color: wSwitch.checked ? "#4cc2ff" : (wSwitch.hovered ? "#24ffffff" : "#14000000")
-            border.color: wSwitch.checked ? "#4cc2ff" : "#99ffffff"
+            color: wSwitch.checked ? shellRoot.accentColor : (wSwitch.hovered ? "#24ffffff" : "#14000000")
+            border.color: wSwitch.checked ? shellRoot.accentColor : "#99ffffff"
             border.width: 1
             antialiasing: true
             Behavior on color { ColorAnimation { duration: 130 } }
@@ -1628,8 +1767,14 @@ ShellRoot {
                 }
             }
 
+            Rectangle {
+                anchors.fill: parent
+                color: shellRoot.wallpaperMode === 4 ? (shellRoot.solidBgColor || "#141923") : "#0b0e14"
+            }
+
             Image {
                 anchors.fill: parent
+                visible: shellRoot.wallpaperMode !== 4
                 cache: false
                 source: (shellRoot.wallpaperMode === 3 && shellRoot.customWallpaperUrl !== "")
                         ? shellRoot.customWallpaperUrl
@@ -1638,7 +1783,9 @@ ShellRoot {
                            : (shellRoot.wallpaperMode === 1
                               ? (shellRoot.wpDir + "win11-bloom-light.jpg")
                               : (shellRoot.wpDir + "x64-monolith.jpg")))
-                fillMode: Image.PreserveAspectCrop
+                fillMode: shellRoot.wallpaperFit === "fit" ? Image.PreserveAspectFit
+                          : (shellRoot.wallpaperFit === "stretch" ? Image.Stretch
+                             : (shellRoot.wallpaperFit === "center" ? Image.Pad : Image.PreserveAspectCrop))
                 smooth: true
             }
 
@@ -1662,8 +1809,8 @@ ShellRoot {
                     width: desktopWin.deskCellW
                     height: desktopWin.deskCellH
                     radius: 5
-                    color: "#224cc2ff"
-                    border.color: "#994cc2ff"
+                    color: Qt.alpha(shellRoot.accentColor, 0.13)
+                    border.color: Qt.alpha(shellRoot.accentColor, 0.6)
                     border.width: 1
                     Behavior on x { NumberAnimation { duration: 85; easing.type: Easing.OutCubic } }
                     Behavior on y { NumberAnimation { duration: 85; easing.type: Easing.OutCubic } }
@@ -1690,8 +1837,8 @@ ShellRoot {
                         opacity: isDraggingSelf ? 0.35 : (isCutPending ? 0.52 : 1.0)
                         color: isDropTarget ? (modelData.kind === "trash" ? "#55c42b1c" : "#550078d4")
                                             : (isSel ? "#440078d4" : (isHov ? "#1cffffff" : "transparent"))
-                        border.color: isDropTarget ? (modelData.kind === "trash" ? "#ff7b72" : "#4cc2ff")
-                                                   : (isSel ? "#884cc2ff" : (isHov ? "#22ffffff" : "transparent"))
+                        border.color: isDropTarget ? (modelData.kind === "trash" ? "#ff7b72" : shellRoot.accentColor)
+                                                   : (isSel ? Qt.alpha(shellRoot.accentColor, 0.53) : (isHov ? "#22ffffff" : "transparent"))
                         border.width: isDropTarget ? 1.5 : 1
 
                         Behavior on x { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -2043,7 +2190,7 @@ ShellRoot {
                     height: desktopWin.deskCellH
                     radius: 6
                     color: "#66182230"
-                    border.color: "#994cc2ff"
+                    border.color: Qt.alpha(shellRoot.accentColor, 0.6)
                     border.width: 1
 
                     Column {
@@ -2074,7 +2221,7 @@ ShellRoot {
                         anchors.top: parent.top; anchors.right: parent.right
                         anchors.topMargin: -6; anchors.rightMargin: -6
                         width: 24; height: 22; radius: 11
-                        color: "#0078d4"; border.color: "#4cc2ff"; border.width: 1
+                        color: "#0078d4"; border.color: shellRoot.accentColor; border.width: 1
                         Text {
                             anchors.centerIn: parent
                             text: String(desktopWin.selectedDesktopIndices.length)
@@ -2088,7 +2235,7 @@ ShellRoot {
                     visible: desktopArea.dropHintLabel !== ""
                     x: 0; y: desktopWin.deskCellH + 6
                     width: hintTxt.implicitWidth + 18; height: 24; radius: 5
-                    color: "#ee202020"; border.color: "#4cc2ff"; border.width: 1
+                    color: shellRoot.panelBg; border.color: shellRoot.accentColor; border.width: 1
                     Text {
                         id: hintTxt; anchors.centerIn: parent
                         text: desktopArea.dropHintLabel
@@ -2103,7 +2250,7 @@ ShellRoot {
                 z: 20
                 visible: desktopArea.draggingBox && (width > 4 || height > 4)
                 color: "#380078d4"
-                border.color: "#4cc2ff"
+                border.color: shellRoot.accentColor
                 border.width: 1
             }
 
@@ -2165,7 +2312,7 @@ ShellRoot {
                 y: screenFilterWin.height - height - (shellRoot.taskbarCompact ? 62 : 72)
                 width: 156; height: 118; radius: 12
                 color: "#eb1c1c1c"
-                border.color: "#4cc2ff"; border.width: 2
+                border.color: shellRoot.accentColor; border.width: 2
                 Column {
                     anchors.centerIn: parent; spacing: 2
                     Text {
@@ -2176,7 +2323,7 @@ ShellRoot {
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: parent.parent.scrName || "Pantalla"
-                        color: "#4cc2ff"; font.pixelSize: 13; font.weight: Font.DemiBold
+                        color: shellRoot.accentColor; font.pixelSize: 13; font.weight: Font.DemiBold
                     }
                 }
             }
@@ -2191,7 +2338,7 @@ ShellRoot {
                 x: Math.round((screenFilterWin.width - width) / 2)
                 y: screenFilterWin.height - (shellRoot.taskbarCompact ? 38 : 48) - height - (shellRoot.osdVisible ? 20 : 10)
                 Behavior on y { NumberAnimation { duration: 170; easing.type: Easing.OutCubic } }
-                color: "#f2222222"
+                color: shellRoot.panelBg
                 border.color: "#32ffffff"; border.width: 1
 
                 RowLayout {
@@ -2212,7 +2359,7 @@ ShellRoot {
                         Rectangle {
                             height: 4; radius: 2
                             width: shellRoot.osdMuted ? 0 : Math.max(0, Math.min(parent.width, parent.width * (Math.min(100, shellRoot.osdValue) / 100.0)))
-                            color: shellRoot.osdValue > 100 ? "#fbbf24" : "#4cc2ff"
+                            color: shellRoot.osdValue > 100 ? "#fbbf24" : shellRoot.accentColor
                             Behavior on width { NumberAnimation { duration: 85; easing.type: Easing.OutCubic } }
                         }
                     }
@@ -2275,7 +2422,7 @@ ShellRoot {
             anchors.bottom: true
             implicitHeight: shellRoot.taskbarCompact ? 38 : 48
             exclusiveZone: implicitHeight
-            color: "#ee1c1c1c"
+            color: shellRoot.taskbarBg
 
             readonly property var toplevels: ToplevelManager.toplevels ? ToplevelManager.toplevels.values : []
 
@@ -2288,7 +2435,7 @@ ShellRoot {
             // [1] Left Weather Widget (Exact Windows 11 26H2 Two-Line Layout: Temp on top, Condition below)
             Rectangle {
                 id: wthWidget
-                visible: !shellRoot.taskbarLeftAlign && taskbarWin.width >= 900
+                visible: shellRoot.showWeatherWidget && !shellRoot.taskbarLeftAlign && taskbarWin.width >= 900
                 anchors.left: parent.left
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
@@ -2338,7 +2485,7 @@ ShellRoot {
             // [2] Centered (or Left-Aligned) Taskbar Icons + Running Wayland Windows
             Row {
                 id: mainIconsRow
-                readonly property bool autoCompactSearch: shellRoot.taskbarCompact || taskbarWin.width < 1180
+                readonly property bool autoCompactSearch: shellRoot.taskbarSearchMode === "icon" || shellRoot.taskbarCompact || taskbarWin.width < 1180
                 x: shellRoot.taskbarLeftAlign
                    ? 8
                    : Math.max(wthWidget.visible ? 174 : 8,
@@ -2395,6 +2542,7 @@ ShellRoot {
                 // WINDOWS 11 26H2 SEARCH CAPSULE ("Buscar" + Search Highlights Sparkle)
                 Rectangle {
                     id: searchPillRect
+                    visible: shellRoot.taskbarSearchMode !== "hidden"
                     width: mainIconsRow.autoCompactSearch ? (shellRoot.taskbarCompact ? 34 : 40) : 210
                     height: shellRoot.taskbarCompact ? 30 : 32
                     radius: mainIconsRow.autoCompactSearch ? 4 : 16
@@ -2405,7 +2553,7 @@ ShellRoot {
                     Behavior on color { ColorAnimation { duration: 110 } }
                     border.color: mainIconsRow.autoCompactSearch
                                   ? "transparent"
-                                  : (shellRoot.searchOpen ? "#4cc2ff" : "#32ffffff")
+                                  : (shellRoot.searchOpen ? shellRoot.accentColor : "#32ffffff")
                     border.width: 1
 
                     RowLayout {
@@ -2458,6 +2606,7 @@ ShellRoot {
                 // WINDOWS 11 26H2 TASK VIEW BUTTON ("Vista de tareas")
                 Rectangle {
                     id: tvBtnRect
+                    visible: shellRoot.showTaskViewBtn
                     width: shellRoot.taskbarCompact ? 34 : 40
                     height: shellRoot.taskbarCompact ? 34 : 40
                     radius: 4
@@ -2537,7 +2686,7 @@ ShellRoot {
                             width: tbAppBtn.isFocused ? 16 : 6
                             height: 3
                             radius: 1.5
-                            color: tbAppBtn.isFocused ? "#4cc2ff" : "#9a9a9a"
+                            color: tbAppBtn.isFocused ? shellRoot.accentColor : "#9a9a9a"
                             Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                             Behavior on color { ColorAnimation { duration: 120 } }
                         }
@@ -2650,7 +2799,7 @@ ShellRoot {
                             width: dynBtn.isFocused ? 16 : 6
                             height: 3
                             radius: 1.5
-                            color: dynBtn.isFocused ? "#4cc2ff" : "#9a9a9a"
+                            color: dynBtn.isFocused ? shellRoot.accentColor : "#9a9a9a"
                             Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                             Behavior on color { ColorAnimation { duration: 120 } }
                         }
@@ -2751,25 +2900,24 @@ ShellRoot {
                         spacing: -1
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: shellRoot.kbLayout === "ES" ? "ESP" : "ENG"
+                            text: shellRoot.kbLangTop(shellRoot.kbLayout)
                             color: "#f2f2f2"; font.pixelSize: 11
                         }
                         Text {
                             visible: !shellRoot.taskbarCompact
                             anchors.horizontalCenter: parent.horizontalCenter
-                            text: shellRoot.kbLayout
+                            text: shellRoot.kbLangSub(shellRoot.kbLayout)
                             color: "#cfcfcf"; font.pixelSize: 11
                         }
                     }
                     MouseArea {
                         id: kbHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
                         onEntered: shellRoot.showTbTooltip(taskbarWin.modelData, rightTrayRow.x + kbTrayBtn.x + 18,
-                                                           shellRoot.kbLayout === "ES" ? "Español (España) • Teclado Español\n(Alt + Mayús para cambiar)" : "Inglés (EE. UU.) • Teclado US\n(Alt + Mayús para cambiar)")
+                                                           shellRoot.kbLangTooltip(shellRoot.kbLayout))
                         onExited: shellRoot.hideTbTooltip()
                         onClicked: {
                             shellRoot.hideTbTooltip();
-                            shellRoot.kbLayout = (shellRoot.kbLayout === "ES" ? "US" : "ES");
-                            shellRoot.spawnCmd("command -v wtype >/dev/null 2>&1 && wtype -M alt -P Shift_L -p Shift_L -m alt || true");
+                            Quickshell.execDetached(["/usr/bin/x64-win11-ctl", "kb-cycle"]);
                         }
                     }
                 }
@@ -2951,6 +3099,53 @@ ShellRoot {
                     shellRoot.taskbarCtxX = Math.max(12, Math.min(taskbarWin.width - 250, mouse.x - 110));
                     shellRoot.taskbarCtxOpen = true;
                 }
+            }
+        }
+    }
+
+    // =========================================================================
+    // LAYER 3B: SECONDARY MONITORS LOCK SCREEN CURTAIN (True Multi-Monitor Win+L!)
+    // =========================================================================
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: shellRoot.lockScreenOpen && modelData !== shellRoot.activeScreen
+            WlrLayershell.namespace: "x64-win11-lock-secondary"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            anchors.top: true; anchors.bottom: true; anchors.left: true; anchors.right: true
+            color: (shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperMode === 4) ? (shellRoot.solidBgColor || "#141923") : "#0b0e14"
+
+            Image {
+                anchors.fill: parent
+                visible: !(shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperMode === 4)
+                cache: false
+                source: {
+                    var lm = shellRoot.lockWallpaperMode;
+                    if (lm === 3 && shellRoot.lockWallpaperUrl !== "") return shellRoot.lockWallpaperUrl;
+                    if (lm === 0) return shellRoot.wpDir + "win11-bloom-dark.jpg";
+                    if (lm === 1) return shellRoot.wpDir + "win11-bloom-light.jpg";
+                    if (lm === 2) return shellRoot.wpDir + "x64-monolith.jpg";
+                    if (shellRoot.wallpaperMode === 3 && shellRoot.customWallpaperUrl !== "") return shellRoot.customWallpaperUrl;
+                    if (shellRoot.wallpaperMode === 1) return shellRoot.wpDir + "win11-bloom-light.jpg";
+                    if (shellRoot.wallpaperMode === 2) return shellRoot.wpDir + "x64-monolith.jpg";
+                    return shellRoot.wpDir + "win11-bloom-dark.jpg";
+                }
+                fillMode: (shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "fit") ? Image.PreserveAspectFit
+                          : ((shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "stretch") ? Image.Stretch
+                             : ((shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "center") ? Image.Pad : Image.PreserveAspectCrop))
+            }
+            Rectangle {
+                anchors.fill: parent
+                color: shellRoot.lockPromptOpen ? "#bf0c1018" : "#30000000"
+                Behavior on color { ColorAnimation { duration: 220 } }
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: { if (!shellRoot.lockPromptOpen) shellRoot.lockPromptOpen = true; }
             }
         }
     }
@@ -3188,7 +3383,7 @@ ShellRoot {
                    : (desktopCtxCard.x - width - 4)
                 y: Math.min(shellRoot.ctxSubY, overlayWin.height - (shellRoot.taskbarCompact ? 38 : 48) - height - 10)
                 radius: 8
-                color: "#f62b2b2b"
+                color: shellRoot.menuBg
                 border.color: "#32ffffff"
                 border.width: 1
                 MouseArea { anchors.fill: parent }
@@ -3289,7 +3484,7 @@ ShellRoot {
                                             visible: !modelData.icon && Boolean(modelData.checked) && !modelData.isCheck
                                             anchors.centerIn: parent
                                             width: 6; height: 6; radius: 3
-                                            color: "#4cc2ff"
+                                            color: shellRoot.accentColor
                                         }
                                     }
 
@@ -3625,7 +3820,7 @@ ShellRoot {
                 x: winXCard.x + winXCard.width + 4
                 y: winXCard.y + winXCard.height - height - 30
                 radius: 8
-                color: "#f62b2b2b"
+                color: shellRoot.menuBg
                 border.color: "#32ffffff"; border.width: 1
                 MouseArea { anchors.fill: parent }
 
@@ -3672,7 +3867,7 @@ ShellRoot {
             width: 390
             height: propsInnerCol.implicitHeight + 84
             radius: 10
-            color: "#f8232323"
+            color: shellRoot.menuBg
             border.color: "#34ffffff"
             border.width: 1
             z: 90
@@ -3766,7 +3961,7 @@ ShellRoot {
                         }
                         Item { Layout.fillWidth: true }
                         Rectangle {
-                            width: 92; height: 30; radius: 5; color: "#4cc2ff"
+                            width: 92; height: 30; radius: 5; color: shellRoot.accentColor
                             Text { anchors.centerIn: parent; text: "Aceptar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: shellRoot.propertiesModalOpen = false }
                         }
@@ -3787,7 +3982,7 @@ ShellRoot {
             }
             anchors.centerIn: parent
             width: 380; height: 168; radius: 10
-            color: "#f8242424"; border.color: "#34ffffff"; border.width: 1; z: 90
+            color: shellRoot.menuBg; border.color: "#34ffffff"; border.width: 1; z: 90
             MouseArea { anchors.fill: parent }
 
             ColumnLayout {
@@ -3798,7 +3993,7 @@ ShellRoot {
                     Text { text: "Cambiar nombre"; color: "#f5f5f5"; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true }
                 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 34; radius: 5; color: "#171717"; border.color: "#4cc2ff"; border.width: 1
+                    Layout.fillWidth: true; height: 34; radius: 5; color: "#171717"; border.color: shellRoot.accentColor; border.width: 1
                     TextInput {
                         id: renameDialogInput
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
@@ -3816,7 +4011,7 @@ ShellRoot {
                     Layout.fillWidth: true; spacing: 8
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        width: 90; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 90; height: 30; radius: 5; color: shellRoot.accentColor
                         Text { anchors.centerIn: parent; text: "Guardar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: renameDialogInput.accepted() }
                     }
@@ -3841,7 +4036,7 @@ ShellRoot {
             }
             anchors.centerIn: parent
             width: 400; height: 224; radius: 10
-            color: "#f8242424"; border.color: "#34ffffff"; border.width: 1; z: 90
+            color: shellRoot.menuBg; border.color: "#34ffffff"; border.width: 1; z: 90
             MouseArea { anchors.fill: parent }
 
             ColumnLayout {
@@ -3853,7 +4048,7 @@ ShellRoot {
                 }
                 Text { text: "Nombre del acceso directo:"; color: "#c8c8c8"; font.pixelSize: 12 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 32; radius: 5; color: "#171717"; border.color: "#4cc2ff"
+                    Layout.fillWidth: true; height: 32; radius: 5; color: "#171717"; border.color: shellRoot.accentColor
                     TextInput {
                         id: newShortcutNameIn
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
@@ -3882,7 +4077,7 @@ ShellRoot {
                     Layout.fillWidth: true; spacing: 8
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        width: 90; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 90; height: 30; radius: 5; color: shellRoot.accentColor
                         Text { anchors.centerIn: parent; text: "Crear"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: newShortcutCmdIn.accepted() }
                     }
@@ -4325,7 +4520,7 @@ ShellRoot {
                             height: 178
                             radius: 10
                             color: tvCardHov.containsMouse ? "#f52d2d2d" : "#f0242424"
-                            border.color: (modelData && modelData.activated) ? "#4cc2ff" : (tvCardHov.containsMouse ? "#48ffffff" : "#26ffffff")
+                            border.color: (modelData && modelData.activated) ? shellRoot.accentColor : (tvCardHov.containsMouse ? "#48ffffff" : "#26ffffff")
                             border.width: (modelData && modelData.activated) ? 2 : 1
                             Behavior on color { ColorAnimation { duration: 110 } }
 
@@ -4408,7 +4603,7 @@ ShellRoot {
                                             text: (modelData && modelData.minimized)
                                                   ? "Minimizada"
                                                   : ((modelData && modelData.activated) ? "En primer plano" : "Abierta")
-                                            color: (modelData && modelData.activated && !modelData.minimized) ? "#4cc2ff" : "#969696"
+                                            color: (modelData && modelData.activated && !modelData.minimized) ? shellRoot.accentColor : "#969696"
                                             font.pixelSize: 11
                                         }
                                     }
@@ -4444,7 +4639,7 @@ ShellRoot {
                 width: Math.min(parent.width - 48, desktopsRow.implicitWidth + 24)
                 height: 112
                 radius: 10
-                color: "#f0222222"
+                color: shellRoot.panelBg
                 border.color: "#2effffff"
                 border.width: 1
                 clip: true
@@ -4513,12 +4708,14 @@ ShellRoot {
                                     height: 60
                                     radius: 5
                                     clip: true
-                                    border.color: isCur ? "#4cc2ff" : "#30ffffff"
+                                    border.color: isCur ? shellRoot.accentColor : "#30ffffff"
                                     border.width: isCur ? 2 : 1
+                                    color: shellRoot.wallpaperMode === 4 ? (shellRoot.solidBgColor || "#141923") : "#0b0e14"
 
                                     Image {
                                         anchors.fill: parent
                                         anchors.margins: isCur ? 2 : 1
+                                        visible: shellRoot.wallpaperMode !== 4
                                         source: (shellRoot.wallpaperMode === 3 && shellRoot.customWallpaperUrl !== "")
                                                 ? shellRoot.customWallpaperUrl
                                                 : (shellRoot.wallpaperMode === 0
@@ -4649,7 +4846,7 @@ ShellRoot {
                     width: 656
                     height: 700
                     radius: 12
-                    color: "#f4202020"
+                    color: shellRoot.panelBg
                     border.color: "#2cffffff"
                     border.width: 1
 
@@ -4884,6 +5081,84 @@ ShellRoot {
                                                         shellRoot.startAppCtxOpen = false;
                                                         shellRoot.startOpen = false;
                                                         shellRoot.spawnCmd(modelData.cmd);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // [SECTION 1.5] RECOMENDADO — Authentic Windows 11 26H2 Recent Files Grid (controlled by showRecommended!)
+                                Column {
+                                    visible: shellRoot.showRecommended && shellRoot.searchQuery.trim() === ""
+                                    width: 592
+                                    spacing: 10
+
+                                    RowLayout {
+                                        width: 592
+                                        Text {
+                                            text: "Recomendado"
+                                            color: "#ffffff"
+                                            font.pixelSize: 14
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Rectangle {
+                                            width: recMoreRow.implicitWidth + 18; height: 26; radius: 5
+                                            color: recMoreHov.containsMouse ? "#323232" : "#282828"
+                                            border.color: "#1effffff"; border.width: 1
+                                            Row {
+                                                id: recMoreRow; anchors.centerIn: parent; spacing: 5
+                                                Text { text: "Más"; color: "#e8e8e8"; font.pixelSize: 11 }
+                                                WinSvg { width: 10; height: 10; iconFile: "fluent-chevron-right.svg"; anchors.verticalCenter: parent.verticalCenter; opacity: 0.85 }
+                                            }
+                                            MouseArea {
+                                                id: recMoreHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
+                                                onClicked: {
+                                                    shellRoot.startOpen = false;
+                                                    shellRoot.spawnCmd("/usr/bin/x64-win11-app explorer 'Descargas'");
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: (shellRoot.startRecentFiles || []).length === 0
+                                        text: "Tus archivos recientes aparecerán aquí automáticamente."
+                                        color: "#9a9a9a"; font.pixelSize: 12
+                                    }
+
+                                    Grid {
+                                        visible: (shellRoot.startRecentFiles || []).length > 0
+                                        width: 592
+                                        columns: 2
+                                        columnSpacing: 12
+                                        rowSpacing: 8
+
+                                        Repeater {
+                                            model: (shellRoot.startRecentFiles || []).slice(0, 6)
+                                            delegate: Rectangle {
+                                                width: 290; height: 50; radius: 6
+                                                color: recItemHov.containsMouse ? "#1affffff" : "#10ffffff"
+                                                border.color: recItemHov.containsMouse ? "#24ffffff" : "transparent"; border.width: 1
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+
+                                                RowLayout {
+                                                    anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 10
+                                                    WinSvg { width: 22; height: 22; iconFile: modelData.icon || "fluent-document.svg" }
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true; spacing: 1
+                                                        Text { text: modelData.name || ""; color: "#f2f2f2"; font.pixelSize: 12; font.weight: Font.Medium; Layout.fillWidth: true; elide: Text.ElideRight }
+                                                        Text { text: (modelData.age || "") + (modelData.folder ? ("  •  " + modelData.folder) : ""); color: "#9e9e9e"; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: recItemHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        shellRoot.startOpen = false;
+                                                        var p = String(modelData.path || "").replace(/'/g, "'\\''");
+                                                        if (p !== "") shellRoot.spawnCmd("xdg-open '" + p + "'");
                                                     }
                                                 }
                                             }
@@ -5248,7 +5523,7 @@ ShellRoot {
                         width: 156
                         height: 112
                         radius: 8
-                        color: "#f82b2b2b"
+                        color: shellRoot.menuBg
                         border.color: "#34ffffff"
                         border.width: 1
                         z: 30
@@ -5271,7 +5546,7 @@ ShellRoot {
                                         visible: parent.isSel
                                         x: 2; anchors.verticalCenter: parent.verticalCenter
                                         width: 3; height: 16; radius: 1.5
-                                        color: "#4cc2ff"
+                                        color: shellRoot.accentColor
                                     }
 
                                     RowLayout {
@@ -5285,6 +5560,7 @@ ShellRoot {
                                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.ArrowCursor
                                         onClicked: {
                                             shellRoot.startAllViewMode = modelData.id;
+                                            shellRoot.saveConfigKey("startAllViewMode", JSON.stringify(modelData.id));
                                             shellRoot.startViewDropdownOpen = false;
                                         }
                                     }
@@ -5309,7 +5585,7 @@ ShellRoot {
                         width: 246
                         height: stAppCtxCol.implicitHeight + 10
                         radius: 8
-                        color: "#f82b2b2b"
+                        color: shellRoot.menuBg
                         border.color: "#36ffffff"
                         border.width: 1
                         z: 35
@@ -5444,7 +5720,7 @@ ShellRoot {
                         visible: shellRoot.powerPopupOpen
                         anchors.right: parent.right; anchors.bottom: parent.bottom
                         anchors.rightMargin: 24; anchors.bottomMargin: 58
-                        width: 210; height: 170; radius: 8; color: "#f82b2b2b"; border.color: "#34ffffff"
+                        width: 210; height: 170; radius: 8; color: shellRoot.menuBg; border.color: "#34ffffff"
                         z: 45
 
                         Column {
@@ -5489,7 +5765,7 @@ ShellRoot {
                     width: 250
                     height: 700
                     radius: 12
-                    color: "#f4202020"
+                    color: shellRoot.panelBg
                     border.color: "#2cffffff"
                     border.width: 1
                     MouseArea { anchors.fill: parent }
@@ -5556,7 +5832,7 @@ ShellRoot {
                             implicitHeight: phStatInner.implicitHeight + 24
                             radius: 8
                             color: "#282828"
-                            border.color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#444cc2ff" : "#1fffffff"
+                            border.color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? Qt.alpha(shellRoot.accentColor, 0.27) : "#1fffffff"
                             border.width: 1
 
                             Column {
@@ -5570,7 +5846,7 @@ ShellRoot {
                                     spacing: 10
                                     Rectangle {
                                         width: 36; height: 36; radius: 8
-                                        color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#264cc2ff" : "#333333"
+                                        color: (phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? Qt.alpha(shellRoot.accentColor, 0.15) : "#333333"
                                         WinSvg { anchors.centerIn: parent; width: 20; height: 20; iconFile: "fluent-phone.svg" }
                                     }
                                     Column {
@@ -5604,7 +5880,7 @@ ShellRoot {
                                                 }
                                                 return "KDE Connect + scrcpy listos";
                                             }
-                                            color: (shellRoot.phoneMirrorActive || phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? "#4cc2ff" : "#a8a8a8"
+                                            color: (shellRoot.phoneMirrorActive || phoneCompanionCard.activeAdb || (phoneCompanionCard.activeKde && phoneCompanionCard.activeKde.reachable)) ? shellRoot.accentColor : "#a8a8a8"
                                             font.pixelSize: 11
                                         }
                                     }
@@ -5714,7 +5990,7 @@ ShellRoot {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     height: 36; radius: 5
-                                    color: phMirBtnH.containsMouse ? "#5cd0ff" : "#4cc2ff"
+                                    color: phMirBtnH.containsMouse ? Qt.lighter(shellRoot.accentColor, 1.12) : shellRoot.accentColor
                                     Behavior on color { ColorAnimation { duration: 110 } }
                                     Text {
                                         anchors.centerIn: parent
@@ -6050,9 +6326,9 @@ ShellRoot {
                         spacing: 5
                         Rectangle {
                             width: 100; height: 48; radius: 6
-                            color: shellRoot.qsWifi ? "#4cc2ff" : "#2d2d2d"
+                            color: shellRoot.qsWifi ? shellRoot.accentColor : "#2d2d2d"
                             Behavior on color { ColorAnimation { duration: 115 } }
-                            border.color: shellRoot.qsWifi ? "#4cc2ff" : "#22ffffff"
+                            border.color: shellRoot.qsWifi ? shellRoot.accentColor : "#22ffffff"
 
                             Row {
                                 anchors.fill: parent
@@ -6101,9 +6377,9 @@ ShellRoot {
                         spacing: 5
                         Rectangle {
                             width: 100; height: 48; radius: 6
-                            color: shellRoot.qsBt ? "#4cc2ff" : "#2d2d2d"
+                            color: shellRoot.qsBt ? shellRoot.accentColor : "#2d2d2d"
                             Behavior on color { ColorAnimation { duration: 115 } }
-                            border.color: shellRoot.qsBt ? "#4cc2ff" : "#22ffffff"
+                            border.color: shellRoot.qsBt ? shellRoot.accentColor : "#22ffffff"
 
                             Row {
                                 anchors.fill: parent
@@ -6155,9 +6431,9 @@ ShellRoot {
                         spacing: 5
                         Rectangle {
                             width: 100; height: 48; radius: 6
-                            color: shellRoot.qsGaming ? "#4cc2ff" : (qsGameHov.containsMouse ? "#383838" : "#2d2d2d")
+                            color: shellRoot.qsGaming ? shellRoot.accentColor : (qsGameHov.containsMouse ? "#383838" : "#2d2d2d")
                             Behavior on color { ColorAnimation { duration: 115 } }
-                            border.color: shellRoot.qsGaming ? "#4cc2ff" : "#22ffffff"
+                            border.color: shellRoot.qsGaming ? shellRoot.accentColor : "#22ffffff"
                             WinSvg {
                                 anchors.centerIn: parent
                                 width: 21; height: 21
@@ -6187,9 +6463,9 @@ ShellRoot {
                         spacing: 5
                         Rectangle {
                             width: 100; height: 48; radius: 6
-                            color: shellRoot.qsNightLight ? "#4cc2ff" : (qsNlHov.containsMouse ? "#383838" : "#2d2d2d")
+                            color: shellRoot.qsNightLight ? shellRoot.accentColor : (qsNlHov.containsMouse ? "#383838" : "#2d2d2d")
                             Behavior on color { ColorAnimation { duration: 115 } }
-                            border.color: shellRoot.qsNightLight ? "#4cc2ff" : "#22ffffff"
+                            border.color: shellRoot.qsNightLight ? shellRoot.accentColor : "#22ffffff"
                             WinSvg {
                                 anchors.centerIn: parent
                                 width: 20; height: 20
@@ -6218,9 +6494,9 @@ ShellRoot {
                         spacing: 5
                         Rectangle {
                             width: 100; height: 48; radius: 6
-                            color: shellRoot.qsBatterySaver ? "#4cc2ff" : (qsSaverHov.containsMouse ? "#383838" : "#2d2d2d")
+                            color: shellRoot.qsBatterySaver ? shellRoot.accentColor : (qsSaverHov.containsMouse ? "#383838" : "#2d2d2d")
                             Behavior on color { ColorAnimation { duration: 115 } }
-                            border.color: shellRoot.qsBatterySaver ? "#4cc2ff" : "#22ffffff"
+                            border.color: shellRoot.qsBatterySaver ? shellRoot.accentColor : "#22ffffff"
                             WinSvg {
                                 anchors.centerIn: parent
                                 width: 20; height: 20
@@ -6554,7 +6830,7 @@ ShellRoot {
                 height: notifCardInnerCol.implicitHeight + 28
                 Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                 radius: 12
-                color: "#f4202020"
+                color: shellRoot.panelBg
                 border.color: "#2effffff"
                 border.width: 1
                 clip: true
@@ -6587,8 +6863,8 @@ ShellRoot {
                             width: 30
                             height: 26
                             radius: 5
-                            color: shellRoot.qsDnd ? "#4cc2ff" : (dndBtnHov.containsMouse ? "#2effffff" : "#1effffff")
-                            border.color: shellRoot.qsDnd ? "#4cc2ff" : "#20ffffff"
+                            color: shellRoot.qsDnd ? shellRoot.accentColor : (dndBtnHov.containsMouse ? "#2effffff" : "#1effffff")
+                            border.color: shellRoot.qsDnd ? shellRoot.accentColor : "#20ffffff"
                             border.width: 1
                             Behavior on color { ColorAnimation { duration: 115 } }
 
@@ -6794,7 +7070,7 @@ ShellRoot {
                 width: 360
                 height: calOuterCol.implicitHeight
                 radius: 12
-                color: "#f4202020"
+                color: shellRoot.panelBg
                 border.color: "#2effffff"
                 border.width: 1
                 clip: true
@@ -6841,7 +7117,7 @@ ShellRoot {
 
                             Text {
                                 text: shellRoot.calShortTopDate
-                                color: topDateHov.containsMouse ? "#4cc2ff" : "#f0f0f0"
+                                color: topDateHov.containsMouse ? shellRoot.accentColor : "#f0f0f0"
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
@@ -6904,7 +7180,7 @@ ShellRoot {
 
                                 Text {
                                     text: shellRoot.calMonthTitle
-                                    color: monthLblHov.containsMouse ? "#4cc2ff" : "#f5f5f5"
+                                    color: monthLblHov.containsMouse ? shellRoot.accentColor : "#f5f5f5"
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                     Layout.fillWidth: true
@@ -6995,7 +7271,7 @@ ShellRoot {
                                             text: String(modelData.day)
                                             color: modelData.isToday
                                                    ? "#000000"
-                                                   : (parent.isSel ? "#4cc2ff" : (modelData.inMonth ? "#f5f5f5" : "#767676"))
+                                                   : (parent.isSel ? shellRoot.accentColor : (modelData.inMonth ? "#f5f5f5" : "#767676"))
                                             font.pixelSize: 12
                                             font.weight: (modelData.isToday || parent.isSel) ? Font.DemiBold : Font.Normal
                                         }
@@ -7154,7 +7430,7 @@ ShellRoot {
                                 spacing: -1
                                 Text {
                                     text: shellRoot.formatFocusTime(shellRoot.focusRemainingSecs)
-                                    color: "#4cc2ff"
+                                    color: shellRoot.accentColor
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                 }
@@ -7223,7 +7499,7 @@ ShellRoot {
             width: 444
             height: 222
             radius: 10
-            color: "#f6242424"
+            color: shellRoot.menuBg
             border.color: "#30ffffff"
             border.width: 1
             clip: true
@@ -7306,7 +7582,7 @@ ShellRoot {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 height: runInput.activeFocus ? 2 : 1
-                                color: runInput.activeFocus ? "#4cc2ff" : "#55ffffff"
+                                color: runInput.activeFocus ? shellRoot.accentColor : "#55ffffff"
                             }
 
                             TextInput {
@@ -7357,7 +7633,7 @@ ShellRoot {
                         Rectangle {
                             readonly property bool canRun: runInput.text.trim() !== ""
                             width: 96; height: 32; radius: 5
-                            color: !canRun ? "#2a2a2a" : (runOkHov.containsMouse ? "#5cd0ff" : "#4cc2ff")
+                            color: !canRun ? "#2a2a2a" : (runOkHov.containsMouse ? Qt.lighter(shellRoot.accentColor, 1.12) : shellRoot.accentColor)
                             opacity: canRun ? 1.0 : 0.5
                             Text {
                                 anchors.centerIn: parent
@@ -7423,13 +7699,34 @@ ShellRoot {
             visible: shellRoot.lockScreenOpen
             anchors.fill: parent
             color: "#000000"
-            focus: shellRoot.lockScreenOpen && !shellRoot.lockPromptOpen
+            focus: shellRoot.lockScreenOpen && (!shellRoot.lockPromptOpen || !shellRoot.lockRequireAuth)
 
             onVisibleChanged: {
                 if (visible) {
                     shellRoot.lockShowPass = false;
+                    shellRoot.lockAuthError = "";
+                    shellRoot.lockAuthChecking = false;
                     lockPassInput.text = "";
                     lockScreenRoot.forceActiveFocus();
+                } else {
+                    shellRoot.lockAuthError = "";
+                    shellRoot.lockAuthChecking = false;
+                }
+            }
+
+            Connections {
+                target: shellRoot
+                function onLockPromptOpenChanged() {
+                    if (shellRoot.lockPromptOpen && shellRoot.lockRequireAuth) {
+                        Qt.callLater(function() { lockPassInput.forceActiveFocus(); });
+                    } else if (shellRoot.lockScreenOpen) {
+                        Qt.callLater(function() { lockScreenRoot.forceActiveFocus(); });
+                    }
+                }
+                function onLockAuthErrorChanged() {
+                    if (shellRoot.lockAuthError !== "" && shellRoot.lockPromptOpen && shellRoot.lockRequireAuth) {
+                        Qt.callLater(function() { lockPassInput.forceActiveFocus(); });
+                    }
                 }
             }
 
@@ -7437,20 +7734,40 @@ ShellRoot {
                 if (!shellRoot.lockPromptOpen && (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
                     shellRoot.lockPromptOpen = true;
                     event.accepted = true;
+                } else if (shellRoot.lockPromptOpen && !shellRoot.lockRequireAuth && (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+                    shellRoot.submitLockUnlock("");
+                    event.accepted = true;
                 } else if (shellRoot.lockPromptOpen && event.key === Qt.Key_Escape) {
+                    shellRoot.lockAuthError = "";
                     shellRoot.lockPromptOpen = false;
                     lockScreenRoot.forceActiveFocus();
                     event.accepted = true;
                 }
             }
 
+            Rectangle {
+                anchors.fill: parent
+                color: (shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperMode === 4) ? (shellRoot.solidBgColor || "#141923") : "#0b0e14"
+            }
+
             Image {
                 anchors.fill: parent
+                visible: !(shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperMode === 4)
                 cache: false
-                source: shellRoot.wallpaperMode === 1
-                        ? (shellRoot.wpDir + "win11-bloom-light.jpg")
-                        : (shellRoot.wpDir + "win11-bloom-dark.jpg")
-                fillMode: Image.PreserveAspectCrop
+                source: {
+                    var lm = shellRoot.lockWallpaperMode;
+                    if (lm === 3 && shellRoot.lockWallpaperUrl !== "") return shellRoot.lockWallpaperUrl;
+                    if (lm === 0) return shellRoot.wpDir + "win11-bloom-dark.jpg";
+                    if (lm === 1) return shellRoot.wpDir + "win11-bloom-light.jpg";
+                    if (lm === 2) return shellRoot.wpDir + "x64-monolith.jpg";
+                    if (shellRoot.wallpaperMode === 3 && shellRoot.customWallpaperUrl !== "") return shellRoot.customWallpaperUrl;
+                    if (shellRoot.wallpaperMode === 1) return shellRoot.wpDir + "win11-bloom-light.jpg";
+                    if (shellRoot.wallpaperMode === 2) return shellRoot.wpDir + "x64-monolith.jpg";
+                    return shellRoot.wpDir + "win11-bloom-dark.jpg";
+                }
+                fillMode: (shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "fit") ? Image.PreserveAspectFit
+                          : ((shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "stretch") ? Image.Stretch
+                             : ((shellRoot.lockWallpaperMode === -1 && shellRoot.wallpaperFit === "center") ? Image.Pad : Image.PreserveAspectCrop))
                 scale: shellRoot.lockPromptOpen ? 1.04 : 1.0
                 Behavior on scale { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
             }
@@ -7461,7 +7778,7 @@ ShellRoot {
                 Behavior on color { ColorAnimation { duration: 240 } }
             }
 
-            // [A] Clock & Date Spotlight View
+            // [A] Clock & Date Spotlight View (+ Optional Lock Screen Quick Status Card!)
             Column {
                 visible: opacity > 0.01
                 opacity: shellRoot.lockPromptOpen ? 0.0 : 1.0
@@ -7483,6 +7800,21 @@ ShellRoot {
                     text: shellRoot.currentLockDateStr
                     color: "#f2f4f8"
                     font.pixelSize: 21
+                }
+                Rectangle {
+                    visible: shellRoot.lockShowStatus
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: lockStatRow.implicitWidth + 28; height: 38; radius: 19
+                    color: "#66141820"; border.color: "#2cffffff"; border.width: 1
+                    RowLayout {
+                        id: lockStatRow; anchors.centerIn: parent; spacing: 10
+                        WinSvg { width: 18; height: 18; iconFile: shellRoot.weatherData.icon || "win11-weather.svg" }
+                        Text {
+                            text: (shellRoot.weatherData.temp || "--°C") + "  •  " + (shellRoot.weatherData.desc || "El Tiempo")
+                                  + (shellRoot.qsWifiSsid ? ("  •  " + shellRoot.qsWifiSsid) : "")
+                            color: "#f0f4f8"; font.pixelSize: 12; font.weight: Font.Medium
+                        }
+                    }
                 }
             }
 
@@ -7540,14 +7872,15 @@ ShellRoot {
                     font.weight: Font.DemiBold
                 }
 
-                // Authentic WinUI 3 Password / PIN Input Field with Eye Reveal & Submit Arrow
+                // Authentic WinUI 3 Password / PIN Input Field with Eye Reveal & Real PAM/PIN Verification
                 Rectangle {
+                    visible: shellRoot.lockRequireAuth
                     anchors.horizontalCenter: parent.horizontalCenter
                     width: 288
                     height: 38
                     radius: 5
                     color: "#cc1e1e1e"
-                    border.color: "#36ffffff"
+                    border.color: shellRoot.lockAuthError !== "" ? "#ef4444" : "#36ffffff"
                     border.width: 1
                     clip: true
 
@@ -7556,7 +7889,7 @@ ShellRoot {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         height: 2
-                        color: "#4cc2ff"
+                        color: shellRoot.lockAuthError !== "" ? "#ef4444" : shellRoot.accentColor
                     }
 
                     RowLayout {
@@ -7572,15 +7905,17 @@ ShellRoot {
                             color: "#ffffff"
                             font.pixelSize: 13
                             echoMode: shellRoot.lockShowPass ? TextInput.Normal : TextInput.Password
-                            focus: shellRoot.lockPromptOpen
+                            focus: shellRoot.lockPromptOpen && shellRoot.lockRequireAuth
+                            onTextChanged: { if (shellRoot.lockAuthError !== "") shellRoot.lockAuthError = ""; }
                             Keys.onEscapePressed: {
+                                shellRoot.lockAuthError = "";
                                 shellRoot.lockPromptOpen = false;
                                 lockScreenRoot.forceActiveFocus();
                             }
                             onAccepted: {
+                                var v = lockPassInput.text;
                                 lockPassInput.text = "";
-                                shellRoot.lockPromptOpen = false;
-                                shellRoot.lockScreenOpen = false;
+                                shellRoot.submitLockUnlock(v);
                             }
 
                             Text {
@@ -7616,9 +7951,9 @@ ShellRoot {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
+                                    var v = lockPassInput.text;
                                     lockPassInput.text = "";
-                                    shellRoot.lockPromptOpen = false;
-                                    shellRoot.lockScreenOpen = false;
+                                    shellRoot.submitLockUnlock(v);
                                 }
                             }
                         }
@@ -7626,21 +7961,36 @@ ShellRoot {
                 }
 
                 Text {
+                    visible: shellRoot.lockRequireAuth && shellRoot.lockAuthError !== ""
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Iniciar sesión"
-                    color: signInTxtHov.containsMouse ? "#4cc2ff" : "#cfcfcf"
+                    text: shellRoot.lockAuthError
+                    color: "#fca5a5"
                     font.pixelSize: 12
+                }
+
+                // Instant Windows 11 Sign-In Button when lockRequireAuth is OFF (or helper label when ON)
+                Rectangle {
+                    visible: !shellRoot.lockRequireAuth
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 146; height: 36; radius: 6
+                    color: signInBtnHov.containsMouse ? "#42ffffff" : "#2cffffff"
+                    border.color: "#44ffffff"; border.width: 1
+                    Text { anchors.centerIn: parent; text: "Iniciar sesión"; color: "#ffffff"; font.pixelSize: 13; font.weight: Font.Medium }
                     MouseArea {
-                        id: signInTxtHov
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
+                        id: signInBtnHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             lockPassInput.text = "";
-                            shellRoot.lockPromptOpen = false;
-                            shellRoot.lockScreenOpen = false;
+                            shellRoot.submitLockUnlock("");
                         }
                     }
+                }
+
+                Text {
+                    visible: shellRoot.lockRequireAuth
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: shellRoot.lockAuthChecking ? "Verificando credenciales..." : "Introduce tu PIN o contraseña de Linux"
+                    color: "#cfcfcf"
+                    font.pixelSize: 12
                 }
             }
 

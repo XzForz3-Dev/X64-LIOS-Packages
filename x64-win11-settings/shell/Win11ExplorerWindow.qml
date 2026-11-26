@@ -10,6 +10,14 @@ Rectangle {
     focus: true
 
     property string explorerSection: (typeof initialArg !== "undefined" && initialArg !== "") ? initialArg : "Este equipo"
+    property string accentColor: "#4cc2ff"
+    function syncAccentFromCfg() {
+        try {
+            var c = JSON.parse(bridge.getConfigJson());
+            if (c && c.accentColor && String(c.accentColor).indexOf("#") === 0) root.accentColor = String(c.accentColor);
+        } catch (e) {}
+    }
+    Timer { interval: 2500; running: true; repeat: true; onTriggered: root.syncAccentFromCfg() }
     property string explorerRealPath: "Este equipo"
     property string explorerMode: "thispc"
     property bool isTrashFolder: false
@@ -776,6 +784,7 @@ Rectangle {
     }
 
     Component.onCompleted: {
+        root.syncAccentFromCfg();
         try {
             var cfg = JSON.parse(bridge.getConfigJson());
             if (cfg.explorerShowHidden !== undefined) showHiddenFiles = Boolean(cfg.explorerShowHidden);
@@ -915,7 +924,7 @@ Rectangle {
                     radius: 5
                     clip: true
                     color: root.editingAddress ? "#171717" : "#2b2b2b"
-                    border.color: root.editingAddress ? "#4cc2ff" : "#1fffffff"
+                    border.color: root.editingAddress ? root.accentColor : "#1fffffff"
                     border.width: 1
 
                     // Background click switches to direct text path editing
@@ -964,7 +973,7 @@ Rectangle {
                                     width: Math.min(150, segTxt.implicitWidth + 14)
                                     height: 26; radius: 4
                                     color: parent.isDrop ? "#550078d4" : (segHov.containsMouse ? "#28ffffff" : "transparent")
-                                    border.color: parent.isDrop ? "#4cc2ff" : "transparent"; border.width: 1
+                                    border.color: parent.isDrop ? root.accentColor : "transparent"; border.width: 1
                                     Text {
                                         id: segTxt
                                         anchors.centerIn: parent
@@ -1004,7 +1013,7 @@ Rectangle {
                     radius: 5
                     clip: true
                     color: expSearchInput.activeFocus ? "#171717" : "#2b2b2b"
-                    border.color: expSearchInput.activeFocus ? "#4cc2ff" : "#1fffffff"
+                    border.color: expSearchInput.activeFocus ? root.accentColor : "#1fffffff"
                     border.width: 1
 
                     RowLayout {
@@ -1037,7 +1046,7 @@ Rectangle {
                         Rectangle {
                             visible: expSearchInput.text.trim() !== ""
                             width: 24; height: 22; radius: 4
-                            color: root.deepSearchActive ? "#444cc2ff" : (dsHov.containsMouse ? "#28ffffff" : "transparent")
+                            color: root.deepSearchActive ? Qt.alpha(root.accentColor, 0.27) : (dsHov.containsMouse ? "#28ffffff" : "transparent")
                             WinSvg { anchors.centerIn: parent; width: 13; height: 13; iconFile: "fluent-search.svg" }
                             MouseArea {
                                 id: dsHov; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -1233,8 +1242,8 @@ Rectangle {
                 Rectangle {
                     visible: root.isTrashFolder && root.selectedPaths.length > 0
                     width: 158; height: 30; radius: 5
-                    color: resSelH.containsMouse ? "#384cc2ff" : "#244cc2ff"
-                    border.color: "#4cc2ff"; border.width: 1
+                    color: resSelH.containsMouse ? Qt.alpha(root.accentColor, 0.22) : Qt.alpha(root.accentColor, 0.14)
+                    border.color: root.accentColor; border.width: 1
                     RowLayout {
                         anchors.centerIn: parent; spacing: 6
                         WinSvg { width: 14; height: 14; iconFile: "fluent-arrow-undo.svg" }
@@ -1288,14 +1297,14 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 42
             color: "#232323"
-            border.color: "#4cc2ff"; border.width: 1
+            border.color: root.accentColor; border.width: 1
 
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 10
                 WinSvg { width: 16; height: 16; iconFile: "fluent-rename.svg" }
                 Text { text: "Nuevo nombre:"; color: "#e6e6e6"; font.pixelSize: 12 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 28; radius: 4; color: "#151515"; border.color: "#4cc2ff"; border.width: 1; clip: true
+                    Layout.fillWidth: true; height: 28; radius: 4; color: "#151515"; border.color: root.accentColor; border.width: 1; clip: true
                     TextInput {
                         id: renameField
                         anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
@@ -1313,7 +1322,7 @@ Rectangle {
                     }
                 }
                 Rectangle {
-                    width: 78; height: 28; radius: 4; color: "#4cc2ff"
+                    width: 78; height: 28; radius: 4; color: root.accentColor
                     Text { anchors.centerIn: parent; text: "Guardar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: renameField.accepted() }
                 }
@@ -1371,13 +1380,13 @@ Rectangle {
                                     anchors.fill: parent; radius: 5
                                     color: parent.isDrop ? (modelData.name === "Papelera" ? "#55c42b1c" : "#550078d4")
                                                          : (root.explorerSection === modelData.name ? "#2c2c2c" : (navHover.containsMouse ? "#222222" : "transparent"))
-                                    border.color: parent.isDrop ? (modelData.name === "Papelera" ? "#ff7b72" : "#4cc2ff") : "transparent"
+                                    border.color: parent.isDrop ? (modelData.name === "Papelera" ? "#ff7b72" : root.accentColor) : "transparent"
                                     border.width: parent.isDrop ? 1.5 : 0
 
                                     Rectangle {
                                         visible: root.explorerSection === modelData.name
                                         x: 2; anchors.verticalCenter: parent.verticalCenter
-                                        width: 3; height: 16; radius: 1.5; color: "#4cc2ff"
+                                        width: 3; height: 16; radius: 1.5; color: root.accentColor
                                     }
                                     RowLayout {
                                         anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 10
@@ -1427,12 +1436,12 @@ Rectangle {
                                 Rectangle {
                                     anchors.fill: parent; radius: 5
                                     color: parent.isDrop ? "#550078d4" : (parent.isCurDrv ? "#2c2c2c" : (drvNavH.containsMouse ? "#222222" : "transparent"))
-                                    border.color: parent.isDrop ? "#4cc2ff" : "transparent"
+                                    border.color: parent.isDrop ? root.accentColor : "transparent"
                                     border.width: parent.isDrop ? 1.5 : 0
                                     Rectangle {
                                         visible: parent.parent.isCurDrv
                                         x: 2; anchors.verticalCenter: parent.verticalCenter
-                                        width: 3; height: 16; radius: 1.5; color: "#4cc2ff"
+                                        width: 3; height: 16; radius: 1.5; color: root.accentColor
                                     }
                                     RowLayout {
                                         anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
@@ -1568,8 +1577,8 @@ Rectangle {
                                                 Text { text: modelData.name; color: "#f5f5f5"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
                                                 Rectangle {
                                                     visible: !modelData.mounted
-                                                    width: 66; height: 17; radius: 4; color: "#264cc2ff"; border.color: "#444cc2ff"; border.width: 1
-                                                    Text { anchors.centerIn: parent; text: "Sin montar"; color: "#4cc2ff"; font.pixelSize: 9; font.weight: Font.DemiBold }
+                                                    width: 66; height: 17; radius: 4; color: Qt.alpha(root.accentColor, 0.15); border.color: Qt.alpha(root.accentColor, 0.27); border.width: 1
+                                                    Text { anchors.centerIn: parent; text: "Sin montar"; color: root.accentColor; font.pixelSize: 9; font.weight: Font.DemiBold }
                                                 }
                                             }
                                             Rectangle {
@@ -1577,7 +1586,7 @@ Rectangle {
                                                 Rectangle {
                                                     visible: Boolean(modelData.mounted)
                                                     x: 1; y: 1; width: (parent.width - 2) * Number(modelData.usedRatio || 0); height: parent.height - 2; radius: 2
-                                                    color: modelData.isCritical ? "#d13438" : "#4cc2ff"
+                                                    color: modelData.isCritical ? "#d13438" : root.accentColor
                                                 }
                                             }
                                             Text { text: modelData.info; color: "#9e9e9e"; font.pixelSize: 11; width: 235; elide: Text.ElideRight }
@@ -1682,7 +1691,7 @@ Rectangle {
                                         width: detailsCol.width; height: 34; radius: 4
                                         opacity: (isDragSrc || isCut) ? 0.48 : (modelData.isHidden ? 0.68 : 1.0)
                                         color: isDrop ? "#550078d4" : (isSel ? "#400078d4" : (isHov ? "#242424" : "transparent"))
-                                        border.color: isDrop ? "#4cc2ff" : (isSel ? "#784cc2ff" : "transparent")
+                                        border.color: isDrop ? root.accentColor : (isSel ? Qt.alpha(root.accentColor, 0.47) : "transparent")
                                         border.width: isDrop ? 1.5 : 1
 
                                         RowLayout {
@@ -1887,7 +1896,7 @@ Rectangle {
                         Rectangle {
                             id: detRubber; z: 20
                             visible: detailsMarquee.draggingBox && (width > 3 || height > 3)
-                            color: "#380078d4"; border.color: "#4cc2ff"; border.width: 1
+                            color: "#380078d4"; border.color: root.accentColor; border.width: 1
                         }
                     }
                 }
@@ -1932,7 +1941,7 @@ Rectangle {
                                     radius: 6
                                     opacity: (isDragSrc || isCut) ? 0.48 : (modelData.isHidden ? 0.68 : 1.0)
                                     color: isDrop ? "#550078d4" : (isSel ? "#400078d4" : (isHov ? "#282828" : "#1f1f1f"))
-                                    border.color: isDrop ? "#4cc2ff" : (isSel ? "#784cc2ff" : (isHov ? "#30ffffff" : "#14ffffff"))
+                                    border.color: isDrop ? root.accentColor : (isSel ? Qt.alpha(root.accentColor, 0.47) : (isHov ? "#30ffffff" : "#14ffffff"))
                                     border.width: isDrop ? 1.5 : 1
 
                                     // Large Icons Layout
@@ -2141,7 +2150,7 @@ Rectangle {
                     Rectangle {
                         id: tilesRubber; z: 20
                         visible: tilesMarquee.draggingBox && (width > 3 || height > 3)
-                        color: "#380078d4"; border.color: "#4cc2ff"; border.width: 1
+                        color: "#380078d4"; border.color: root.accentColor; border.width: 1
                     }
                 }
             }
@@ -2173,7 +2182,7 @@ Rectangle {
                 Item { Layout.fillWidth: true }
                 Text {
                     visible: root.statusToast !== ""
-                    text: root.statusToast; color: "#4cc2ff"; font.pixelSize: 11
+                    text: root.statusToast; color: root.accentColor; font.pixelSize: 11
                 }
                 Rectangle {
                     width: 24; height: 22; radius: 4
@@ -2209,7 +2218,7 @@ Rectangle {
             spacing: 4
             Rectangle {
                 width: Math.min(220, dragRow.implicitWidth + 24); height: 36; radius: 6
-                color: "#ee242c38"; border.color: "#4cc2ff"; border.width: 1
+                color: "#ee242c38"; border.color: root.accentColor; border.width: 1
                 RowLayout {
                     id: dragRow; anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 8
                     WinSvg { width: 18; height: 18; iconUrl: root.dragLeadIconUrl; iconFile: root.dragLeadIcon }
@@ -2222,8 +2231,8 @@ Rectangle {
             Rectangle {
                 visible: root.dropTargetLabel !== ""
                 width: dropLblTxt.implicitWidth + 16; height: 24; radius: 5
-                color: "#ee1a1a1a"; border.color: "#4cc2ff"; border.width: 1
-                Text { id: dropLblTxt; anchors.centerIn: parent; text: root.dropTargetLabel; color: "#4cc2ff"; font.pixelSize: 11; font.weight: Font.DemiBold }
+                color: "#ee1a1a1a"; border.color: root.accentColor; border.width: 1
+                Text { id: dropLblTxt; anchors.centerIn: parent; text: root.dropTargetLabel; color: root.accentColor; font.pixelSize: 11; font.weight: Font.DemiBold }
             }
         }
     }
@@ -2304,7 +2313,7 @@ Rectangle {
                                 width: 16; height: 16
                                 WinSvg { visible: Boolean(modelData.icon); anchors.centerIn: parent; width: 16; height: 16; iconFile: modelData.icon || "folder.svg" }
                                 WinSvg { visible: !modelData.icon && Boolean(modelData.active) && Boolean(modelData.isCheck); anchors.centerIn: parent; width: 14; height: 14; iconFile: "fluent-checkmark.svg" }
-                                Rectangle { visible: !modelData.icon && Boolean(modelData.active) && !modelData.isCheck; anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: "#4cc2ff" }
+                                Rectangle { visible: !modelData.icon && Boolean(modelData.active) && !modelData.isCheck; anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: root.accentColor }
                             }
                             Text { text: modelData.label || ""; color: "#f2f2f2"; font.pixelSize: 12; Layout.fillWidth: true }
                         }
@@ -2520,7 +2529,7 @@ Rectangle {
                 Text {
                     visible: Boolean(root.expPropsData && root.expPropsData.isLink)
                     text: "Destino de enlace:  " + (root.expPropsData ? root.expPropsData.linkTarget : "")
-                    color: "#4cc2ff"; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true
+                    color: root.accentColor; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.fillWidth: true
                 }
 
                 // Executable Permission Toggle for Files (real chmod +x / -x!)
@@ -2530,8 +2539,8 @@ Rectangle {
                     Text { text: "Permitir ejecutar como programa"; color: "#e6e6e6"; font.pixelSize: 12; Layout.fillWidth: true }
                     Rectangle {
                         width: 38; height: 20; radius: 10
-                        color: (root.expPropsData && root.expPropsData.isExecutable) ? "#4cc2ff" : "#2e2e2e"
-                        border.color: (root.expPropsData && root.expPropsData.isExecutable) ? "#4cc2ff" : "#55ffffff"; border.width: 1
+                        color: (root.expPropsData && root.expPropsData.isExecutable) ? root.accentColor : "#2e2e2e"
+                        border.color: (root.expPropsData && root.expPropsData.isExecutable) ? root.accentColor : "#55ffffff"; border.width: 1
                         Rectangle {
                             x: (root.expPropsData && root.expPropsData.isExecutable) ? 20 : 4
                             anchors.verticalCenter: parent.verticalCenter
@@ -2564,7 +2573,7 @@ Rectangle {
                     }
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        width: 88; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 88; height: 30; radius: 5; color: root.accentColor
                         Text { anchors.centerIn: parent; text: "Aceptar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.expPropsOpen = false }
                     }

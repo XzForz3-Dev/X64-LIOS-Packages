@@ -10,6 +10,14 @@ Rectangle {
     focus: true
 
     property string activeTab: (typeof initialArg !== "undefined" && (initialArg === "startup" || initialArg === "performance")) ? initialArg : "processes" // "processes" | "performance" | "startup"
+    property string accentColor: "#4cc2ff"
+    function syncAccentFromCfg() {
+        try {
+            var c = JSON.parse(bridge.getConfigJson());
+            if (c && c.accentColor && String(c.accentColor).indexOf("#") === 0) root.accentColor = String(c.accentColor);
+        } catch (e) {}
+    }
+    Timer { interval: 2500; running: true; repeat: true; onTriggered: root.syncAccentFromCfg() }
     property string perfSubTab: "cpu"      // "cpu" | "ram" | "disk" | "net" | "gpu_0" | "gpu_1" ...
     property bool cpuShowPerCore: false
     property int historyTick: 0
@@ -412,6 +420,7 @@ Rectangle {
     }
 
     Component.onCompleted: {
+        root.syncAccentFromCfg();
         refreshStartupApps();
         refreshTelemetry();
         try { installedAppsList = JSON.parse(bridge.getInstalledAppsJson()); } catch (e) {}
@@ -428,7 +437,7 @@ Rectangle {
     component MiniSpark : Canvas {
         property var series: []
         property int repaintTick: 0
-        property string strokeColor: "#4cc2ff"
+        property string strokeColor: root.accentColor
         property string fillColor: "rgba(76, 194, 255, 0.22)"
         width: 56; height: 34
         onRepaintTickChanged: requestPaint()
@@ -514,7 +523,7 @@ Rectangle {
                         Rectangle {
                             visible: root.activeTab === modelData.id
                             x: 2; anchors.verticalCenter: parent.verticalCenter
-                            width: 3; height: 16; radius: 1.5; color: "#4cc2ff"
+                            width: 3; height: 16; radius: 1.5; color: root.accentColor
                         }
 
                         RowLayout {
@@ -611,7 +620,7 @@ Rectangle {
                             radius: 5
                             clip: true
                             color: tmSearch.activeFocus ? "#161616" : "#2b2b2b"
-                            border.color: tmSearch.activeFocus ? "#4cc2ff" : "#22ffffff"
+                            border.color: tmSearch.activeFocus ? root.accentColor : "#22ffffff"
                             border.width: 1
 
                             RowLayout {
@@ -662,8 +671,8 @@ Rectangle {
                         // Pause / Resume Refresh Toggle
                         Rectangle {
                             width: 32; height: 32; radius: 5
-                            color: root.telemetryPaused ? "#384cc2ff" : (pauseHov.containsMouse ? "#363636" : "#2b2b2b")
-                            border.color: root.telemetryPaused ? "#4cc2ff" : "#22ffffff"; border.width: 1
+                            color: root.telemetryPaused ? Qt.alpha(root.accentColor, 0.22) : (pauseHov.containsMouse ? "#363636" : "#2b2b2b")
+                            border.color: root.telemetryPaused ? root.accentColor : "#22ffffff"; border.width: 1
                             WinSvg {
                                 anchors.centerIn: parent; width: 14; height: 14
                                 iconFile: root.telemetryPaused ? "fluent-play-filled.svg" : "fluent-refresh.svg"
@@ -724,7 +733,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 44
                     color: "#252525"
-                    border.color: "#4cc2ff"; border.width: 1
+                    border.color: root.accentColor; border.width: 1
 
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 10
@@ -747,7 +756,7 @@ Rectangle {
                             }
                         }
                         Rectangle {
-                            width: 80; height: 28; radius: 4; color: "#4cc2ff"
+                            width: 80; height: 28; radius: 4; color: root.accentColor
                             Text { anchors.centerIn: parent; text: "Ejecutar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: newTaskInput.accepted() }
                         }
@@ -808,10 +817,10 @@ Rectangle {
 
                         Rectangle {
                             Layout.preferredWidth: 92; height: 44
-                            color: root.procSortKey === "cpu" ? "#164cc2ff" : "transparent"
+                            color: root.procSortKey === "cpu" ? Qt.alpha(root.accentColor, 0.09) : "transparent"
                             Column {
                                 anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                                Text { anchors.right: parent.right; text: root.sysInfo.cpuPct + "%"; color: "#4cc2ff"; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                Text { anchors.right: parent.right; text: root.sysInfo.cpuPct + "%"; color: root.accentColor; font.pixelSize: 13; font.weight: Font.DemiBold }
                                 Text { anchors.right: parent.right; text: "CPU" + (root.procSortKey === "cpu" ? (root.procSortDesc ? " ▼" : " ▲") : ""); color: "#b8b8b8"; font.pixelSize: 10 }
                             }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleProcSort("cpu") }
@@ -819,10 +828,10 @@ Rectangle {
 
                         Rectangle {
                             Layout.preferredWidth: 108; height: 44
-                            color: root.procSortKey === "mem" ? "#164cc2ff" : "transparent"
+                            color: root.procSortKey === "mem" ? Qt.alpha(root.accentColor, 0.09) : "transparent"
                             Column {
                                 anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                                Text { anchors.right: parent.right; text: root.sysInfo.ramPct + "%"; color: "#4cc2ff"; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                Text { anchors.right: parent.right; text: root.sysInfo.ramPct + "%"; color: root.accentColor; font.pixelSize: 13; font.weight: Font.DemiBold }
                                 Text { anchors.right: parent.right; text: "Memoria" + (root.procSortKey === "mem" ? (root.procSortDesc ? " ▼" : " ▲") : ""); color: "#b8b8b8"; font.pixelSize: 10 }
                             }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleProcSort("mem") }
@@ -895,7 +904,7 @@ Rectangle {
 
                                     Rectangle {
                                         Layout.preferredWidth: 92; height: 34
-                                        color: (modelData.cpuNum || 0) > 15 ? "#384cc2ff" : ((modelData.cpuNum || 0) > 2 ? "#1e4cc2ff" : "#0c4cc2ff")
+                                        color: (modelData.cpuNum || 0) > 15 ? Qt.alpha(root.accentColor, 0.22) : ((modelData.cpuNum || 0) > 2 ? Qt.alpha(root.accentColor, 0.12) : Qt.alpha(root.accentColor, 0.05))
                                         Text {
                                             anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                                             text: modelData.cpu
@@ -905,7 +914,7 @@ Rectangle {
 
                                     Rectangle {
                                         Layout.preferredWidth: 108; height: 34
-                                        color: (modelData.memNum || 0) > 600 ? "#384cc2ff" : ((modelData.memNum || 0) > 150 ? "#1e4cc2ff" : "#0c4cc2ff")
+                                        color: (modelData.memNum || 0) > 600 ? Qt.alpha(root.accentColor, 0.22) : ((modelData.memNum || 0) > 150 ? Qt.alpha(root.accentColor, 0.12) : Qt.alpha(root.accentColor, 0.05))
                                         Text {
                                             anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                                             text: modelData.mem
@@ -948,10 +957,10 @@ Rectangle {
                         anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 18
                         Text { text: "Procesos: " + root.sysInfo.procCount; color: "#a8a8a8"; font.pixelSize: 11 }
                         Text { text: "Subprocesos: " + root.sysInfo.threadCount; color: "#a8a8a8"; font.pixelSize: 11 }
-                        Text { text: "CPU: " + root.sysInfo.cpuPct + "%  (" + root.sysInfo.cpuGhz + ")"; color: "#4cc2ff"; font.pixelSize: 11 }
+                        Text { text: "CPU: " + root.sysInfo.cpuPct + "%  (" + root.sysInfo.cpuGhz + ")"; color: root.accentColor; font.pixelSize: 11 }
                         Text { text: "RAM: " + root.sysInfo.ramShort; color: "#c084fc"; font.pixelSize: 11 }
                         Item { Layout.fillWidth: true }
-                        Text { text: root.statusToastText !== "" ? root.statusToastText : ("Tiempo activo: " + root.sysInfo.uptime); color: root.statusToastText !== "" ? "#4cc2ff" : "#8e8e8e"; font.pixelSize: 11 }
+                        Text { text: root.statusToastText !== "" ? root.statusToastText : ("Tiempo activo: " + root.sysInfo.uptime); color: root.statusToastText !== "" ? root.accentColor : "#8e8e8e"; font.pixelSize: 11 }
                     }
                 }
             }
@@ -988,14 +997,14 @@ Rectangle {
                             Rectangle {
                                 width: parent.width; height: 62; radius: 6
                                 color: root.perfSubTab === "cpu" ? "#2b2b2b" : (cCardH.containsMouse ? "#232323" : "transparent")
-                                border.color: root.perfSubTab === "cpu" ? "#4cc2ff" : "#18ffffff"; border.width: 1
+                                border.color: root.perfSubTab === "cpu" ? root.accentColor : "#18ffffff"; border.width: 1
                                 RowLayout {
                                     anchors.fill: parent; anchors.margins: 8; spacing: 10
-                                    MiniSpark { id: miniCpuCanvas; series: root.cpuHistory; strokeColor: "#4cc2ff"; fillColor: "rgba(76, 194, 255, 0.24)" }
+                                    MiniSpark { id: miniCpuCanvas; series: root.cpuHistory; strokeColor: root.accentColor; fillColor: "rgba(76, 194, 255, 0.24)" }
                                     Column {
                                         Layout.fillWidth: true; spacing: 2
                                         Text { text: "CPU"; color: "#f5f5f5"; font.pixelSize: 12; font.weight: Font.DemiBold }
-                                        Text { text: root.sysInfo.cpuPct + "%  " + root.sysInfo.cpuGhz; color: "#4cc2ff"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
+                                        Text { text: root.sysInfo.cpuPct + "%  " + root.sysInfo.cpuGhz; color: root.accentColor; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
                                         Text { text: root.sysInfo.cpuTemp !== "—" ? ("Temp: " + root.sysInfo.cpuTemp) : (root.sysInfo.cpuCores + " hilos"); color: "#8e8e8e"; font.pixelSize: 10 }
                                     }
                                 }
@@ -1141,7 +1150,7 @@ Rectangle {
                                 Text {
                                     anchors.centerIn: parent
                                     text: root.cpuShowPerCore ? "Ver uso general" : "Ver núcleos lógicos"
-                                    color: "#4cc2ff"; font.pixelSize: 11; font.weight: Font.DemiBold
+                                    color: root.accentColor; font.pixelSize: 11; font.weight: Font.DemiBold
                                 }
                                 MouseArea {
                                     id: cpuViewH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -1183,7 +1192,7 @@ Rectangle {
                             Layout.preferredHeight: 225
                             radius: 6
                             color: "#141414"
-                            border.color: "#4cc2ff"; border.width: 1
+                            border.color: root.accentColor; border.width: 1
 
                             Grid {
                                 anchors.fill: parent; anchors.margins: 12
@@ -1196,12 +1205,12 @@ Rectangle {
                                         readonly property int rows: Math.max(1, Math.ceil((root.sysInfo.cpuPerCore || []).length / cols))
                                         width: (parent.width - (cols - 1) * 8) / cols
                                         height: (parent.height - (rows - 1) * 8) / rows
-                                        radius: 4; color: "#1b1b1b"; border.color: "#224cc2ff"; border.width: 1
+                                        radius: 4; color: "#1b1b1b"; border.color: Qt.alpha(root.accentColor, 0.13); border.width: 1
                                         clip: true
                                         Rectangle {
                                             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
                                             height: Math.max(2, parent.height * (Math.min(100, Number(modelData || 0)) / 100.0))
-                                            color: "#384cc2ff"
+                                            color: Qt.alpha(root.accentColor, 0.22)
                                             Behavior on height { NumberAnimation { duration: 300 } }
                                         }
                                         Text {
@@ -1209,7 +1218,7 @@ Rectangle {
                                         }
                                         Text {
                                             anchors.right: parent.right; anchors.rightMargin: 7; y: 5
-                                            text: Number(modelData || 0) + "%"; color: "#4cc2ff"; font.pixelSize: 11; font.weight: Font.DemiBold
+                                            text: Number(modelData || 0) + "%"; color: root.accentColor; font.pixelSize: 11; font.weight: Font.DemiBold
                                         }
                                     }
                                 }
@@ -1223,7 +1232,7 @@ Rectangle {
                             Layout.preferredHeight: 225
                             radius: 6
                             color: "#141414"
-                            border.color: root.perfSubTab === "cpu" ? "#4cc2ff"
+                            border.color: root.perfSubTab === "cpu" ? root.accentColor
                                           : (root.perfSubTab === "ram" ? "#c084fc"
                                              : (root.isDiskPerfTab ? "#4ade80"
                                                 : (root.perfSubTab === "net" ? "#f59e0b" : "#38bdf8")))
@@ -1278,12 +1287,12 @@ Rectangle {
                                         ctx.restore();
                                     }
 
-                                    if (root.perfSubTab === "cpu") drawSeries(root.cpuHistory, "#4cc2ff", "rgba(76, 194, 255, 0.22)", false);
+                                    if (root.perfSubTab === "cpu") drawSeries(root.cpuHistory, root.accentColor, "rgba(76, 194, 255, 0.22)", false);
                                     else if (root.perfSubTab === "ram") drawSeries(root.ramHistory, "#c084fc", "rgba(192, 132, 252, 0.22)", false);
                                     else if (root.isDiskPerfTab) drawSeries(root.diskHistories[root.activeDiskObj.id || "disk_0"] || [], "#4ade80", "rgba(74, 222, 128, 0.22)", false);
                                     else if (root.perfSubTab === "net") {
                                         drawSeries(root.netRecvHistory, "#f59e0b", "rgba(245, 158, 11, 0.20)", false);
-                                        drawSeries(root.netSendHistory, "#4cc2ff", "", true);
+                                        drawSeries(root.netSendHistory, root.accentColor, "", true);
                                     } else {
                                         drawSeries(root.gpuHistories[root.perfSubTab] || [], "#38bdf8", "rgba(56, 189, 248, 0.22)", false);
                                     }
@@ -1351,7 +1360,7 @@ Rectangle {
                             // CPU Metrics
                             Repeater {
                                 model: root.perfSubTab === "cpu" ? [
-                                    { k: "Uso actual",           v: root.sysInfo.cpuPct + "%", accent: "#4cc2ff" },
+                                    { k: "Uso actual",           v: root.sysInfo.cpuPct + "%", accent: root.accentColor },
                                     { k: "Velocidad actual",     v: root.sysInfo.cpuGhz },
                                     { k: "Temperatura",          v: root.sysInfo.cpuTemp },
                                     { k: "Procesos / Hilos",     v: root.sysInfo.procCount + " / " + root.sysInfo.threadCount },
@@ -1359,7 +1368,7 @@ Rectangle {
                                     { k: "Velocidad máxima",     v: root.sysInfo.cpuMaxGhz },
                                     { k: "Caché L3",             v: root.sysInfo.cpuCache },
                                     { k: "Virtualización",       v: root.sysInfo.cpuVirt },
-                                    { k: "Planificador",         v: root.sysInfo.sched, accent: "#4cc2ff" },
+                                    { k: "Planificador",         v: root.sysInfo.sched, accent: root.accentColor },
                                     { k: "Tiempo activo",        v: root.sysInfo.uptime },
                                     { k: "Kernel",               v: root.sysInfo.kernel }
                                 ] : (root.perfSubTab === "ram" ? [
@@ -1381,7 +1390,7 @@ Rectangle {
                                     { k: "Planificador I/O",     v: root.activeDiskObj.ioSched || "none", accent: "#4ade80" }
                                 ] : (root.perfSubTab === "net" ? [
                                     { k: "Recibir (descarga)",   v: root.sysInfo.netRecvStr, accent: "#f59e0b" },
-                                    { k: "Enviar (subida)",      v: root.sysInfo.netSendStr, accent: "#4cc2ff" },
+                                    { k: "Enviar (subida)",      v: root.sysInfo.netSendStr, accent: root.accentColor },
                                     { k: "Interfaz activa",      v: root.sysInfo.netIface + " (" + root.sysInfo.netType + ")" },
                                     { k: "Dirección IPv4",       v: root.sysInfo.netIp },
                                     { k: "Dirección MAC",        v: root.sysInfo.netMac },
@@ -1442,7 +1451,7 @@ Rectangle {
                             Layout.maximumWidth: 260
                             height: 32; radius: 5; clip: true
                             color: startupSearch.activeFocus ? "#161616" : "#2b2b2b"
-                            border.color: startupSearch.activeFocus ? "#4cc2ff" : "#22ffffff"; border.width: 1
+                            border.color: startupSearch.activeFocus ? root.accentColor : "#22ffffff"; border.width: 1
                             RowLayout {
                                 anchors.fill: parent; anchors.leftMargin: 9; anchors.rightMargin: 8; spacing: 7
                                 WinSvg { width: 14; height: 14; iconFile: "fluent-search.svg"; opacity: 0.8 }
@@ -1487,7 +1496,7 @@ Rectangle {
                         // "+ Agregar" Button
                         Rectangle {
                             width: 102; height: 32; radius: 5
-                            color: stAddH.containsMouse ? "#5ecbff" : "#4cc2ff"
+                            color: stAddH.containsMouse ? Qt.lighter(root.accentColor, 1.12) : root.accentColor
                             RowLayout {
                                 anchors.centerIn: parent; spacing: 5
                                 Text { text: "+"; color: "#000000"; font.pixelSize: 15; font.weight: Font.Bold }
@@ -1628,13 +1637,13 @@ Rectangle {
                                         Layout.preferredWidth: 146; spacing: 10
                                         Text {
                                             text: modelData.status
-                                            color: modelData.enabled ? "#4cc2ff" : "#8e8e8e"
+                                            color: modelData.enabled ? root.accentColor : "#8e8e8e"
                                             font.pixelSize: 11; Layout.fillWidth: true
                                         }
                                         Rectangle {
                                             width: 38; height: 20; radius: 10
-                                            color: modelData.enabled ? "#4cc2ff" : "#2e2e2e"
-                                            border.color: modelData.enabled ? "#4cc2ff" : "#55ffffff"; border.width: 1
+                                            color: modelData.enabled ? root.accentColor : "#2e2e2e"
+                                            border.color: modelData.enabled ? root.accentColor : "#55ffffff"; border.width: 1
                                             Behavior on color { ColorAnimation { duration: 130 } }
                                             Rectangle {
                                                 x: modelData.enabled ? 20 : 4
@@ -1661,10 +1670,10 @@ Rectangle {
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16; spacing: 14
                         Text { text: root.startupApps.length + " aplicaciones configuradas"; color: "#a8a8a8"; font.pixelSize: 11 }
-                        Text { text: root.enabledStartupCount + " habilitadas"; color: "#4cc2ff"; font.pixelSize: 11 }
+                        Text { text: root.enabledStartupCount + " habilitadas"; color: root.accentColor; font.pixelSize: 11 }
                         Text { text: (root.startupApps.length - root.enabledStartupCount) + " deshabilitadas"; color: "#8e8e8e"; font.pixelSize: 11 }
                         Item { Layout.fillWidth: true }
-                        Text { text: root.statusToastText; color: "#4cc2ff"; font.pixelSize: 11 }
+                        Text { text: root.statusToastText; color: root.accentColor; font.pixelSize: 11 }
                     }
                 }
             }
@@ -1787,7 +1796,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        width: 86; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 86; height: 30; radius: 5; color: root.accentColor
                         Text { anchors.centerIn: parent; text: "Aceptar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.procPropsOpen = false }
                     }
@@ -1813,7 +1822,7 @@ Rectangle {
                     Column {
                         Layout.fillWidth: true
                         Text { text: root.startupPropsObj ? root.startupPropsObj.name : ""; color: "#ffffff"; font.pixelSize: 15; font.weight: Font.DemiBold }
-                        Text { text: (root.startupPropsObj ? root.startupPropsObj.publisher : "") + "  •  " + (root.startupPropsObj ? root.startupPropsObj.status : ""); color: "#4cc2ff"; font.pixelSize: 11 }
+                        Text { text: (root.startupPropsObj ? root.startupPropsObj.publisher : "") + "  •  " + (root.startupPropsObj ? root.startupPropsObj.status : ""); color: root.accentColor; font.pixelSize: 11 }
                     }
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: "#1effffff" }
@@ -1825,7 +1834,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        width: 86; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 86; height: 30; radius: 5; color: root.accentColor
                         Text { anchors.centerIn: parent; text: "Aceptar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.startupPropsOpen = false }
                     }
@@ -1878,7 +1887,7 @@ Rectangle {
 
                 Text { text: "Nombre:"; color: "#cccccc"; font.pixelSize: 11 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 30; radius: 5; color: "#151515"; border.color: addNameIn.activeFocus ? "#4cc2ff" : "#30ffffff"; clip: true
+                    Layout.fillWidth: true; height: 30; radius: 5; color: "#151515"; border.color: addNameIn.activeFocus ? root.accentColor : "#30ffffff"; clip: true
                     TextInput {
                         id: addNameIn; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                         verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12; selectByMouse: true; clip: true
@@ -1887,7 +1896,7 @@ Rectangle {
 
                 Text { text: "Comando:"; color: "#cccccc"; font.pixelSize: 11 }
                 Rectangle {
-                    Layout.fillWidth: true; height: 30; radius: 5; color: "#151515"; border.color: addCmdIn.activeFocus ? "#4cc2ff" : "#30ffffff"; clip: true
+                    Layout.fillWidth: true; height: 30; radius: 5; color: "#151515"; border.color: addCmdIn.activeFocus ? root.accentColor : "#30ffffff"; clip: true
                     TextInput {
                         id: addCmdIn; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
                         verticalAlignment: TextInput.AlignVCenter; color: "#ffffff"; font.pixelSize: 12; selectByMouse: true; clip: true
@@ -1903,7 +1912,7 @@ Rectangle {
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.startupAddOpen = false }
                     }
                     Rectangle {
-                        width: 92; height: 30; radius: 5; color: "#4cc2ff"
+                        width: 92; height: 30; radius: 5; color: root.accentColor
                         Text { anchors.centerIn: parent; text: "Agregar"; color: "#000000"; font.pixelSize: 12; font.weight: Font.DemiBold }
                         MouseArea {
                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor

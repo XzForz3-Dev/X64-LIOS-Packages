@@ -15,6 +15,10 @@ import sys
 import os
 import re
 import pwd
+import grp
+import hmac
+import hashlib
+import secrets
 import glob
 import json
 import shutil
@@ -51,8 +55,767 @@ DEFAULT_CFG = {
     "phoneAudio": True,
     "phoneTurnScreenOff": False,
     "phoneStayAwake": True,
-    "phoneAlwaysOnTop": False
+    "phoneAlwaysOnTop": False,
+    "lockRequireAuth": False,
+    "clockShowSeconds": False,
+    "gameModeAutoDnd": True,
+    "screenshotDir": "",
+    "screenshotCopyClipboard": True,
+    "screenshotNotify": True
 }
+
+
+PIN_FILE = os.path.join(STATE_DIR, "pin.json")
+
+
+def _verify_linux_password(username, password):
+    if not username or password is None or password == "":
+        return False
+    chk = "/usr/bin/unix_chkpwd" if os.path.exists("/usr/bin/unix_chkpwd") else "/usr/sbin/unix_chkpwd"
+    if not os.path.exists(chk):
+        return False
+    try:
+        r = subprocess.run(
+            [chk, username, "nullok"],
+            input=(str(password) + "\x00").encode("utf-8"),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5.0
+        )
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _verify_quick_pin(candidate):
+    if not candidate or not os.path.isfile(PIN_FILE):
+        return False
+    try:
+        d = json.load(open(PIN_FILE, "r", encoding="utf-8"))
+        salt = bytes.fromhex(str(d.get("salt", "")))
+        iters = int(d.get("iters", 200000))
+        expected = str(d.get("hash", ""))
+        if not salt or not expected:
+            return False
+        got = hashlib.pbkdf2_hmac("sha256", str(candidate).encode("utf-8"), salt, iters).hex()
+        return hmac.compare_digest(got, expected)
+    except Exception:
+        return False
+
+
+def _get_sddm_autologin_state(uname):
+    paths = ["/etc/sddm.conf.d/20-x64-autologin.conf"]
+    if os.path.isdir("/etc/sddm.conf.d"):
+        for fn in sorted(os.listdir("/etc/sddm.conf.d")):
+            p = os.path.join("/etc/sddm.conf.d", fn)
+            if fn.endswith(".conf") and p not in paths:
+                paths.append(p)
+    paths.append("/etc/sddm.conf")
+    for p in paths:
+        if not os.path.isfile(p):
+            continue
+        try:
+            in_auto = False
+            for raw in open(p, "r", encoding="utf-8", errors="ignore"):
+                s = raw.strip()
+                if not s or s.startswith("#"):
+                    continue
+                if s.startswith("["):
+                    in_auto = (s.lower() == "[autologin]")
+                    continue
+                if in_auto and s.startswith("User="):
+                    val = s.split("=", 1)[1].strip()
+                    if val == uname:
+                        return True
+        except Exception:
+            continue
+    return False
+
+
+def _get_available_shells(current_shell):
+    excluded = {"sh", "rbash", "git-shell", "nologin", "false", "systemd-home-fallback-shell"}
+    shells = []
+    seen_real = set()
+    if current_shell and os.path.exists(current_shell):
+        shells.append(current_shell)
+        seen_real.add(os.path.realpath(current_shell))
+    try:
+        if os.path.isfile("/etc/shells"):
+            for raw in open("/etc/shells", "r", encoding="utf-8", errors="ignore"):
+                s = raw.strip()
+                if not s or s.startswith("#") or not s.startswith("/"):
+                    continue
+                bn = os.path.basename(s)
+                if bn in excluded or not os.path.exists(s):
+                    continue
+                rp = os.path.realpath(s)
+                if rp in seen_real:
+                    continue
+                seen_real.add(rp)
+                shells.append(s)
+    except Exception:
+        pass
+    return shells[:8]
+
+
+def _list_local_users(current_uname):
+    wheel_members = set()
+    try:
+        wheel_members = set(grp.getgrnam("wheel").gr_mem)
+    except Exception:
+        pass
+    cfg_cur = load_cfg()
+    disp_ov = str(cfg_cur.get("displayNameOverride", "") or "").strip()
+    users = []
+    try:
+        for p in pwd.getpwall():
+            if p.pw_uid < 1000 or p.pw_uid >= 65000 or p.pw_name == "nobody":
+                continue
+            gecos = (p.pw_gecos or "").split(",")[0].strip()
+            disp = gecos if gecos else p.pw_name.capitalize()
+            is_cur = (p.pw_name == current_uname)
+            av_url = ""
+            if is_cur:
+                if disp_ov:
+                    disp = disp_ov
+                av_url = str(cfg_cur.get("userAvatarUrl", "") or "")
+            else:
+                face_p = os.path.join(p.pw_dir, ".face")
+                if os.path.isfile(face_p) and os.access(face_p, os.R_OK):
+                    av_url = f"file://{face_p}"
+            users.append({
+                "username": p.pw_name,
+                "displayName": disp,
+                "uid": p.pw_uid,
+                "homeDir": p.pw_dir,
+                "shell": p.pw_shell,
+                "isAdmin": (p.pw_name in wheel_members),
+                "isCurrent": is_cur,
+                "avatarUrl": av_url,
+            })
+    except Exception:
+        pass
+    users.sort(key=lambda u: (not u["isCurrent"], u["username"].lower()))
+    return users
+
+
+def _build_account_info(cfg=None):
+    if cfg is None:
+        cfg = load_cfg()
+    display_name, uname, hostname = get_real_user_info()
+    groups = []
+    try:
+        groups = [g.gr_name for g in grp.getgrall() if uname in g.gr_mem]
+    except Exception:
+        pass
+    try:
+        user_shell = pwd.getpwuid(os.getuid()).pw_shell
+    except Exception:
+        user_shell = "/bin/fish"
+    # If kitty.conf explicitly overrides shell, prefer reflecting active /etc/passwd shell (setUserShell syncs both!)
+    other_users = _list_local_users(uname)
+    return {
+        "displayName": display_name,
+        "username": uname,
+        "hostname": hostname,
+        "homeDir": HOME_DIR,
+        "shell": user_shell,
+        "groups": ", ".join(groups[:10]) if groups else "usuario",
+        "isAdmin": "wheel" in groups,
+        "avatarUrl": str(cfg.get("userAvatarUrl", "") or ""),
+        "hasPin": os.path.isfile(PIN_FILE),
+        "sddmAutologin": _get_sddm_autologin_state(uname),
+        "availableShells": _get_available_shells(user_shell),
+        "otherUsers": other_users,
+        "adminCount": sum(1 for u in other_users if u["isAdmin"]),
+    }
+
+
+def _sync_kitty_shell(new_shell):
+    """Sync ~/.config/kitty/kitty.conf shell directive so Kitty immediately opens the selected interpreter."""
+    try:
+        kdir = os.path.join(HOME_DIR, ".config", "kitty")
+        os.makedirs(kdir, exist_ok=True)
+        kconf = os.path.join(kdir, "kitty.conf")
+        if not os.path.isfile(kconf) and os.path.isfile("/etc/xdg/kitty/kitty.conf"):
+            shutil.copy2("/etc/xdg/kitty/kitty.conf", kconf)
+        lines = open(kconf, "r", encoding="utf-8", errors="ignore").read().splitlines() if os.path.isfile(kconf) else []
+        out = []
+        replaced = False
+        for ln in lines:
+            if re.match(r"^\s*shell\s+", ln):
+                if not replaced:
+                    out.append(f"shell {new_shell}")
+                    replaced = True
+                continue
+            out.append(ln)
+        if not replaced:
+            out.insert(0, f"shell {new_shell}")
+        with open(kconf + ".tmp", "w", encoding="utf-8") as f:
+            f.write("\n".join(out) + "\n")
+        os.replace(kconf + ".tmp", kconf)
+    except Exception:
+        pass
+
+
+_CACHED_TIMEZONES = None
+
+
+def _get_tz_offset_mins(tz_id=""):
+    try:
+        from zoneinfo import ZoneInfo
+        tid = (tz_id or "").strip()
+        if not tid or tid == "Local":
+            if os.path.islink("/etc/localtime"):
+                rp = os.path.realpath("/etc/localtime")
+                if "/zoneinfo/" in rp:
+                    tid = rp.split("/zoneinfo/", 1)[1]
+        if tid:
+            now_z = datetime.now(ZoneInfo(tid))
+            off = now_z.utcoffset()
+            if off is not None:
+                return int(round(off.total_seconds() / 60.0))
+    except Exception:
+        pass
+    try:
+        return int(round(datetime.now().astimezone().utcoffset().total_seconds() / 60.0))
+    except Exception:
+        return 0
+
+
+def _build_timelang_info(cfg=None):
+    if cfg is None:
+        cfg = load_cfg()
+    tz_full = "Local"
+    tz_id = "UTC"
+    ntp_on = True
+    synced = True
+    local_rtc = False
+    try:
+        tout = subprocess.check_output(
+            ["timedatectl", "status"], text=True, timeout=1.2,
+            stderr=subprocess.DEVNULL, env=dict(os.environ, LC_ALL="C")
+        )
+        for ln in tout.splitlines():
+            if "Time zone:" in ln:
+                tz_full = ln.split(":", 1)[1].strip()
+                tz_id = tz_full.split()[0].strip() if tz_full else "UTC"
+            elif "NTP service:" in ln:
+                ntp_on = ("active" in ln.lower() and "inactive" not in ln.lower())
+            elif "synchronized:" in ln:
+                synced = ("yes" in ln.lower())
+            elif "RTC in local TZ:" in ln:
+                local_rtc = ("yes" in ln.lower())
+    except Exception:
+        pass
+
+    locale_str = os.environ.get("LANG", "es_ES.UTF-8")
+    try:
+        if os.path.isfile("/etc/locale.conf"):
+            for ln in open("/etc/locale.conf", "r", encoding="utf-8", errors="ignore"):
+                s = ln.strip()
+                if s.startswith("LANG="):
+                    val = s.split("=", 1)[1].strip().strip("\"'")
+                    if val:
+                        locale_str = val
+                        break
+    except Exception:
+        pass
+
+    installed_locales = []
+    try:
+        lout = subprocess.check_output(["locale", "-a"], text=True, timeout=1.0, stderr=subprocess.DEVNULL)
+        for ln in lout.splitlines():
+            s = ln.strip()
+            if s.lower().endswith(".utf8") or s.lower().endswith(".utf-8"):
+                norm = re.sub(r"\.utf8$", ".UTF-8", s, flags=re.I)
+                if norm not in installed_locales:
+                    installed_locales.append(norm)
+    except Exception:
+        pass
+
+    kb_primary = "es"
+    kb_secondary = "us"
+    kb_toggle_opt = "grp:alt_shift_toggle"
+    try:
+        env_p = os.path.join(HOME_DIR, ".config", "labwc", "environment")
+        if os.path.isfile(env_p):
+            for ln in open(env_p, "r", encoding="utf-8", errors="ignore"):
+                s = ln.strip()
+                if s.startswith("XKB_DEFAULT_LAYOUT="):
+                    parts = [p.strip().split("(")[0].lower() for p in s.split("=", 1)[1].split(",") if p.strip()]
+                    if parts:
+                        kb_primary = parts[0]
+                        kb_secondary = parts[1] if len(parts) > 1 else "none"
+                elif s.startswith("XKB_DEFAULT_OPTIONS="):
+                    opt_v = s.split("=", 1)[1].strip()
+                    if "ctrl_shift_toggle" in opt_v:
+                        kb_toggle_opt = "grp:ctrl_shift_toggle"
+                    elif "alt_shift_toggle" in opt_v:
+                        kb_toggle_opt = "grp:alt_shift_toggle"
+                    elif not opt_v:
+                        kb_toggle_opt = "none"
+    except Exception:
+        pass
+
+    tag_map = {"es": "ES", "latam": "LATAM", "us": "US", "br": "BR", "fr": "FR", "de": "DE"}
+    cur_kb = tag_map.get(kb_primary, kb_primary.upper() or "ES")
+
+    repeat_rate = 25
+    repeat_delay = 600
+    numlock_on = False
+    try:
+        rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+        if os.path.isfile(rc_p):
+            rc_t = open(rc_p, "r", encoding="utf-8", errors="ignore").read()
+            m_rr = re.search(r"<repeatRate>(\d+)</repeatRate>", rc_t)
+            if m_rr:
+                repeat_rate = max(10, min(80, int(m_rr.group(1))))
+            m_rd = re.search(r"<repeatDelay>(\d+)</repeatDelay>", rc_t)
+            if m_rd:
+                repeat_delay = max(150, min(1200, int(m_rd.group(1))))
+            m_nl = re.search(r"<numlock>\s*(on|off)\s*</numlock>", rc_t, re.I)
+            if m_nl:
+                numlock_on = (m_nl.group(1).lower() == "on")
+    except Exception:
+        pass
+
+    return {
+        "timezone": tz_full,
+        "timezoneId": tz_id,
+        "tzOffsetMins": _get_tz_offset_mins(tz_id),
+        "ntpActive": ntp_on,
+        "synced": synced,
+        "localRtc": local_rtc,
+        "locale": locale_str,
+        "installedLocales": installed_locales,
+        "kbLayout": cur_kb,
+        "kbPrimary": kb_primary,
+        "kbSecondary": kb_secondary,
+        "kbToggleOpt": kb_toggle_opt,
+        "repeatRate": repeat_rate,
+        "repeatDelay": repeat_delay,
+        "numlock": numlock_on,
+    }
+
+
+def _resolve_screenshot_dir(cfg=None):
+    if cfg is None:
+        cfg = load_cfg()
+    custom = str(cfg.get("screenshotDir", "") or "").strip()
+    if custom:
+        return custom
+    pic = os.path.join(HOME_DIR, "Imágenes") if os.path.isdir(os.path.join(HOME_DIR, "Imágenes")) else os.path.join(HOME_DIR, "Pictures")
+    sub = "Capturas" if os.path.basename(pic) == "Imágenes" else "Screenshots"
+    return os.path.join(pic, sub)
+
+
+def _build_gaming_info(cfg=None):
+    if cfg is None:
+        cfg = load_cfg()
+    def _svc_on(svc):
+        try:
+            return subprocess.run(["systemctl", "is-active", "--quiet", svc], timeout=0.6).returncode == 0
+        except Exception:
+            return False
+
+    sched = "BORE"
+    try:
+        if os.path.isfile("/sys/kernel/sched_ext/state") and open("/sys/kernel/sched_ext/state").read().strip() == "enabled":
+            ops = open("/sys/kernel/sched_ext/root/ops").read().strip() if os.path.isfile("/sys/kernel/sched_ext/root/ops") else ""
+            if ops:
+                sched = "scx_" + ops.split("_")[0]
+            else:
+                sched = "scx_ext"
+    except Exception:
+        pass
+
+    adaptive_sync = "yes"
+    allow_tearing = "no"
+    try:
+        rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+        if os.path.isfile(rc_p):
+            rc_t = open(rc_p, "r", encoding="utf-8", errors="ignore").read()
+            m_as = re.search(r"<adaptiveSync>\s*(yes|no|fullscreen)\s*</adaptiveSync>", rc_t, re.I)
+            if m_as:
+                adaptive_sync = m_as.group(1)
+            m_at = re.search(r"<allowTearing>\s*(yes|no|fullscreen|fullscreenForced)\s*</allowTearing>", rc_t)
+            if m_at:
+                allow_tearing = m_at.group(1)
+    except Exception:
+        pass
+
+    shot_dir = _resolve_screenshot_dir(cfg)
+    shot_count = 0
+    try:
+        if os.path.isdir(shot_dir):
+            shot_count = sum(1 for fn in os.listdir(shot_dir) if fn.lower().endswith((".png", ".jpg", ".jpeg", ".webp")))
+    except Exception:
+        pass
+
+    gamepads = []
+    seen_gp = set()
+    noise_kw = ("motion sensor", "touchpad", "accelerometer", "gyro", "imu")
+
+    def _is_evdev_gamepad(dev_dir):
+        key_p = os.path.join(dev_dir, "capabilities", "key")
+        if not os.path.isfile(key_p):
+            return False
+        try:
+            words = [int(w, 16) for w in open(key_p).read().strip().split()]
+            # Linux input-event-codes.h: BTN_GAMEPAD = 0x130 (304), BTN_JOYSTICK = 0x120 (288)
+            bits = 0
+            for idx, w in enumerate(reversed(words)):
+                bits |= (w << (idx * 64))
+            return bool((bits & (1 << 0x130)) or (bits & (1 << 0x120)))
+        except Exception:
+            return False
+
+    try:
+        for js_p in sorted(glob.glob("/sys/class/input/js*")):
+            nm_p = os.path.join(js_p, "device", "name")
+            if os.path.isfile(nm_p):
+                gname = open(nm_p, "r", encoding="utf-8", errors="ignore").read().strip()
+                low = gname.lower()
+                if gname and gname not in seen_gp and not any(nk in low for nk in noise_kw):
+                    seen_gp.add(gname)
+                    gamepads.append({"id": os.path.basename(js_p), "name": gname})
+        for ev_p in sorted(glob.glob("/sys/class/input/event*")):
+            dev_d = os.path.join(ev_p, "device")
+            nm_p = os.path.join(dev_d, "name")
+            if os.path.isfile(nm_p) and _is_evdev_gamepad(dev_d):
+                gname = open(nm_p, "r", encoding="utf-8", errors="ignore").read().strip()
+                low = gname.lower()
+                if gname and gname not in seen_gp and not any(nk in low for nk in noise_kw):
+                    seen_gp.add(gname)
+                    gamepads.append({"id": os.path.basename(ev_p), "name": gname})
+    except Exception:
+        pass
+
+    def _pick_icon(candidates, fallback_svg):
+        for k in candidates:
+            u = resolve_app_icon_url(k)
+            if u and not u.endswith("windows.svg"):
+                return u
+        return f"file://{ASSET_DIR}{fallback_svg}"
+
+    app_icons = {
+        "steam":    _pick_icon(["steam"], "steam.svg"),
+        "heroic":   _pick_icon(["com.heroicgameslauncher.hgl", "heroic"], "fluent-games.svg"),
+        "lutris":   _pick_icon(["net.lutris.Lutris", "lutris"], "fluent-games.svg"),
+        "goverlay": _pick_icon(["io.github.benjamimgois.goverlay", "goverlay"], "fluent-display.svg"),
+        "obs":      _pick_icon(["com.obsproject.Studio", "obs"], "fluent-play-filled.svg"),
+    }
+
+    return {
+        "sched": sched,
+        "falcond": _svc_on("falcond.service"),
+        "dmemcg": _svc_on("dmemcg-booster-system.service"),
+        "ananicy": _svc_on("ananicy-cpp.service"),
+        "ntsync": os.path.exists("/dev/ntsync") or os.environ.get("PROTON_USE_NTSYNC") == "1",
+        "hasSteam": shutil.which("steam") is not None,
+        "hasHeroic": shutil.which("heroic") is not None,
+        "hasLutris": shutil.which("lutris") is not None,
+        "hasGoverlay": shutil.which("goverlay") is not None,
+        "hasMangohud": shutil.which("mangohud") is not None,
+        "hasGamescope": shutil.which("gamescope") is not None,
+        "hasObs": shutil.which("obs") is not None,
+        "hasX64Hello": shutil.which("x64-hello") is not None,
+        "adaptiveSync": adaptive_sync,
+        "allowTearing": allow_tearing,
+        "screenshotDir": shot_dir,
+        "screenshotCount": shot_count,
+        "gamepads": gamepads,
+        "appIcons": app_icons,
+    }
+
+
+def _read_x64_update_cache():
+    st_dir = os.path.join(HOME_DIR, ".local", "state", "x64-update")
+    cnt_f = os.path.join(st_dir, "count")
+    pkg_f = os.path.join(st_dir, "packages.txt")
+    chk_f = os.path.join(st_dir, "last_check")
+    if not os.path.isfile(cnt_f):
+        return None
+    try:
+        raw_cnt = open(cnt_f, "r", encoding="utf-8", errors="ignore").read().strip()
+        total_cnt = int(raw_cnt)
+    except Exception:
+        return None
+    all_pkgs = []
+    pac_cnt = 0
+    aur_cnt = 0
+    fp_cnt = 0
+    if os.path.isfile(pkg_f):
+        try:
+            for ln in open(pkg_f, "r", encoding="utf-8", errors="ignore"):
+                s = ln.strip()
+                if not s:
+                    continue
+                all_pkgs.append(s)
+                if s.endswith("(AUR)"):
+                    aur_cnt += 1
+                elif s.endswith("(Flatpak)") or s.startswith("[Flatpak]"):
+                    fp_cnt += 1
+                else:
+                    pac_cnt += 1
+        except Exception:
+            pass
+    if all_pkgs and total_cnt != len(all_pkgs):
+        total_cnt = len(all_pkgs)
+    checked_at = ""
+    if os.path.isfile(chk_f):
+        try:
+            ts = float(open(chk_f, "r", encoding="utf-8", errors="ignore").read().strip())
+            dt = datetime.fromtimestamp(ts)
+            now = datetime.now()
+            checked_at = dt.strftime("%H:%M:%S") if dt.date() == now.date() else dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+    return {
+        "count": total_cnt,
+        "pacmanCount": pac_cnt,
+        "aurCount": aur_cnt,
+        "flatpakCount": fp_cnt,
+        "packages": all_pkgs[:50],
+        "flatpakPackages": [p for p in all_pkgs if p.endswith("(Flatpak)") or p.startswith("[Flatpak]")][:20],
+        "checkedAt": checked_at,
+        "error": "",
+        "fromCache": True,
+    }
+
+
+def _is_update_tray_running():
+    my_uid = os.getuid()
+    try:
+        for pid in os.listdir("/proc"):
+            if not pid.isdigit():
+                continue
+            pdir = os.path.join("/proc", pid)
+            try:
+                if os.stat(pdir).st_uid != my_uid:
+                    continue
+                cmd = open(os.path.join(pdir, "cmdline"), "rb").read().replace(b"\x00", b" ").decode("utf-8", "ignore")
+                if "/usr/bin/x64-update-tray" in cmd or cmd.strip().endswith("x64-update-tray"):
+                    return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return False
+
+
+def _is_update_tray_autostart():
+    user_desk = os.path.join(HOME_DIR, ".config", "autostart", "x64-update-tray.desktop")
+    if not os.path.isfile(user_desk):
+        return os.path.isfile("/etc/xdg/autostart/x64-update-tray.desktop") or shutil.which("x64-update-tray") is not None
+    try:
+        txt = open(user_desk, "r", encoding="utf-8", errors="ignore").read().lower()
+        if "hidden=true" in txt or "x-gnome-autostart-enabled=false" in txt:
+            return False
+        return True
+    except Exception:
+        return True
+
+
+def _build_update_info():
+    history = []
+    last_upg_date = ""
+    try:
+        if os.path.isfile("/var/log/pacman.log"):
+            lines = open("/var/log/pacman.log", "r", encoding="utf-8", errors="ignore").readlines()[-3500:]
+            for ln in reversed(lines):
+                act = ""
+                body = ""
+                if "[ALPM] upgraded " in ln:
+                    act = "upgraded"
+                    body = ln.split("[ALPM] upgraded ", 1)[1].strip()
+                elif "[ALPM] installed " in ln:
+                    act = "installed"
+                    body = ln.split("[ALPM] installed ", 1)[1].strip()
+                elif "[ALPM] removed " in ln:
+                    act = "removed"
+                    body = ln.split("[ALPM] removed ", 1)[1].strip()
+                elif "[ALPM] downgraded " in ln:
+                    act = "downgraded"
+                    body = ln.split("[ALPM] downgraded ", 1)[1].strip()
+                else:
+                    continue
+                dt = ln[1:17].replace("T", " ")
+                pkg_nm = body.split()[0] if body else ""
+                if act == "upgraded" and not last_upg_date:
+                    last_upg_date = dt
+                history.append({"date": dt, "action": act, "pkg": pkg_nm, "entry": body})
+                if len(history) >= 60:
+                    break
+    except Exception:
+        pass
+
+    try:
+        pkg_count = max(0, len(os.listdir("/var/lib/pacman/local")) - 1)
+    except Exception:
+        pkg_count = 0
+
+    repos = []
+    ignore_pkgs = []
+    try:
+        if os.path.isfile("/etc/pacman.conf"):
+            for raw in open("/etc/pacman.conf", "r", encoding="utf-8", errors="ignore"):
+                s = raw.strip()
+                if not s or s.startswith("#"):
+                    continue
+                if s.startswith("[") and s.endswith("]"):
+                    rname = s[1:-1].strip()
+                    if rname and rname.lower() != "options" and rname not in repos:
+                        repos.append(rname)
+                elif s.startswith("IgnorePkg"):
+                    vals = s.split("=", 1)[1].strip().split() if "=" in s else []
+                    for v in vals:
+                        if v and v not in ignore_pkgs:
+                            ignore_pkgs.append(v)
+    except Exception:
+        pass
+
+    def _unit_exists(unit):
+        return os.path.isfile(f"/usr/lib/systemd/system/{unit}") or os.path.isfile(f"/etc/systemd/system/{unit}")
+
+    def _timer_enabled(unit):
+        if not _unit_exists(unit):
+            return False
+        try:
+            r = subprocess.run(["systemctl", "is-enabled", unit], capture_output=True, text=True, timeout=0.8)
+            return r.stdout.strip() == "enabled"
+        except Exception:
+            return False
+
+    cache_bytes = 0
+    try:
+        if os.path.isdir("/var/cache/pacman/pkg"):
+            for ent in os.scandir("/var/cache/pacman/pkg"):
+                try:
+                    if ent.is_file(follow_symlinks=False):
+                        cache_bytes += ent.stat(follow_symlinks=False).st_size
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    if cache_bytes >= 1024 ** 3:
+        pacman_cache_human = f"{cache_bytes / (1024 ** 3):.1f} GB"
+    else:
+        pacman_cache_human = f"{cache_bytes / (1024 ** 2):.0f} MB"
+
+    tray_running = _is_update_tray_running()
+    tray_autostart = _is_update_tray_autostart()
+
+    running_k = ""
+    try:
+        running_k = os.uname().release
+    except Exception:
+        pass
+
+    installed_kernels = []
+    installed_k_releases = set()
+    try:
+        if os.path.isdir("/var/lib/pacman/local"):
+            for d in sorted(os.listdir("/var/lib/pacman/local")):
+                if not d.startswith("linux"):
+                    continue
+                files_p = os.path.join("/var/lib/pacman/local", d, "files")
+                desc_p = os.path.join("/var/lib/pacman/local", d, "desc")
+                if not os.path.isfile(files_p) or not os.path.isfile(desc_p):
+                    continue
+                rel_found = ""
+                try:
+                    with open(files_p, "r", encoding="utf-8", errors="ignore") as ff:
+                        for fln in ff:
+                            s = fln.strip()
+                            if s.startswith("usr/lib/modules/") and s.endswith("/vmlinuz"):
+                                parts = s.split("/")
+                                if len(parts) >= 5:
+                                    rel_found = parts[3]
+                                    break
+                except Exception:
+                    continue
+                if not rel_found:
+                    continue
+                installed_k_releases.add(rel_found)
+                kname = kver = ""
+                cur = None
+                with open(desc_p, "r", encoding="utf-8", errors="ignore") as df:
+                    for raw in df:
+                        s = raw.strip()
+                        if s.startswith("%") and s.endswith("%"):
+                            cur = s
+                        elif s:
+                            if cur == "%NAME%": kname = s
+                            elif cur == "%VERSION%": kver = s
+                if kname:
+                    installed_kernels.append({
+                        "name": kname,
+                        "version": kver,
+                        "release": rel_found,
+                        "active": bool(running_k) and (rel_found == running_k),
+                    })
+    except Exception:
+        pass
+
+    if running_k and installed_k_releases:
+        reboot_required = running_k not in installed_k_releases
+    else:
+        reboot_required = bool(running_k) and not os.path.isdir(f"/usr/lib/modules/{running_k}")
+
+    snapper_cfgs = []
+    try:
+        if os.path.isdir("/etc/snapper/configs"):
+            snapper_cfgs = sorted(f for f in os.listdir("/etc/snapper/configs") if not f.startswith("."))
+    except Exception:
+        pass
+
+    has_snap_pac = os.path.isfile("/usr/share/libalpm/hooks/05-snap-pac-pre.hook")
+    has_limine_snapper = _timer_enabled("limine-snapper-sync.service")
+
+    is_uefi = os.path.isdir("/sys/firmware/efi")
+    can_fw_reboot = False
+    if is_uefi:
+        try:
+            rfw = subprocess.run(
+                ["busctl", "call", "org.freedesktop.login1", "/org/freedesktop/login1",
+                 "org.freedesktop.login1.Manager", "CanRebootToFirmwareSetup"],
+                capture_output=True, text=True, timeout=0.8
+            )
+            out_fw = (rfw.stdout or "").lower()
+            if '"yes"' in out_fw or '"challenge"' in out_fw:
+                can_fw_reboot = True
+            elif rfw.returncode != 0:
+                can_fw_reboot = bool(glob.glob("/sys/firmware/efi/efivars/OsIndicationsSupported-*"))
+        except Exception:
+            can_fw_reboot = bool(glob.glob("/sys/firmware/efi/efivars/OsIndicationsSupported-*"))
+
+    return {
+        "history": history,
+        "lastUpgradeDate": last_upg_date,
+        "pkgCount": pkg_count,
+        "repos": repos,
+        "ignorePkgs": ignore_pkgs,
+        "hasPaccacheTimer": _unit_exists("paccache.timer"),
+        "hasFstrimTimer": _unit_exists("fstrim.timer"),
+        "paccacheTimerEnabled": _timer_enabled("paccache.timer"),
+        "fstrimTimerEnabled": _timer_enabled("fstrim.timer"),
+        "pacmanCacheHuman": pacman_cache_human,
+        "trayRunning": tray_running,
+        "trayAutostartEnabled": tray_autostart,
+        "hasUpdateTray": shutil.which("x64-update-tray") is not None,
+        "runningKernel": running_k,
+        "rebootRequired": reboot_required,
+        "installedKernels": installed_kernels,
+        "snapperConfigs": snapper_cfgs,
+        "hasSnapPac": has_snap_pac,
+        "hasLimineSnapper": has_limine_snapper,
+        "hasBtrfsAssistant": shutil.which("btrfs-assistant") is not None,
+        "hasX64Update": shutil.which("x64-update") is not None,
+        "hasX64Hello": shutil.which("x64-hello") is not None,
+        "isUefi": is_uefi,
+        "canRebootFirmware": can_fw_reboot,
+        "cachedCheck": _read_x64_update_cache(),
+    }
 
 
 def get_real_user_info():
@@ -181,33 +944,57 @@ def get_live_hardware_controls():
         wifi_enabled = (out_g == "enabled")
         if wifi_enabled:
             out_w = subprocess.check_output(
-                ["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "no"],
+                ["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY,FREQ", "dev", "wifi", "list", "--rescan", "no"],
                 text=True, timeout=1.5, env=env, stderr=subprocess.DEVNULL
             ).splitlines()
-            seen_ssids = set()
+            by_ssid = {}
             for line in out_w:
-                parts = line.split(":")
+                parts = re.split(r"(?<!\\):", line)
                 if len(parts) < 4:
                     continue
                 act = (parts[0].strip().lower() == "yes")
-                ssid = parts[1].strip()
+                ssid = parts[1].replace("\\:", ":").strip()
                 if not ssid:
                     continue
                 try:
                     sig = int(parts[2].strip())
                 except Exception:
                     sig = 50
-                sec = parts[3].strip() or "Abierta"
+                sec = parts[3].replace("\\:", ":").strip() or "Abierta"
+                freq_raw = parts[4].strip() if len(parts) > 4 else ""
+                band = ""
+                m_f = re.search(r"(\d+)", freq_raw)
+                if m_f:
+                    mhz = int(m_f.group(1))
+                    if mhz >= 5900:
+                        band = "6 GHz"
+                    elif mhz >= 4900:
+                        band = "5 GHz"
+                    elif mhz >= 2400:
+                        band = "2.4 GHz"
                 if act:
                     wifi_ssid = ssid
-                if ssid not in seen_ssids or act:
-                    seen_ssids.add(ssid)
-                    wifi_networks.append({
+                prev = by_ssid.get(ssid)
+                if prev is None:
+                    by_ssid[ssid] = {
                         "ssid": ssid,
                         "signal": sig,
                         "security": sec,
+                        "band": band,
+                        "bands": [band] if band else [],
                         "active": act
-                    })
+                    }
+                else:
+                    if band and band not in prev["bands"]:
+                        prev["bands"].append(band)
+                    if act or (not prev["active"] and sig > prev["signal"]):
+                        prev["signal"] = sig
+                        prev["security"] = sec
+                        if band:
+                            prev["band"] = band
+                        if act:
+                            prev["active"] = True
+            wifi_networks = list(by_ssid.values())
             wifi_networks.sort(key=lambda x: (not x["active"], -x["signal"]))
         else:
             wifi_ssid = "Desactivado"
@@ -393,13 +1180,267 @@ def resolve_app_icon_url(icon_name):
     return f"file://{ASSET_DIR}windows.svg"
 
 
-def scan_installed_desktop_apps():
+PROTECTED_SYSTEM_PKGS = {
+    "pacman", "systemd", "systemd-libs", "systemd-sysvcompat", "glibc", "filesystem",
+    "base", "bash", "coreutils", "sudo", "polkit", "polkit-kde-agent", "dbus", "dbus-broker",
+    "networkmanager", "sddm", "labwc", "quickshell", "quickshell-git", "kitty",
+    "pipewire", "pipewire-pulse", "pipewire-alsa", "wireplumber", "xdg-desktop-portal",
+    "xdg-desktop-portal-gtk", "xdg-desktop-portal-wlr", "xorg-xwayland", "wayland",
+    "mesa", "python", "python-pyqt6", "shelly", "shelly-ui", "shelly-flatpak-backend",
+    "breeze", "breeze-icons", "inter-font", "wlr-randr", "wl-clipboard", "grim", "slurp",
+    "mako", "swaybg", "swaylock", "gammastep", "udisks2", "bluez", "bluez-utils",
+    "cups", "ufw", "openssh", "grub", "limine", "mkinitcpio", "dracut", "cachyos-settings",
+    "cachyos-keyring", "archlinux-keyring", "ca-certificates", "openssl", "gnupg", "shadow",
+    "util-linux", "iproute2", "kmod", "procps-ng", "psmisc", "sed", "grep", "gawk", "tar", "gzip",
+}
+
+PROTECTED_SYSTEM_PREFIXES = (
+    "linux-", "x64-", "nvidia-", "vulkan-", "qt6-", "kf6-", "lib32-nvidia", "cachyos-kernel",
+)
+
+UNSAFE_USERDATA_SLUGS = {
+    "app", "apps", "bin", "usr", "lib", "x64", "gtk", "kde", "gnome", "qt6", "qt5", "linux",
+    "system", "config", "cache", "local", "share", "icons", "themes", "labwc", "quickshell",
+    "autostart", "systemd", "pipewire", "wireplumber", "fontconfig", "dconf", "pulse",
+    "x64-win11", "dconf", "menus", "mime", "applications", "Trash", "trash", "keyrings",
+    "flatpak", "fish", "bash", "ssh", "gnupg", "pki", "mozilla-none", "xdg", "wayland",
+}
+
+
+def is_pkg_system_protected(pkg_name):
+    p = (pkg_name or "").strip().lower()
+    if not p:
+        return False
+    if p in PROTECTED_SYSTEM_PKGS:
+        return True
+    return any(p.startswith(pref) for pref in PROTECTED_SYSTEM_PREFIXES)
+
+
+def _fmt_size_bytes(n):
+    try:
+        n = float(n or 0)
+    except Exception:
+        n = 0.0
+    if n <= 0:
+        return "—"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024.0 or unit == "TB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{int(n)} B"
+        n /= 1024.0
+    return "—"
+
+
+def _dir_size_bytes(path, max_files=4000):
+    total = 0
+    cnt = 0
+    try:
+        if os.path.isfile(path) or os.path.islink(path):
+            return os.path.getsize(path)
+        for dp, _, fns in os.walk(path):
+            for fn in fns:
+                cnt += 1
+                if cnt > max_files:
+                    return total
+                try:
+                    total += os.path.getsize(os.path.join(dp, fn))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return total
+
+
+def _find_safe_user_data_paths(pkg_or_id, app_name, source):
+    found = []
+    seen = set()
+    real_home = os.path.realpath(HOME_DIR)
+    if source == "flatpak" and pkg_or_id and "." in pkg_or_id and "/" not in pkg_or_id:
+        fp_var = os.path.join(HOME_DIR, ".var", "app", pkg_or_id)
+        if os.path.isdir(fp_var):
+            rp = os.path.realpath(fp_var)
+            if rp.startswith(real_home + os.sep):
+                found.append(fp_var)
+                seen.add(rp)
+        return found
+
+    cands = set()
+    for raw in (pkg_or_id or "", app_name or ""):
+        s = raw.strip().lower()
+        if not s:
+            continue
+        cands.add(s)
+        cands.add(re.sub(r"[^a-z0-9._-]+", "-", s).strip("-"))
+        cands.add(re.sub(r"[^a-z0-9]+", "", s))
+        if s.endswith("-bin") or s.endswith("-git"):
+            cands.add(s[:-4])
+
+    clean_cands = [c for c in cands if len(c) >= 3 and "/" not in c and ".." not in c and c not in UNSAFE_USERDATA_SLUGS]
+    bases = [
+        os.path.join(HOME_DIR, ".config"),
+        os.path.join(HOME_DIR, ".cache"),
+        os.path.join(HOME_DIR, ".local", "share"),
+    ]
+    for base in bases:
+        if not os.path.isdir(base):
+            continue
+        try:
+            entries = os.listdir(base)
+        except Exception:
+            continue
+        lower_map = {e.lower(): e for e in entries}
+        for c in clean_cands:
+            if c in lower_map:
+                full = os.path.join(base, lower_map[c])
+                rp = os.path.realpath(full)
+                if rp.startswith(real_home + os.sep) and rp not in seen and os.path.isdir(full):
+                    seen.add(rp)
+                    found.append(full)
+    return found[:6]
+
+
+def _scan_pacman_local_index():
+    """Fast pure-Python index of /var/lib/pacman/local (<100ms, zero subprocesses)."""
+    desktop_to_pkg = {}
+    bin_to_pkg = {}
+    pkg_meta = {}
+    base = "/var/lib/pacman/local"
+    if not os.path.isdir(base):
+        return desktop_to_pkg, bin_to_pkg, pkg_meta
+    try:
+        dirs = os.listdir(base)
+    except Exception:
+        return desktop_to_pkg, bin_to_pkg, pkg_meta
+    for d in dirs:
+        dp = os.path.join(base, d)
+        desc_p = os.path.join(dp, "desc")
+        if not os.path.isfile(desc_p):
+            continue
+        name = ver = desc = packager = ""
+        size_b = 0
+        inst_ts = 0
+        cur = None
+        try:
+            with open(desc_p, "r", encoding="utf-8", errors="ignore") as f:
+                for raw in f:
+                    s = raw.strip()
+                    if s.startswith("%") and s.endswith("%"):
+                        cur = s
+                    elif s:
+                        if cur == "%NAME%":
+                            name = s
+                        elif cur == "%VERSION%":
+                            ver = s
+                        elif cur == "%DESC%":
+                            desc = s
+                        elif cur == "%PACKAGER%":
+                            packager = s
+                        elif cur == "%SIZE%":
+                            try:
+                                size_b = int(s)
+                            except Exception:
+                                pass
+                        elif cur == "%INSTALLDATE%":
+                            try:
+                                inst_ts = int(s)
+                            except Exception:
+                                pass
+        except Exception:
+            continue
+        if not name:
+            continue
+        inst_date = ""
+        if inst_ts > 0:
+            try:
+                inst_date = datetime.fromtimestamp(inst_ts).strftime("%d/%m/%Y")
+            except Exception:
+                pass
+        pub = "Arch / CachyOS"
+        if "x64" in name.lower() or "x64" in packager.lower():
+            pub = "X64 Studios"
+        elif "cachyos" in packager.lower():
+            pub = "CachyOS"
+        elif packager and "<" in packager:
+            pub = packager.split("<", 1)[0].strip() or "Arch / CachyOS"
+        pkg_meta[name] = {
+            "version": ver,
+            "sizeBytes": size_b,
+            "desc": desc,
+            "installDate": inst_date,
+            "publisher": pub,
+        }
+        files_p = os.path.join(dp, "files")
+        if os.path.isfile(files_p):
+            try:
+                with open(files_p, "r", encoding="utf-8", errors="ignore") as f:
+                    for raw in f:
+                        s = raw.strip()
+                        if s.startswith("usr/share/applications/") and s.endswith(".desktop"):
+                            desktop_to_pkg["/" + s] = name
+                        elif s.startswith("usr/bin/") and "/" not in s[8:]:
+                            bin_to_pkg[s[8:]] = name
+            except Exception:
+                pass
+    return desktop_to_pkg, bin_to_pkg, pkg_meta
+
+
+def _scan_flatpak_apps_map():
+    fp_map = {}
+    if not shutil.which("flatpak"):
+        return fp_map
+    try:
+        out = subprocess.check_output(
+            ["flatpak", "list", "--app", "--columns=application,name,version,size,origin,installation"],
+            text=True, timeout=2.5, stderr=subprocess.DEVNULL, env=dict(os.environ, LC_ALL="C")
+        )
+        for ln in out.splitlines():
+            parts = ln.split("\t")
+            if len(parts) < 2:
+                continue
+            app_id = parts[0].strip()
+            if not app_id:
+                continue
+            nm = parts[1].strip() if len(parts) > 1 else app_id
+            ver = parts[2].strip() if len(parts) > 2 else ""
+            sz_str = parts[3].strip() if len(parts) > 3 else ""
+            origin = parts[4].strip() if len(parts) > 4 else "Flathub"
+            scope = parts[5].strip().lower() if len(parts) > 5 else "system"
+            # Parse flatpak size string like "412.3 MB" or "85.2 kB"
+            sz_b = 0
+            m = re.match(r"([\d.,]+)\s*([kKmMgGtT]?)[bB]?", sz_str.replace("\xa0", " "))
+            if m:
+                try:
+                    val = float(m.group(1).replace(",", "."))
+                    u = m.group(2).lower()
+                    mul = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}.get(u, 1)
+                    sz_b = int(val * mul)
+                except Exception:
+                    pass
+            fp_map[app_id] = {
+                "name": nm,
+                "version": ver,
+                "sizeBytes": sz_b,
+                "sizeHuman": _fmt_size_bytes(sz_b) if sz_b > 0 else (sz_str or "—"),
+                "origin": origin or "Flathub",
+                "scope": "user" if "user" in scope else "system",
+            }
+    except Exception:
+        pass
+    return fp_map
+
+
+def scan_installed_desktop_apps(detailed=False):
     dirs = [
         "/usr/share/applications",
+        "/var/lib/flatpak/exports/share/applications",
+        os.path.join(HOME_DIR, ".local", "share", "flatpak", "exports", "share", "applications"),
         os.path.join(HOME_DIR, ".local", "share", "applications"),
     ]
+    desktop_to_pkg, bin_to_pkg, pkg_meta = _scan_pacman_local_index() if detailed else ({}, {}, {})
+    fp_map = _scan_flatpak_apps_map() if detailed else {}
     seen_names = set()
     apps = []
+    user_apps_dir = os.path.realpath(os.path.join(HOME_DIR, ".local", "share", "applications"))
+
     for d in dirs:
         if not os.path.isdir(d):
             continue
@@ -416,9 +1457,12 @@ def scan_installed_desktop_apps():
             in_entry = False
             name = ""
             name_es = ""
+            comment = ""
+            comment_es = ""
             exec_cmd = ""
             icon = ""
             cats = ""
+            x_flatpak = ""
             no_display = False
             hidden = False
             terminal = False
@@ -442,12 +1486,18 @@ def scan_installed_desktop_apps():
                     name = v
                 elif k in ("Name[es]", "Name[es_ES]", "Name[es_PA]"):
                     name_es = v
+                elif k == "Comment":
+                    comment = v
+                elif k in ("Comment[es]", "Comment[es_ES]", "Comment[es_PA]"):
+                    comment_es = v
                 elif k == "Exec":
                     exec_cmd = v
                 elif k == "Icon":
                     icon = v
                 elif k == "Categories":
                     cats = v
+                elif k == "X-Flatpak":
+                    x_flatpak = v
                 elif k == "NoDisplay" and v.lower() == "true":
                     no_display = True
                 elif k == "Hidden" and v.lower() == "true":
@@ -478,13 +1528,96 @@ def scan_installed_desktop_apps():
                 continue
             seen_names.add(key)
 
-            apps.append({
+            entry = {
                 "id": fname[:-8],
                 "name": final_name,
                 "cmd": clean_exec,
                 "iconUrl": resolve_app_icon_url(icon),
-                "categories": cats.lower()
-            })
+                "categories": cats.lower(),
+            }
+            if detailed:
+                # Detect source: flatpak > pacman > local
+                fp_id = x_flatpak
+                if not fp_id and ("flatpak run" in exec_cmd or "/flatpak/exports/" in fpath):
+                    m_fp = re.search(r"flatpak\s+run\s+(?:--[^\s]+\s+)*([A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+)", exec_cmd)
+                    fp_id = m_fp.group(1) if m_fp else fname[:-8]
+
+                source = "local"
+                source_label = "Local"
+                pkg_name = fname[:-8]
+                version = ""
+                size_bytes = 0
+                install_date = ""
+                publisher = "Aplicación local"
+                fp_scope = ""
+                protected = False
+                can_uninst = False
+
+                if fp_id and (fp_id in fp_map or "/flatpak/exports/" in fpath):
+                    meta = fp_map.get(fp_id, {})
+                    source = "flatpak"
+                    source_label = "Flatpak"
+                    pkg_name = fp_id
+                    version = meta.get("version", "")
+                    size_bytes = meta.get("sizeBytes", 0)
+                    publisher = meta.get("origin", "Flathub")
+                    fp_scope = meta.get("scope", "system")
+                    protected = False
+                    can_uninst = True
+                else:
+                    owner = desktop_to_pkg.get(fpath, "")
+                    if not owner:
+                        # Try binary owner lookup
+                        toks = clean_exec.split()
+                        cand_bin = toks[-1] if (toks[0] == "kitty" and len(toks) >= 3) else toks[0]
+                        bname = os.path.basename(cand_bin.strip("\"'"))
+                        if bname and bname not in ("env", "sh", "bash", "python", "python3", "kitty"):
+                            owner = bin_to_pkg.get(bname, "")
+                    if owner and owner in pkg_meta:
+                        pm = pkg_meta[owner]
+                        source = "pacman"
+                        source_label = "Pacman"
+                        pkg_name = owner
+                        version = pm["version"]
+                        size_bytes = pm["sizeBytes"]
+                        install_date = pm["installDate"]
+                        publisher = pm["publisher"]
+                        protected = is_pkg_system_protected(owner)
+                        can_uninst = not protected
+                    else:
+                        rp = os.path.realpath(fpath)
+                        if rp.startswith(user_apps_dir + os.sep):
+                            source = "local"
+                            source_label = "Local"
+                            pkg_name = fname[:-8]
+                            try:
+                                size_bytes = os.path.getsize(fpath)
+                            except Exception:
+                                size_bytes = 0
+                            can_uninst = True
+                        else:
+                            source = "system"
+                            source_label = "Sistema"
+                            pkg_name = fname[:-8]
+                            protected = True
+                            can_uninst = False
+
+                entry.update({
+                    "comment": comment_es or comment or (pkg_meta.get(pkg_name, {}).get("desc", "") if source == "pacman" else ""),
+                    "desktopPath": fpath,
+                    "source": source,
+                    "sourceLabel": source_label,
+                    "pkgName": pkg_name,
+                    "version": version,
+                    "sizeBytes": size_bytes,
+                    "sizeHuman": _fmt_size_bytes(size_bytes),
+                    "installDate": install_date,
+                    "publisher": publisher,
+                    "flatpakScope": fp_scope,
+                    "isSystemProtected": protected,
+                    "canUninstall": can_uninst,
+                })
+            apps.append(entry)
 
     apps.sort(key=lambda x: x["name"].lower())
     return apps
@@ -965,12 +2098,84 @@ def generate_sysinfo_dict():
     hw_ctrl = get_live_hardware_controls()
     phone_link = get_phone_link_status()
 
+    # Real Recent Files for Windows 11 26H2 Start Menu "Recomendado" section
+    recent_files = []
+    try:
+        seen_rec = set()
+        cand_rec = []
+        now_ep = time.time()
+        def _rec_icon(p):
+            if os.path.isdir(p):
+                return "folder.svg"
+            ext = os.path.splitext(p)[1].lower()
+            if ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"):
+                return "fluent-image.svg"
+            if ext in (".zip", ".tar", ".gz", ".xz", ".zst", ".7z", ".rar"):
+                return "fluent-folder-zip.svg"
+            return "fluent-document.svg"
+        def _rec_age(mt):
+            diff = max(0, int(now_ep - mt))
+            if diff < 120:
+                return "Hace un momento"
+            if diff < 3600:
+                return f"Hace {diff // 60} min"
+            if diff < 86400:
+                return f"Hace {diff // 3600} h"
+            if diff < 172800:
+                return "Ayer"
+            return datetime.fromtimestamp(mt).strftime("%d/%m/%Y")
+        xbel = os.path.join(HOME_DIR, ".local", "share", "recently-used.xbel")
+        if os.path.isfile(xbel):
+            try:
+                xtxt = open(xbel, "r", encoding="utf-8", errors="ignore").read()
+                for m in re.finditer(r'href="file://([^"]+)"', xtxt):
+                    fp = urllib.parse.unquote(m.group(1))
+                    if fp and os.path.exists(fp) and not os.path.basename(fp).startswith(".") and fp not in seen_rec:
+                        seen_rec.add(fp)
+                        try:
+                            cand_rec.append((os.path.getmtime(fp), fp))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        for folder_nm in ("Descargas", "Documentos", "Imágenes", "Escritorio", "Vídeos"):
+            fdir = resolve_special_folder(folder_nm)
+            if not fdir or not os.path.isdir(fdir):
+                continue
+            try:
+                for fn in os.listdir(fdir):
+                    if fn.startswith(".") or fn.endswith(".desktop"):
+                        continue
+                    fp = os.path.join(fdir, fn)
+                    if fp in seen_rec or not os.path.isfile(fp):
+                        continue
+                    seen_rec.add(fp)
+                    try:
+                        cand_rec.append((os.path.getmtime(fp), fp))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        cand_rec.sort(key=lambda x: -x[0])
+        for mt, fp in cand_rec[:6]:
+            parent_nm = os.path.basename(os.path.dirname(fp)) or "Inicio"
+            recent_files.append({
+                "name": os.path.basename(fp),
+                "path": fp,
+                "folder": parent_nm,
+                "age": _rec_age(mt),
+                "icon": _rec_icon(fp)
+            })
+    except Exception:
+        pass
+
     return {
         "user": display_name,
         "username": uname,
         "hostname": hostname,
         "userEmail": f"{uname}@{hostname}",
         "userAvatarUrl": str(cfg_cur.get("userAvatarUrl", "") or ""),
+        "tzOffsetMins": _get_tz_offset_mins(""),
         "hasBattery": bat["hasBattery"],
         "batteryPct": bat["batteryPct"],
         "batteryCharging": bat["batteryCharging"],
@@ -985,6 +2190,7 @@ def generate_sysinfo_dict():
         "desktopIcons": desktop_icons,
         "taskbarPinned": taskbar_pinned,
         "startPinned": start_pinned[:18],
+        "recentFiles": recent_files,
         "allApps": all_apps[:80],
         "categories": categories_out,
         "calendar": build_calendar_data(),
@@ -1462,24 +2668,97 @@ def main():
 
     class _UpdateCheckWorker(QThread):
         done = pyqtSignal(str)
+        def _has_network(self):
+            for host, port in (("repo.x64lios.com", 443), ("archlinux.org", 443), ("1.1.1.1", 53)):
+                try:
+                    with socket.create_connection((host, port), timeout=2.5):
+                        return True
+                except Exception:
+                    continue
+            return False
+
         def run(self):
-            pkgs = []
+            if not self._has_network():
+                self.done.emit(json.dumps({
+                    "count": -1,
+                    "pacmanCount": 0,
+                    "aurCount": 0,
+                    "flatpakCount": 0,
+                    "packages": [],
+                    "flatpakPackages": [],
+                    "checkedAt": datetime.now().strftime("%H:%M:%S"),
+                    "error": "Sin conexión a Internet para comprobar actualizaciones.",
+                }))
+                return
+
+            if shutil.which("x64-update"):
+                try:
+                    r = subprocess.run(["x64-update", "--check"], capture_output=True, text=True, timeout=60.0)
+                    cached = _read_x64_update_cache()
+                    if r.returncode == 0 and cached is not None:
+                        cached["fromCache"] = False
+                        cached["checkedAt"] = datetime.now().strftime("%H:%M:%S")
+                        self.done.emit(json.dumps(cached))
+                        return
+                except subprocess.TimeoutExpired:
+                    self.done.emit(json.dumps({
+                        "count": -1,
+                        "pacmanCount": 0,
+                        "aurCount": 0,
+                        "flatpakCount": 0,
+                        "packages": [],
+                        "flatpakPackages": [],
+                        "checkedAt": datetime.now().strftime("%H:%M:%S"),
+                        "error": "Tiempo de espera agotado al consultar los repositorios.",
+                    }))
+                    return
+                except Exception:
+                    pass
+
+            pac_pkgs = []
+            fp_pkgs = []
+            err_msg = ""
             try:
                 cmd = ["checkupdates"] if shutil.which("checkupdates") else ["pacman", "-Qu"]
-                out = subprocess.check_output(cmd, text=True, timeout=12.0, stderr=subprocess.DEVNULL)
-                for ln in out.splitlines():
-                    ln = ln.strip()
-                    if ln:
-                        pkgs.append(ln)
-            except subprocess.CalledProcessError as e:
-                if e.returncode == 2:
-                    pkgs = []
-            except Exception:
-                pass
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=25.0)
+                if r.returncode == 0:
+                    for ln in (r.stdout or "").splitlines():
+                        s = ln.strip()
+                        if s:
+                            pac_pkgs.append(s)
+                elif r.returncode == 2:
+                    pac_pkgs = []
+                else:
+                    err_msg = "No se pudo consultar los repositorios (comprueba tu conexión a Internet)."
+            except subprocess.TimeoutExpired:
+                err_msg = "Tiempo de espera agotado al consultar los repositorios."
+            except Exception as ex:
+                err_msg = f"Error al comprobar actualizaciones: {str(ex)[:90]}"
+
+            if not err_msg and shutil.which("flatpak"):
+                try:
+                    rf = subprocess.run(
+                        ["flatpak", "remote-ls", "--updates", "--columns=application,version"],
+                        capture_output=True, text=True, timeout=6.0
+                    )
+                    if rf.returncode == 0:
+                        for ln in (rf.stdout or "").splitlines():
+                            s = ln.strip().replace("\t", " ")
+                            if s:
+                                fp_pkgs.append(s)
+                except Exception:
+                    pass
+
+            all_pkgs = pac_pkgs + [f"{p} (Flatpak)" for p in fp_pkgs]
             self.done.emit(json.dumps({
-                "count": len(pkgs),
-                "packages": pkgs[:40],
-                "checkedAt": datetime.now().strftime("%H:%M:%S")
+                "count": -1 if err_msg else len(all_pkgs),
+                "pacmanCount": len(pac_pkgs),
+                "aurCount": 0,
+                "flatpakCount": len(fp_pkgs),
+                "packages": all_pkgs[:50],
+                "flatpakPackages": fp_pkgs[:20],
+                "checkedAt": datetime.now().strftime("%H:%M:%S"),
+                "error": err_msg,
             }))
 
     class _SettingsRefreshWorker(QThread):
@@ -1570,11 +2849,214 @@ def main():
                 pass
             self.scanDone.emit(json.dumps(found))
 
+    class _WifiScanWorker(QThread):
+        scanDone = pyqtSignal(str)
+        def run(self):
+            try:
+                subprocess.run(
+                    ["nmcli", "dev", "wifi", "rescan"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8.0
+                )
+                dump_sysinfo_file()
+                self.scanDone.emit("ok")
+            except Exception as ex:
+                self.scanDone.emit(f"error:{str(ex)[:60]}")
+
+    class _NetPingWorker(QThread):
+        pingDone = pyqtSignal(str)
+        def run(self):
+            import socket
+            res = {"ok": False, "ipMs": -1, "dnsMs": -1, "gwMs": -1, "summary": "Sin respuesta de red"}
+            try:
+                # 1. Gateway ping (if default route exists)
+                gw = ""
+                try:
+                    rout = subprocess.check_output(["ip", "route", "show", "default"], text=True, timeout=0.8, stderr=subprocess.DEVNULL).splitlines()
+                    if rout:
+                        rt = rout[0].split()
+                        if "via" in rt:
+                            gw = rt[rt.index("via") + 1]
+                except Exception:
+                    pass
+                def _ping_one(host):
+                    try:
+                        out = subprocess.check_output(
+                            ["ping", "-c", "1", "-W", "2", host],
+                            text=True, timeout=3.0, stderr=subprocess.DEVNULL, env=dict(os.environ, LC_ALL="C")
+                        )
+                        m = re.search(r"time=([\d.]+)", out)
+                        if m:
+                            return round(float(m.group(1)), 1)
+                    except Exception:
+                        pass
+                    return -1
+                if gw:
+                    res["gwMs"] = _ping_one(gw)
+                res["ipMs"] = _ping_one("1.1.1.1")
+                t0 = time.monotonic()
+                try:
+                    socket.getaddrinfo("repo.x64lios.com", 443)
+                    res["dnsMs"] = round((time.monotonic() - t0) * 1000.0, 1)
+                except Exception:
+                    res["dnsMs"] = -1
+                if res["ipMs"] >= 0:
+                    res["ok"] = True
+                    parts = []
+                    if res["gwMs"] >= 0:
+                        parts.append(f"Router {res['gwMs']} ms")
+                    parts.append(f"Internet {res['ipMs']} ms")
+                    if res["dnsMs"] >= 0:
+                        parts.append(f"DNS {res['dnsMs']} ms")
+                    res["summary"] = "  •  ".join(parts)
+                elif res["gwMs"] >= 0:
+                    res["summary"] = f"Router responde ({res['gwMs']} ms), sin salida a Internet"
+            except Exception:
+                pass
+            self.pingDone.emit(json.dumps(res))
+
+    class _UninstallWorker(QThread):
+        progress = pyqtSignal(str)
+        done = pyqtSignal(str)
+        def __init__(self, pkg_or_id, source, desktop_path, app_name, clean_user_data, flatpak_scope, parent=None):
+            super().__init__(parent)
+            self.pkg_or_id = (pkg_or_id or "").strip()
+            self.source = (source or "").strip().lower()
+            self.desktop_path = (desktop_path or "").strip()
+            self.app_name = (app_name or self.pkg_or_id).strip()
+            self.clean_user_data = bool(clean_user_data)
+            self.flatpak_scope = (flatpak_scope or "system").strip().lower()
+
+        def run(self):
+            log_lines = []
+            def emit_prog(step, pct, line=""):
+                if line:
+                    log_lines.append(line)
+                self.progress.emit(json.dumps({"step": step, "pct": pct, "logLine": line}))
+
+            try:
+                if self.source == "pacman":
+                    if not re.match(r"^[a-zA-Z0-9@._+-]+$", self.pkg_or_id) or is_pkg_system_protected(self.pkg_or_id):
+                        self.done.emit(json.dumps({
+                            "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                            "error": "Paquete protegido del sistema: no se puede desinstalar.", "log": ""
+                        }))
+                        return
+                    emit_prog("Solicitando autorización de administrador...", 15, f"$ pkexec pacman -Rns --noconfirm {self.pkg_or_id}")
+                    proc = subprocess.Popen(
+                        ["pkexec", "pacman", "-Rns", "--noconfirm", self.pkg_or_id],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                        env=dict(os.environ, LC_ALL="C")
+                    )
+                    pct = 25
+                    for raw in proc.stdout:
+                        ln = raw.rstrip("\r\n")
+                        if not ln:
+                            continue
+                        if "checking dependencies" in ln.lower():
+                            pct = 35
+                            emit_prog("Comprobando dependencias...", pct, ln)
+                        elif "removing " in ln.lower():
+                            pct = min(82, pct + 12)
+                            emit_prog("Eliminando archivos del paquete...", pct, ln)
+                        elif "running post-transaction hooks" in ln.lower():
+                            pct = 86
+                            emit_prog("Actualizando base de datos del escritorio...", pct, ln)
+                        else:
+                            emit_prog("Desinstalando paquete...", pct, ln)
+                    rc = proc.wait(timeout=180)
+                    if rc != 0:
+                        err_msg = "Desinstalación cancelada por el usuario." if rc in (126, 127) else "No se pudo desinstalar el paquete (revisa el registro técnico)."
+                        for ln in reversed(log_lines):
+                            if "breaks dependency" in ln.lower() or "error:" in ln.lower():
+                                err_msg = ln.strip()[:180]
+                                break
+                        self.done.emit(json.dumps({
+                            "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                            "error": err_msg, "log": "\n".join(log_lines[-40:])
+                        }))
+                        return
+
+                elif self.source == "flatpak":
+                    if not re.match(r"^[A-Za-z0-9_.-]+$", self.pkg_or_id):
+                        self.done.emit(json.dumps({
+                            "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                            "error": "Identificador Flatpak no válido.", "log": ""
+                        }))
+                        return
+                    if self.flatpak_scope == "user":
+                        cmd = ["flatpak", "uninstall", "-y", "--user", "--noninteractive", self.pkg_or_id]
+                        emit_prog("Desinstalando aplicación Flatpak de usuario...", 25, "$ " + " ".join(cmd))
+                    else:
+                        cmd = ["pkexec", "flatpak", "uninstall", "-y", "--system", "--noninteractive", self.pkg_or_id]
+                        emit_prog("Solicitando autorización para Flatpak...", 20, "$ " + " ".join(cmd))
+                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    pct = 40
+                    for raw in proc.stdout:
+                        ln = raw.rstrip("\r\n")
+                        if ln:
+                            pct = min(84, pct + 8)
+                            emit_prog("Eliminando aplicación Flatpak...", pct, ln)
+                    rc = proc.wait(timeout=180)
+                    if rc != 0:
+                        err_msg = "Desinstalación cancelada por el usuario." if rc in (126, 127) else "Flatpak devolvió un error al desinstalar."
+                        self.done.emit(json.dumps({
+                            "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                            "error": err_msg, "log": "\n".join(log_lines[-40:])
+                        }))
+                        return
+
+                elif self.source == "local":
+                    user_apps_dir = os.path.realpath(os.path.join(HOME_DIR, ".local", "share", "applications"))
+                    rp = os.path.realpath(self.desktop_path) if self.desktop_path else ""
+                    if not rp or not rp.startswith(user_apps_dir + os.sep) or not rp.endswith(".desktop") or not os.path.isfile(rp):
+                        self.done.emit(json.dumps({
+                            "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                            "error": "No se encontró un lanzador local de usuario válido.", "log": ""
+                        }))
+                        return
+                    emit_prog("Eliminando acceso local de aplicación...", 50, f"rm {rp}")
+                    os.remove(rp)
+                else:
+                    self.done.emit(json.dumps({
+                        "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                        "error": "Origen de aplicación no soportado para desinstalación.", "log": ""
+                    }))
+                    return
+
+                # Optional user-data cleanup (strictly recomputed safe paths inside $HOME!)
+                cleaned_dirs = []
+                if self.clean_user_data:
+                    safe_dirs = _find_safe_user_data_paths(self.pkg_or_id, self.app_name, self.source)
+                    for sd in safe_dirs:
+                        try:
+                            emit_prog("Limpiando datos locales del usuario...", 90, f"rm -rf {sd}")
+                            shutil.rmtree(sd, ignore_errors=True)
+                            cleaned_dirs.append(sd)
+                        except Exception:
+                            pass
+
+                emit_prog("Actualizando Menú Inicio y lista de aplicaciones...", 95, "Sincronizando sysinfo.json...")
+                dump_sysinfo_file()
+                emit_prog("Desinstalación completada", 100, "Listo.")
+                self.done.emit(json.dumps({
+                    "ok": True, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                    "cleanedDirs": cleaned_dirs, "error": "", "log": "\n".join(log_lines[-40:])
+                }))
+            except Exception as ex:
+                self.done.emit(json.dumps({
+                    "ok": False, "appName": self.app_name, "pkgName": self.pkg_or_id,
+                    "error": str(ex)[:140], "log": "\n".join(log_lines[-40:])
+                }))
+
     class AppBridge(QObject):
         updatesChecked = pyqtSignal(str)
         liveStateReady = pyqtSignal(str)
         micTestStateChanged = pyqtSignal(str)
         btScanFinished = pyqtSignal(str)
+        wifiScanFinished = pyqtSignal(str)
+        netPingFinished = pyqtSignal(str)
+        uninstallProgress = pyqtSignal(str)
+        uninstallFinished = pyqtSignal(str)
         hwOsdUpdated = pyqtSignal(str)
         mouseBackPressed = pyqtSignal()
         mouseForwardPressed = pyqtSignal()
@@ -1584,6 +3066,9 @@ def main():
             self._upd_worker = None
             self._mic_worker = None
             self._bt_scan_worker = None
+            self._wifi_scan_worker = None
+            self._net_ping_worker = None
+            self._uninstall_worker = None
             self._refresh_worker = None
             self._last_osd_ts = 0
             try:
@@ -2731,6 +4216,9 @@ def main():
                 elif act == "poweroff":
                     subprocess.Popen(["systemctl", "poweroff"], start_new_session=True)
                     return True
+                elif act == "firmware":
+                    r = subprocess.run(["systemctl", "reboot", "--firmware-setup"], capture_output=True, text=True, timeout=4.0)
+                    return r.returncode == 0
             except Exception:
                 pass
             return False
@@ -3144,6 +4632,165 @@ def main():
             except Exception:
                 return False
 
+        @pyqtSlot()
+        def startWifiScan(self):
+            if self._wifi_scan_worker is not None and self._wifi_scan_worker.isRunning():
+                return
+            w = _WifiScanWorker()
+            w.scanDone.connect(self.wifiScanFinished.emit)
+            self._wifi_scan_worker = w
+            w.start()
+
+        @pyqtSlot()
+        def startNetPingTest(self):
+            if self._net_ping_worker is not None and self._net_ping_worker.isRunning():
+                return
+            w = _NetPingWorker()
+            w.pingDone.connect(self.netPingFinished.emit)
+            self._net_ping_worker = w
+            w.start()
+
+        @pyqtSlot(bool, result=bool)
+        def setAirplaneMode(self, enabled):
+            try:
+                cfg = load_cfg()
+                if enabled:
+                    # Save current Wi-Fi / BT states so disabling Airplane Mode restores them accurately
+                    hw = get_live_hardware_controls()
+                    cfg["_preAirplaneWifi"] = bool(hw.get("wifiEnabled", True))
+                    cfg["_preAirplaneBt"] = bool(hw.get("btEnabled", True))
+                    save_cfg(cfg)
+                    subprocess.run(["nmcli", "radio", "all", "off"], timeout=2.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["bluetoothctl", "power", "off"], timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run(["rfkill", "block", "bluetooth"], timeout=1.5, stderr=subprocess.DEVNULL)
+                else:
+                    want_wifi = bool(cfg.get("_preAirplaneWifi", True))
+                    want_bt = bool(cfg.get("_preAirplaneBt", True))
+                    subprocess.run(["rfkill", "unblock", "wifi"], timeout=1.5, stderr=subprocess.DEVNULL)
+                    if want_wifi:
+                        subprocess.run(["nmcli", "radio", "wifi", "on"], timeout=2.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if want_bt:
+                        subprocess.run(["rfkill", "unblock", "bluetooth"], timeout=1.5, stderr=subprocess.DEVNULL)
+                        subprocess.run(["bluetoothctl", "power", "on"], timeout=2.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, str, result=bool)
+        def setConnectionProp(self, uuid, prop_key, prop_val):
+            u = (uuid or "").strip()
+            k = (prop_key or "").strip()
+            v = (prop_val or "").strip()
+            if not u or k not in ("connection.autoconnect", "connection.metered"):
+                return False
+            try:
+                r = subprocess.run(
+                    ["nmcli", "con", "mod", "uuid", u, k, v],
+                    timeout=3.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def forgetNetwork(self, uuid_or_id):
+            t = (uuid_or_id or "").strip()
+            if not t:
+                return False
+            try:
+                is_uuid = bool(re.match(r"^[0-9a-fA-F-]{32,40}$", t))
+                cmd = ["nmcli", "con", "delete", "uuid" if is_uuid else "id", t]
+                r = subprocess.run(cmd, timeout=4.0, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                dump_sysinfo_file()
+                return r.returncode == 0
+            except Exception:
+                return False
+
+        @pyqtSlot(str, bool, result=str)
+        def setAdapterConnected(self, iface, connect_flag):
+            d = (iface or "").strip()
+            if not d:
+                return "error:Adaptador no válido"
+            try:
+                act = "connect" if connect_flag else "disconnect"
+                r = subprocess.run(
+                    ["nmcli", "dev", act, d],
+                    text=True, capture_output=True, timeout=10.0, env=dict(os.environ, LC_ALL="C")
+                )
+                dump_sysinfo_file()
+                if r.returncode == 0:
+                    return "ok"
+                err = (r.stderr or r.stdout or "Operación fallida").strip().splitlines()[-1][:85]
+                return f"error:{err}"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(str, bool, result=str)
+        def toggleVpnProfile(self, uuid, activate):
+            u = (uuid or "").strip()
+            if not u:
+                return "error:Perfil VPN no válido"
+            try:
+                act = "up" if activate else "down"
+                r = subprocess.run(
+                    ["nmcli", "con", act, "uuid", u],
+                    text=True, capture_output=True, timeout=12.0, env=dict(os.environ, LC_ALL="C")
+                )
+                dump_sysinfo_file()
+                if r.returncode == 0:
+                    return "ok"
+                err = (r.stderr or r.stdout or "Error al cambiar VPN").strip().splitlines()[-1][:90]
+                return f"error:{err}"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(result=str)
+        def importVpnFile(self):
+            try:
+                from PyQt6.QtWidgets import QFileDialog
+                fp, _ = QFileDialog.getOpenFileName(
+                    None,
+                    "Importar perfil VPN (OpenVPN / WireGuard)",
+                    HOME_DIR,
+                    "Perfiles VPN (*.ovpn *.conf);;OpenVPN (*.ovpn);;WireGuard (*.conf);;Todos (*)"
+                )
+                if not fp:
+                    return "cancel"
+                vtype = "openvpn"
+                low = fp.lower()
+                if low.endswith(".conf"):
+                    try:
+                        txt = open(fp, "r", encoding="utf-8", errors="ignore").read(4096)
+                        if "[Interface]" in txt or "[Peer]" in txt:
+                            vtype = "wireguard"
+                    except Exception:
+                        vtype = "wireguard"
+                r = subprocess.run(
+                    ["nmcli", "connection", "import", "type", vtype, "file", fp],
+                    text=True, capture_output=True, timeout=8.0, env=dict(os.environ, LC_ALL="C")
+                )
+                if r.returncode == 0:
+                    return "ok:" + os.path.basename(fp)
+                err = (r.stderr or r.stdout or "Formato VPN no reconocido").strip().splitlines()[-1][:90]
+                return f"error:{err}"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
+        @pyqtSlot(result=str)
+        def restartNetworkStack(self):
+            try:
+                r = subprocess.run(
+                    ["pkexec", "systemctl", "restart", "NetworkManager"],
+                    text=True, capture_output=True, timeout=20.0
+                )
+                if r.returncode == 0:
+                    dump_sysinfo_file()
+                    return "ok"
+                return "error:Cancelado o sin permisos"
+            except Exception as ex:
+                return f"error:{str(ex)[:75]}"
+
         def _save_monitors_patch(self, patches):
             mon_p = os.path.join(STATE_DIR, "monitors.json")
             os.makedirs(STATE_DIR, exist_ok=True)
@@ -3355,30 +5002,269 @@ def main():
             except Exception:
                 return False
 
-        @pyqtSlot(str, result=bool)
-        def setKeyboardLayout(self, code):
-            c = (code or "es").strip().lower()
-            pairs = {"es": ("es,us", "ES"), "us": ("us,es", "US"), "latam": ("latam,us", "LATAM")}
-            pair, label = pairs.get(c, ("es,us", "ES"))
+        @pyqtSlot(result=str)
+        def getTimeLangInfoJson(self):
+            return json.dumps(_build_timelang_info())
+
+        @pyqtSlot(result=str)
+        def getGamingInfoJson(self):
+            return json.dumps(_build_gaming_info())
+
+        @pyqtSlot(result=str)
+        def getUpdateInfoJson(self):
+            return json.dumps(_build_update_info())
+
+        @pyqtSlot(str, bool, result=str)
+        def setSystemdTimerEnabled(self, timer_name, enabled):
+            unit = (timer_name or "").strip()
+            if unit not in ("paccache.timer", "fstrim.timer"):
+                return "error:Temporizador no permitido"
+            if not (os.path.isfile(f"/usr/lib/systemd/system/{unit}") or os.path.isfile(f"/etc/systemd/system/{unit}")):
+                return f"error:La unidad {unit} no está instalada en este equipo"
+            act = "enable" if bool(enabled) else "disable"
+            try:
+                r = subprocess.run(["pkexec", "systemctl", act, "--now", unit], capture_output=True, text=True, timeout=25.0)
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or f"No se pudo modificar {unit}").strip()[:110])
+            except Exception as ex:
+                return "error:" + str(ex)[:110]
+
+        @pyqtSlot(bool, result=str)
+        def setUpdateTrayEnabled(self, enabled):
+            en = bool(enabled)
+            if en and shutil.which("x64-update-tray") is None:
+                return "error:x64-update-tray no está instalado"
+            try:
+                auto_dir = os.path.join(HOME_DIR, ".config", "autostart")
+                os.makedirs(auto_dir, exist_ok=True)
+                user_desk = os.path.join(auto_dir, "x64-update-tray.desktop")
+                sys_desk = "/etc/xdg/autostart/x64-update-tray.desktop"
+                if os.path.isfile(sys_desk):
+                    with open(sys_desk, "r", encoding="utf-8", errors="ignore") as sf:
+                        base_lines = [
+                            ln for ln in sf.read().splitlines()
+                            if not ln.lower().startswith(("hidden=", "x-gnome-autostart-enabled="))
+                        ]
+                else:
+                    base_lines = [
+                        "[Desktop Entry]",
+                        "Name=X64 Update Tray",
+                        "Comment=Notificador de actualizaciones de X64 LIOS",
+                        "Exec=x64-update-tray",
+                        "Icon=x64-update",
+                        "Terminal=false",
+                        "Type=Application",
+                        "StartupNotify=false",
+                        "NoDisplay=true",
+                    ]
+                base_lines.append("Hidden=false" if en else "Hidden=true")
+                base_lines.append("X-GNOME-Autostart-enabled=true" if en else "X-GNOME-Autostart-enabled=false")
+                with open(user_desk, "w", encoding="utf-8") as df:
+                    df.write("\n".join(base_lines) + "\n")
+
+                if en:
+                    if not _is_update_tray_running():
+                        subprocess.Popen(
+                            ["/usr/bin/x64-update-tray"],
+                            start_new_session=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                        time.sleep(0.25)
+                else:
+                    my_uid = os.getuid()
+                    for pid in os.listdir("/proc"):
+                        if not pid.isdigit():
+                            continue
+                        pdir = os.path.join("/proc", pid)
+                        try:
+                            if os.stat(pdir).st_uid != my_uid:
+                                continue
+                            cmd = open(os.path.join(pdir, "cmdline"), "rb").read().replace(b"\x00", b" ").decode("utf-8", "ignore")
+                            if "/usr/bin/x64-update-tray" in cmd or cmd.strip().endswith("x64-update-tray"):
+                                os.kill(int(pid), signal.SIGTERM)
+                        except Exception:
+                            continue
+                    time.sleep(0.15)
+                return "ok"
+            except Exception as ex:
+                return "error:" + str(ex)[:110]
+
+        @pyqtSlot(bool, result=str)
+        def setGameModeActive(self, enabled):
+            prof = "performance" if bool(enabled) else "balanced"
+            cfg = load_cfg()
+            dnd_res = bool(cfg.get("doNotDisturb", False))
+            try:
+                subprocess.Popen(["/usr/bin/x64-win11-ctl", "power-profile", prof], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if cfg.get("gameModeAutoDnd", True):
+                    if enabled:
+                        if "_preGameDnd" not in cfg:
+                            cfg["_preGameDnd"] = dnd_res
+                        cfg["doNotDisturb"] = True
+                        dnd_res = True
+                    else:
+                        if "_preGameDnd" in cfg:
+                            dnd_res = bool(cfg.pop("_preGameDnd"))
+                            cfg["doNotDisturb"] = dnd_res
+                        else:
+                            cfg["doNotDisturb"] = False
+                            dnd_res = False
+                    self._cfg_rev += 1
+                    save_cfg(cfg)
+                return json.dumps({"ok": True, "doNotDisturb": dnd_res})
+            except Exception:
+                return json.dumps({"ok": False, "doNotDisturb": dnd_res})
+
+        @pyqtSlot(result=bool)
+        def openScreenshotDir(self):
+            try:
+                sdir = _resolve_screenshot_dir()
+                os.makedirs(sdir, exist_ok=True)
+                subprocess.Popen(["/usr/bin/x64-win11-app", "explorer", sdir], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, str, result=bool)
+        def setLabwcGamingCore(self, adaptive_sync, allow_tearing):
+            a_sync = (adaptive_sync or "yes").strip()
+            if a_sync not in ("yes", "no", "fullscreen"):
+                a_sync = "yes"
+            a_tear = (allow_tearing or "no").strip()
+            if a_tear not in ("no", "yes", "fullscreen", "fullscreenForced"):
+                a_tear = "no"
+            rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+            try:
+                os.makedirs(os.path.dirname(rc_p), exist_ok=True)
+                if not os.path.isfile(rc_p) and os.path.isfile("/etc/xdg/x64-win11/labwc/rc.xml"):
+                    shutil.copy2("/etc/xdg/x64-win11/labwc/rc.xml", rc_p)
+                txt = open(rc_p, "r", encoding="utf-8", errors="ignore").read() if os.path.isfile(rc_p) else "<labwc_config><core></core></labwc_config>"
+                txt = re.sub(r"\n?[ \t]*<(?:adaptiveSync|allowTearing)>[^<]*</(?:adaptiveSync|allowTearing)>", "", txt)
+                inject = f"\n    <adaptiveSync>{a_sync}</adaptiveSync>\n    <allowTearing>{a_tear}</allowTearing>"
+                if "<core>" in txt:
+                    txt = txt.replace("<core>", "<core>" + inject, 1)
+                elif "</labwc_config>" in txt:
+                    txt = txt.replace("</labwc_config>", f"  <core>{inject}\n  </core>\n</labwc_config>", 1)
+                with open(rc_p + ".tmp", "w", encoding="utf-8") as f:
+                    f.write(txt)
+                os.replace(rc_p + ".tmp", rc_p)
+                subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.0, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(result=str)
+        def pickScreenshotDir(self):
+            if not _HAS_QTWIDGETS or QFileDialog is None:
+                return ""
+            cur_dir = _resolve_screenshot_dir()
+            if not os.path.isdir(cur_dir):
+                cur_dir = HOME_DIR
+            chosen = QFileDialog.getExistingDirectory(None, "Seleccionar carpeta para capturas", cur_dir)
+            if not chosen or not os.path.isdir(chosen):
+                return ""
+            cfg = load_cfg()
+            cfg["screenshotDir"] = chosen
+            self._cfg_rev += 1
+            save_cfg(cfg)
+            return chosen
+
+        @pyqtSlot(result=str)
+        def resetScreenshotDir(self):
+            cfg = load_cfg()
+            cfg["screenshotDir"] = ""
+            self._cfg_rev += 1
+            save_cfg(cfg)
+            return _resolve_screenshot_dir(cfg)
+
+        @pyqtSlot(result=str)
+        def getAllTimezonesJson(self):
+            global _CACHED_TIMEZONES
+            if _CACHED_TIMEZONES is None:
+                try:
+                    out = subprocess.check_output(["timedatectl", "list-timezones"], text=True, timeout=2.0, stderr=subprocess.DEVNULL)
+                    _CACHED_TIMEZONES = [ln.strip() for ln in out.splitlines() if ln.strip()]
+                except Exception:
+                    _CACHED_TIMEZONES = ["America/Panama", "America/Bogota", "America/Mexico_City", "America/Lima", "America/Santiago", "America/Argentina/Buenos_Aires", "America/New_York", "Europe/Madrid", "UTC"]
+            return json.dumps(_CACHED_TIMEZONES)
+
+        @pyqtSlot(str, str, str, result=bool)
+        def setKeyboardConfig(self, primary, secondary, toggle_opt):
+            allowed = {"es", "latam", "us", "br", "fr", "de"}
+            p = (primary or "es").strip().lower()
+            if p not in allowed:
+                p = "es"
+            s = (secondary or "none").strip().lower()
+            if s not in allowed or s == p:
+                s = "none"
+            pair = f"{p},{s}" if s != "none" else p
+            opt = (toggle_opt or "grp:alt_shift_toggle").strip()
+            if opt not in ("grp:alt_shift_toggle", "grp:ctrl_shift_toggle", "none"):
+                opt = "grp:alt_shift_toggle"
+            opt_val = "" if opt == "none" else opt
+            tag_map = {"es": "ES", "latam": "LATAM", "us": "US", "br": "BR", "fr": "FR", "de": "DE"}
+            label = tag_map.get(p, p.upper())
             env_p = os.path.join(HOME_DIR, ".config", "labwc", "environment")
             try:
                 os.makedirs(os.path.dirname(env_p), exist_ok=True)
                 lines = open(env_p, "r", encoding="utf-8", errors="ignore").read().splitlines() if os.path.isfile(env_p) else []
                 out = []
-                replaced = False
+                rep_l = False
+                rep_o = False
                 for ln in lines:
                     if ln.startswith("XKB_DEFAULT_LAYOUT="):
                         out.append(f"XKB_DEFAULT_LAYOUT={pair}")
-                        replaced = True
+                        rep_l = True
+                    elif ln.startswith("XKB_DEFAULT_OPTIONS="):
+                        out.append(f"XKB_DEFAULT_OPTIONS={opt_val}")
+                        rep_o = True
                     else:
                         out.append(ln)
-                if not replaced:
+                if not rep_l:
                     out.append(f"XKB_DEFAULT_LAYOUT={pair}")
+                if not rep_o:
+                    out.append(f"XKB_DEFAULT_OPTIONS={opt_val}")
                 with open(env_p, "w", encoding="utf-8") as f:
                     f.write("\n".join(out) + "\n")
                 cfg = load_cfg()
                 cfg["kbLayout"] = label
+                self._cfg_rev += 1
                 save_cfg(cfg)
+                subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.0, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=bool)
+        def setKeyboardLayout(self, code):
+            c = (code or "es").strip().lower()
+            sec = "es" if c == "us" else "us"
+            return self.setKeyboardConfig(c, sec, "grp:alt_shift_toggle")
+
+        @pyqtSlot(int, int, bool, result=bool)
+        def setKeyboardTyping(self, repeat_rate, repeat_delay, numlock_on):
+            rr = max(15, min(60, int(repeat_rate)))
+            rd = max(200, min(1000, int(repeat_delay)))
+            nl = "on" if bool(numlock_on) else "off"
+            rc_p = os.path.join(HOME_DIR, ".config", "labwc", "rc.xml")
+            try:
+                os.makedirs(os.path.dirname(rc_p), exist_ok=True)
+                if not os.path.isfile(rc_p) and os.path.isfile("/etc/xdg/x64-win11/labwc/rc.xml"):
+                    shutil.copy2("/etc/xdg/x64-win11/labwc/rc.xml", rc_p)
+                txt = open(rc_p, "r", encoding="utf-8", errors="ignore").read() if os.path.isfile(rc_p) else "<labwc_config><keyboard></keyboard></labwc_config>"
+                txt = re.sub(r"\n?[ \t]*<(?:repeatRate|repeatDelay|numlock)>[^<]*</(?:repeatRate|repeatDelay|numlock)>", "", txt)
+                inject = f"\n    <repeatRate>{rr}</repeatRate>\n    <repeatDelay>{rd}</repeatDelay>\n    <numlock>{nl}</numlock>"
+                if "<keyboard>" in txt:
+                    txt = txt.replace("<keyboard>", "<keyboard>" + inject, 1)
+                elif "</labwc_config>" in txt:
+                    txt = txt.replace("</labwc_config>", f"  <keyboard>{inject}\n  </keyboard>\n</labwc_config>", 1)
+                with open(rc_p + ".tmp", "w", encoding="utf-8") as f:
+                    f.write(txt)
+                os.replace(rc_p + ".tmp", rc_p)
                 subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.0, stderr=subprocess.DEVNULL)
                 return True
             except Exception:
@@ -3387,32 +5273,125 @@ def main():
         @pyqtSlot(str, result=bool)
         def setSystemTimezone(self, tz_name):
             tz = (tz_name or "").strip()
-            if not tz or "/" not in tz and tz != "UTC":
+            if not tz or ("/" not in tz and tz != "UTC") or not re.match(r"^[A-Za-z0-9_/+.-]+$", tz):
                 return False
             try:
-                r = subprocess.run(["pkexec", "timedatectl", "set-timezone", tz], timeout=15.0, stderr=subprocess.DEVNULL)
-                return r.returncode == 0
+                r = subprocess.run(["pkexec", "timedatectl", "set-timezone", tz], timeout=25.0, stderr=subprocess.DEVNULL)
+                if r.returncode == 0:
+                    dump_sysinfo_file()
+                    return True
+                return False
             except Exception:
                 return False
 
         @pyqtSlot(bool, result=bool)
         def setNtpEnabled(self, enabled):
             try:
-                r = subprocess.run(["pkexec", "timedatectl", "set-ntp", "true" if enabled else "false"], timeout=15.0, stderr=subprocess.DEVNULL)
+                r = subprocess.run(["pkexec", "timedatectl", "set-ntp", "true" if enabled else "false"], timeout=25.0, stderr=subprocess.DEVNULL)
                 return r.returncode == 0
             except Exception:
                 return False
+
+        @pyqtSlot(result=str)
+        def syncClockNow(self):
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c", "timedatectl set-ntp true && (systemctl restart systemd-timesyncd 2>/dev/null || systemctl restart chronyd 2>/dev/null || true)"],
+                    capture_output=True, text=True, timeout=25.0
+                )
+                if r.returncode == 0:
+                    dump_sysinfo_file()
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo sincronizar la hora").strip()[:110])
+            except Exception as ex:
+                return "error:" + str(ex)[:110]
+
+        @pyqtSlot(str, result=str)
+        def setManualDateTime(self, dt_str):
+            s = (dt_str or "").strip()
+            if not re.match(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$", s):
+                return "error:Formato inválido (usa AAAA-MM-DD HH:MM:SS)"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c", 'timedatectl set-ntp false && timedatectl set-time "$1"', "--", s],
+                    capture_output=True, text=True, timeout=25.0
+                )
+                if r.returncode == 0:
+                    dump_sysinfo_file()
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo establecer la fecha y hora").strip()[:110])
+            except Exception as ex:
+                return "error:" + str(ex)[:110]
+
+        @pyqtSlot(bool, result=str)
+        def setLocalRtc(self, enabled):
+            try:
+                r = subprocess.run(
+                    ["pkexec", "timedatectl", "set-local-rtc", "1" if enabled else "0", "--adjust-system-clock"],
+                    capture_output=True, text=True, timeout=25.0
+                )
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo cambiar el modo RTC").strip()[:110])
+            except Exception as ex:
+                return "error:" + str(ex)[:110]
+
+        @pyqtSlot(str, result=str)
+        def setSystemLocale(self, locale_code):
+            loc = (locale_code or "").strip()
+            if not re.match(r"^[a-z]{2}_[A-Z]{2}\.UTF-8$", loc):
+                return "error:Código de idioma/región no válido"
+            try:
+                script = (
+                    'L="$1"; '
+                    'if ! locale -a | grep -qi "^${L%.UTF-8}\\.utf-*8$"; then '
+                    '  sed -i "s/^#${L}[[:space:]]\\+UTF-8/${L} UTF-8/" /etc/locale.gen; '
+                    '  grep -q "^${L}[[:space:]]\\+UTF-8" /etc/locale.gen || echo "${L} UTF-8" >> /etc/locale.gen; '
+                    '  locale-gen; '
+                    'fi && localectl set-locale '
+                    '"LANG=${L}" "LC_ADDRESS=${L}" "LC_IDENTIFICATION=${L}" '
+                    '"LC_MEASUREMENT=${L}" "LC_MONETARY=${L}" "LC_NAME=${L}" '
+                    '"LC_NUMERIC=${L}" "LC_PAPER=${L}" "LC_TELEPHONE=${L}" "LC_TIME=${L}"'
+                )
+                r = subprocess.run(["pkexec", "sh", "-c", script, "--", loc], capture_output=True, text=True, timeout=60.0)
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo aplicar el idioma").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
 
         @pyqtSlot(str, str, result=bool)
         def setDefaultAppForRole(self, role_id, desktop_file):
             if not desktop_file or not desktop_file.endswith(".desktop"):
                 return False
+            if role_id == "terminal":
+                try:
+                    cfg = load_cfg()
+                    cfg["defaultTerminal"] = desktop_file
+                    save_cfg(cfg)
+                    term_list = os.path.join(HOME_DIR, ".config", "xdg-terminals.list")
+                    os.makedirs(os.path.dirname(term_list), exist_ok=True)
+                    with open(term_list, "w", encoding="utf-8") as f:
+                        f.write(f"# X64 Windows 11 Default Terminal\n{desktop_file}\n")
+                    return True
+                except Exception:
+                    return False
             role_mimes = {
                 "web":     ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"],
+                "mail":    ["x-scheme-handler/mailto"],
                 "text":    ["text/plain", "text/markdown", "inode/x-empty", "application/x-zerosize", "text/x-empty"],
                 "image":   ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"],
                 "pdf":     ["application/pdf"],
                 "video":   ["video/mp4", "video/x-matroska", "video/webm", "video/x-msvideo"],
+                "audio":   ["audio/mpeg", "audio/flac", "audio/ogg", "audio/wav", "audio/x-wav", "audio/mp4"],
                 "archive": ["application/zip", "application/x-tar", "application/gzip", "application/x-7z-compressed"],
                 "files":   ["inode/directory"],
             }
@@ -3424,6 +5403,28 @@ def main():
                 return True
             except Exception:
                 return False
+
+        @pyqtSlot(result=bool)
+        def resetDefaultAppsWin11(self):
+            recommended = {
+                "web":     ["chromium.desktop", "firefox.desktop", "brave-browser.desktop"],
+                "files":   ["x64-win11-explorer.desktop", "org.gnome.Nautilus.desktop", "thunar.desktop"],
+                "image":   ["org.gnome.Loupe.desktop"],
+                "video":   ["mpv.desktop", "vlc.desktop"],
+                "audio":   ["mpv.desktop", "vlc.desktop"],
+                "text":    ["org.gnome.TextEditor.desktop", "antigravity-ide.desktop"],
+                "pdf":     ["org.gnome.Papers.desktop", "chromium.desktop"],
+                "archive": ["org.gnome.FileRoller.desktop"],
+                "terminal": ["kitty.desktop", "alacritty.desktop", "foot.desktop", "org.kde.konsole.desktop"],
+            }
+            ok_any = False
+            for rid, cands in recommended.items():
+                for df in cands:
+                    if os.path.isfile(os.path.join("/usr/share/applications", df)) or os.path.isfile(os.path.join(HOME_DIR, ".local", "share", "applications", df)):
+                        if self.setDefaultAppForRole(rid, df):
+                            ok_any = True
+                        break
+            return ok_any
 
         @pyqtSlot()
         def startAsyncUpdateCheck(self):
@@ -3477,6 +5478,7 @@ def main():
             url = f"file://{out_p}?v={int(time.time() * 1000)}"
             cfg = load_cfg()
             cfg["userAvatarUrl"] = url
+            self._cfg_rev += 1
             save_cfg(cfg)
             dump_sysinfo_file()
             return url
@@ -3540,14 +5542,19 @@ def main():
 
         @pyqtSlot(result=bool)
         def resetUserAvatar(self):
-            av_p = os.path.join(STATE_DIR, "avatar.png")
-            try:
-                if os.path.isfile(av_p):
-                    os.remove(av_p)
-            except Exception:
-                pass
+            for fp in (
+                os.path.join(STATE_DIR, "avatar.png"),
+                os.path.join(HOME_DIR, ".face"),
+                os.path.join(HOME_DIR, ".face.icon"),
+            ):
+                try:
+                    if os.path.isfile(fp):
+                        os.remove(fp)
+                except Exception:
+                    pass
             cfg = load_cfg()
             cfg["userAvatarUrl"] = ""
+            self._cfg_rev += 1
             save_cfg(cfg)
             dump_sysinfo_file()
             return True
@@ -3557,9 +5564,216 @@ def main():
             clean = (new_name or "").strip()[:48]
             cfg = load_cfg()
             cfg["displayNameOverride"] = clean
+            self._cfg_rev += 1
             save_cfg(cfg)
             dump_sysinfo_file()
             return True
+
+        @pyqtSlot(result=str)
+        def getAccountInfoJson(self):
+            return json.dumps(_build_account_info())
+
+        @pyqtSlot(str, str, result=str)
+        def changeAccountPassword(self, current_pw, new_pw):
+            _, uname, _ = get_real_user_info()
+            if not current_pw:
+                return "error:Introduce tu contraseña actual"
+            if not new_pw or len(new_pw) < 4:
+                return "error:La nueva contraseña debe tener al menos 4 caracteres"
+            if "\n" in new_pw or "\r" in new_pw:
+                return "error:La contraseña contiene caracteres no válidos"
+            if not _verify_linux_password(uname, current_pw):
+                return "error:La contraseña actual es incorrecta"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "/usr/bin/chpasswd"],
+                    input=f"{uname}:{new_pw}\n",
+                    capture_output=True, text=True, timeout=30.0
+                )
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or r.stdout or "No se pudo actualizar la contraseña").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(str, str, result=str)
+        def setQuickPin(self, verify_secret, new_pin):
+            _, uname, _ = get_real_user_info()
+            pin = (new_pin or "").strip()
+            if not re.match(r"^\d{4,8}$", pin):
+                return "error:El PIN debe contener entre 4 y 8 dígitos numéricos"
+            if not verify_secret:
+                return "error:Introduce tu contraseña actual de Linux para confirmar"
+            if not (_verify_linux_password(uname, verify_secret) or _verify_quick_pin(verify_secret)):
+                return "error:La contraseña o PIN actual es incorrecto"
+            try:
+                os.makedirs(STATE_DIR, exist_ok=True)
+                salt = secrets.token_bytes(16)
+                iters = 200000
+                dk = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, iters).hex()
+                tmp = PIN_FILE + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump({"salt": salt.hex(), "iters": iters, "hash": dk}, f)
+                os.chmod(tmp, 0o600)
+                os.replace(tmp, PIN_FILE)
+                cfg = load_cfg()
+                cfg["lockRequireAuth"] = True
+                self._cfg_rev += 1
+                save_cfg(cfg)
+                return "ok"
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(result=bool)
+        def removeQuickPin(self):
+            try:
+                if os.path.isfile(PIN_FILE):
+                    os.remove(PIN_FILE)
+                self._cfg_rev += 1
+                return True
+            except Exception:
+                return False
+
+        @pyqtSlot(str, result=str)
+        def setUserShell(self, new_shell):
+            _, uname, _ = get_real_user_info()
+            sh_p = (new_shell or "").strip()
+            allowed = _get_available_shells("")
+            if not sh_p or (sh_p not in allowed and not os.path.isfile(sh_p)):
+                return "error:Shell no válido en /etc/shells"
+            try:
+                r = subprocess.run(["pkexec", "/usr/bin/usermod", "-s", sh_p, uname], capture_output=True, text=True, timeout=25.0)
+                if r.returncode == 0:
+                    _sync_kitty_shell(sh_p)
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo cambiar el shell").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(bool, result=str)
+        def setSddmAutologin(self, enabled):
+            _, uname, _ = get_real_user_info()
+            if not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", uname):
+                return "error:Usuario no válido"
+            conf_p = "/etc/sddm.conf.d/20-x64-autologin.conf"
+            try:
+                if enabled:
+                    script = (
+                        "mkdir -p /etc/sddm.conf.d && "
+                        f"printf '[Autologin]\\nUser={uname}\\nSession=x64-win11\\nRelogin=false\\n' > {conf_p}"
+                    )
+                else:
+                    script = f"rm -f {conf_p}"
+                r = subprocess.run(["pkexec", "sh", "-c", script], capture_output=True, text=True, timeout=25.0)
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or "No se pudo actualizar SDDM").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(str, str, str, bool, result=str)
+        def createLocalUser(self, username, full_name, password, is_admin):
+            un = (username or "").strip().lower()
+            fn = (full_name or "").strip().replace(":", "").replace(",", "")[:48]
+            pw = password or ""
+            if not re.match(r"^[a-z_][a-z0-9_-]{1,30}$", un):
+                return "error:Usuario inválido (usa minúsculas, números, _ o -)"
+            if len(pw) < 4 or "\n" in pw or "\r" in pw:
+                return "error:La contraseña debe tener al menos 4 caracteres"
+            try:
+                pwd.getpwnam(un)
+                return "error:Ya existe una cuenta con ese nombre de usuario"
+            except KeyError:
+                pass
+            groups = "wheel,network,video,audio,storage" if is_admin else "network,video,audio,storage"
+            sh_def = "/bin/fish" if os.path.exists("/bin/fish") else "/bin/bash"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "sh", "-c",
+                     'useradd -m -s "$1" -c "$2" -G "$3" "$4" && chpasswd',
+                     "--", sh_def, fn or un.capitalize(), groups, un],
+                    input=f"{un}:{pw}\n",
+                    capture_output=True, text=True, timeout=30.0
+                )
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or r.stdout or "No se pudo crear la cuenta").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(str, bool, result=str)
+        def setOtherUserAdmin(self, username, make_admin):
+            _, cur_uname, _ = get_real_user_info()
+            un = (username or "").strip()
+            if not un or un == cur_uname or not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", un):
+                return "error:No puedes cambiar los privilegios de tu propia cuenta activa"
+            all_u = _list_local_users(cur_uname)
+            admins = [u["username"] for u in all_u if u["isAdmin"]]
+            if not make_admin and un in admins and len(admins) <= 1:
+                return "error:Debe quedar al menos un administrador en el equipo"
+            try:
+                cmd = ["pkexec", "/usr/bin/usermod", "-aG", "wheel", un] if make_admin else ["pkexec", "/usr/bin/gpasswd", "-d", un, "wheel"]
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=25.0)
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or r.stdout or "No se pudieron cambiar los permisos").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(str, str, result=str)
+        def resetOtherUserPassword(self, username, new_pw):
+            _, cur_uname, _ = get_real_user_info()
+            un = (username or "").strip()
+            if not un or un == cur_uname or not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", un):
+                return "error:Usuario secundario no válido"
+            if not new_pw or len(new_pw) < 4 or "\n" in new_pw or "\r" in new_pw:
+                return "error:La nueva contraseña debe tener al menos 4 caracteres"
+            try:
+                r = subprocess.run(
+                    ["pkexec", "/usr/bin/chpasswd"],
+                    input=f"{un}:{new_pw}\n",
+                    capture_output=True, text=True, timeout=25.0
+                )
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or r.stdout or "No se pudo cambiar la contraseña").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
+
+        @pyqtSlot(str, bool, result=str)
+        def deleteLocalUser(self, username, remove_home):
+            _, cur_uname, _ = get_real_user_info()
+            un = (username or "").strip()
+            if not un or un == cur_uname or not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", un):
+                return "error:No puedes eliminar la cuenta actualmente activa"
+            try:
+                pw = pwd.getpwnam(un)
+                if pw.pw_uid < 1000:
+                    return "error:No se puede eliminar una cuenta del sistema"
+            except KeyError:
+                return "error:La cuenta ya no existe"
+            try:
+                cmd = ["pkexec", "/usr/bin/userdel"] + (["-r"] if remove_home else []) + [un]
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=30.0)
+                if r.returncode == 0:
+                    return "ok"
+                if r.returncode in (126, 127):
+                    return "error:Autorización cancelada por el usuario"
+                return "error:" + ((r.stderr or r.stdout or "No se pudo eliminar la cuenta").strip()[:120])
+            except Exception as ex:
+                return "error:" + str(ex)[:120]
 
         @pyqtSlot(result=str)
         def pickAndSetWallpaper(self):
@@ -3580,8 +5794,198 @@ def main():
             cfg = load_cfg()
             cfg["customWallpaperUrl"] = url
             cfg["wallpaperMode"] = 3
+            self._cfg_rev += 1
             save_cfg(cfg)
             return url
+
+        @pyqtSlot(result=str)
+        def pickAndSetLockWallpaper(self):
+            if not _HAS_QTWIDGETS or QFileDialog is None:
+                return ""
+            start_dir = resolve_special_folder("Imágenes")
+            if not os.path.isdir(start_dir):
+                start_dir = HOME_DIR
+            fname, _ = QFileDialog.getOpenFileName(
+                None,
+                "Elegir fondo de pantalla de bloqueo",
+                start_dir,
+                "Imágenes (*.png *.jpg *.jpeg *.webp *.bmp)"
+            )
+            if not fname or not os.path.isfile(fname):
+                return ""
+            url = f"file://{fname}"
+            cfg = load_cfg()
+            cfg["lockWallpaperUrl"] = url
+            cfg["lockWallpaperMode"] = 3
+            self._cfg_rev += 1
+            save_cfg(cfg)
+            return url
+
+        @pyqtSlot(str, result=bool)
+        def applyAppearanceSetting(self, json_str):
+            """Apply real accent color, GTK Dark/Light mode, and Cursor Theme/Size across gsettings, GTK3/4 & labwc."""
+            try:
+                d = json.loads(json_str)
+            except Exception:
+                return False
+            try:
+                def _upd_ini(path, kv_map):
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    lines = open(path, "r", encoding="utf-8", errors="ignore").read().splitlines() if os.path.isfile(path) else ["[Settings]"]
+                    if not any(ln.strip() == "[Settings]" for ln in lines):
+                        lines.insert(0, "[Settings]")
+                    seen = set()
+                    out = []
+                    for ln in lines:
+                        if "=" in ln and not ln.strip().startswith("#"):
+                            k = ln.split("=", 1)[0].strip()
+                            if k in kv_map:
+                                out.append(f"{k}={kv_map[k]}")
+                                seen.add(k)
+                                continue
+                        out.append(ln)
+                    for k, v in kv_map.items():
+                        if k not in seen:
+                            out.append(f"{k}={v}")
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        f.write("\n".join(out) + "\n")
+                    os.replace(tmp, path)
+
+                def _upd_env(path, kv_map):
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    lines = open(path, "r", encoding="utf-8", errors="ignore").read().splitlines() if os.path.isfile(path) else []
+                    seen = set()
+                    out = []
+                    for ln in lines:
+                        if "=" in ln and not ln.strip().startswith("#"):
+                            k = ln.split("=", 1)[0].strip()
+                            if k in kv_map:
+                                out.append(f"{k}={kv_map[k]}")
+                                seen.add(k)
+                                continue
+                        out.append(ln)
+                    for k, v in kv_map.items():
+                        if k not in seen:
+                            out.append(f"{k}={v}")
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        f.write("\n".join(out) + "\n")
+                    os.replace(tmp, path)
+
+                ini_updates = {}
+                env_updates = {}
+                need_labwc_reconf = False
+                has_gs = shutil.which("gsettings") is not None
+
+                if "accentColor" in d or "accentOnBorders" in d:
+                    cfg = load_cfg()
+                    ac = str(d.get("accentColor", cfg.get("accentColor", "#4cc2ff")) or "#4cc2ff").strip()
+                    if not re.match(r"^#[0-9a-fA-F]{6}$", ac):
+                        ac = "#4cc2ff"
+                    on_borders = bool(d.get("accentOnBorders", cfg.get("accentOnBorders", True)))
+                    cfg["accentColor"] = ac
+                    cfg["accentOnBorders"] = on_borders
+                    self._cfg_rev += 1
+                    save_cfg(cfg)
+
+                    # 1. Live labwc Window Borders, Active Menus & Alt+Tab OSD (~/.config/labwc/themerc-override)
+                    ovr_dir = os.path.join(HOME_DIR, ".config", "labwc")
+                    os.makedirs(ovr_dir, exist_ok=True)
+                    ovr_p = os.path.join(ovr_dir, "themerc-override")
+                    border_col = ac if on_borders else "#38ffffff"
+                    ovr_txt = (
+                        "# X64 Windows 11 Live Accent Override\n"
+                        f"window.active.border.color: {border_col}\n"
+                        f"osd.border.color: {ac}\n"
+                        f"menu.items.active.bg.color: {ac}\n"
+                        "menu.items.active.text.color: #000000\n"
+                    )
+                    with open(ovr_p + ".tmp", "w", encoding="utf-8") as f:
+                        f.write(ovr_txt)
+                    os.replace(ovr_p + ".tmp", ovr_p)
+                    need_labwc_reconf = True
+
+                    # 2. Live GTK3 & GTK4 Accent CSS (~/.config/gtk-{3,4}.0/gtk.css)
+                    gtk_css = (
+                        "/* X64-WIN11-ACCENT */\n"
+                        f"@define-color accent_bg_color {ac};\n"
+                        f"@define-color accent_color {ac};\n"
+                        "@define-color accent_fg_color #000000;\n"
+                    )
+                    for gver in ("gtk-3.0", "gtk-4.0"):
+                        gdir = os.path.join(HOME_DIR, ".config", gver)
+                        os.makedirs(gdir, exist_ok=True)
+                        gp = os.path.join(gdir, "gtk.css")
+                        with open(gp + ".tmp", "w", encoding="utf-8") as f:
+                            f.write(gtk_css)
+                        os.replace(gp + ".tmp", gp)
+
+                    # 3. GNOME / Libadwaita gsettings accent-color
+                    gn_map = {
+                        "#4cc2ff": "blue", "#60a5fa": "blue", "#a78bfa": "purple",
+                        "#ff6b6b": "red", "#ff4d4d": "red", "#34d399": "green",
+                        "#fbbf24": "orange", "#2dd4bf": "teal", "#f472b6": "pink"
+                    }
+                    if has_gs:
+                        subprocess.run(
+                            ["gsettings", "set", "org.gnome.desktop.interface", "accent-color", gn_map.get(ac.lower(), "blue")],
+                            timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        )
+
+                if "gtkDark" in d:
+                    dark = bool(d["gtkDark"])
+                    gtk_th = "adw-gtk3-dark" if dark else "adw-gtk3"
+                    cscheme = "prefer-dark" if dark else "default"
+                    ini_updates["gtk-application-prefer-dark-theme"] = "1" if dark else "0"
+                    ini_updates["gtk-theme-name"] = gtk_th
+                    env_updates["GTK_THEME"] = gtk_th
+                    if has_gs:
+                        subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", cscheme], timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "gtk-theme", gtk_th], timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                if "cursorTheme" in d:
+                    ct = str(d["cursorTheme"] or "breeze_cursors").strip()
+                    if ct and re.match(r"^[A-Za-z0-9_.-]+$", ct):
+                        ini_updates["gtk-cursor-theme-name"] = ct
+                        env_updates["XCURSOR_THEME"] = ct
+                        # Write standard XDG/X11 default cursor index.theme for Wayland/XWayland clients
+                        for ic_def in (
+                            os.path.join(HOME_DIR, ".icons", "default", "index.theme"),
+                            os.path.join(HOME_DIR, ".local", "share", "icons", "default", "index.theme"),
+                        ):
+                            os.makedirs(os.path.dirname(ic_def), exist_ok=True)
+                            with open(ic_def + ".tmp", "w", encoding="utf-8") as f:
+                                f.write(f"[Icon Theme]\nInherits={ct}\n")
+                            os.replace(ic_def + ".tmp", ic_def)
+                        if has_gs:
+                            subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "cursor-theme", ct], timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                if "cursorSize" in d:
+                    cs = max(16, min(64, int(d["cursorSize"])))
+                    ini_updates["gtk-cursor-theme-size"] = str(cs)
+                    env_updates["XCURSOR_SIZE"] = str(cs)
+                    if has_gs:
+                        subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "cursor-size", str(cs)], timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                if ini_updates:
+                    for gver in ("gtk-3.0", "gtk-4.0"):
+                        _upd_ini(os.path.join(HOME_DIR, ".config", gver, "settings.ini"), ini_updates)
+                if env_updates:
+                    _upd_env(os.path.join(HOME_DIR, ".config", "labwc", "environment"), env_updates)
+                    # Propagate XCURSOR/GTK env to systemd user & DBus so newly launched apps inherit live changes!
+                    exp_pairs = [f"{k}={v}" for k, v in env_updates.items()]
+                    if shutil.which("dbus-update-activation-environment"):
+                        subprocess.run(["dbus-update-activation-environment", "--systemd"] + exp_pairs, timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    elif shutil.which("systemctl"):
+                        subprocess.run(["systemctl", "--user", "set-environment"] + exp_pairs, timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    need_labwc_reconf = True
+                if need_labwc_reconf:
+                    # Send SIGHUP directly to labwc (works even if LABWC_PID is not inherited!)
+                    subprocess.run(["pkill", "-HUP", "-x", "labwc"], timeout=1.2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                return False
 
         @pyqtSlot(result=str)
         def checkPendingUpdatesJson(self):
@@ -4152,11 +6556,31 @@ def main():
             except Exception:
                 pass
 
-            # 4. Network Extra Info (prefer real NetworkManager upstream DNS over systemd-resolved 127.0.0.53!)
+            # 4. Network Extra Info & Universal NetworkManager Hub Telemetry (Wi-Fi, Ethernet, VPN, Data Usage, Stack)
+            def _fmt_net_bytes(nb):
+                nb = float(max(0, nb))
+                for u in ("B", "KB", "MB", "GB", "TB"):
+                    if nb < 1024.0 or u == "TB":
+                        return f"{nb:.2f} {u}" if u in ("GB", "TB") else (f"{nb:.1f} {u}" if u == "MB" else f"{int(nb)} {u}")
+                    nb /= 1024.0
+                return "0 B"
+
             net_gw = "—"
             net_dns = "—"
             net_iface = "—"
+            net_full = {
+                "connected": False, "activeType": "none", "activeName": "Sin conexión",
+                "activeIface": "", "activeUuid": "", "hasWifi": False, "wifiIface": "",
+                "wifiEnabled": False, "wifiConnected": False, "wifiBand": "", "wifiRate": "",
+                "wifiSignalDbm": "", "wifiConName": "", "wifiUuid": "", "wifiAutoconnect": True,
+                "wifiMetered": False, "wifiIp4": "", "wifiIp6": "", "wifiGateway": "",
+                "wifiMac": "", "wifiDns": "", "airplaneMode": False,
+                "knownWifi": [], "ethernetDevices": [], "vpnProfiles": [], "adapters": [],
+                "totalRxHuman": "0 B", "totalTxHuman": "0 B",
+                "dnsDot": False, "ufwActive": False, "tcpCongestion": "—", "qdisc": "—", "wifiPowerSaveOff": False
+            }
             try:
+                c_env = dict(os.environ, LC_ALL="C")
                 rout = subprocess.check_output(["ip", "route", "show", "default"], text=True, timeout=0.8, stderr=subprocess.DEVNULL).splitlines()
                 if rout:
                     rt = rout[0].split()
@@ -4164,24 +6588,319 @@ def main():
                         net_gw = rt[rt.index("via") + 1]
                     if "dev" in rt:
                         net_iface = rt[rt.index("dev") + 1]
-                dns_l = []
-                if net_iface != "—" and shutil.which("nmcli"):
+
+                # Radios & Airplane mode
+                wifi_radio_on = True
+                if shutil.which("nmcli"):
                     try:
-                        dout = subprocess.check_output(
-                            ["nmcli", "-t", "-f", "IP4.DNS", "dev", "show", net_iface],
-                            text=True, timeout=0.8, stderr=subprocess.DEVNULL
-                        ).splitlines()
-                        for dl in dout:
-                            if ":" in dl:
-                                v = dl.split(":", 1)[1].strip()
-                                if v and v not in dns_l:
-                                    dns_l.append(v)
+                        rg = subprocess.check_output(["nmcli", "-t", "-f", "WIFI", "g"], text=True, timeout=0.8, env=c_env, stderr=subprocess.DEVNULL).strip().lower()
+                        wifi_radio_on = (rg == "enabled")
                     except Exception:
                         pass
+                bt_blocked = False
+                try:
+                    rf_out = subprocess.check_output(["rfkill", "list", "bluetooth"], text=True, timeout=0.6, stderr=subprocess.DEVNULL).lower()
+                    bt_blocked = ("soft blocked: yes" in rf_out or "hard blocked: yes" in rf_out)
+                except Exception:
+                    pass
+                net_full["wifiEnabled"] = wifi_radio_on
+
+                # Enumerate all NetworkManager devices & saved connections cleanly
+                dev_map = {}
+                if shutil.which("nmcli"):
+                    try:
+                        dout = subprocess.check_output(
+                            ["nmcli", "-t", "-f", "GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION,GENERAL.HWADDR,GENERAL.MTU,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS,CAPABILITIES.SPEED", "device", "show"],
+                            text=True, timeout=1.5, env=c_env, stderr=subprocess.DEVNULL
+                        )
+                        cur_dev = {}
+                        def _flush_dev(cd):
+                            dn = cd.get("GENERAL.DEVICE", "")
+                            dt = cd.get("GENERAL.TYPE", "")
+                            if dn and dt not in ("loopback", "wifi-p2p", "bridge", "tun", "dummy"):
+                                dev_map[dn] = cd
+                        for ln in dout.splitlines():
+                            if not ln.strip():
+                                if cur_dev:
+                                    _flush_dev(cur_dev)
+                                    cur_dev = {}
+                                continue
+                            if ":" in ln:
+                                k, v = ln.split(":", 1)
+                                k = k.strip()
+                                v = v.strip()
+                                if k.startswith("IP4.DNS"):
+                                    cur_dev.setdefault("_dns", []).append(v)
+                                elif k.startswith("IP4.ADDRESS"):
+                                    cur_dev.setdefault("_ip4", []).append(v)
+                                elif k.startswith("IP6.ADDRESS"):
+                                    cur_dev.setdefault("_ip6", []).append(v)
+                                else:
+                                    cur_dev[k] = v
+                        if cur_dev:
+                            _flush_dev(cur_dev)
+                    except Exception:
+                        pass
+
+                # Helper to read connection properties (autoconnect, metered, dns-over-tls)
+                def _conn_props(uuid_str):
+                    out_p = {"autoconnect": True, "metered": False, "dot": False}
+                    if not uuid_str or not shutil.which("nmcli"):
+                        return out_p
+                    try:
+                        co = subprocess.check_output(
+                            ["nmcli", "-t", "-f", "connection.autoconnect,connection.metered,connection.dns-over-tls", "con", "show", "uuid", uuid_str],
+                            text=True, timeout=0.9, env=c_env, stderr=subprocess.DEVNULL
+                        ).splitlines()
+                        for cl in co:
+                            if ":" not in cl:
+                                continue
+                            ck, cv = cl.split(":", 1)
+                            cv = cv.strip().lower()
+                            if ck == "connection.autoconnect":
+                                out_p["autoconnect"] = (cv == "yes")
+                            elif ck == "connection.metered":
+                                out_p["metered"] = (cv in ("yes", "1", "3"))
+                            elif ck == "connection.dns-over-tls":
+                                out_p["dot"] = (cv in ("2", "yes", "1"))
+                    except Exception:
+                        pass
+                    return out_p
+
+                known_wifi = []
+                vpn_profiles = []
+                eth_con_by_name = {}
+                wifi_con_uuid_by_name = {}
+                if shutil.which("nmcli"):
+                    try:
+                        clines = subprocess.check_output(
+                            ["nmcli", "-t", "-f", "NAME,UUID,TYPE,DEVICE,AUTOCONNECT", "con", "show"],
+                            text=True, timeout=1.2, env=c_env, stderr=subprocess.DEVNULL
+                        ).splitlines()
+                        for ln in clines:
+                            ps = re.split(r"(?<!\\):", ln)
+                            if len(ps) < 5:
+                                continue
+                            cname = ps[0].replace("\\:", ":").strip()
+                            cuuid = ps[1].strip()
+                            ctype = ps[2].strip()
+                            cdev = ps[3].strip()
+                            cauto = (ps[4].strip().lower() == "yes")
+                            cact = bool(cdev and cdev != "--")
+                            if ctype == "802-11-wireless":
+                                wifi_con_uuid_by_name[cname] = cuuid
+                                known_wifi.append({
+                                    "name": cname, "uuid": cuuid,
+                                    "autoconnect": cauto, "active": cact, "device": cdev if cact else ""
+                                })
+                            elif ctype == "802-3-ethernet":
+                                eth_con_by_name[cname] = {"name": cname, "uuid": cuuid, "autoconnect": cauto, "active": cact, "device": cdev}
+                            elif ctype in ("vpn", "wireguard"):
+                                vpn_profiles.append({
+                                    "name": cname, "uuid": cuuid,
+                                    "vpnType": "WireGuard" if ctype == "wireguard" else "OpenVPN / VPN",
+                                    "active": cact, "device": cdev if cact else ""
+                                })
+                    except Exception:
+                        pass
+                known_wifi.sort(key=lambda x: (not x["active"], x["name"].lower()))
+                vpn_profiles.sort(key=lambda x: (not x["active"], x["name"].lower()))
+                net_full["knownWifi"] = known_wifi
+                net_full["vpnProfiles"] = vpn_profiles
+
+                # Build adapters, ethernetDevices, wifi details & session data usage
+                total_rx, total_tx = 0, 0
+                adapters = []
+                eth_list = []
+                st_es_map = {
+                    "connected": "Conectado",
+                    "disconnected": "Desconectado",
+                    "unavailable": "Cable desconectado",
+                    "connecting": "Conectando...",
+                    "unmanaged": "Sin gestionar"
+                }
+                for dn, cd in dev_map.items():
+                    dtype = cd.get("GENERAL.TYPE", "")
+                    st_raw = cd.get("GENERAL.STATE", "")
+                    st_key = re.sub(r"^\d+\s*\(([^)]+)\).*$", r"\1", st_raw).strip().lower()
+                    is_conn = (st_key == "connected")
+                    cname = cd.get("GENERAL.CONNECTION", "")
+                    if cname == "--":
+                        cname = ""
+                    mac = cd.get("GENERAL.HWADDR", "—")
+                    mtu = cd.get("GENERAL.MTU", "1500")
+                    spd = cd.get("CAPABILITIES.SPEED", "")
+                    if spd.lower() in ("unknown", ""):
+                        spd = ""
+                    ip4 = (cd.get("_ip4") or [""])[0].split("/")[0]
+                    ip6_list = [x.split("/")[0] for x in (cd.get("_ip6") or []) if x]
+                    ip6 = ip6_list[0] if ip6_list else ""
+                    gw_d = cd.get("IP4.GATEWAY", "")
+                    if gw_d == "--":
+                        gw_d = ""
+                    dns_d = ", ".join((cd.get("_dns") or [])[:2])
+                    drv = ""
+                    rx_b, tx_b = 0, 0
+                    try:
+                        dlk = os.path.realpath(f"/sys/class/net/{dn}/device/driver")
+                        if os.path.isdir(dlk):
+                            drv = os.path.basename(dlk)
+                    except Exception:
+                        pass
+                    try:
+                        rx_b = int(open(f"/sys/class/net/{dn}/statistics/rx_bytes").read().strip())
+                        tx_b = int(open(f"/sys/class/net/{dn}/statistics/tx_bytes").read().strip())
+                    except Exception:
+                        pass
+                    total_rx += rx_b
+                    total_tx += tx_b
+
+                    st_lbl = st_es_map.get(st_key, st_key.capitalize() or "Desconocido")
+                    if dtype == "wifi" and st_key == "unavailable":
+                        st_lbl = "Desactivado"
+
+                    if dtype == "wifi":
+                        net_full["hasWifi"] = True
+                        if not net_full["wifiIface"] or is_conn:
+                            net_full["wifiIface"] = dn
+                            net_full["wifiConnected"] = is_conn
+                            net_full["wifiConName"] = cname
+                            net_full["wifiMac"] = mac
+                            net_full["wifiIp4"] = ip4
+                            net_full["wifiIp6"] = ip6
+                            net_full["wifiGateway"] = gw_d
+                            net_full["wifiDns"] = dns_d
+                            net_full["wifiRate"] = spd
+                            w_uuid = wifi_con_uuid_by_name.get(cname, "")
+                            net_full["wifiUuid"] = w_uuid
+                            if is_conn and w_uuid:
+                                wp = _conn_props(w_uuid)
+                                net_full["wifiAutoconnect"] = wp["autoconnect"]
+                                net_full["wifiMetered"] = wp["metered"]
+                                if dn == net_iface:
+                                    net_full["dnsDot"] = wp["dot"]
+                            if is_conn and shutil.which("iw"):
+                                try:
+                                    iwo = subprocess.check_output(["iw", "dev", dn, "link"], text=True, timeout=0.6, stderr=subprocess.DEVNULL)
+                                    mf = re.search(r"freq:\s*([\d.]+)", iwo)
+                                    if mf:
+                                        fmhz = float(mf.group(1))
+                                        net_full["wifiBand"] = "6 GHz" if fmhz >= 5900 else ("5 GHz" if fmhz >= 4900 else "2.4 GHz")
+                                    ms = re.search(r"signal:\s*(-?\d+\s*dBm)", iwo)
+                                    if ms:
+                                        net_full["wifiSignalDbm"] = ms.group(1)
+                                    mr = re.search(r"rx bitrate:\s*([\d.]+)\s*MBit/s", iwo)
+                                    mt = re.search(r"tx bitrate:\s*([\d.]+)\s*MBit/s", iwo)
+                                    if mr:
+                                        rx_r = int(round(float(mr.group(1))))
+                                        tx_r = int(round(float(mt.group(1)))) if mt else rx_r
+                                        net_full["wifiRate"] = f"{rx_r} / {tx_r} Mb/s"
+                                except Exception:
+                                    pass
+                    elif dtype == "ethernet":
+                        # Find matching ethernet profile (active or first available wired profile)
+                        e_prof = eth_con_by_name.get(cname) if cname else None
+                        if not e_prof and eth_con_by_name:
+                            e_prof = next(iter(eth_con_by_name.values()))
+                        e_uuid = e_prof["uuid"] if e_prof else ""
+                        ep = _conn_props(e_uuid) if e_uuid else {"autoconnect": True, "metered": False, "dot": False}
+                        if is_conn and dn == net_iface:
+                            net_full["dnsDot"] = ep["dot"]
+                        carrier_on = False
+                        try:
+                            carrier_on = (open(f"/sys/class/net/{dn}/carrier").read().strip() == "1")
+                        except Exception:
+                            carrier_on = is_conn
+                        eth_list.append({
+                            "iface": dn, "state": st_key, "stateLabel": st_lbl,
+                            "connected": is_conn, "carrier": carrier_on,
+                            "connName": cname or (e_prof["name"] if e_prof else "Conexión cableada"),
+                            "connUuid": e_uuid, "mac": mac, "mtu": mtu, "driver": drv or "ethernet",
+                            "speed": spd or ("1000 Mb/s" if is_conn else "—"),
+                            "ip4": ip4 or "—", "ip6": ip6 or "—", "gateway": gw_d or "—", "dns": dns_d or "—",
+                            "autoconnect": ep["autoconnect"], "metered": ep["metered"],
+                            "rxHuman": _fmt_net_bytes(rx_b), "txHuman": _fmt_net_bytes(tx_b)
+                        })
+
+                    adapters.append({
+                        "iface": dn, "type": dtype,
+                        "typeLabel": "Wi-Fi" if dtype == "wifi" else ("Ethernet" if dtype == "ethernet" else dtype.upper()),
+                        "state": st_key, "stateLabel": st_lbl, "connected": is_conn,
+                        "connName": cname, "mac": mac, "mtu": mtu, "driver": drv or "kernel",
+                        "speed": net_full["wifiRate"] if (dtype == "wifi" and net_full["wifiRate"]) else (spd or "—"),
+                        "ip4": ip4 or "—", "rxBytes": rx_b, "txBytes": tx_b,
+                        "rxHuman": _fmt_net_bytes(rx_b), "txHuman": _fmt_net_bytes(tx_b)
+                    })
+
+                adapters.sort(key=lambda x: (not x["connected"], x["type"] != "ethernet", x["iface"]))
+                net_full["adapters"] = adapters
+                net_full["ethernetDevices"] = eth_list
+                net_full["totalRxHuman"] = _fmt_net_bytes(total_rx)
+                net_full["totalTxHuman"] = _fmt_net_bytes(total_tx)
+                net_full["airplaneMode"] = (not wifi_radio_on) and (bt_blocked or not net_full["hasWifi"])
+                if not net_full["hasWifi"]:
+                    net_full["airplaneMode"] = False
+
+                # Resolve primary active connection for universal Hero Banner (Ethernet OR Wi-Fi!)
+                if net_iface != "—" and net_iface in dev_map:
+                    ad = dev_map[net_iface]
+                    atype = ad.get("GENERAL.TYPE", "")
+                    net_full["connected"] = True
+                    net_full["activeType"] = atype if atype in ("wifi", "ethernet") else "other"
+                    net_full["activeIface"] = net_iface
+                    net_full["activeName"] = ad.get("GENERAL.CONNECTION", "") or net_iface
+                    if atype == "wifi":
+                        net_full["activeUuid"] = net_full["wifiUuid"]
+                    elif atype == "ethernet":
+                        for e in eth_list:
+                            if e["iface"] == net_iface:
+                                net_full["activeUuid"] = e["connUuid"]
+                                break
+                elif net_full["wifiConnected"]:
+                    net_full["connected"] = True
+                    net_full["activeType"] = "wifi"
+                    net_full["activeIface"] = net_full["wifiIface"]
+                    net_full["activeName"] = net_full["wifiConName"] or "Wi-Fi"
+                    net_full["activeUuid"] = net_full["wifiUuid"]
+                else:
+                    for e in eth_list:
+                        if e["connected"]:
+                            net_full["connected"] = True
+                            net_full["activeType"] = "ethernet"
+                            net_full["activeIface"] = e["iface"]
+                            net_full["activeName"] = e["connName"]
+                            net_full["activeUuid"] = e["connUuid"]
+                            break
+
+                # DNS summary (prefer real NetworkManager upstream DNS over 127.0.0.53)
+                dns_l = []
+                if net_iface != "—" and net_iface in dev_map:
+                    dns_l = list(dev_map[net_iface].get("_dns") or [])
                 if not dns_l and os.path.isfile("/etc/resolv.conf"):
                     dns_l = [l.split()[1] for l in open("/etc/resolv.conf") if l.strip().startswith("nameserver")]
                 if dns_l:
                     net_dns = ", ".join(dns_l[:2])
+
+                # Read-only UFW + X64 kernel network stack status (zero sudo!)
+                try:
+                    if os.path.isfile("/etc/ufw/ufw.conf"):
+                        net_full["ufwActive"] = ("ENABLED=yes" in open("/etc/ufw/ufw.conf", "r", encoding="utf-8", errors="ignore").read())
+                except Exception:
+                    pass
+                try:
+                    net_full["tcpCongestion"] = open("/proc/sys/net/ipv4/tcp_congestion_control").read().strip()
+                except Exception:
+                    pass
+                try:
+                    net_full["qdisc"] = open("/proc/sys/net/core/default_qdisc").read().strip()
+                except Exception:
+                    pass
+                try:
+                    ps_p = "/etc/NetworkManager/conf.d/99-x64-wifi-powersave.conf"
+                    if os.path.isfile(ps_p) and "wifi.powersave = 2" in open(ps_p).read():
+                        net_full["wifiPowerSaveOff"] = True
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -4218,6 +6937,8 @@ def main():
                 "chromium.desktop": "Chromium",
                 "firefox.desktop": "Firefox",
                 "brave-browser.desktop": "Brave",
+                "thunderbird.desktop": "Thunderbird",
+                "org.gnome.Geary.desktop": "Geary",
                 "org.gnome.TextEditor.desktop": "Editor de texto",
                 "antigravity-ide.desktop": "Antigravity IDE",
                 "org.gnome.Loupe.desktop": "Visor de imágenes (Loupe)",
@@ -4229,6 +6950,12 @@ def main():
                 "org.gnome.Nautilus.desktop": "Nautilus",
                 "thunar.desktop": "Thunar",
                 "org.kde.dolphin.desktop": "Dolphin",
+                "kitty.desktop": "Kitty Terminal",
+                "alacritty.desktop": "Alacritty",
+                "foot.desktop": "Foot Terminal",
+                "org.kde.konsole.desktop": "Konsole",
+                "org.gnome.Console.desktop": "GNOME Console",
+                "org.wezfurlong.wezterm.desktop": "WezTerm",
             }
             def qmime_raw(m):
                 try:
@@ -4238,15 +6965,25 @@ def main():
             def scan_role_candidates(mime_key, cur_df):
                 cands = []
                 seen_df = set()
-                for df in sorted(os.listdir("/usr/share/applications")) if os.path.isdir("/usr/share/applications") else []:
-                    if not df.endswith(".desktop"):
+                for app_dir in ("/usr/share/applications", os.path.join(HOME_DIR, ".local", "share", "applications")):
+                    if not os.path.isdir(app_dir):
                         continue
-                    fp = os.path.join("/usr/share/applications", df)
-                    try:
-                        txt = open(fp, "r", encoding="utf-8", errors="ignore").read()
-                        if "NoDisplay=true" in txt or "Terminal=true" in txt:
+                    for df in sorted(os.listdir(app_dir)):
+                        if not df.endswith(".desktop") or df in seen_df:
                             continue
-                        if mime_key in txt or df == cur_df:
+                        fp = os.path.join(app_dir, df)
+                        try:
+                            txt = open(fp, "r", encoding="utf-8", errors="ignore").read()
+                            if "NoDisplay=true" in txt:
+                                continue
+                            if mime_key == "__terminal__":
+                                if "TerminalEmulator" not in txt and df not in ("kitty.desktop", "alacritty.desktop", "foot.desktop", "org.kde.konsole.desktop", "org.gnome.Console.desktop"):
+                                    continue
+                            else:
+                                if "Terminal=true" in txt:
+                                    continue
+                                if mime_key not in txt and df != cur_df:
+                                    continue
                             nm = friendly_map.get(df, "")
                             if not nm:
                                 for ln in txt.splitlines():
@@ -4254,31 +6991,49 @@ def main():
                                         nm = ln.split("=", 1)[1].strip(); break
                                     elif ln.startswith("Name=") and not nm:
                                         nm = ln.split("=", 1)[1].strip()
-                            if df not in seen_df:
-                                seen_df.add(df)
-                                cands.append({"desktop": df, "label": nm or df[:-8], "active": df == cur_df})
-                    except Exception:
-                        continue
+                            seen_df.add(df)
+                            cands.append({"desktop": df, "label": nm or df[:-8], "active": df == cur_df})
+                        except Exception:
+                            continue
                 return cands[:8]
 
+            cur_term = str(cfg.get("defaultTerminal", "") or "").strip()
+            if not cur_term:
+                try:
+                    tlp = os.path.join(HOME_DIR, ".config", "xdg-terminals.list")
+                    if os.path.isfile(tlp):
+                        for ln in open(tlp, "r", encoding="utf-8", errors="ignore"):
+                            s = ln.strip()
+                            if s and not s.startswith("#") and s.endswith(".desktop"):
+                                cur_term = s; break
+                except Exception:
+                    pass
+            if not cur_term:
+                cur_term = "kitty.desktop"
+
             role_defs = [
-                ("web",     "Navegador web",          "x-scheme-handler/https", "chromium.png"),
-                ("text",    "Editor de texto (.txt)", "text/plain",             "fluent-document.svg"),
-                ("image",   "Visor de fotos",         "image/png",              "folder-images.svg"),
-                ("pdf",     "Documentos PDF",         "application/pdf",        "folder-documents.svg"),
-                ("video",   "Reproductor de vídeo",   "video/mp4",              "folder-videos.svg"),
-                ("archive", "Archivos comprimidos",   "application/zip",        "fluent-folder-zip.svg"),
-                ("files",   "Explorador de archivos", "inode/directory",        "explorer.svg"),
+                ("web",      "Navegador web",          "x-scheme-handler/https", "chromium.png",             "Enlaces http/https y archivos HTML"),
+                ("mail",     "Correo electrónico",     "x-scheme-handler/mailto","fluent-chat.svg",          "Enlaces mailto: y correo del sistema"),
+                ("files",    "Explorador de archivos", "inode/directory",        "explorer.svg",             "Carpetas y unidades del equipo"),
+                ("image",    "Visor de fotos",         "image/png",              "folder-images.svg",        "PNG, JPG, WebP, GIF y SVG"),
+                ("video",    "Reproductor de vídeo",   "video/mp4",              "folder-videos.svg",        "MP4, MKV, WebM y AVI"),
+                ("audio",    "Reproductor de música",  "audio/mpeg",             "fluent-speaker-high.svg",  "MP3, FLAC, OGG, WAV y M4A"),
+                ("text",     "Editor de texto (.txt)", "text/plain",             "fluent-document.svg",      "Archivos de texto plano y Markdown"),
+                ("pdf",      "Documentos PDF",         "application/pdf",        "folder-documents.svg",     "Documentos portátiles (.pdf)"),
+                ("archive",  "Archivos comprimidos",   "application/zip",        "fluent-folder-zip.svg",    "ZIP, TAR, GZ y 7-Zip"),
+                ("terminal", "Terminal predeterminada","__terminal__",           "fluent-window-console.svg","Consola del sistema (xdg-terminals)"),
             ]
             defaults_list = []
-            for rid, rtitle, rmime, ricon in role_defs:
-                cur_d = qmime_raw(rmime)
+            for rid, rtitle, rmime, ricon, rsub in role_defs:
+                cur_d = cur_term if rid == "terminal" else qmime_raw(rmime)
                 cands = scan_role_candidates(rmime, cur_d)
+                app_label = friendly_map.get(cur_d, cur_d.replace(".desktop", "")) if cur_d else "Sin asignar"
                 defaults_list.append({
                     "id": rid,
                     "role": rtitle,
+                    "subtitle": rsub,
                     "desktop": cur_d,
-                    "app": friendly_map.get(cur_d, cur_d.replace(".desktop", "") or "Predeterminada"),
+                    "app": app_label,
                     "icon": ricon,
                     "candidates": cands
                 })
@@ -4308,15 +7063,7 @@ def main():
                 except Exception:
                     return False
 
-            gaming_stack = {
-                "falcond": svc_active("falcond.service"),
-                "dmemcg": svc_active("dmemcg-booster-system.service"),
-                "ananicy": svc_active("ananicy-cpp.service"),
-                "ntsync": os.path.exists("/dev/ntsync") or os.environ.get("PROTON_USE_NTSYNC") == "1",
-                "hasSteam": shutil.which("steam") is not None,
-                "hasHeroic": shutil.which("heroic") is not None,
-                "hasLutris": shutil.which("lutris") is not None,
-            }
+            gaming_stack = _build_gaming_info(cfg)
             tool_flags = {
                 "hasKdeConnect": (shutil.which("kdeconnect-app") is not None) or (shutil.which("kdeconnect-settings") is not None),
                 "hasBlueman": shutil.which("blueman-manager") is not None,
@@ -4677,6 +7424,45 @@ def main():
             about_info = dict(self._cache_about_static)
             about_info["uptimeHuman"] = uptime_human
 
+            # Live Appearance Telemetry (GTK Dark/Light, Cursor Theme & Size, Installed Cursor Themes)
+            gtk_dark = True
+            cur_theme = "breeze_cursors"
+            cur_size = 24
+            try:
+                ini_p = os.path.join(HOME_DIR, ".config", "gtk-3.0", "settings.ini")
+                if os.path.isfile(ini_p):
+                    for ln in open(ini_p, "r", encoding="utf-8", errors="ignore"):
+                        if "=" not in ln:
+                            continue
+                        k, v = [x.strip() for x in ln.split("=", 1)]
+                        if k == "gtk-theme-name":
+                            gtk_dark = ("dark" in v.lower())
+                        elif k == "gtk-application-prefer-dark-theme" and v == "0":
+                            gtk_dark = False
+                        elif k == "gtk-cursor-theme-name" and v:
+                            cur_theme = v
+                        elif k == "gtk-cursor-theme-size":
+                            try:
+                                cur_size = int(v)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+            cursor_themes = []
+            try:
+                for base_ic in ("/usr/share/icons", os.path.join(HOME_DIR, ".local", "share", "icons")):
+                    if not os.path.isdir(base_ic):
+                        continue
+                    for entry in sorted(os.listdir(base_ic)):
+                        if entry in ("default", "hicolor", "locolor") or entry in cursor_themes:
+                            continue
+                        if os.path.isdir(os.path.join(base_ic, entry, "cursors")):
+                            cursor_themes.append(entry)
+            except Exception:
+                pass
+            if cur_theme not in cursor_themes:
+                cursor_themes.insert(0, cur_theme)
+
             return {
                 "monitors": monitors_list,
                 "hasBacklight": has_backlight,
@@ -4698,30 +7484,23 @@ def main():
                 "netDns": net_dns,
                 "netIface": net_iface,
                 "netIsEthernet": net_is_eth,
+                "net": net_full,
+                "appearance": {
+                    "gtkDark": gtk_dark,
+                    "cursorTheme": cur_theme,
+                    "cursorSize": cur_size,
+                    "cursorThemes": cursor_themes[:8]
+                },
                 "battery": bat_info,
                 "powerInfo": power_info,
                 "storageExtras": self._cache_storage,
                 "about": about_info,
-                "account": {
-                    "displayName": display_name,
-                    "username": uname,
-                    "hostname": hostname,
-                    "homeDir": HOME_DIR,
-                    "shell": user_shell,
-                    "groups": ", ".join(groups[:8]) if groups else "usuario",
-                    "isAdmin": "wheel" in groups,
-                    "avatarUrl": str(cfg.get("userAvatarUrl", "") or "")
-                },
-                "timeLang": {
-                    "timezone": tz_str,
-                    "ntpActive": ntp_on,
-                    "synced": synced,
-                    "locale": locale_str,
-                    "kbLayout": cur_kb
-                },
+                "account": _build_account_info(cfg),
+                "timeLang": _build_timelang_info(cfg),
                 "defaultApps": defaults_list,
                 "gamingStack": gaming_stack,
                 "tools": tool_flags,
+                "updateInfo": _build_update_info(),
                 "recentUpgrades": recent_upg,
                 "pkgCount": max(0, pkg_count)
             }
@@ -4788,7 +7567,156 @@ def main():
 
         @pyqtSlot(result=str)
         def getInstalledAppsJson(self):
-            return json.dumps(scan_installed_desktop_apps()[:120])
+            return json.dumps(scan_installed_desktop_apps(detailed=True)[:300])
+
+        @pyqtSlot(str, str, str, str, result=str)
+        def inspectUninstallPlanJson(self, pkg_or_id, source, desktop_path, app_name):
+            pkg = (pkg_or_id or "").strip()
+            src = (source or "").strip().lower()
+            dpath = (desktop_path or "").strip()
+            aname = (app_name or pkg).strip()
+            plan = {
+                "ok": True,
+                "canUninstall": False,
+                "blockedReason": "",
+                "source": src,
+                "sourceLabel": {"pacman": "Pacman / CachyOS", "flatpak": "Flatpak", "local": "Aplicación local"}.get(src, "Sistema"),
+                "pkgName": pkg,
+                "appName": aname,
+                "version": "",
+                "description": "",
+                "totalFreeBytes": 0,
+                "totalFreeHuman": "—",
+                "removePkgs": [],
+                "orphanCount": 0,
+                "requiredBy": [],
+                "needsRoot": src == "pacman",
+                "flatpakScope": "system",
+                "userDataPaths": [],
+                "userDataSizeHuman": "",
+            }
+            try:
+                if src == "pacman":
+                    if not pkg or not re.match(r"^[a-zA-Z0-9@._+-]+$", pkg):
+                        plan["blockedReason"] = "No se pudo resolver un paquete Pacman válido para esta aplicación."
+                        return json.dumps(plan)
+                    if is_pkg_system_protected(pkg):
+                        plan["blockedReason"] = "Componente protegido del sistema X64 LIOS / escritorio Windows 11. Está bloqueado para proteger la estabilidad del equipo."
+                        return json.dumps(plan)
+                    env_c = dict(os.environ, LC_ALL="C")
+                    qi = subprocess.run(["pacman", "-Qi", pkg], capture_output=True, text=True, timeout=3.0, env=env_c)
+                    if qi.returncode != 0:
+                        plan["blockedReason"] = f"El paquete «{pkg}» ya no se encuentra instalado en la base de Pacman."
+                        return json.dumps(plan)
+                    for ln in qi.stdout.splitlines():
+                        if ln.startswith("Version"):
+                            plan["version"] = ln.split(":", 1)[1].strip()
+                        elif ln.startswith("Description"):
+                            plan["description"] = ln.split(":", 1)[1].strip()
+                        elif ln.startswith("Installed Size"):
+                            plan["totalFreeHuman"] = ln.split(":", 1)[1].strip()
+
+                    rsp = subprocess.run(["pacman", "-Rsp", "--print-format", "%n|%s", pkg], capture_output=True, text=True, timeout=4.0, env=env_c)
+                    if rsp.returncode == 0:
+                        rem = []
+                        tot_b = 0
+                        for ln in rsp.stdout.splitlines():
+                            s = ln.strip()
+                            if "|" in s:
+                                pnm, sstr = s.split("|", 1)
+                                pnm = pnm.strip()
+                                try:
+                                    sb = int(sstr.strip())
+                                except Exception:
+                                    sb = 0
+                                if is_pkg_system_protected(pnm):
+                                    plan["blockedReason"] = f"La desinstalación afectaría al componente protegido «{pnm}»."
+                                    return json.dumps(plan)
+                                rem.append({"name": pnm, "sizeHuman": _fmt_size_bytes(sb)})
+                                tot_b += sb
+                        plan["removePkgs"] = rem
+                        plan["orphanCount"] = max(0, len(rem) - 1)
+                        plan["totalFreeBytes"] = tot_b
+                        if tot_b > 0:
+                            plan["totalFreeHuman"] = _fmt_size_bytes(tot_b)
+                        plan["canUninstall"] = True
+                    else:
+                        blockers = []
+                        combined = (rsp.stdout or "") + "\n" + (rsp.stderr or "")
+                        for ln in combined.splitlines():
+                            m = re.search(r"required by\s+([^\s]+)", ln)
+                            if m:
+                                b = m.group(1).strip()
+                                if b not in blockers:
+                                    blockers.append(b)
+                        plan["requiredBy"] = blockers[:10]
+                        if blockers:
+                            plan["blockedReason"] = "Otros paquetes instalados dependen de esta aplicación: " + ", ".join(blockers[:6]) + ("..." if len(blockers) > 6 else "") + "."
+                        else:
+                            plan["blockedReason"] = "Pacman no permite eliminar este paquete debido a dependencias activas del sistema."
+                        return json.dumps(plan)
+
+                elif src == "flatpak":
+                    if not pkg or not shutil.which("flatpak"):
+                        plan["blockedReason"] = "Flatpak no está disponible o el identificador no es válido."
+                        return json.dumps(plan)
+                    env_c = dict(os.environ, LC_ALL="C")
+                    fi = subprocess.run(["flatpak", "info", pkg], capture_output=True, text=True, timeout=3.0, env=env_c)
+                    if fi.returncode != 0:
+                        plan["blockedReason"] = f"La aplicación Flatpak «{pkg}» no se encuentra instalada."
+                        return json.dumps(plan)
+                    for ln in fi.stdout.splitlines():
+                        s = ln.strip()
+                        if s.startswith("Version:"):
+                            plan["version"] = s.split(":", 1)[1].strip()
+                        elif s.startswith("Installed:"):
+                            plan["totalFreeHuman"] = s.split(":", 1)[1].strip()
+                        elif s.startswith("Installation:"):
+                            sc = s.split(":", 1)[1].strip().lower()
+                            plan["flatpakScope"] = "user" if "user" in sc else "system"
+                            plan["needsRoot"] = (plan["flatpakScope"] != "user")
+                    plan["removePkgs"] = [{"name": pkg, "sizeHuman": plan["totalFreeHuman"]}]
+                    plan["canUninstall"] = True
+
+                elif src == "local":
+                    user_apps_dir = os.path.realpath(os.path.join(HOME_DIR, ".local", "share", "applications"))
+                    rp = os.path.realpath(dpath) if dpath else ""
+                    if rp and rp.startswith(user_apps_dir + os.sep) and rp.endswith(".desktop") and os.path.isfile(rp):
+                        sb = os.path.getsize(rp)
+                        plan["totalFreeBytes"] = sb
+                        plan["totalFreeHuman"] = _fmt_size_bytes(sb)
+                        plan["description"] = f"Lanzador local en {dpath}"
+                        plan["removePkgs"] = [{"name": os.path.basename(rp), "sizeHuman": _fmt_size_bytes(sb)}]
+                        plan["needsRoot"] = False
+                        plan["canUninstall"] = True
+                    else:
+                        plan["blockedReason"] = "Este acceso directo pertenece al sistema y no puede eliminarse como app local."
+                        return json.dumps(plan)
+                else:
+                    plan["blockedReason"] = "Esta aplicación es un componente del sistema o no tiene un gestor de paquetes desinstalable."
+                    return json.dumps(plan)
+
+                # Inspect safe optional user-data folders
+                udirs = _find_safe_user_data_paths(pkg, aname, src)
+                if udirs:
+                    utot = sum(_dir_size_bytes(p) for p in udirs)
+                    plan["userDataPaths"] = [p.replace(HOME_DIR, "~", 1) for p in udirs]
+                    plan["userDataSizeHuman"] = _fmt_size_bytes(utot)
+            except Exception as ex:
+                plan["ok"] = False
+                plan["blockedReason"] = str(ex)[:140]
+            return json.dumps(plan)
+
+        @pyqtSlot(str, str, str, str, bool, str, result=bool)
+        def startAppUninstall(self, pkg_or_id, source, desktop_path, app_name, clean_user_data, flatpak_scope):
+            if self._uninstall_worker is not None and self._uninstall_worker.isRunning():
+                return False
+            w = _UninstallWorker(pkg_or_id, source, desktop_path, app_name, clean_user_data, flatpak_scope, self)
+            w.progress.connect(self.uninstallProgress.emit)
+            w.done.connect(self.uninstallFinished.emit)
+            self._uninstall_worker = w
+            w.start()
+            return True
 
         @pyqtSlot(result=str)
         def getStartupAppsJson(self):
@@ -5956,7 +8884,15 @@ def main():
     view.show()
 
     def _cleanup_workers():
-        for w in (getattr(bridge, "_refresh_worker", None), getattr(bridge, "_upd_worker", None), getattr(bridge, "_mic_worker", None), getattr(bridge, "_bt_scan_worker", None)):
+        for w in (
+            getattr(bridge, "_refresh_worker", None),
+            getattr(bridge, "_upd_worker", None),
+            getattr(bridge, "_mic_worker", None),
+            getattr(bridge, "_bt_scan_worker", None),
+            getattr(bridge, "_wifi_scan_worker", None),
+            getattr(bridge, "_net_ping_worker", None),
+            getattr(bridge, "_uninstall_worker", None),
+        ):
             try:
                 if w is not None and w.isRunning():
                     w.quit()
